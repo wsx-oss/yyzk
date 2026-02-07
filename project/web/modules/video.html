@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>视频监控</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="module-header">
+    <div class="module-title">视频监控信息</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>视频源名称</label>
+        <input type="text" placeholder="请输入视频源名称" />
+      </div>
+      <div class="filter-group">
+        <label>视频源地址</label>
+        <input type="text" placeholder="请输入视频源地址" />
+      </div>
+      <div class="filter-group">
+        <label>监控区域</label>
+        <select>
+          <option>全部区域</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>监控状态</label>
+        <select>
+          <option>正常</option>
+        </select>
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(4, 1fr);">
+      <div class="filter-group">
+        <label>摄像源</label>
+        <select>
+          <option>摄像</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>开始时间</label>
+        <input type="datetime-local" />
+      </div>
+      <div class="filter-group">
+        <label>结束时间</label>
+        <input type="datetime-local" />
+      </div>
+      <div class="filter-group">
+        <label>视频活动</label>
+        <label style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;">
+          <input type="checkbox" />
+          <span style="font-size: 14px; font-weight: normal; color: #0f172a;">开启</span>
+        </label>
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="search()">查询</button>
+      <button class="btn btn-secondary" onclick="exportVideo()">📤 导出</button>
+      <button class="btn btn-success" onclick="showAddDialog()">➕ 新增视频源</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>视频源名称</th>
+          <th>视频源地址</th>
+          <th>监控区域</th>
+          <th>摄像源</th>
+          <th>开始时间</th>
+          <th>结束时间</th>
+          <th>视频状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>大门入口监控</td>
+          <td>http://example.com/video1.mp4</td>
+          <td>A区</td>
+          <td>正常</td>
+          <td>2024-10-01 08:00:00</td>
+          <td>2024-10-01 18:00:00</td>
+          <td><span class="status-badge status-online">✓</span></td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>大厅前坪监控</td>
+          <td>http://example.com/video2.mp4</td>
+          <td>A区</td>
+          <td>异常</td>
+          <td>2024-10-02 09:00:00</td>
+          <td>2024-10-02 17:00:00</td>
+          <td><span class="status-badge status-warning">⚠</span></td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>工作区监控</td>
+          <td>http://example.com/video3.mp4</td>
+          <td>C区</td>
+          <td>正常</td>
+          <td>2024-10-03 10:00:00</td>
+          <td>2024-10-03 16:00:00</td>
+          <td><span class="status-badge status-online">✓</span></td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>A区走廊前摄像头</td>
+          <td>http://example.com/video4.mp4</td>
+          <td>A区</td>
+          <td>正常</td>
+          <td>2024-10-04 11:00:00</td>
+          <td>2024-10-04 15:00:00</td>
+          <td><span class="status-badge status-online">✓</span></td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hint-box">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 请在上方填写视频源的详细信息,支持RTSP、HTTP等多种协议</div>
+    <div>2. 可点击"查看"按钮实时预览视频画面,支持回放与截图</div>
+    <div>3. 新增视频源时需配置流地址、编码格式和存储策略</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">视频源统计</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">视频状态分布</div>
+        <canvas id="statusChart" width="300" height="300"></canvas>
+      </div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">监控区域分布</div>
+        <canvas id="regionChart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🎥 视频预览窗口</div>
+    <video controls style="width: 100%; max-height: 500px; background: #000; border-radius: 8px;">
+      <source src="" type="video/mp4" />
+      您的浏览器不支持视频播放
+    </video>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    createChart($('#statusChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['正常', '异常', '离线'],
+        datasets: [{
+          data: [70, 20, 10],
+          backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+        }]
+      }
+    });
+
+    createChart($('#regionChart'), {
+      type: 'bar',
+      data: {
+        labels: ['A区', 'B区', 'C区'],
+        datasets: [{
+          label: '摄像头数量',
+          data: [15, 10, 8],
+          backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b']
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        scales: { x: { beginAtZero: true } }
+      }
+    });
+
+    function search() {
+      showToast('正在查询视频源...', 'info');
+    }
+
+    function exportVideo() {
+      showToast('视频导出功能开发中', 'info');
+    }
+
+    function showAddDialog() {
+      showToast('新增视频源功能开发中', 'info');
+    }
+  </script>
+</body>
+</html>

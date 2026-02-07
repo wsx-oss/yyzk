@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>性能分析报告</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="module-header">
+    <div class="module-title">性能分析报告</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>分析时间段</label>
+        <input type="date" />
+      </div>
+      <div class="filter-group">
+        <label>结束时间</label>
+        <input type="date" />
+      </div>
+      <div class="filter-group">
+        <label>性能类型</label>
+        <select>
+          <option>全部性能</option>
+          <option>CPU性能</option>
+          <option>内存性能</option>
+          <option>磁盘性能</option>
+        </select>
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="filter-group">
+        <label>报告名称</label>
+        <select>
+          <option>历史报告</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>性能范围</label>
+        <input type="text" placeholder="请输入性能范围" />
+      </div>
+      <div class="filter-group">
+        <label>显示汇总</label>
+        <input type="text" placeholder="请输入汇总项" />
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="search()">查询报告</button>
+      <button class="btn btn-secondary" onclick="exportReport()">📤 导出报告</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>分析时间</th>
+          <th>报告名称</th>
+          <th>性能类型</th>
+          <th>平均值</th>
+          <th>成功率</th>
+          <th>异常率</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>2024-10-01 10:00</td>
+          <td>性能体检</td>
+          <td>U001</td>
+          <td>200ms</td>
+          <td>1000毫秒/s</td>
+          <td>0.1%</td>
+          <td><button class="btn btn-primary btn-action">查看</button></td>
+        </tr>
+        <tr>
+          <td>2024-10-02 14:30</td>
+          <td>问题提醒</td>
+          <td>U002</td>
+          <td>300ms</td>
+          <td>800毫秒/s</td>
+          <td>0.2%</td>
+          <td><button class="btn btn-primary btn-action">查看</button></td>
+        </tr>
+        <tr>
+          <td>2024-10-03 09:15</td>
+          <td>提醒查询</td>
+          <td>U003</td>
+          <td>250ms</td>
+          <td>900毫秒/s</td>
+          <td>0.15%</td>
+          <td><button class="btn btn-primary btn-action">查看</button></td>
+        </tr>
+        <tr>
+          <td>2024-10-04 16:45</td>
+          <td>系统异常</td>
+          <td>U004</td>
+          <td>250ms</td>
+          <td>700毫秒/s</td>
+          <td>0.25%</td>
+          <td><button class="btn btn-primary btn-action">查看</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hint-box">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 性能分析报告可从多维度展示系统运行状态和性能指标</div>
+    <div>2. 定期查看性能报告,优化系统配置和资源分配</div>
+    <div>3. 第三方本分析到时特定时间段的性能趋势与实际支持</div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+    <div class="card">
+      <div class="card-title">性能分析统计趋势</div>
+      <canvas id="trendChart" width="400" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">平均值分布</div>
+      <canvas id="avgChart" width="400" height="200"></canvas>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+    <div class="card">
+      <div class="card-title">错误率分布</div>
+      <canvas id="errorChart" width="400" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">模块性能综合评估</div>
+      <canvas id="radarChart" width="400" height="200"></canvas>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    createChart($('#trendChart'), {
+      type: 'line',
+      data: {
+        labels: ['10:00', '11:00', '12:00', '13:00'],
+        datasets: [{
+          label: '响应时间(ms)',
+          data: [200, 300, 250, 250],
+          borderColor: '#0ea5e9',
+          backgroundColor: 'rgba(14, 165, 233, 0.1)',
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+
+    createChart($('#avgChart'), {
+      type: 'bar',
+      data: {
+        labels: ['性能', '问题', '提醒', '系统'],
+        datasets: [{
+          label: '平均值',
+          data: [1000, 800, 900, 700],
+          backgroundColor: ['#10b981', '#a855f7', '#0ea5e9']
+        }]
+      },
+      options: {
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+
+    createChart($('#errorChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['模块A', '模块B', '模块C'],
+        datasets: [{
+          data: [35, 30, 35],
+          backgroundColor: ['#ef4444', '#f59e0b', '#ef4444']
+        }]
+      }
+    });
+
+    createChart($('#radarChart'), {
+      type: 'radar',
+      data: {
+        labels: ['响应速度', '稳定性', '并发能力', '资源利用', '错误处理'],
+        datasets: [{
+          label: '当前性能',
+          data: [85, 90, 75, 80, 88],
+          backgroundColor: 'rgba(14, 165, 233, 0.2)',
+          borderColor: '#0ea5e9',
+          pointBackgroundColor: '#0ea5e9'
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            beginAtZero: true,
+            max: 100
+          }
+        }
+      }
+    });
+
+    function search() {
+      showToast('正在查询性能报告...', 'info');
+    }
+
+    function exportReport() {
+      showToast('导出报告功能开发中', 'info');
+    }
+  </script>
+</body>
+</html>

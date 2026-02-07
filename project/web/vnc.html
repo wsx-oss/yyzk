@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VNC 远程桌面</title>
+  <link rel="stylesheet" href="/app/styles.css" />
+  <!-- noVNC库 - 使用可靠的CDN -->
+  <script type="module">
+    import RFB from 'https://cdn.jsdelivr.net/npm/@novnc/novnc@1.3.0/core/rfb.js';
+    window.RFB = RFB;
+    window.novncLoaded = true;
+  </script>
+  <style>
+    body { margin: 0; padding: 20px; background: #f1f5f9; font-family: system-ui, sans-serif; }
+    .control-bar { background: #fff; padding: 16px; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .control-row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+    .control-row input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+    .control-row button { padding: 8px 20px; background: #0ea5e9; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
+    .control-row button:hover { background: #0284c7; }
+    #state { padding: 8px 12px; background: #f1f5f9; border-radius: 4px; font-size: 13px; }
+    #state.connected { background: #d1fae5; color: #065f46; }
+    #state.disconnected { background: #fee2e2; color: #991b1b; }
+    #state.connecting { background: #fef3c7; color: #92400e; }
+    #screen { width: 100%; height: calc(100vh - 180px); background: #000; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; }
+    #screen canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .error-box { background: #fee; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 4px; color: #991b1b; font-size: 14px; margin-bottom: 12px; display: none; }
+    .hint-box { background: #eff6ff; border-left: 4px solid #0ea5e9; padding: 12px 16px; border-radius: 4px; color: #1e40af; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="control-bar">
+    <div class="control-row">
+      <input id="target" placeholder="目标地址 (例: 192.168.1.100:5900)" />
+      <button id="btnConnect">连接</button>
+      <button id="btnDisconnect" style="background: #64748b; display: none;">断开</button>
+      <span id="state">未连接</span>
+    </div>
+    <div class="error-box" id="errorBox"></div>
+    <div class="hint-box">
+      <strong>提示：</strong>如需输入VNC密码，会在连接时弹出对话框。确保目标机器已安装并启动VNC服务（如TightVNC）。
+    </div>
+  </div>
+  <div id="screen"></div>
+
+<script>
+const $=(q)=>document.querySelector(q);
+let rfb;
+const stateEl = $('#state');
+const errorBox = $('#errorBox');
+const btnConnect = $('#btnConnect');
+const btnDisconnect = $('#btnDisconnect');
+const deviceId = new URLSearchParams(location.search).get('deviceId');
+
+function authHeaders(){
+  const token = localStorage.getItem('token');
+  const h = {};
+  if(token) h['Authorization'] = `Bearer ${token}`;
+  h['Content-Type'] = 'application/json';
+  return h;
+}
+
+async function setDeviceStatus(status, keepalive=false){
+  if(!deviceId) return;
+  try{
+    await fetch(`/api/devices/${encodeURIComponent(deviceId)}/status`, {
+      method:'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({Status: status}),
+      keepalive
+    });
+  }catch(e){ /* ignore */ }
+}
+
+async function incrUserConn(){
+  try{ await fetch('/api/user/stats/incr_connection', { method:'POST', headers: authHeaders() }); }catch(e){ /* ignore */ }
+}
+
+// ===== In-page rate limiter for connect/disconnect =====
+const CONNECT_CD_MS = 10000; // 10s
+const DISCONNECT_CD_MS = 8000; // 8s
+let cdTimer = null;
+
+function cdKey(type){ return `vnc_cd_${type}_${deviceId||'na'}`; }
+function allowedAt(type){ return Number(localStorage.getItem(cdKey(type))||0); }
+function setAllowedAt(type, ts){ localStorage.setItem(cdKey(type), String(ts)); }
+
+function updateCooldownUI(){
+  const now = Date.now();
+  const aC = allowedAt('connect');
+  const aD = allowedAt('disconnect');
+  const remC = Math.max(0, Math.ceil((aC-now)/1000));
+  const remD = Math.max(0, Math.ceil((aD-now)/1000));
+  btnConnect.disabled = remC>0;
+  btnDisconnect.disabled = remD>0;
+  btnConnect.textContent = remC>0 ? `连接(${remC}s)` : '连接';
+  btnDisconnect.textContent = remD>0 ? `断开(${remD}s)` : '断开';
+}
+
+function startCdTicker(){
+  if(cdTimer) clearInterval(cdTimer);
+  cdTimer = setInterval(()=>{
+    updateCooldownUI();
+    const now = Date.now();
+    if(now>allowedAt('connect') && now>allowedAt('disconnect')){
+      clearInterval(cdTimer); cdTimer=null;
+    }
+  }, 500);
+}
+
+function showError(msg){
+  errorBox.textContent = msg;
+  errorBox.style.display = 'block';
+}
+
+function hideError(){
+  errorBox.style.display = 'none';
+}
+
+function updateState(status, text){
+  stateEl.textContent = text;
+  stateEl.className = status;
+}
+
+async function connect(){
+  // cooldown gate
+  const now = Date.now();
+  const allow = allowedAt('connect');
+  if(now < allow){
+    const secs = Math.ceil((allow-now)/1000);
+    showError(`操作频繁，请 ${secs}s 后再试`);
+    startCdTicker();
+    return;
+  }
+  setAllowedAt('connect', now + CONNECT_CD_MS);
+  startCdTicker();
+  hideError();
+  const t = new URLSearchParams(location.search).get('target') || $('#target').value.trim();
+  if(!t) {
+    showError('请输入目标VNC地址（格式: IP:端口）');
+    return;
+  }
+  
+  // 等待 RFB 库加载
+  if(typeof window.RFB === 'undefined') {
+    updateState('connecting', '正在加载 noVNC 库...');
+    let attempts = 0;
+    while(typeof window.RFB === 'undefined' && attempts < 50) {
+      await new Promise(r => setTimeout(r, 100));
+      attempts++;
+    }
+    if(typeof window.RFB === 'undefined') {
+      showError('noVNC 库加载失败，请检查网络连接或刷新页面重试');
+      return;
+    }
+  }
+  
+  updateState('connecting', '正在连接...');
+  btnConnect.style.display = 'none';
+  btnDisconnect.style.display = 'inline-block';
+  
+  const proto = location.protocol==='https:'?'wss':'ws';
+  const url = `${proto}://${location.host}/api/vnc/ws?target=${encodeURIComponent(t)}`;
+  
+  try {
+    rfb && rfb.disconnect();
+    rfb = new window.RFB(document.getElementById('screen'), url, {
+      credentials: { }
+    });
+    
+    rfb.viewOnly = false;
+    rfb.scaleViewport = true;  // 自动缩放以适应容器
+    rfb.resizeSession = false; // 不改变远程桌面分辨率
+    rfb.showDotCursor = true;
+    rfb.clipViewport = false;  // 显示完整桌面，不裁剪
+    
+    rfb.addEventListener('connect', () => {
+      updateState('connected', '✓ 已连接');
+      hideError();
+      // 成功连接：设备置为在线、更新最近连接时间、自增用户总连接次数
+      setDeviceStatus('online');
+      incrUserConn();
+    });
+    
+    rfb.addEventListener('disconnect', (e) => {
+      updateState('disconnected', '✗ 已断开');
+      btnConnect.style.display = 'inline-block';
+      btnDisconnect.style.display = 'none';
+      // 断开：进入冷却
+      setAllowedAt('disconnect', Date.now() + DISCONNECT_CD_MS);
+      startCdTicker();
+      // 断开：设备置为离线
+      setDeviceStatus('offline');
+      if(e.detail.clean === false) {
+        showError(`连接断开: ${e.detail.reason || '未知原因'}`);
+      }
+    });
+    
+    rfb.addEventListener('securityfailure', (e) => {
+      showError(`安全验证失败: ${e.detail.reason || '可能是密码错误'}`);
+    });
+    
+    rfb.addEventListener('credentialsrequired', (e) => {
+      const password = prompt('请输入VNC密码:');
+      if(password !== null) {
+        rfb.sendCredentials({ password: password });
+      } else {
+        rfb.disconnect();
+      }
+    });
+    
+  } catch(err) {
+    updateState('disconnected', '✗ 连接失败');
+    showError(`连接错误: ${err.message}`);
+    btnConnect.style.display = 'inline-block';
+    btnDisconnect.style.display = 'none';
+  }
+}
+
+function disconnect(){
+  // cooldown gate
+  const now = Date.now();
+  const allow = allowedAt('disconnect');
+  if(now < allow){
+    const secs = Math.ceil((allow-now)/1000);
+    showError(`操作频繁，请 ${secs}s 后再试`);
+    startCdTicker();
+    return;
+  }
+  setAllowedAt('disconnect', now + DISCONNECT_CD_MS);
+  startCdTicker();
+  if(rfb) {
+    rfb.disconnect();
+  }
+}
+
+// 页面关闭时确保下线
+window.addEventListener('beforeunload', ()=>{ setDeviceStatus('offline', true); });
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  btnConnect.addEventListener('click', connect);
+  btnDisconnect.addEventListener('click', disconnect);
+  updateCooldownUI();
+  const t = new URLSearchParams(location.search).get('target');
+  if(t) {
+    $('#target').value = t;
+    setTimeout(connect, 500); // 延迟自动连接，让页面先渲染
+  }
+});
+</script>
+</body>
+</html>

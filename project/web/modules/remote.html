@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>远程桌面控制</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="module-header">
+    <div class="module-title">远程桌面控制</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>设备名称</label>
+        <input id="qName" type="text" placeholder="请输入设备名称" />
+      </div>
+      <div class="filter-group">
+        <label>连接协议</label>
+        <select id="qProtocol">
+          <option value="">全部</option>
+          <option value="VNC">VNC</option>
+          <option value="RDP">RDP</option>
+          <option value="SSH">SSH</option>
+        </select>
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-success" onclick="openAddModal()">➕ 新增远程桌面</button>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-label">在线设备数</div>
+      <div class="stat-value" id="statOnline">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">离线设备数</div>
+      <div class="stat-value" id="statOffline" style="color: #ef4444;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">总连接次数</div>
+      <div class="stat-value" id="statTotalConn" style="color: #10b981;">0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table" id="tblDevices">
+      <thead>
+        <tr>
+          <th>设备名称</th>
+          <th>IP地址</th>
+          <th>连接协议</th>
+          <th>状态</th>
+          <th>连接时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="tbBody"></tbody>
+    </table>
+  </div>
+
+  <div class="hint-box">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 连接远程设备前请确保网络连通,VPN已接入或防火墙已配置</div>
+    <div>2. 支持的协议包括RDP(Windows)、VNC(跨平台)、SSH(Linux)</div>
+    <div>3. 新增设备时请填写正确的IP地址、端口和认证信息</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">连接统计</div>
+    <div style="display: grid; grid-template-columns: 1fr; gap: 24px;">
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">连接类型分布</div>
+        <canvas id="protocolChart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增设备弹窗 -->
+  <div id="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); align-items:center; justify-content:center;">
+    <div style="background:#fff; padding:20px; border-radius:8px; width:420px; max-width:90%;">
+      <div style="font-weight:600; font-size:16px; margin-bottom:12px;">新增远程桌面</div>
+      <div class="filter-row" style="grid-template-columns: 1fr;">
+        <div class="filter-group">
+          <label>设备名称</label>
+          <input id="mName" type="text" placeholder="例如：Server01" />
+        </div>
+        <div class="filter-group">
+          <label>IP地址</label>
+          <input id="mIP" type="text" placeholder="例如：192.168.1.100 或 192.168.1.100:5900" />
+        </div>
+        <div class="filter-group">
+          <label>连接协议</label>
+          <select id="mProtocol">
+            <option value="VNC">VNC</option>
+            <option value="RDP">RDP</option>
+            <option value="SSH">SSH</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; justify-content:flex-end; margin-top:12px;">
+        <button class="btn" onclick="closeAddModal()">取消</button>
+        <button class="btn btn-success" onclick="submitAdd()">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    let protocolChart = createChart($('#protocolChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['RDP', 'VNC', 'SSH'],
+        datasets: [{
+          data: [0, 0, 0],
+          backgroundColor: ['#10b981', '#ef4444', '#f59e0b']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { position: 'top' } }
+      }
+    });
+
+    function updateProtocolChart(items){
+      if(!protocolChart) return;
+      const counts = { RDP:0, VNC:0, SSH:0 };
+      (items||[]).forEach(it=>{ const p=(it.protocol||'').toUpperCase(); if(counts[p]!==undefined) counts[p]++; });
+      protocolChart.data.datasets[0].data = [counts.RDP, counts.VNC, counts.SSH];
+      protocolChart.update();
+    }
+
+    let lastItems = [];
+    let reqSeq = 0; // 请求序号，确保只应用最后一次
+    let backoffMs = 0;
+    let inFlightCtl = null; let lastLoadAt = 0;
+    async function loadDevices() {
+      const mySeq = ++reqSeq;
+      const name = $('#qName').value.trim();
+      const protocol = $('#qProtocol').value;
+      const nowTs = Date.now();
+      if(nowTs - lastLoadAt < 500){ return; } // 500ms 节流
+      lastLoadAt = nowTs;
+      if(inFlightCtl){ try{ inFlightCtl.abort(); }catch(e){} }
+      inFlightCtl = new AbortController();
+      try{
+        const res = await api(`/devices?name=${encodeURIComponent(name)}&protocol=${encodeURIComponent(protocol)}`, { signal: inFlightCtl.signal });
+        if (res.status === 429) {
+          // 退避并不清空界面
+          const j = await res.json().catch(()=>({}));
+          const retry = (j.retry_after? Number(j.retry_after): 1) || 1;
+          backoffMs = Math.min((backoffMs||0)+retry*500, 5000);
+          setTimeout(()=>{ if(mySeq===reqSeq) loadDevices(); }, backoffMs);
+          return;
+        }
+        backoffMs = 0;
+        const data = await res.json();
+        if (mySeq !== reqSeq) return; // 丢弃过期响应
+        lastItems = Array.isArray(data.items) ? data.items : [];
+        renderDevices(lastItems);
+        updateStats(lastItems);
+        updateProtocolChart(lastItems);
+      }catch(e){
+        // 网络或解析错误：保留现有 UI，不清空
+        console.warn('loadDevices failed', e);
+      }
+    }
+
+    function prioritySort(items, name, protocol) {
+      const n = (name||'').trim().toLowerCase();
+      const p = (protocol||'').trim().toUpperCase();
+      return items.slice().sort((a,b)=>{
+        const w = (it)=> (n && (it.name||'').toLowerCase().includes(n) ? 2:0) + (p && (it.protocol||'').toUpperCase()===p ? 1:0);
+        const dw = w(b)-w(a);
+        if (dw!==0) return dw;
+        return String(b.created_at||'').localeCompare(String(a.created_at||''));
+      });
+    }
+
+    function renderDevices(items) {
+      const name = $('#qName').value;
+      const protocol = $('#qProtocol').value;
+      const sorted = prioritySort(items, name, protocol);
+      const tbody = $('#tbBody');
+      tbody.innerHTML = '';
+      sorted.forEach(it => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${it.name||'-'}</td>
+          <td>${it.ip||'-'}</td>
+          <td>${it.protocol||'-'}</td>
+          <td>${(it.status||'offline')==='online' ? '<span class="status-badge status-online">在线</span>' : '<span class="status-badge status-offline">离线</span>'}</td>
+          <td>${it.last_connected_at ? formatDate(it.last_connected_at) : '-'}</td>
+          <td>
+            <button class="btn btn-primary btn-action" onclick="doConnect(${it.id}, '${it.ip||''}', '${(it.protocol||'').toUpperCase()}')">连接</button>
+            <button class="btn btn-danger btn-action" onclick="doDelete(${it.id})">删除</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 输入即自动置顶：300ms 防抖，加快响应
+    let qTimer=null;
+    function onQueryInput(){
+      if(qTimer) clearTimeout(qTimer);
+      // 本地先行重排，立即反馈
+      renderDevices(lastItems);
+      qTimer = setTimeout(()=>{ loadDevices(); }, 300);
+    }
+
+    function openAddModal(){ $('#modal').style.display='flex'; }
+    function closeAddModal(){ $('#modal').style.display='none'; }
+
+    async function submitAdd(){
+      const name = $('#mName').value.trim();
+      const ip = $('#mIP').value.trim();
+      const protocol = $('#mProtocol').value;
+      if(!name || !ip || !protocol){ showToast('请完整填写信息','error'); return; }
+      // 前端先查重：完全一致则拦截
+      const dup = (lastItems||[]).some(it=> (it.name||'').trim()===name && (it.ip||'').trim()===ip && String((it.protocol||'').toUpperCase())===String(protocol).toUpperCase());
+      if(dup){ showToast('已存在相同设备','error'); return; }
+      const res = await api('/devices',{ method:'POST', body:{ name, IP: ip, Protocol: protocol }});
+      if(res.ok){ showToast('已新增','success'); closeAddModal(); await loadDevices(); }
+      else {
+        let msg = '新增失败';
+        try{ const j = await res.json(); if(j && j.error) msg = j.error; }catch(_){ }
+        if(res.status===409) msg = '已存在相同设备';
+        showToast(msg,'error');
+      }
+    }
+
+    function normalizeVncTarget(ip){
+      if(!ip) return '127.0.0.1:5900';
+      return ip.includes(':') ? ip : (ip+':5900');
+    }
+
+    const vncWindows = new Map();
+    const connectCooldown = new Map();
+    let nextAllowedOpenAt = Number(localStorage.getItem('vnc_next_allowed_at')||0); // 全局开窗门槛时间（持久）
+
+    async function preflightOpenVnc(url){
+      const now = Date.now();
+      if(now < nextAllowedOpenAt){
+        const secs = Math.ceil((nextAllowedOpenAt - now)/1000);
+        showToast(`操作过于频繁，请 ${secs}s 后再试`,'error');
+        return null;
+      }
+      try{
+        const res = await fetch('/app/vnc.html', { method:'GET', cache:'no-store' });
+        if(res.status === 429){
+          let retry = 5;
+          try{ const j = await res.json(); if(j && j.retry_after) retry = Number(j.retry_after)||retry; }catch(_){ }
+          nextAllowedOpenAt = Date.now() + retry*1000;
+          localStorage.setItem('vnc_next_allowed_at', String(nextAllowedOpenAt));
+          showToast(`已触发限制，请 ${retry}s 后再试`,'error');
+          return null;
+        }
+        if(!res.ok){ showToast('暂时无法打开连接页面','error'); return null; }
+        // 通过预检，允许打开
+        const w = window.open(url,'_blank');
+        return w||null;
+      }catch(e){
+        showToast('网络异常，稍后重试','error');
+        return null;
+      }
+    }
+    async function doConnect(id, ip, protocol){
+      if((protocol||'').toUpperCase()!=='VNC'){
+        showToast('当前仅支持通过浏览器VNC连接','error');
+        return;
+      }
+      // 每台设备点击间隔保护：5s
+      const now = Date.now();
+      const last = connectCooldown.get(id)||0;
+      if(now - last < 5000){
+        showToast('连接太频繁，请稍后再试','error');
+        return;
+      }
+      connectCooldown.set(id, now);
+      // 临时禁用所有连接按钮 1s，避免连击
+      document.querySelectorAll('.btn-action').forEach(b=>{ b.disabled=true; setTimeout(()=>{ b.disabled=false; }, 1000); });
+      // 单窗口保护：已打开则聚焦
+      const existing = vncWindows.get(id);
+      if(existing && !existing.closed){ existing.focus(); return; }
+      const target = normalizeVncTarget(ip||'');
+      const openUrl = `/app/vnc.html?target=${encodeURIComponent(target)}&deviceId=${encodeURIComponent(id)}`;
+      const w = await preflightOpenVnc(openUrl);
+      if(w){ vncWindows.set(id, w); }
+      // 启动短期轮询获取实时状态
+      startBurstRefresh(id);
+    }
+
+    async function doDelete(id){
+      if(!confirm('确定删除该设备吗？')) return;
+      const res = await api(`/devices/${id}`, { method:'DELETE' });
+      if(res.ok){ showToast('已删除','success'); await loadDevices(); }
+      else { const j = await res.json().catch(()=>({})); showToast(j.error||'删除失败','error'); }
+    }
+
+    async function fetchUserTotalConn(){
+      try{ const r = await api('/user/stats'); const j = await r.json(); $('#statTotalConn').textContent = (j.total_connections||0); }catch(e){ /* ignore */ }
+    }
+
+    function updateStats(items){
+      const online = items.filter(it=>String(it.status).toLowerCase()==='online').length;
+      const offline = items.filter(it=>String(it.status).toLowerCase()!=='online').length;
+      $('#statOnline').textContent = online;
+      $('#statOffline').textContent = offline;
+      fetchUserTotalConn();
+    }
+
+    let burstTimer=null; let burstCount=0; let burstDevice=null;
+    function startBurstRefresh(deviceId){
+      burstCount = 0; burstDevice = deviceId||null;
+      if(burstTimer) clearInterval(burstTimer);
+      burstTimer = setInterval(async ()=>{
+        burstCount++;
+        await loadDevices();
+        // 如果对应设备已在线，或执行3次后即停止，避免额外压力
+        if(burstDevice){
+          const found = (lastItems||[]).find(it=>it.id===burstDevice);
+          if(found && String(found.status).toLowerCase()==='online'){
+            clearInterval(burstTimer); burstTimer=null; return;
+          }
+        }
+        if(burstCount>=3){ clearInterval(burstTimer); burstTimer=null; }
+      }, 3000);
+    }
+
+    // 绑定输入事件
+    document.getElementById('qName').addEventListener('input', onQueryInput);
+    document.getElementById('qProtocol').addEventListener('change', onQueryInput);
+
+    // 周期刷新，保持状态同步（更快）
+    setInterval(loadDevices, 5000);
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadDevices(); });
+    window.addEventListener('DOMContentLoaded', ()=>{
+      loadDevices();
+      // 首次渲染后强制调整图表，避免错位
+      setTimeout(()=>{ if(protocolChart){ try{ protocolChart.resize(); }catch(e){} } }, 200);
+    });
+  </script>
+</body>
+</html>

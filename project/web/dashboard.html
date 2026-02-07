@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智能工具人机交互与远程操控系统</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, "Segoe UI", Arial, Helvetica, sans-serif;
+      background: #f1f5f9;
+      overflow: hidden;
+    }
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+    .sidebar {
+      width: 200px;
+      background: #1e3a8a;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-header {
+      padding: 20px 16px;
+      background: #1e40af;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .nav-item {
+      padding: 14px 16px;
+      color: rgba(255,255,255,0.9);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      transition: all 0.2s;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover {
+      background: rgba(255,255,255,0.1);
+      border-left-color: #60a5fa;
+    }
+    .nav-item.active {
+      background: rgba(255,255,255,0.15);
+      border-left-color: #fff;
+      font-weight: 500;
+    }
+    .nav-item::before {
+      content: '●';
+      margin-right: 8px;
+      font-size: 8px;
+    }
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .top-bar {
+      background: #0ea5e9;
+      color: #fff;
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .top-bar h1 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+    }
+    .btn-logout {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: #fff;
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .btn-logout:hover {
+      background: rgba(255,255,255,0.3);
+    }
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #fff;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <div class="sidebar-header">系统菜单</div>
+      <a class="nav-item active" data-page="monitor">系统状态监控</a>
+      <a class="nav-item" data-page="audio">语音交互记录</a>
+      <a class="nav-item" data-page="remote">远程桌面控制</a>
+      <a class="nav-item" data-page="video">视频监控</a>
+      <a class="nav-item" data-page="hardware">硬件状态检测</a>
+      <a class="nav-item" data-page="updates">软件更新管理</a>
+      <a class="nav-item" data-page="sync">数据同步状态</a>
+      <a class="nav-item" data-page="alerts">异常报警</a>
+      <a class="nav-item" data-page="performance">性能分析报告</a>
+      <a class="nav-item" data-page="logs">维护操作日志</a>
+    </aside>
+    <main class="main-content">
+      <div class="top-bar">
+        <h1>智能工具人机交互与远程操控系统</h1>
+        <div class="user-info">
+          <span id="username">-</span>
+          <button class="btn-logout" id="btnLogout">退出</button>
+        </div>
+      </div>
+      <div class="content-area">
+        <iframe id="contentFrame" src="/app/modules/monitor.html"></iframe>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('token');
+    const username = localStorage.getItem('username');
+    
+    if (!token) {
+      window.location.href = '/app/login.html';
+    }
+    
+    document.getElementById('username').textContent = username || '用户';
+    
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      window.location.href = '/app/login.html';
+    });
+    
+    const navItems = document.querySelectorAll('.nav-item');
+    const iframe = document.getElementById('contentFrame');
+    
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        navItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        const page = item.dataset.page;
+        iframe.src = `/app/modules/${page}.html`;
+      });
+    });
+  </script>
+</body>
+</html>

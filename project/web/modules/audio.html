@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>语音交互记录</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="module-header">
+    <div class="module-title">语音交互记录</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>交互时间</label>
+        <select>
+          <option>全部</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>用户ID</label>
+        <input type="text" placeholder="请输入用户ID" />
+      </div>
+      <div class="filter-group">
+        <label>交互类型</label>
+        <input type="text" placeholder="全部交互类型" />
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="filter-group">
+        <label>语音源类型</label>
+        <select>
+          <option>全部</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>时长</label>
+        <input type="text" placeholder="秒 1-5" />
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="filter-group">
+        <label>内容描述</label>
+        <input type="text" placeholder="请" />
+      </div>
+      <div class="filter-group">
+        <label>评分</label>
+        <input type="text" placeholder="请输入评分" />
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="search()">查询</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>序号</th>
+          <th>交互时间</th>
+          <th>用户ID</th>
+          <th>交互类型</th>
+          <th>语音源类型/文本内容</th>
+          <th>时长</th>
+          <th>评分</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="audioTable">
+        <tr>
+          <td>1</td>
+          <td>2024-10-01 10:00:00</td>
+          <td>U001</td>
+          <td>查询</td>
+          <td>▶️ 📥 📚 "今天天气如何"</td>
+          <td>无</td>
+          <td>⭐⭐⭐⭐</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>2024-10-02 14:30:00</td>
+          <td>U002</td>
+          <td>指令</td>
+          <td>▶️ 📥 📚</td>
+          <td>4s</td>
+          <td>⭐⭐⭐</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>2024-10-03 09 11:00</td>
+          <td>U003</td>
+          <td>反馈</td>
+          <td>▶️ 📥 📚 "这是语音内容反馈"</td>
+          <td>5s</td>
+          <td>⭐⭐⭐⭐⭐(5s)</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>2024-10-04 16:45:00</td>
+          <td>U004</td>
+          <td>查询</td>
+          <td>▶️ 📥 📚 "需要完成对当天任务"</td>
+          <td>无</td>
+          <td>⭐⭐⭐⭐</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>2024-10-05 13:00:00</td>
+          <td>U005</td>
+          <td>指令</td>
+          <td>▶️ 📥 📚</td>
+          <td>2s</td>
+          <td>⭐⭐⭐</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hint-box">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 请通过上方筛选语音交互的相关信息,输入具体条件查询</div>
+    <div>2. 可点击播放按钮收听语音内容,或点击下载按钮保存</div>
+    <div>3. 新的语音可通过上方"新增语音记录"功能录制或上传</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">交互统计</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">交互类型分布</div>
+        <canvas id="typeChart" width="300" height="300"></canvas>
+      </div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">交互时长平均值</div>
+        <canvas id="durationChart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    createChart($('#typeChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['查询', '指令', '反馈'],
+        datasets: [{
+          data: [40, 30, 30],
+          backgroundColor: ['#0ea5e9', '#10b981', '#ef4444']
+        }]
+      }
+    });
+
+    createChart($('#durationChart'), {
+      type: 'bar',
+      data: {
+        labels: ['查询', '指令', '反馈'],
+        datasets: [{
+          label: '平均时长(秒)',
+          data: [3, 4.5, 5],
+          backgroundColor: ['#0ea5e9', '#10b981', '#ef4444']
+        }]
+      },
+      options: {
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+
+    function search() {
+      showToast('正在查询语音记录...', 'info');
+    }
+  </script>
+</body>
+</html>

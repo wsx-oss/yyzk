@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>异常报警</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="module-header">
+    <div class="module-title">异常报警记录</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>定制时间</label>
+        <input type="date" />
+      </div>
+      <div class="filter-group">
+        <label>结束时间</label>
+        <input type="date" />
+      </div>
+      <div class="filter-group">
+        <label>报警类型</label>
+        <select>
+          <option>全部</option>
+          <option>系统警报</option>
+          <option>设备异常</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>报警等级</label>
+        <select>
+          <option>全部</option>
+          <option>高</option>
+          <option>中</option>
+          <option>低</option>
+        </select>
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="filter-group">
+        <label>报警状态</label>
+        <select>
+          <option>全部</option>
+          <option>未处理</option>
+          <option>处理中</option>
+          <option>已解决</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>关键词查找</label>
+        <input type="text" placeholder="请输入关键词" />
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="search()">查询</button>
+      <button class="btn btn-secondary" onclick="exportAlerts()">📤 导出报警</button>
+      <button class="btn btn-success" onclick="createAlert()">➕ 新增报警记录</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>定制时间</th>
+          <th>报警类型</th>
+          <th>报警等级</th>
+          <th>设备ID/类型</th>
+          <th>报警描述</th>
+          <th>报警状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>2024-10-01 10:00</td>
+          <td>系统异常</td>
+          <td>🔴 高</td>
+          <td>网络连接1</td>
+          <td>网络断开·时间到延迟过高</td>
+          <td><button class="btn btn-success btn-action">标记已读</button></td>
+          <td><button class="btn btn-danger btn-action">删除记录</button></td>
+        </tr>
+        <tr>
+          <td>2024-10-02 14:30</td>
+          <td>问题提醒</td>
+          <td>🟡 中</td>
+          <td>硬件ID2</td>
+          <td>部分功能功能ID2</td>
+          <td><button class="btn btn-success btn-action">标记已读</button></td>
+          <td><button class="btn btn-danger btn-action">删除记录</button></td>
+        </tr>
+        <tr>
+          <td>2024-10-03 09:15</td>
+          <td>提醒查询</td>
+          <td>🟢 低</td>
+          <td>门控ID3</td>
+          <td>门控功能不3</td>
+          <td><button class="btn btn-success btn-action">标记已读</button></td>
+          <td><button class="btn btn-danger btn-action">删除记录</button></td>
+        </tr>
+        <tr>
+          <td>2024-10-04 16:45</td>
+          <td>系统异常</td>
+          <td>🔴 高</td>
+          <td>新恒功能起程ID4</td>
+          <td>新恒功能起程后程序4</td>
+          <td><button class="btn btn-success btn-action">标记已读</button></td>
+          <td><button class="btn btn-danger btn-action">删除记录</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hint-box">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 定期查看异常报警,及时发现和处理问题</div>
+    <div>2. 不同等级的报警需采取相应的处理措施</div>
+    <div>3. 建议关闭已处理的报警,保持界面整洁</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">报警统计</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">报警类型分布</div>
+        <canvas id="typeChart" width="300" height="300"></canvas>
+      </div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">报警优先级分布</div>
+        <canvas id="priorityChart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    createChart($('#typeChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['系统异常', '问题提醒', '提醒查询'],
+        datasets: [{
+          data: [45, 35, 20],
+          backgroundColor: ['#ef4444', '#f59e0b', '#0ea5e9']
+        }]
+      }
+    });
+
+    createChart($('#priorityChart'), {
+      type: 'bar',
+      data: {
+        labels: ['高', '中', '低'],
+        datasets: [{
+          label: '报警数量',
+          data: [15, 25, 10],
+          backgroundColor: ['#ef4444', '#f59e0b', '#10b981']
+        }]
+      },
+      options: {
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+
+    function search() {
+      showToast('正在查询报警记录...', 'info');
+    }
+
+    function exportAlerts() {
+      showToast('导出报警功能开发中', 'info');
+    }
+
+    function createAlert() {
+      showToast('新增报警功能开发中', 'info');
+    }
+  </script>
+</body>
+</html>

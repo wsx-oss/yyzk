@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数据同步状态</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="module-header">
+    <div class="module-title">数据同步状态</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>配置源</label>
+        <input type="text" placeholder="请输入配置源地址" />
+      </div>
+      <div class="filter-group">
+        <label>目标同步</label>
+        <input type="text" placeholder="请输入目标同步地址" />
+      </div>
+      <div class="filter-group">
+        <label>同步类型</label>
+        <select>
+          <option>15步骤</option>
+        </select>
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="filter-group">
+        <label>开始时间</label>
+        <input type="datetime-local" />
+      </div>
+      <div class="filter-group">
+        <label>结束时间</label>
+        <input type="datetime-local" />
+      </div>
+      <div class="filter-group">
+        <label>已同步设定</label>
+        <label style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;">
+          <input type="checkbox" />
+          <span style="font-size: 14px; font-weight: normal; color: #0f172a;">启用</span>
+        </label>
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="search()">查询</button>
+      <button class="btn btn-secondary" onclick="syncNow()">📤 执行/立即同步</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>编号</th>
+          <th>配置源</th>
+          <th>目标端</th>
+          <th>同步类型</th>
+          <th>同步状态</th>
+          <th>开始时间</th>
+          <th>结束时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>Server A</td>
+          <td>Server B</td>
+          <td>5分步</td>
+          <td><span class="status-badge status-online">已完成</span></td>
+          <td>2024-10-01 08:00</td>
+          <td>2024-10-01 18:00</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Server C</td>
+          <td>Server D</td>
+          <td>10分步</td>
+          <td><span class="status-badge status-offline">已失败</span></td>
+          <td>2024-10-02 09:00</td>
+          <td>2024-10-02 20:00</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Server E</td>
+          <td>Server F</td>
+          <td>1小时</td>
+          <td><span class="status-badge status-online">运行中</span></td>
+          <td>2024-10-03 10:00</td>
+          <td>2024-10-03 22:00</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Server G</td>
+          <td>Server H</td>
+          <td>1小时</td>
+          <td><span class="status-badge status-offline">已失败</span></td>
+          <td>2024-10-04 11:00</td>
+          <td>2024-10-04 23:00</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hint-box">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 通过配置同步任务实现多服务器之间的数据一致性</div>
+    <div>2. 定期检查同步状态,确保数据准确无误</div>
+    <div>3. 同步失败时请检查网络连接和目标端状态</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">同步状态统计</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">同步状态分布</div>
+        <canvas id="statusChart" width="300" height="300"></canvas>
+      </div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">同步时长分布</div>
+        <canvas id="durationChart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">实时同步进度</div>
+    <div class="progress-bar" style="height: 24px; margin-bottom: 8px;">
+      <div class="progress-fill" style="width: 56%; background: #0ea5e9;">
+        <span style="color: #fff; font-size: 13px; padding-left: 10px;">已完成 56%</span>
+      </div>
+    </div>
+    <div style="font-size: 13px; color: #64748b;">已同步数据量: 200MB / 1000MB</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">即时动态</div>
+    <div style="background: #eff6ff; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
+      <div style="font-size: 14px; color: #1e40af;">📊 数据同步中详细</div>
+      <div style="font-size: 13px; color: #64748b; margin-top: 4px;">2024-10-21 13:50</div>
+    </div>
+    <div style="background: #fee; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
+      <div style="font-size: 14px; color: #991b1b;">❌ 同步失败详细</div>
+      <div style="font-size: 13px; color: #64748b; margin-top: 4px;">0%</div>
+    </div>
+    <div style="background: #f0fdf4; padding: 12px; border-radius: 6px;">
+      <div style="font-size: 14px; color: #065f46;">✅ 平均运期时刻</div>
+      <div style="font-size: 13px; color: #64748b; margin-top: 4px;">350毫秒</div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    createChart($('#statusChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['已完成', '已失败', '运行中'],
+        datasets: [{
+          data: [50, 30, 20],
+          backgroundColor: ['#10b981', '#ef4444', '#0ea5e9']
+        }]
+      }
+    });
+
+    createChart($('#durationChart'), {
+      type: 'bar',
+      data: {
+        labels: ['5分步', '10分步', '1小时', '1小时'],
+        datasets: [{
+          label: '同步次数',
+          data: [5, 3, 2, 2],
+          backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#a855f7']
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        scales: { x: { beginAtZero: true } }
+      }
+    });
+
+    function search() {
+      showToast('正在查询同步状态...', 'info');
+    }
+
+    function syncNow() {
+      showToast('正在执行数据同步...', 'info');
+    }
+  </script>
+</body>
+</html>

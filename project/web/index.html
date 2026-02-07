@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智能工具人机交互与远程操控系统</title>
+  <link rel="stylesheet" href="/app/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="icon" href="data:," />
+  
+</head>
+<body>
+  <header>
+    <h1>智能工具人机交互与远程操控系统</h1>
+    <nav>
+      <a href="#dashboard">监控</a>
+      <a href="#audio">语音记录</a>
+      <a href="#vnc">远程桌面</a>
+      <a href="#video">视频监控</a>
+      <a href="#alerts">告警与日志</a>
+      <a href="#updates">更新与同步</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="dashboard">
+      <h2>系统状态监控</h2>
+      <div class="cards">
+        <div class="card"><span>CPU</span><strong id="cpuVal">-</strong></div>
+        <div class="card"><span>内存</span><strong id="memVal">-</strong></div>
+        <div class="card"><span>负载</span><strong id="loadVal">-</strong></div>
+        <div class="card"><span>磁盘</span><strong id="diskVal">-</strong></div>
+        <div class="card"><span>网络发送</span><strong id="txVal">-</strong></div>
+        <div class="card"><span>网络接收</span><strong id="rxVal">-</strong></div>
+      </div>
+      <canvas id="cpuChart"></canvas>
+      <canvas id="memChart"></canvas>
+    </section>
+
+    <section id="audio">
+      <h2>语音交互记录</h2>
+      <div class="row">
+        <button id="btnRec">开始录音</button>
+        <button id="btnStop" disabled>停止并上传</button>
+      </div>
+      <ul id="recList"></ul>
+    </section>
+
+    <section id="vnc">
+      <h2>远程桌面控制</h2>
+      <div class="row">
+        <input id="vncTarget" placeholder="目标 VNC 服务器 127.0.0.1:5900" />
+        <button id="btnVNC">打开</button>
+      </div>
+      <div class="hint">需要在被控端运行 VNC 服务。浏览器将通过 WebSocket 代理连接。</div>
+    </section>
+
+    <section id="video">
+      <h2>视频监控</h2>
+      <video id="cam" autoplay playsinline></video>
+      <div class="hint">演示使用本机摄像头。可在后端配置 RTSP 源扩展。</div>
+    </section>
+
+    <section id="alerts">
+      <h2>告警与维护日志</h2>
+      <div class="row">
+        <button id="btnRefreshAlerts">刷新告警</button>
+        <button id="btnRefreshLogs">刷新日志</button>
+      </div>
+      <ul id="alertList"></ul>
+      <ul id="logList"></ul>
+    </section>
+
+    <section id="updates">
+      <h2>软件更新与数据同步</h2>
+      <div class="row">
+        <button id="btnCheckUpdate">检查更新</button>
+        <button id="btnSync">执行同步</button>
+      </div>
+      <pre id="updateInfo"></pre>
+      <pre id="syncInfo"></pre>
+    </section>
+  </main>
+
+  <script src="/app/script.js"></script>
+</body>
+</html>

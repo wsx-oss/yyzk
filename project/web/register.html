@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>注册 - 智能工具人机交互与远程操控系统</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, "Segoe UI", Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    body::before {
+      content: '';
+      position: absolute;
+      width: 200%;
+      height: 200%;
+      background-image: 
+        linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      animation: grid 20s linear infinite;
+    }
+    @keyframes grid {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(50px, 50px); }
+    }
+    .register-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      padding: 48px 40px;
+      width: 420px;
+      max-width: 90%;
+      position: relative;
+      z-index: 10;
+    }
+    .register-card h1 {
+      font-size: 20px;
+      color: #0f172a;
+      text-align: center;
+      margin-bottom: 32px;
+      font-weight: 600;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      color: #475569;
+      margin-bottom: 8px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    }
+    .btn-register {
+      width: 100%;
+      padding: 12px;
+      background: #0ea5e9;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+    .btn-register:hover {
+      background: #0284c7;
+    }
+    .btn-register:active {
+      transform: scale(0.98);
+    }
+    .login-link {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 14px;
+      color: #64748b;
+    }
+    .login-link a {
+      color: #0ea5e9;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .login-link a:hover {
+      text-decoration: underline;
+    }
+    .error-msg, .success-msg {
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .error-msg {
+      background: #fee;
+      color: #c00;
+    }
+    .success-msg {
+      background: #efe;
+      color: #060;
+    }
+  </style>
+</head>
+<body>
+  <div class="register-card">
+    <h1>注册新账号</h1>
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="success-msg" id="successMsg"></div>
+    <form id="registerForm">
+      <div class="form-group">
+        <label for="username">用户名</label>
+        <input type="text" id="username" name="username" required autocomplete="username" minlength="3" />
+      </div>
+      <div class="form-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" name="password" required autocomplete="new-password" minlength="6" />
+      </div>
+      <div class="form-group">
+        <label for="password2">确认密码</label>
+        <input type="password" id="password2" name="password2" required autocomplete="new-password" minlength="6" />
+      </div>
+      <button type="submit" class="btn-register">注册</button>
+    </form>
+    <div class="login-link">
+      已有账号？<a href="/app/login.html">登录</a>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('registerForm');
+    const errorMsg = document.getElementById('errorMsg');
+    const successMsg = document.getElementById('successMsg');
+    
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.style.display = 'none';
+      successMsg.style.display = 'none';
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const password2 = document.getElementById('password2').value;
+      
+      if (password !== password2) {
+        errorMsg.textContent = '两次密码输入不一致';
+        errorMsg.style.display = 'block';
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          successMsg.textContent = '注册成功！正在跳转到登录页...';
+          successMsg.style.display = 'block';
+          setTimeout(() => {
+            window.location.href = '/app/login.html';
+          }, 1500);
+        } else {
+          errorMsg.textContent = data.error || '注册失败';
+          errorMsg.style.display = 'block';
+        }
+      } catch (err) {
+        errorMsg.textContent = '网络错误，请稍后重试';
+        errorMsg.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>硬件状态检测</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="module-header">
+    <div class="module-title">硬件状态检测</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>硬件名称</label>
+        <input type="text" placeholder="请输入硬件名称" />
+      </div>
+      <div class="filter-group">
+        <label>硬件类型</label>
+        <select>
+          <option>全部</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>硬件ID类型</label>
+        <input type="text" placeholder="ID类型" />
+      </div>
+      <div class="filter-group">
+        <label>检测时间</label>
+        <select>
+          <option>请选择检测时间</option>
+        </select>
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="filter-group">
+        <label>状态选项</label>
+        <select>
+          <option>全部</option>
+          <option>正常</option>
+          <option>警告</option>
+          <option>异常</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>温度范围</label>
+        <input type="text" placeholder="例: 20-30℃" />
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="filter-group">
+        <label>CPU使用率范围</label>
+        <input type="text" placeholder="例: 10%-30%" />
+      </div>
+      <div class="filter-group">
+        <label>检测间隔时间</label>
+        <input type="text" placeholder="请输入检测间隔" />
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="search()">查询</button>
+      <button class="btn btn-secondary" onclick="exportData()">📤 导出详情</button>
+      <button class="btn btn-success" onclick="addMonitor()">➕ 添加监控</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>硬件名称</th>
+          <th>硬件类型</th>
+          <th>硬件ID类型</th>
+          <th>状态</th>
+          <th>温度</th>
+          <th>CPU使用率</th>
+          <th>内存使用率</th>
+          <th>网络带宽</th>
+          <th>检测时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>服务器1</td>
+          <td>服务器</td>
+          <td>192.168.1.100</td>
+          <td><span class="status-badge status-online">● 在线</span></td>
+          <td>25℃</td>
+          <td>10%</td>
+          <td>15%</td>
+          <td>5Mbps</td>
+          <td>2024-10-15 10:00</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>路由器1</td>
+          <td>路由器</td>
+          <td>192.168.1.1</td>
+          <td><span class="status-badge status-offline">● 离线</span></td>
+          <td>23℃</td>
+          <td>10%</td>
+          <td>11%</td>
+          <td>5Mbps</td>
+          <td>2024-10-15 10:05</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>交换机1</td>
+          <td>交换机</td>
+          <td>192.168.1.20</td>
+          <td><span class="status-badge status-warning">● 警告</span></td>
+          <td>80℃</td>
+          <td>80%</td>
+          <td>70%</td>
+          <td>100Mbps</td>
+          <td>2024-10-15 10:10</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>交换机2</td>
+          <td>交换机</td>
+          <td>192.168.1.21</td>
+          <td><span class="status-badge status-warning">● 警告</span></td>
+          <td>52℃</td>
+          <td>82%</td>
+          <td>72%</td>
+          <td>120Mbps</td>
+          <td>2024-10-15 10:30</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>路由器2</td>
+          <td>路由器</td>
+          <td>192.168.1.2</td>
+          <td><span class="status-badge status-online">● 在线</span></td>
+          <td>23℃</td>
+          <td>8%</td>
+          <td>12%</td>
+          <td>5Mbps</td>
+          <td>2024-10-15 10:25</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>交换机3</td>
+          <td>交换机</td>
+          <td>192.168.1.21</td>
+          <td><span class="status-badge status-online">● 在线</span></td>
+          <td>31℃</td>
+          <td>16%</td>
+          <td>20%</td>
+          <td>2100Mbps</td>
+          <td>2024-10-15 10:35</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看详情</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hint-box">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 硬件状态检测可监控温度、CPU、内存等关键指标,预防故障</div>
+    <div>2. 当硬件指标超出安全范围时,系统会自动告警</div>
+    <div>3. 定期检查和维护硬件状态,确保系统稳定运行</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">硬件状态统计</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">硬件状态分布</div>
+        <canvas id="statusChart" width="300" height="300"></canvas>
+      </div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">硬件类型分布</div>
+        <canvas id="typeChart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    createChart($('#statusChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['在线', '离线', '警告'],
+        datasets: [{
+          data: [60, 20, 20],
+          backgroundColor: ['#10b981', '#ef4444', '#f59e0b']
+        }]
+      }
+    });
+
+    createChart($('#typeChart'), {
+      type: 'bar',
+      data: {
+        labels: ['服务器1', '路由器2', '交换机3', '服务器4'],
+        datasets: [{
+          label: '硬件数量',
+          data: [2, 2, 3, 1],
+          backgroundColor: ['#ef4444', '#a855f7', '#0ea5e9', '#10b981']
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        scales: { x: { beginAtZero: true } }
+      }
+    });
+
+    function search() {
+      showToast('正在查询硬件状态...', 'info');
+    }
+
+    function exportData() {
+      showToast('数据导出功能开发中', 'info');
+    }
+
+    function addMonitor() {
+      showToast('添加监控功能开发中', 'info');
+    }
+  </script>
+</body>
+</html>

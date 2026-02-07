@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>维护操作日志</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="module-header">
+    <div class="module-title">维护操作日志</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>操作时间</label>
+        <select>
+          <option>全部</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>操作人员</label>
+        <input type="text" placeholder="请输入人员/组合选择" />
+      </div>
+      <div class="filter-group">
+        <label>操作内容类型</label>
+        <input type="text" placeholder="月自选" />
+      </div>
+    </div>
+    <div class="filter-row" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="filter-group">
+        <label>操作结果</label>
+        <select>
+          <option>全部</option>
+          <option>成功</option>
+          <option>失败</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>日志级别</label>
+        <select>
+          <option>全部</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>已读过滤</label>
+        <label style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;">
+          <input type="checkbox" />
+          <span style="font-size: 14px; font-weight: normal; color: #0f172a;">启用</span>
+        </label>
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="search()">查询</button>
+      <button class="btn btn-secondary" onclick="exportLogs()">📤 导出</button>
+      <button class="btn btn-success" onclick="addLog()">➕ 新增日志</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>操作时间</th>
+          <th>操作人员</th>
+          <th>操作时间</th>
+          <th>操作类型</th>
+          <th>记录类型</th>
+          <th>日志级别</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>系统操作</td>
+          <td>张三</td>
+          <td>2024-10-01 10:00</td>
+          <td>🟢 成功</td>
+          <td>空间操作1</td>
+          <td>信息</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>交换操作</td>
+          <td>李四</td>
+          <td>2024-10-02 14:30</td>
+          <td>🔴 失败</td>
+          <td>交换操作2</td>
+          <td>错误</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>删除操作</td>
+          <td>王五</td>
+          <td>2024-10-03 09:15</td>
+          <td>🟢 成功</td>
+          <td>删除内容3</td>
+          <td>信息</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+        <tr>
+          <td>新恒操作</td>
+          <td>赵六</td>
+          <td>2024-10-04 16:45</td>
+          <td>🔴 失败</td>
+          <td>工作模块4</td>
+          <td>错误</td>
+          <td>
+            <button class="btn btn-primary btn-action">查看</button>
+            <button class="btn btn-danger btn-action">删除</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hint-box">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 不车做用户活动,便于追溯和审计操作行为</div>
+    <div>2. 定期检查所安装日志,识别异常操作和潜在风险</div>
+    <div>3. 操作日志自动记录,无法修改,确保信息准确可靠</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">日志统计柱状图</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">操作类型分布</div>
+        <canvas id="typeChart" width="300" height="300"></canvas>
+      </div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">操作结果分布</div>
+        <canvas id="resultChart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    createChart($('#typeChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['系统操作', '交换操作', '删除操作'],
+        datasets: [{
+          data: [40, 30, 30],
+          backgroundColor: ['#a855f7', '#0ea5e9', '#10b981']
+        }]
+      }
+    });
+
+    createChart($('#resultChart'), {
+      type: 'bar',
+      data: {
+        labels: ['成功', '失败'],
+        datasets: [{
+          label: '操作次数',
+          data: [35, 15],
+          backgroundColor: ['#10b981', '#ef4444']
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        scales: { x: { beginAtZero: true } }
+      }
+    });
+
+    function search() {
+      showToast('正在查询操作日志...', 'info');
+    }
+
+    function exportLogs() {
+      showToast('导出日志功能开发中', 'info');
+    }
+
+    function addLog() {
+      showToast('新增日志功能开发中', 'info');
+    }
+  </script>
+</body>
+</html>
