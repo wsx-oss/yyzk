@@ -145,6 +145,7 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
         api.GET("/hardware/snapshot", a.HardwareSnapshot)
 
         api.POST("/audio/upload", a.AudioUpload)
+        api.POST("/audio/add", a.AudioAdd)
         api.GET("/audio/list", a.AudioList)
         api.GET("/audio/download/:id", a.AudioDownload)
         api.DELETE("/audio/:id", a.AudioDelete)
@@ -234,9 +235,43 @@ func (a *API) AudioUpload(c *gin.Context) {
     if d, err := strconv.ParseFloat(durationStr, 64); err == nil { duration = d }
     path, size, err := saveUploadedFile(fh, filepath.Join("data", "recordings"))
     if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
-    _, err = a.db.Exec(`INSERT INTO recordings(filename, mime, duration, size) VALUES(?,?,?,?)`, path, fh.Header.Get("Content-Type"), duration, size)
+    userId := c.PostForm("user_id")
+    interactType := c.PostForm("interact_type")
+    content := c.PostForm("content")
+    clarity := c.PostForm("clarity")
+    result := c.PostForm("result")
+    scoreStr := c.PostForm("score")
+    score := 4
+    if s, err := strconv.Atoi(scoreStr); err == nil { score = s }
+    tags := c.PostForm("tags")
+    remark := c.PostForm("remark")
+    interactTime := c.PostForm("interact_time")
+    res, err := a.db.Exec(`INSERT INTO recordings(filename, mime, duration, size, user_id, interact_type, content, clarity, result, score, tags, remark, interact_time) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        path, fh.Header.Get("Content-Type"), duration, size, userId, interactType, content, clarity, result, score, tags, remark, interactTime)
     if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
-    c.JSON(200, gin.H{"ok": true})
+    newId, _ := res.LastInsertId()
+    c.JSON(200, gin.H{"ok": true, "id": newId})
+}
+
+func (a *API) AudioAdd(c *gin.Context) {
+    var p struct {
+        UserId      string `json:"user_id"`
+        InteractType string `json:"interact_type"`
+        Content     string `json:"content"`
+        Clarity     string `json:"clarity"`
+        Result      string `json:"result"`
+        Score       int    `json:"score"`
+        Tags        string `json:"tags"`
+        Remark      string `json:"remark"`
+        InteractTime string `json:"interact_time"`
+    }
+    if err := c.BindJSON(&p); err != nil { c.JSON(400, gin.H{"error":"bad json"}); return }
+    if p.Score == 0 { p.Score = 4 }
+    res, err := a.db.Exec(`INSERT INTO recordings(filename, mime, duration, size, user_id, interact_type, content, clarity, result, score, tags, remark, interact_time) VALUES('','',0,0,?,?,?,?,?,?,?,?,?)`,
+        p.UserId, p.InteractType, p.Content, p.Clarity, p.Result, p.Score, p.Tags, p.Remark, p.InteractTime)
+    if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
+    newId, _ := res.LastInsertId()
+    c.JSON(200, gin.H{"ok": true, "id": newId})
 }
 
 func (a *API) AudioList(c *gin.Context) {
@@ -246,15 +281,15 @@ func (a *API) AudioList(c *gin.Context) {
     var total int
     _ = a.db.QueryRow(`SELECT COUNT(*) FROM recordings`).Scan(&total)
     
-    rows, err := a.db.Query(`SELECT id, filename, mime, duration, size, created_at FROM recordings ORDER BY id DESC LIMIT ? OFFSET ?`,
+    rows, err := a.db.Query(`SELECT id, filename, mime, duration, size, user_id, interact_type, content, clarity, result, score, tags, remark, interact_time, created_at FROM recordings ORDER BY id DESC LIMIT ? OFFSET ?`,
         pagination.PageSize, pagination.Offset)
     if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
     defer rows.Close()
     var items []gin.H
     for rows.Next() {
-        var id int; var filename, mime string; var duration float64; var size int64; var created string
-        if err := rows.Scan(&id, &filename, &mime, &duration, &size, &created); err == nil {
-            items = append(items, gin.H{"id": id, "filename": filepath.Base(filename), "mime": mime, "duration": duration, "size": size, "created_at": created})
+        var id int; var filename, mime, userId, iType, content, clarity, result, tags, remark, iTime, created string; var duration float64; var size int64; var score int
+        if err := rows.Scan(&id, &filename, &mime, &duration, &size, &userId, &iType, &content, &clarity, &result, &score, &tags, &remark, &iTime, &created); err == nil {
+            items = append(items, gin.H{"id": id, "filename": filepath.Base(filename), "mime": mime, "duration": duration, "size": size, "user_id": userId, "interact_type": iType, "content": content, "clarity": clarity, "result": result, "score": score, "tags": tags, "remark": remark, "interact_time": iTime, "created_at": created})
         }
     }
     c.JSON(200, gin.H{

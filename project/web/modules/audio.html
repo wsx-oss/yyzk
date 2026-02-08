@@ -6,301 +6,293 @@
   <title>语音交互记录</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .search-form{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+    .search-row{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px;align-items:flex-end}
+    .search-group{display:flex;flex-direction:column;gap:4px;min-width:140px;flex:1}
+    .search-group label{font-size:13px;color:#64748b;font-weight:500}
+    .search-group input,.search-group select{padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px}
+    .toggle-row{display:flex;align-items:center;gap:6px;height:34px}
+    .audio-cell{display:flex;flex-direction:column;gap:4px}
+    .audio-cell .text{font-weight:500;font-size:13px}
+    .audio-cell audio{height:32px;width:200px}
+    .stars{color:#f59e0b;letter-spacing:1px}
+    .tag{display:inline-block;background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px}
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;justify-content:center;align-items:center}
+    .modal-overlay.active{display:flex}
+    .modal-box{background:#fff;border-radius:12px;padding:28px 32px;width:560px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+    .modal-box h3{margin:0 0 20px;font-size:18px}
+    .form-row{display:flex;gap:16px;margin-bottom:14px}
+    .form-group{flex:1;display:flex;flex-direction:column;gap:4px}
+    .form-group label{font-size:13px;color:#475569;font-weight:500}
+    .form-group input,.form-group select,.form-group textarea{padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px}
+    .form-group textarea{resize:vertical;min-height:60px}
+    .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+    .detail-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;justify-content:center;align-items:center}
+    .detail-overlay.active{display:flex}
+    .detail-box{background:#fff;border-radius:12px;padding:28px 32px;width:500px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+    .detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9}
+    .confirm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1100;justify-content:center;align-items:center}
+    .confirm-overlay.active{display:flex}
+    .confirm-box{background:#fff;border-radius:12px;padding:24px 28px;width:380px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+    .confirm-box p{margin:16px 0 24px;font-size:15px}
+    .stats-section{background:#fff;border-radius:12px;padding:20px 24px;margin-top:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+    .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+    .chart-wrap{text-align:center}
+    .chart-wrap h4{margin:0 0 12px;font-size:14px;font-weight:600}
+    .chart-wrap canvas{max-height:260px}
+  </style>
 </head>
 <body>
-  <div class="module-header">
+  <!-- Header -->
+  <div class="module-header" style="display:flex;justify-content:space-between;align-items:center;">
     <div class="module-title">语音交互记录</div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label>文件名关键字</label>
-        <input id="filterKeyword" type="text" placeholder="请输入文件名关键字" />
-      </div>
-    </div>
-    <div class="action-buttons">
-      <button class="btn btn-primary" onclick="search()">查询</button>
-      <button class="btn btn-success" id="recordBtn" onclick="toggleRecord()">🎙 开始录音</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-success" onclick="openAddModal()">新增记录</button>
+      <button class="btn" style="background:#6366f1;color:#fff;" onclick="importData()">导入</button>
+      <button class="btn" style="background:#64748b;color:#fff;" onclick="exportData()">导出</button>
+      <button class="btn btn-primary" onclick="basicSearch()">搜索</button>
     </div>
   </div>
 
-  <div class="card" id="recordingCard" style="display: none;">
-    <div class="card-title">🎙 录音中...</div>
-    <div style="display: flex; align-items: center; gap: 16px;">
-      <div id="recordTimer" style="font-size: 24px; font-weight: 700; color: #ef4444;">00:00</div>
-      <div style="flex: 1;">
-        <div class="progress-bar" style="height: 8px;">
-          <div id="recordBar" class="progress-fill" style="width: 0%; background: #ef4444; transition: width 0.5s;"></div>
-        </div>
+  <!-- Search Form -->
+  <div class="search-form">
+    <div class="search-row">
+      <div class="search-group"><label>交互时间</label>
+        <div style="display:flex;gap:6px;align-items:center;"><input type="date" id="sDateStart"/><span>至</span><input type="date" id="sDateEnd"/></div>
       </div>
-      <button class="btn btn-danger" onclick="toggleRecord()">⏹ 停止</button>
+      <div class="search-group" style="max-width:160px"><label>用户ID</label><input type="text" id="sUserId" placeholder="请输入用户ID"/></div>
+      <div class="search-group" style="max-width:140px"><label>交互类型</label>
+        <select id="sType"><option value="">全部</option><option value="查询">查询</option><option value="指令">指令</option><option value="反馈">反馈</option></select>
+      </div>
+    </div>
+    <div class="search-row">
+      <div class="search-group" style="max-width:140px"><label>语音清晰度</label>
+        <select id="sClarity"><option value="">全部</option><option value="高">高</option><option value="中">中</option><option value="低">低</option></select>
+      </div>
+      <div class="search-group" style="max-width:140px"><label>交互结果</label>
+        <select id="sResult"><option value="">全部</option><option value="成功">成功</option><option value="部分成功">部分成功</option><option value="失败">失败</option></select>
+      </div>
+      <div class="search-group" style="max-width:120px"><label>是否加急</label><div class="toggle-row"><input type="checkbox" id="sUrgent"/><span>是</span></div></div>
+      <div class="search-group" style="max-width:140px"><label>是否有后续跟进</label><div class="toggle-row"><input type="checkbox" id="sFollowup"/><span>是</span></div></div>
+    </div>
+    <div class="search-row">
+      <div class="search-group" style="max-width:180px"><label>关键词</label><input type="text" id="sKeyword" placeholder="请输入关键词"/></div>
+      <div class="search-group" style="max-width:160px"><label>评分范围</label><input type="text" id="sScoreRange" placeholder="如: 3-5"/></div>
+      <div class="search-group"><label>标签</label><input type="text" id="sTags" placeholder="多个标签用逗号分隔"/></div>
+      <div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" onclick="advancedSearch()">高级搜索</button></div>
     </div>
   </div>
 
+  <!-- Table -->
   <div class="card">
-    <div class="card-title">录音列表 <span id="totalCount" style="font-size: 13px; color: #94a3b8; font-weight: normal;"></span></div>
     <table class="data-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>文件名</th>
-          <th>时长(秒)</th>
-          <th>大小</th>
-          <th>录制时间</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="audioTbody"></tbody>
+      <thead><tr><th>序号</th><th>交互时间</th><th>用户ID</th><th>交互类型</th><th>语音内容</th><th>语音清晰度</th><th>交互结果</th><th>评分</th><th>标签</th><th>操作</th></tr></thead>
+      <tbody id="mainTbody"></tbody>
     </table>
   </div>
 
+  <!-- Tips -->
   <div class="hint-box">
-    <div><strong>使用提示:</strong></div>
-    <div>1. 点击"开始录音"按钮录制语音,录制完成后自动上传</div>
-    <div>2. 可点击播放按钮收听语音内容,或点击下载按钮保存</div>
-    <div>3. 删除操作不可恢复,请谨慎操作</div>
+    <div><strong>使用提示</strong></div>
+    <div>1. 语音交互记录可帮助您了解用户与智能工具的交互情况，请妥善管理。</div>
+    <div>2. 可通过搜索功能快速定位所需记录。</div>
+    <div>3. 删除记录操作不可恢复，请谨慎操作。</div>
   </div>
 
-  <div class="card">
-    <div class="card-title">录音统计</div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">文件大小分布</div>
-        <canvas id="sizeChart" width="300" height="300"></canvas>
+  <!-- Charts -->
+  <div class="stats-section">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px;">交互统计</div>
+    <div class="chart-grid">
+      <div class="chart-wrap"><h4>交互类型分布</h4><canvas id="typeChart" height="260"></canvas></div>
+      <div class="chart-wrap"><h4>交互成功率统计</h4><canvas id="successChart" height="260"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Add Modal -->
+  <div class="modal-overlay" id="addOverlay" onclick="if(event.target===this)closeAddModal()">
+    <div class="modal-box">
+      <h3>新增语音交互记录</h3>
+      <div class="form-row"><div class="form-group"><label>交互时间 *</label><input type="datetime-local" id="fTime"/></div><div class="form-group"><label>用户ID *</label><input type="text" id="fUserId" placeholder="如 U001"/></div></div>
+      <div class="form-row"><div class="form-group"><label>交互类型 *</label><select id="fType"><option value="查询">查询</option><option value="指令">指令</option><option value="反馈">反馈</option></select></div><div class="form-group"><label>语音清晰度</label><select id="fClarity2"><option value="高">高</option><option value="中">中</option><option value="低">低</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label>语音内容 *</label><textarea id="fContent" placeholder="请输入语音内容文本"></textarea></div></div>
+      <div class="form-row"><div class="form-group"><label>交互结果</label><select id="fResult"><option value="成功">成功</option><option value="部分成功">部分成功</option><option value="失败">失败</option></select></div><div class="form-group"><label>评分 (1-5)</label><input type="number" id="fScore" min="1" max="5" value="4"/></div></div>
+      <div class="form-row"><div class="form-group"><label>上传语音文件</label><input type="file" id="fFile" accept="audio/*"/></div></div>
+      <div class="form-row"><div class="form-group"><label>标签</label><input type="text" id="fTags" placeholder="多个标签用逗号分隔"/></div></div>
+      <div class="form-row"><div class="form-group"><label>备注</label><textarea id="fRemark" placeholder="可选备注信息"></textarea></div></div>
+      <div class="modal-actions">
+        <button class="btn" style="background:#94a3b8;color:#fff;" onclick="closeAddModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitAdd()">确认</button>
       </div>
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">时长分布</div>
-        <canvas id="durationChart" width="300" height="300"></canvas>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="detail-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
+    <div class="detail-box"><h3 style="margin:0 0 16px;">记录详情</h3><div id="detailContent"></div>
+      <div style="text-align:right;margin-top:20px;"><button class="btn" style="background:#94a3b8;color:#fff;" onclick="closeDetail()">关闭</button></div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm -->
+  <div class="confirm-overlay" id="confirmOverlay" onclick="if(event.target===this)closeConfirm()">
+    <div class="confirm-box"><div style="font-size:36px;">&#9888;</div>
+      <p>确定要删除这条语音交互记录吗？<br><span style="color:#ef4444;font-size:13px;">此操作不可恢复</span></p>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="btn" style="background:#94a3b8;color:#fff;" onclick="closeConfirm()">取消</button>
+        <button class="btn btn-danger" id="confirmDeleteBtn">确认删除</button>
       </div>
     </div>
   </div>
 
   <script src="/app/modules/common.js"></script>
   <script>
-    let allAudios = [];
-    let visibleAudios = [];
-    let mediaRecorder = null;
-    let recordChunks = [];
-    let recordStart = 0;
-    let recordTimerInterval = null;
+    var allRecords=[], visibleRecords=[], pendingDeleteIdx=-1;
 
-    const sizeChart = createChart($('#sizeChart'), {
-      type: 'doughnut',
-      data: {
-        labels: ['<100KB', '100KB-1MB', '>1MB'],
-        datasets: [{
-          data: [0, 0, 0],
-          backgroundColor: ['#10b981', '#0ea5e9', '#f59e0b']
-        }]
-      }
-    });
+    var typeChart=createChart($('#typeChart'),{type:'doughnut',data:{labels:['查询','指令','反馈'],datasets:[{data:[0,0,0],backgroundColor:['#3b82f6','#10b981','#ef4444']}]},options:{plugins:{legend:{position:'right'}}}});
+    var successChart=createChart($('#successChart'),{type:'bar',data:{labels:['查询','指令','反馈'],datasets:[{label:'成功率 %',data:[0,0,0],backgroundColor:['#3b82f6','#10b981','#ef4444']}]},options:{scales:{y:{beginAtZero:true,max:100}},plugins:{legend:{display:false}}}});
 
-    const durationChart = createChart($('#durationChart'), {
-      type: 'bar',
-      data: {
-        labels: ['<5s', '5-30s', '30-60s', '>60s'],
-        datasets: [{
-          label: '数量',
-          data: [0, 0, 0, 0],
-          backgroundColor: ['#10b981', '#0ea5e9', '#f59e0b', '#ef4444']
-        }]
-      },
-      options: {
-        scales: { y: { beginAtZero: true } }
-      }
-    });
+    window.addEventListener('DOMContentLoaded',function(){loadData();});
 
-    function renderTable(items) {
-      const tbody = $('#audioTbody');
-      tbody.innerHTML = '';
-      if (!items || items.length === 0) {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        td.colSpan = 6;
-        td.style.textAlign = 'center';
-        td.style.color = '#94a3b8';
-        td.textContent = '暂无录音记录';
-        tr.appendChild(td);
-        tbody.appendChild(tr);
-        return;
-      }
-      for (const it of items) {
-        const tr = document.createElement('tr');
+    async function loadData(){
+      try{
+        var res=await api('/audio/list?page=1&page_size=200');
+        var data=await res.json();
+        var items=Array.isArray(data.items)?data.items:[];
+        allRecords=items.map(function(it){
+          var tArr=[];try{if(it.tags)tArr=it.tags.split(',').map(function(s){return s.trim();}).filter(Boolean);}catch(e){}
+          return{id:it.id,time:it.interact_time||it.created_at||'',userId:it.user_id||'',type:it.interact_type||'',content:it.content||(it.filename?it.filename:''),clarity:it.clarity||'',result:it.result||'',score:it.score||4,tags:tArr,audioId:(it.filename&&it.filename!==''&&it.filename!=='.')?it.id:null,remark:it.remark||''};
+        });
+      }catch(e){allRecords=[];}
+      visibleRecords=allRecords.slice();
+      renderTable(visibleRecords);
+      updateCharts(visibleRecords);
+    }
 
-        const tdId = document.createElement('td');
-        tdId.textContent = it.id;
+    function makeStars(n){var s='';for(var i=0;i<5;i++)s+=i<n?'\u2605':'\u2606';return s;}
 
-        const tdName = document.createElement('td');
-        tdName.textContent = it.filename || '-';
-
-        const tdDur = document.createElement('td');
-        tdDur.textContent = it.duration ? it.duration.toFixed(1) : '-';
-
-        const tdSize = document.createElement('td');
-        tdSize.textContent = formatBytes(it.size || 0);
-
-        const tdTime = document.createElement('td');
-        tdTime.textContent = formatDate(it.created_at);
-
-        const tdActions = document.createElement('td');
-
-        const dlBtn = document.createElement('a');
-        dlBtn.className = 'btn btn-primary btn-action';
-        dlBtn.textContent = '下载';
-        dlBtn.href = '/api/audio/download/' + it.id;
-        dlBtn.target = '_blank';
-        dlBtn.style.textDecoration = 'none';
-        tdActions.appendChild(dlBtn);
-
-        const delBtn = document.createElement('button');
-        delBtn.className = 'btn btn-danger btn-action';
-        delBtn.textContent = '删除';
-        delBtn.onclick = () => deleteAudio(it.id);
-        tdActions.appendChild(delBtn);
-
-        tr.appendChild(tdId);
-        tr.appendChild(tdName);
-        tr.appendChild(tdDur);
-        tr.appendChild(tdSize);
-        tr.appendChild(tdTime);
-        tr.appendChild(tdActions);
-        tbody.appendChild(tr);
+    function renderTable(items){
+      var tb=$('#mainTbody');tb.innerHTML='';
+      if(!items||!items.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:32px;">暂无语音交互记录</td></tr>';return;}
+      for(var i=0;i<items.length;i++){
+        var it=items[i],tr=document.createElement('tr');
+        tr.innerHTML='<td>'+(i+1)+'</td><td style="white-space:nowrap">'+it.time+'</td><td>'+it.userId+'</td><td>'+it.type+'</td>'
+          +'<td><div class="audio-cell"><div class="text">'+it.content+'</div><audio controls preload="none"'+(it.audioId?' src="/api/audio/download/'+it.audioId+'"':'')+'></audio></div></td>'
+          +'<td>'+it.clarity+'</td><td>'+it.result+'</td><td><span class="stars">'+makeStars(it.score)+'</span></td>'
+          +'<td>'+(it.tags||[]).map(function(t){return'<span class="tag">'+t+'</span>';}).join('')+'</td>'
+          +'<td style="white-space:nowrap"><button class="btn btn-primary btn-action" data-i="'+i+'" onclick="openDetail(+this.dataset.i)">查看详情</button> <button class="btn btn-danger btn-action" data-i="'+i+'" onclick="confirmDelete(+this.dataset.i)">删除</button></td>';
+        tb.appendChild(tr);
       }
     }
 
-    function updateCharts(items) {
-      const sizeCounts = [0, 0, 0];
-      const durCounts = [0, 0, 0, 0];
-      for (const it of items) {
-        const s = it.size || 0;
-        if (s < 102400) sizeCounts[0]++;
-        else if (s < 1048576) sizeCounts[1]++;
-        else sizeCounts[2]++;
-
-        const d = it.duration || 0;
-        if (d < 5) durCounts[0]++;
-        else if (d < 30) durCounts[1]++;
-        else if (d < 60) durCounts[2]++;
-        else durCounts[3]++;
-      }
-      if (sizeChart) {
-        sizeChart.data.datasets[0].data = sizeCounts;
-        sizeChart.update();
-      }
-      if (durationChart) {
-        durationChart.data.datasets[0].data = durCounts;
-        durationChart.update();
-      }
+    function updateCharts(items){
+      var tc={'查询':0,'指令':0,'反馈':0},ts={'查询':[0,0],'指令':[0,0],'反馈':[0,0]};
+      for(var i=0;i<items.length;i++){var it=items[i];if(tc[it.type]!==undefined)tc[it.type]++;if(ts[it.type]){ts[it.type][1]++;if(it.result==='成功')ts[it.type][0]++;}}
+      if(typeChart){typeChart.data.datasets[0].data=[tc['查询'],tc['指令'],tc['反馈']];typeChart.update();}
+      if(successChart){successChart.data.datasets[0].data=['查询','指令','反馈'].map(function(k){return ts[k][1]>0?Math.round(ts[k][0]/ts[k][1]*100):0;});successChart.update();}
     }
 
-    async function loadAudioList(page = 1, pageSize = 50) {
-      try {
-        const res = await api(`/audio/list?page=${page}&page_size=${pageSize}`);
-        const data = await res.json();
-        allAudios = Array.isArray(data.items) ? data.items : [];
-        visibleAudios = allAudios.slice();
-        $('#totalCount').textContent = `(共 ${data.total || allAudios.length} 条)`;
-        renderTable(visibleAudios);
-        updateCharts(visibleAudios);
-      } catch (e) {
-        showToast(e.message || '加载失败', 'error');
-      }
+    function basicSearch(){
+      var ds=$('#sDateStart').value,de=$('#sDateEnd').value,uid=($('#sUserId').value||'').trim().toLowerCase(),tp=$('#sType').value;
+      visibleRecords=allRecords.filter(function(it){
+        if(ds&&it.time<ds)return false;if(de&&it.time>de+' 23:59:59')return false;
+        if(uid&&!it.userId.toLowerCase().includes(uid))return false;if(tp&&it.type!==tp)return false;return true;
+      });
+      renderTable(visibleRecords);updateCharts(visibleRecords);showToast('已筛选：'+visibleRecords.length+' 条','success');
     }
 
-    function search() {
-      const keyword = ($('#filterKeyword').value || '').trim().toLowerCase();
-      visibleAudios = allAudios.filter((it) => {
-        if (keyword && !(it.filename || '').toLowerCase().includes(keyword)) return false;
+    function advancedSearch(){
+      var ds=$('#sDateStart').value,de=$('#sDateEnd').value,uid=($('#sUserId').value||'').trim().toLowerCase(),tp=$('#sType').value;
+      var cl=$('#sClarity').value,rs=$('#sResult').value,kw=($('#sKeyword').value||'').trim().toLowerCase();
+      var sr=($('#sScoreRange').value||'').trim(),tg=($('#sTags').value||'').trim().toLowerCase();
+      var ftags=tg?tg.split(',').map(function(s){return s.trim();}).filter(Boolean):[];
+      var smin=0,smax=5;if(sr){var p=sr.split('-');if(p.length===2){smin=parseInt(p[0])||0;smax=parseInt(p[1])||5;}}
+      visibleRecords=allRecords.filter(function(it){
+        if(ds&&it.time<ds)return false;if(de&&it.time>de+' 23:59:59')return false;
+        if(uid&&!it.userId.toLowerCase().includes(uid))return false;if(tp&&it.type!==tp)return false;
+        if(cl&&it.clarity!==cl)return false;if(rs&&it.result!==rs)return false;
+        if(kw&&it.content.toLowerCase().indexOf(kw)===-1)return false;
+        if(it.score<smin||it.score>smax)return false;
+        if(ftags.length>0){var itg=(it.tags||[]).map(function(t){return t.toLowerCase();});if(!ftags.some(function(f){return itg.indexOf(f)>=0;}))return false;}
         return true;
       });
-      renderTable(visibleAudios);
-      updateCharts(visibleAudios);
-      showToast(`已筛选：${visibleAudios.length} 条`, 'success');
+      renderTable(visibleRecords);updateCharts(visibleRecords);showToast('高级搜索完成：'+visibleRecords.length+' 条','success');
     }
 
-    async function deleteAudio(id) {
-      if (!confirm('确定要删除这条录音吗？')) return;
-      try {
-        const res = await api('/audio/' + id, { method: 'DELETE' });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('删除成功', 'success');
-          await loadAudioList();
-        } else {
-          showToast(data.error || '删除失败', 'error');
+    function openAddModal(){
+      var now=new Date();$('#fTime').value=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      $('#fUserId').value='';$('#fContent').value='';$('#fScore').value='4';$('#fTags').value='';$('#fRemark').value='';$('#fFile').value='';
+      $('#addOverlay').classList.add('active');
+    }
+    function closeAddModal(){$('#addOverlay').classList.remove('active');}
+
+    async function submitAdd(){
+      var time=($('#fTime').value||'').replace('T',' '),userId=($('#fUserId').value||'').trim(),type=$('#fType').value;
+      var content=($('#fContent').value||'').trim(),clarity=$('#fClarity2').value,result=$('#fResult').value;
+      var score=parseInt($('#fScore').value)||4,tagsStr=($('#fTags').value||'').trim();
+      var remark=($('#fRemark').value||'').trim();
+      if(!time||!userId||!content){showToast('请填写必填字段（交互时间、用户ID、语音内容）','error');return;}
+      var fi=$('#fFile');
+      try{
+        if(fi.files&&fi.files.length>0){
+          showToast('正在上传语音文件...','info');
+          var fd=new FormData();fd.append('file',fi.files[0]);fd.append('duration','0');
+          fd.append('user_id',userId);fd.append('interact_type',type);fd.append('content',content);
+          fd.append('clarity',clarity);fd.append('result',result);fd.append('score',String(score));
+          fd.append('tags',tagsStr);fd.append('remark',remark);fd.append('interact_time',time);
+          var tk=localStorage.getItem('token');
+          var r=await fetch('/api/audio/upload',{method:'POST',headers:tk?{'Authorization':'Bearer '+tk}:{},body:fd});
+          var d=await r.json();
+          if(!d.ok){showToast(d.error||'上传失败','error');return;}
+        }else{
+          var r=await api('/audio/add',{method:'POST',body:{user_id:userId,interact_type:type,content:content,clarity:clarity,result:result,score:score,tags:tagsStr,remark:remark,interact_time:time}});
+          var d=await r.json();
+          if(!d.ok){showToast(d.error||'新增失败','error');return;}
         }
-      } catch (e) {
-        showToast(e.message || '删除失败', 'error');
-      }
+        closeAddModal();showToast('新增记录成功','success');await loadData();
+      }catch(e){showToast(e.message||'操作失败','error');}
     }
 
-    async function toggleRecord() {
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        return;
-      }
+    function openDetail(idx){
+      var it=visibleRecords[idx];if(!it)return;
+      var rows=[['序号',idx+1],['交互时间',it.time],['用户ID',it.userId],['交互类型',it.type],['语音内容',it.content],['语音清晰度',it.clarity],['交互结果',it.result],['评分',makeStars(it.score)],['标签',(it.tags||[]).join(', ')],['备注',it.remark||'-']];
+      var html=rows.map(function(r){return'<div class="detail-row"><span style="color:#64748b;min-width:80px;">'+r[0]+'</span><span style="font-weight:500;">'+r[1]+'</span></div>';}).join('');
+      if(it.audioId)html+='<div style="margin-top:12px;"><audio controls src="/api/audio/download/'+it.audioId+'" style="width:100%;"></audio></div>';
+      $('#detailContent').innerHTML=html;$('#detailOverlay').classList.add('active');
+    }
+    function closeDetail(){$('#detailOverlay').classList.remove('active');}
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        recordChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        recordStart = Date.now();
-
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) recordChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = async () => {
-          stream.getTracks().forEach(t => t.stop());
-          clearInterval(recordTimerInterval);
-          $('#recordingCard').style.display = 'none';
-          $('#recordBtn').textContent = '🎙 开始录音';
-
-          const duration = (Date.now() - recordStart) / 1000;
-          const blob = new Blob(recordChunks, { type: 'audio/webm' });
-          const formData = new FormData();
-          formData.append('file', blob, `recording_${Date.now()}.webm`);
-          formData.append('duration', duration.toFixed(1));
-
-          try {
-            showToast('正在上传...', 'info');
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/audio/upload', {
-              method: 'POST',
-              headers: token ? { 'Authorization': 'Bearer ' + token } : {},
-              body: formData
-            });
-            const data = await res.json();
-            if (data.ok) {
-              showToast('上传成功', 'success');
-              await loadAudioList();
-            } else {
-              showToast(data.error || '上传失败', 'error');
-            }
-          } catch (e) {
-            showToast(e.message || '上传失败', 'error');
-          }
-        };
-
-        mediaRecorder.start();
-        $('#recordingCard').style.display = 'block';
-        $('#recordBtn').textContent = '⏹ 停止录音';
-
-        recordTimerInterval = setInterval(() => {
-          const elapsed = Math.floor((Date.now() - recordStart) / 1000);
-          const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-          const ss = String(elapsed % 60).padStart(2, '0');
-          $('#recordTimer').textContent = `${mm}:${ss}`;
-          const pct = Math.min(100, (elapsed / 120) * 100);
-          $('#recordBar').style.width = pct + '%';
-        }, 500);
-
-      } catch (e) {
-        showToast('无法访问麦克风: ' + (e.message || ''), 'error');
-      }
+    function confirmDelete(idx){pendingDeleteIdx=idx;$('#confirmOverlay').classList.add('active');$('#confirmDeleteBtn').onclick=function(){doDelete();};}
+    function closeConfirm(){$('#confirmOverlay').classList.remove('active');pendingDeleteIdx=-1;}
+    async function doDelete(){
+      if(pendingDeleteIdx<0)return;var it=visibleRecords[pendingDeleteIdx];
+      if(!it){closeConfirm();return;}
+      try{
+        var r=await api('/audio/'+it.id,{method:'DELETE'});
+        var d=await r.json();
+        if(!d.ok){showToast(d.error||'删除失败','error');closeConfirm();return;}
+      }catch(e){showToast(e.message||'删除失败','error');closeConfirm();return;}
+      closeConfirm();showToast('记录已删除','success');await loadData();
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
-      loadAudioList();
-    });
+    function importData(){
+      var inp=document.createElement('input');inp.type='file';inp.accept='.json,.csv';
+      inp.onchange=function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();
+        rd.onload=function(ev){try{var arr=JSON.parse(ev.target.result);if(Array.isArray(arr)){var mx=allRecords.length>0?Math.max.apply(null,allRecords.map(function(r){return r.id;})):0;
+          for(var i=0;i<arr.length;i++){arr[i].id=++mx;if(!arr[i].tags)arr[i].tags=[];allRecords.push(arr[i]);}
+          visibleRecords=allRecords.slice();renderTable(visibleRecords);updateCharts(visibleRecords);showToast('导入成功：'+arr.length+' 条','success');
+        }else{showToast('文件格式不正确','error');}}catch(err){showToast('解析失败: '+err.message,'error');}};rd.readAsText(f);};inp.click();
+    }
+
+    function exportData(){
+      if(!visibleRecords.length){showToast('暂无数据可导出','info');return;}
+      var h=['序号','交互时间','用户ID','交互类型','语音内容','语音清晰度','交互结果','评分','标签'],rows=[h];
+      for(var i=0;i<visibleRecords.length;i++){var it=visibleRecords[i];rows.push([i+1,it.time,it.userId,it.type,it.content,it.clarity,it.result,it.score,(it.tags||[]).join(';')]);}
+      var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+      var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');a.href=url;a.download='语音交互记录_'+new Date().toISOString().slice(0,10)+'.csv';
+      document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);showToast('数据已导出','success');
+    }
   </script>
 </body>
 </html>

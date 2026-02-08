@@ -32,6 +32,15 @@ func Migrate(db *sql.DB) error {
             mime TEXT,
             duration REAL,
             size INTEGER,
+            user_id TEXT DEFAULT '',
+            interact_type TEXT DEFAULT '',
+            content TEXT DEFAULT '',
+            clarity TEXT DEFAULT '',
+            result TEXT DEFAULT '',
+            score INTEGER DEFAULT 4,
+            tags TEXT DEFAULT '',
+            remark TEXT DEFAULT '',
+            interact_time TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );`,
         `CREATE TABLE IF NOT EXISTS logs (
@@ -111,6 +120,21 @@ func Migrate(db *sql.DB) error {
         if _, err := db.Exec(s); err != nil {
             return err
         }
+    }
+    // safely add new columns to recordings (ignore "duplicate column" errors for existing DBs)
+    alterCols := []string{
+        `ALTER TABLE recordings ADD COLUMN user_id TEXT DEFAULT ''`,
+        `ALTER TABLE recordings ADD COLUMN interact_type TEXT DEFAULT ''`,
+        `ALTER TABLE recordings ADD COLUMN content TEXT DEFAULT ''`,
+        `ALTER TABLE recordings ADD COLUMN clarity TEXT DEFAULT ''`,
+        `ALTER TABLE recordings ADD COLUMN result TEXT DEFAULT ''`,
+        `ALTER TABLE recordings ADD COLUMN score INTEGER DEFAULT 4`,
+        `ALTER TABLE recordings ADD COLUMN tags TEXT DEFAULT ''`,
+        `ALTER TABLE recordings ADD COLUMN remark TEXT DEFAULT ''`,
+        `ALTER TABLE recordings ADD COLUMN interact_time TEXT DEFAULT ''`,
+    }
+    for _, s := range alterCols {
+        db.Exec(s) // ignore error if column already exists
     }
     return nil
 }
