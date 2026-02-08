@@ -12,147 +12,62 @@
     <div class="module-title">语音交互记录</div>
     <div class="filter-row">
       <div class="filter-group">
-        <label>交互时间</label>
-        <select>
-          <option>全部</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>用户ID</label>
-        <input type="text" placeholder="请输入用户ID" />
-      </div>
-      <div class="filter-group">
-        <label>交互类型</label>
-        <input type="text" placeholder="全部交互类型" />
-      </div>
-    </div>
-    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
-      <div class="filter-group">
-        <label>语音源类型</label>
-        <select>
-          <option>全部</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>时长</label>
-        <input type="text" placeholder="秒 1-5" />
-      </div>
-    </div>
-    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
-      <div class="filter-group">
-        <label>内容描述</label>
-        <input type="text" placeholder="请" />
-      </div>
-      <div class="filter-group">
-        <label>评分</label>
-        <input type="text" placeholder="请输入评分" />
+        <label>文件名关键字</label>
+        <input id="filterKeyword" type="text" placeholder="请输入文件名关键字" />
       </div>
     </div>
     <div class="action-buttons">
       <button class="btn btn-primary" onclick="search()">查询</button>
+      <button class="btn btn-success" id="recordBtn" onclick="toggleRecord()">🎙 开始录音</button>
+    </div>
+  </div>
+
+  <div class="card" id="recordingCard" style="display: none;">
+    <div class="card-title">🎙 录音中...</div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div id="recordTimer" style="font-size: 24px; font-weight: 700; color: #ef4444;">00:00</div>
+      <div style="flex: 1;">
+        <div class="progress-bar" style="height: 8px;">
+          <div id="recordBar" class="progress-fill" style="width: 0%; background: #ef4444; transition: width 0.5s;"></div>
+        </div>
+      </div>
+      <button class="btn btn-danger" onclick="toggleRecord()">⏹ 停止</button>
     </div>
   </div>
 
   <div class="card">
+    <div class="card-title">录音列表 <span id="totalCount" style="font-size: 13px; color: #94a3b8; font-weight: normal;"></span></div>
     <table class="data-table">
       <thead>
         <tr>
-          <th>序号</th>
-          <th>交互时间</th>
-          <th>用户ID</th>
-          <th>交互类型</th>
-          <th>语音源类型/文本内容</th>
-          <th>时长</th>
-          <th>评分</th>
+          <th>ID</th>
+          <th>文件名</th>
+          <th>时长(秒)</th>
+          <th>大小</th>
+          <th>录制时间</th>
           <th>操作</th>
         </tr>
       </thead>
-      <tbody id="audioTable">
-        <tr>
-          <td>1</td>
-          <td>2024-10-01 10:00:00</td>
-          <td>U001</td>
-          <td>查询</td>
-          <td>▶️ 📥 📚 "今天天气如何"</td>
-          <td>无</td>
-          <td>⭐⭐⭐⭐</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>2</td>
-          <td>2024-10-02 14:30:00</td>
-          <td>U002</td>
-          <td>指令</td>
-          <td>▶️ 📥 📚</td>
-          <td>4s</td>
-          <td>⭐⭐⭐</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>3</td>
-          <td>2024-10-03 09 11:00</td>
-          <td>U003</td>
-          <td>反馈</td>
-          <td>▶️ 📥 📚 "这是语音内容反馈"</td>
-          <td>5s</td>
-          <td>⭐⭐⭐⭐⭐(5s)</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>4</td>
-          <td>2024-10-04 16:45:00</td>
-          <td>U004</td>
-          <td>查询</td>
-          <td>▶️ 📥 📚 "需要完成对当天任务"</td>
-          <td>无</td>
-          <td>⭐⭐⭐⭐</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>5</td>
-          <td>2024-10-05 13:00:00</td>
-          <td>U005</td>
-          <td>指令</td>
-          <td>▶️ 📥 📚</td>
-          <td>2s</td>
-          <td>⭐⭐⭐</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-      </tbody>
+      <tbody id="audioTbody"></tbody>
     </table>
   </div>
 
   <div class="hint-box">
     <div><strong>使用提示:</strong></div>
-    <div>1. 请通过上方筛选语音交互的相关信息,输入具体条件查询</div>
+    <div>1. 点击"开始录音"按钮录制语音,录制完成后自动上传</div>
     <div>2. 可点击播放按钮收听语音内容,或点击下载按钮保存</div>
-    <div>3. 新的语音可通过上方"新增语音记录"功能录制或上传</div>
+    <div>3. 删除操作不可恢复,请谨慎操作</div>
   </div>
 
   <div class="card">
-    <div class="card-title">交互统计</div>
+    <div class="card-title">录音统计</div>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">交互类型分布</div>
-        <canvas id="typeChart" width="300" height="300"></canvas>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">文件大小分布</div>
+        <canvas id="sizeChart" width="300" height="300"></canvas>
       </div>
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">交互时长平均值</div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">时长分布</div>
         <canvas id="durationChart" width="300" height="300"></canvas>
       </div>
     </div>
@@ -160,25 +75,32 @@
 
   <script src="/app/modules/common.js"></script>
   <script>
-    createChart($('#typeChart'), {
+    let allAudios = [];
+    let visibleAudios = [];
+    let mediaRecorder = null;
+    let recordChunks = [];
+    let recordStart = 0;
+    let recordTimerInterval = null;
+
+    const sizeChart = createChart($('#sizeChart'), {
       type: 'doughnut',
       data: {
-        labels: ['查询', '指令', '反馈'],
+        labels: ['<100KB', '100KB-1MB', '>1MB'],
         datasets: [{
-          data: [40, 30, 30],
-          backgroundColor: ['#0ea5e9', '#10b981', '#ef4444']
+          data: [0, 0, 0],
+          backgroundColor: ['#10b981', '#0ea5e9', '#f59e0b']
         }]
       }
     });
 
-    createChart($('#durationChart'), {
+    const durationChart = createChart($('#durationChart'), {
       type: 'bar',
       data: {
-        labels: ['查询', '指令', '反馈'],
+        labels: ['<5s', '5-30s', '30-60s', '>60s'],
         datasets: [{
-          label: '平均时长(秒)',
-          data: [3, 4.5, 5],
-          backgroundColor: ['#0ea5e9', '#10b981', '#ef4444']
+          label: '数量',
+          data: [0, 0, 0, 0],
+          backgroundColor: ['#10b981', '#0ea5e9', '#f59e0b', '#ef4444']
         }]
       },
       options: {
@@ -186,9 +108,199 @@
       }
     });
 
-    function search() {
-      showToast('正在查询语音记录...', 'info');
+    function renderTable(items) {
+      const tbody = $('#audioTbody');
+      tbody.innerHTML = '';
+      if (!items || items.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 6;
+        td.style.textAlign = 'center';
+        td.style.color = '#94a3b8';
+        td.textContent = '暂无录音记录';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+      for (const it of items) {
+        const tr = document.createElement('tr');
+
+        const tdId = document.createElement('td');
+        tdId.textContent = it.id;
+
+        const tdName = document.createElement('td');
+        tdName.textContent = it.filename || '-';
+
+        const tdDur = document.createElement('td');
+        tdDur.textContent = it.duration ? it.duration.toFixed(1) : '-';
+
+        const tdSize = document.createElement('td');
+        tdSize.textContent = formatBytes(it.size || 0);
+
+        const tdTime = document.createElement('td');
+        tdTime.textContent = formatDate(it.created_at);
+
+        const tdActions = document.createElement('td');
+
+        const dlBtn = document.createElement('a');
+        dlBtn.className = 'btn btn-primary btn-action';
+        dlBtn.textContent = '下载';
+        dlBtn.href = '/api/audio/download/' + it.id;
+        dlBtn.target = '_blank';
+        dlBtn.style.textDecoration = 'none';
+        tdActions.appendChild(dlBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-danger btn-action';
+        delBtn.textContent = '删除';
+        delBtn.onclick = () => deleteAudio(it.id);
+        tdActions.appendChild(delBtn);
+
+        tr.appendChild(tdId);
+        tr.appendChild(tdName);
+        tr.appendChild(tdDur);
+        tr.appendChild(tdSize);
+        tr.appendChild(tdTime);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
     }
+
+    function updateCharts(items) {
+      const sizeCounts = [0, 0, 0];
+      const durCounts = [0, 0, 0, 0];
+      for (const it of items) {
+        const s = it.size || 0;
+        if (s < 102400) sizeCounts[0]++;
+        else if (s < 1048576) sizeCounts[1]++;
+        else sizeCounts[2]++;
+
+        const d = it.duration || 0;
+        if (d < 5) durCounts[0]++;
+        else if (d < 30) durCounts[1]++;
+        else if (d < 60) durCounts[2]++;
+        else durCounts[3]++;
+      }
+      if (sizeChart) {
+        sizeChart.data.datasets[0].data = sizeCounts;
+        sizeChart.update();
+      }
+      if (durationChart) {
+        durationChart.data.datasets[0].data = durCounts;
+        durationChart.update();
+      }
+    }
+
+    async function loadAudioList(page = 1, pageSize = 50) {
+      try {
+        const res = await api(`/audio/list?page=${page}&page_size=${pageSize}`);
+        const data = await res.json();
+        allAudios = Array.isArray(data.items) ? data.items : [];
+        visibleAudios = allAudios.slice();
+        $('#totalCount').textContent = `(共 ${data.total || allAudios.length} 条)`;
+        renderTable(visibleAudios);
+        updateCharts(visibleAudios);
+      } catch (e) {
+        showToast(e.message || '加载失败', 'error');
+      }
+    }
+
+    function search() {
+      const keyword = ($('#filterKeyword').value || '').trim().toLowerCase();
+      visibleAudios = allAudios.filter((it) => {
+        if (keyword && !(it.filename || '').toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+      renderTable(visibleAudios);
+      updateCharts(visibleAudios);
+      showToast(`已筛选：${visibleAudios.length} 条`, 'success');
+    }
+
+    async function deleteAudio(id) {
+      if (!confirm('确定要删除这条录音吗？')) return;
+      try {
+        const res = await api('/audio/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('删除成功', 'success');
+          await loadAudioList();
+        } else {
+          showToast(data.error || '删除失败', 'error');
+        }
+      } catch (e) {
+        showToast(e.message || '删除失败', 'error');
+      }
+    }
+
+    async function toggleRecord() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        recordStart = Date.now();
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          clearInterval(recordTimerInterval);
+          $('#recordingCard').style.display = 'none';
+          $('#recordBtn').textContent = '🎙 开始录音';
+
+          const duration = (Date.now() - recordStart) / 1000;
+          const blob = new Blob(recordChunks, { type: 'audio/webm' });
+          const formData = new FormData();
+          formData.append('file', blob, `recording_${Date.now()}.webm`);
+          formData.append('duration', duration.toFixed(1));
+
+          try {
+            showToast('正在上传...', 'info');
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/audio/upload', {
+              method: 'POST',
+              headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+              body: formData
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast('上传成功', 'success');
+              await loadAudioList();
+            } else {
+              showToast(data.error || '上传失败', 'error');
+            }
+          } catch (e) {
+            showToast(e.message || '上传失败', 'error');
+          }
+        };
+
+        mediaRecorder.start();
+        $('#recordingCard').style.display = 'block';
+        $('#recordBtn').textContent = '⏹ 停止录音';
+
+        recordTimerInterval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - recordStart) / 1000);
+          const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+          const ss = String(elapsed % 60).padStart(2, '0');
+          $('#recordTimer').textContent = `${mm}:${ss}`;
+          const pct = Math.min(100, (elapsed / 120) * 100);
+          $('#recordBar').style.width = pct + '%';
+        }, 500);
+
+      } catch (e) {
+        showToast('无法访问麦克风: ' + (e.message || ''), 'error');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadAudioList();
+    });
   </script>
 </body>
 </html>

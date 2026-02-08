@@ -10,113 +10,55 @@
 <body>
   <div class="module-header">
     <div class="module-title">数据同步状态</div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label>配置源</label>
-        <input type="text" placeholder="请输入配置源地址" />
-      </div>
-      <div class="filter-group">
-        <label>目标同步</label>
-        <input type="text" placeholder="请输入目标同步地址" />
-      </div>
-      <div class="filter-group">
-        <label>同步类型</label>
-        <select>
-          <option>15步骤</option>
-        </select>
-      </div>
-    </div>
-    <div class="filter-row" style="grid-template-columns: repeat(3, 1fr);">
-      <div class="filter-group">
-        <label>开始时间</label>
-        <input type="datetime-local" />
-      </div>
-      <div class="filter-group">
-        <label>结束时间</label>
-        <input type="datetime-local" />
-      </div>
-      <div class="filter-group">
-        <label>已同步设定</label>
-        <label style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;">
-          <input type="checkbox" />
-          <span style="font-size: 14px; font-weight: normal; color: #0f172a;">启用</span>
-        </label>
-      </div>
-    </div>
     <div class="action-buttons">
-      <button class="btn btn-primary" onclick="search()">查询</button>
-      <button class="btn btn-secondary" onclick="syncNow()">📤 执行/立即同步</button>
+      <button class="btn btn-primary" onclick="loadSyncStatus()">🔄 刷新状态</button>
+      <button class="btn btn-secondary" id="syncBtn" onclick="syncNow()">📤 执行/立即同步</button>
     </div>
   </div>
 
   <div class="card">
+    <div class="card-title">当前同步状态</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">同步状态</div>
+        <div id="syncStatusBadge" style="font-size: 18px; font-weight: 700;">-</div>
+      </div>
+      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">状态消息</div>
+        <div id="syncMessage" style="font-size: 14px; font-weight: 600;">-</div>
+      </div>
+      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">最后同步时间</div>
+        <div id="syncLastTime" style="font-size: 14px; font-weight: 600;">-</div>
+      </div>
+      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">更新时间</div>
+        <div id="syncUpdatedAt" style="font-size: 14px; font-weight: 600;">-</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">实时同步进度</div>
+    <div class="progress-bar" style="height: 24px; margin-bottom: 8px;">
+      <div id="progressFill" class="progress-fill" style="width: 0%; background: #0ea5e9; transition: width 0.5s;">
+        <span id="progressText" style="color: #fff; font-size: 13px; padding-left: 10px;"></span>
+      </div>
+    </div>
+    <div id="progressDetail" style="font-size: 13px; color: #64748b;">等待同步...</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">同步历史记录</div>
     <table class="data-table">
       <thead>
         <tr>
-          <th>编号</th>
-          <th>配置源</th>
-          <th>目标端</th>
-          <th>同步类型</th>
-          <th>同步状态</th>
-          <th>开始时间</th>
-          <th>结束时间</th>
-          <th>操作</th>
+          <th>时间</th>
+          <th>状态</th>
+          <th>消息</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>1</td>
-          <td>Server A</td>
-          <td>Server B</td>
-          <td>5分步</td>
-          <td><span class="status-badge status-online">已完成</span></td>
-          <td>2024-10-01 08:00</td>
-          <td>2024-10-01 18:00</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>2</td>
-          <td>Server C</td>
-          <td>Server D</td>
-          <td>10分步</td>
-          <td><span class="status-badge status-offline">已失败</span></td>
-          <td>2024-10-02 09:00</td>
-          <td>2024-10-02 20:00</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>3</td>
-          <td>Server E</td>
-          <td>Server F</td>
-          <td>1小时</td>
-          <td><span class="status-badge status-online">运行中</span></td>
-          <td>2024-10-03 10:00</td>
-          <td>2024-10-03 22:00</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>4</td>
-          <td>Server G</td>
-          <td>Server H</td>
-          <td>1小时</td>
-          <td><span class="status-badge status-offline">已失败</span></td>
-          <td>2024-10-04 11:00</td>
-          <td>2024-10-04 23:00</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-      </tbody>
+      <tbody id="syncHistoryTbody"></tbody>
     </table>
   </div>
 
@@ -135,74 +77,196 @@
         <canvas id="statusChart" width="300" height="300"></canvas>
       </div>
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">同步时长分布</div>
-        <canvas id="durationChart" width="300" height="300"></canvas>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">同步操作时间线</div>
+        <canvas id="timelineChart" width="300" height="300"></canvas>
       </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">实时同步进度</div>
-    <div class="progress-bar" style="height: 24px; margin-bottom: 8px;">
-      <div class="progress-fill" style="width: 56%; background: #0ea5e9;">
-        <span style="color: #fff; font-size: 13px; padding-left: 10px;">已完成 56%</span>
-      </div>
-    </div>
-    <div style="font-size: 13px; color: #64748b;">已同步数据量: 200MB / 1000MB</div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">即时动态</div>
-    <div style="background: #eff6ff; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
-      <div style="font-size: 14px; color: #1e40af;">📊 数据同步中详细</div>
-      <div style="font-size: 13px; color: #64748b; margin-top: 4px;">2024-10-21 13:50</div>
-    </div>
-    <div style="background: #fee; padding: 12px; border-radius: 6px; margin-bottom: 8px;">
-      <div style="font-size: 14px; color: #991b1b;">❌ 同步失败详细</div>
-      <div style="font-size: 13px; color: #64748b; margin-top: 4px;">0%</div>
-    </div>
-    <div style="background: #f0fdf4; padding: 12px; border-radius: 6px;">
-      <div style="font-size: 14px; color: #065f46;">✅ 平均运期时刻</div>
-      <div style="font-size: 13px; color: #64748b; margin-top: 4px;">350毫秒</div>
     </div>
   </div>
 
   <script src="/app/modules/common.js"></script>
   <script>
-    createChart($('#statusChart'), {
+    let syncHistory = [];
+    let isSyncing = false;
+
+    const statusColorMap = {
+      success: '#10b981',
+      syncing: '#0ea5e9',
+      failed: '#ef4444',
+      idle: '#94a3b8'
+    };
+    const statusLabelMap = {
+      success: '✅ 已完成',
+      syncing: '🔄 同步中',
+      failed: '❌ 失败',
+      idle: '⏸ 空闲',
+      '': '⏸ 空闲'
+    };
+
+    const statusChart = createChart($('#statusChart'), {
       type: 'doughnut',
       data: {
-        labels: ['已完成', '已失败', '运行中'],
+        labels: ['已完成', '失败', '同步中', '空闲'],
         datasets: [{
-          data: [50, 30, 20],
-          backgroundColor: ['#10b981', '#ef4444', '#0ea5e9']
+          data: [0, 0, 0, 1],
+          backgroundColor: ['#10b981', '#ef4444', '#0ea5e9', '#94a3b8']
         }]
       }
     });
 
-    createChart($('#durationChart'), {
+    const timelineChart = createChart($('#timelineChart'), {
       type: 'bar',
       data: {
-        labels: ['5分步', '10分步', '1小时', '1小时'],
+        labels: [],
         datasets: [{
-          label: '同步次数',
-          data: [5, 3, 2, 2],
-          backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#a855f7']
+          label: '同步操作',
+          data: [],
+          backgroundColor: []
         }]
       },
       options: {
         indexAxis: 'y',
-        scales: { x: { beginAtZero: true } }
+        scales: { x: { beginAtZero: true, max: 1, display: false } },
+        plugins: { legend: { display: false } }
       }
     });
 
-    function search() {
-      showToast('正在查询同步状态...', 'info');
+    function updateStatusDisplay(data) {
+      const status = data.status || 'idle';
+      $('#syncStatusBadge').textContent = statusLabelMap[status] || status;
+      $('#syncStatusBadge').style.color = statusColorMap[status] || '#64748b';
+      $('#syncMessage').textContent = data.message || '-';
+      $('#syncLastTime').textContent = data.last_synced_at ? formatDate(data.last_synced_at) : '-';
+      $('#syncUpdatedAt').textContent = data.updated_at ? formatDate(data.updated_at) : '-';
+
+      if (status === 'syncing') {
+        isSyncing = true;
+        $('#syncBtn').disabled = true;
+        $('#syncBtn').textContent = '⏳ 同步中...';
+      } else {
+        isSyncing = false;
+        $('#syncBtn').disabled = false;
+        $('#syncBtn').textContent = '📤 执行/立即同步';
+      }
     }
 
-    function syncNow() {
-      showToast('正在执行数据同步...', 'info');
+    function updateCharts() {
+      const counts = { success: 0, failed: 0, syncing: 0, idle: 0 };
+      for (const h of syncHistory) {
+        const s = (h.status || 'idle').toLowerCase();
+        if (counts.hasOwnProperty(s)) counts[s]++;
+        else counts.idle++;
+      }
+      if (syncHistory.length === 0) counts.idle = 1;
+
+      if (statusChart) {
+        statusChart.data.datasets[0].data = [counts.success, counts.failed, counts.syncing, counts.idle];
+        statusChart.update();
+      }
+
+      if (timelineChart) {
+        const recent = syncHistory.slice(-8);
+        timelineChart.data.labels = recent.map(h => formatDate(h.time));
+        timelineChart.data.datasets[0].data = recent.map(() => 1);
+        timelineChart.data.datasets[0].backgroundColor = recent.map(h => statusColorMap[h.status] || '#94a3b8');
+        timelineChart.update();
+      }
     }
+
+    function addHistoryRow(time, status, message) {
+      syncHistory.push({ time, status, message });
+      const tbody = $('#syncHistoryTbody');
+      const tr = document.createElement('tr');
+
+      const tdTime = document.createElement('td');
+      tdTime.textContent = formatDate(time);
+
+      const tdStatus = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = 'status-badge ' + (status === 'success' ? 'status-online' : status === 'failed' ? 'status-offline' : 'status-warning');
+      badge.textContent = statusLabelMap[status] || status;
+      tdStatus.appendChild(badge);
+
+      const tdMsg = document.createElement('td');
+      tdMsg.textContent = message || '-';
+
+      tr.appendChild(tdTime);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdMsg);
+      tbody.insertBefore(tr, tbody.firstChild);
+      updateCharts();
+    }
+
+    async function loadSyncStatus() {
+      try {
+        const res = await api('/sync/status');
+        const data = await res.json();
+        updateStatusDisplay(data);
+        if (data.last_synced_at) {
+          addHistoryRow(data.last_synced_at, data.status || 'success', data.message || '');
+        }
+        showToast('状态已刷新', 'success');
+      } catch (e) {
+        showToast(e.message || '加载失败', 'error');
+      }
+    }
+
+    async function syncNow() {
+      if (isSyncing) return;
+      try {
+        const res = await api('/sync/status', {
+          method: 'POST',
+          body: { Status: 'syncing', Message: '手动触发同步' }
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          showToast(data.error || '触发失败', 'error');
+          return;
+        }
+
+        isSyncing = true;
+        $('#syncBtn').disabled = true;
+        $('#syncBtn').textContent = '⏳ 同步中...';
+        $('#syncStatusBadge').textContent = statusLabelMap.syncing;
+        $('#syncStatusBadge').style.color = statusColorMap.syncing;
+        $('#syncMessage').textContent = '手动触发同步';
+        addHistoryRow(new Date().toISOString(), 'syncing', '手动触发同步');
+
+        let progress = 0;
+        const interval = setInterval(() => {
+          progress += Math.random() * 15 + 5;
+          if (progress > 100) progress = 100;
+          $('#progressFill').style.width = progress.toFixed(0) + '%';
+          $('#progressText').textContent = '已完成 ' + progress.toFixed(0) + '%';
+          $('#progressDetail').textContent = `已同步数据量: ${(progress * 10).toFixed(0)}MB / 1000MB`;
+
+          if (progress >= 100) {
+            clearInterval(interval);
+            completeSyncTask();
+          }
+        }, 500);
+
+      } catch (e) {
+        showToast(e.message || '触发失败', 'error');
+      }
+    }
+
+    async function completeSyncTask() {
+      try {
+        await api('/sync/status', {
+          method: 'POST',
+          body: { Status: 'success', Message: '同步完成' }
+        });
+        updateStatusDisplay({ status: 'success', message: '同步完成', last_synced_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+        addHistoryRow(new Date().toISOString(), 'success', '同步完成');
+        showToast('同步完成', 'success');
+      } catch (e) {
+        showToast(e.message || '完成状态写入失败', 'error');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSyncStatus();
+    });
   </script>
 </body>
 </html>

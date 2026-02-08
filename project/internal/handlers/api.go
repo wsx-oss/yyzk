@@ -396,7 +396,18 @@ func (a *API) UpdatesAdd(c *gin.Context) {
 }
 
 func (a *API) UpdatesCheck(c *gin.Context) {
-    c.JSON(200, gin.H{"latest_version":"1.0.1","has_update":true})
+    currentVersion := strings.TrimSpace(c.Query("current"))
+    if currentVersion == "" {
+        currentVersion = "0.0.0"
+    }
+    var latestVersion sql.NullString
+    err := a.db.QueryRow(`SELECT version FROM updates ORDER BY id DESC LIMIT 1`).Scan(&latestVersion)
+    if err != nil || !latestVersion.Valid || latestVersion.String == "" {
+        c.JSON(200, gin.H{"latest_version": currentVersion, "has_update": false})
+        return
+    }
+    hasUpdate := latestVersion.String != currentVersion
+    c.JSON(200, gin.H{"latest_version": latestVersion.String, "has_update": hasUpdate})
 }
 
 func (a *API) SyncStatusGet(c *gin.Context) {

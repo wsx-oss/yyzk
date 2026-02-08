@@ -12,108 +12,44 @@
     <div class="module-title">软件更新管理</div>
     <div class="filter-row">
       <div class="filter-group">
-        <label>更新包名称</label>
-        <input type="text" placeholder="请输入更新包名称(KB号)" />
+        <label>版本关键字</label>
+        <input id="filterKeyword" type="text" placeholder="请输入版本号或描述" />
       </div>
       <div class="filter-group">
         <label>更新状态</label>
-        <select>
-          <option>可执行</option>
-          <option>已完成</option>
-          <option>已跳过</option>
+        <select id="filterStatus">
+          <option value="">全部</option>
+          <option value="released">已发布</option>
+          <option value="pending">待发布</option>
+          <option value="installed">已安装</option>
         </select>
-      </div>
-      <div class="filter-group">
-        <label>更新类型</label>
-        <select>
-          <option>已执行</option>
-        </select>
-      </div>
-    </div>
-    <div class="filter-row" style="grid-template-columns: 1fr 2fr;">
-      <div class="filter-group">
-        <label>显示自动更新</label>
-        <label style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;">
-          <input type="checkbox" checked />
-          <span style="font-size: 14px; font-weight: normal; color: #0f172a;">启用</span>
-        </label>
-      </div>
-      <div class="filter-group">
-        <label>显示手动触发</label>
-        <label style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;">
-          <input type="checkbox" />
-          <span style="font-size: 14px; font-weight: normal; color: #0f172a;">启用</span>
-        </label>
       </div>
     </div>
     <div class="action-buttons">
       <button class="btn btn-primary" onclick="search()">查询</button>
+      <button class="btn btn-secondary" onclick="checkUpdate()">🔍 检查更新</button>
+      <button class="btn btn-success" onclick="addUpdate()">➕ 新增版本</button>
     </div>
+  </div>
+
+  <div class="card" id="checkResultCard" style="display: none;">
+    <div class="card-title">检查更新结果</div>
+    <div id="checkResult" style="padding: 12px; background: #f8fafc; border-radius: 8px;"></div>
   </div>
 
   <div class="card">
     <table class="data-table">
       <thead>
         <tr>
-          <th>更新包名称</th>
-          <th>更新包大小</th>
-          <th>更新状态</th>
-          <th>更新时间</th>
+          <th>ID</th>
+          <th>版本号</th>
+          <th>描述</th>
+          <th>状态</th>
           <th>创建时间</th>
-          <th>更新类型</th>
           <th>操作</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>智能工具规范定期更新包</td>
-          <td>5.2MB</td>
-          <td><span class="status-badge status-online">已完成</span></td>
-          <td>2024-10-15</td>
-          <td>启用</td>
-          <td>跳过</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>安全更新周四更新</td>
-          <td>15.8MB</td>
-          <td><span class="status-badge status-online">已完成</span></td>
-          <td>2024-09-20</td>
-          <td>启用</td>
-          <td>跳过</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>功能优化更新</td>
-          <td>10.6MB</td>
-          <td><span class="status-badge status-offline">已跳过</span></td>
-          <td>2024-08-10</td>
-          <td>启用</td>
-          <td>跳过</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>小幅提新链集成</td>
-          <td>5.6MB</td>
-          <td><span class="status-badge status-offline">已跳过</span></td>
-          <td>2024-07-05</td>
-          <td>启用</td>
-          <td>跳过</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-      </tbody>
+      <tbody id="updatesTbody"></tbody>
     </table>
   </div>
 
@@ -132,7 +68,7 @@
         <canvas id="statusChart" width="300" height="300"></canvas>
       </div>
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">更新类型分布</div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">版本发布时间线</div>
         <canvas id="typeChart" width="300" height="300"></canvas>
       </div>
     </div>
@@ -140,35 +76,180 @@
 
   <script src="/app/modules/common.js"></script>
   <script>
-    createChart($('#statusChart'), {
+    let allUpdates = [];
+    let visibleUpdates = [];
+
+    const statusLabelMap = { released: '已发布', pending: '待发布', installed: '已安装' };
+
+    const statusChart = createChart($('#statusChart'), {
       type: 'doughnut',
       data: {
-        labels: ['已完成', '已跳过', '已重启'],
+        labels: ['已发布', '待发布', '已安装', '其他'],
         datasets: [{
-          data: [50, 30, 20],
-          backgroundColor: ['#0ea5e9', '#ef4444', '#f59e0b']
+          data: [0, 0, 0, 0],
+          backgroundColor: ['#0ea5e9', '#f59e0b', '#10b981', '#94a3b8']
         }]
       }
     });
 
-    createChart($('#typeChart'), {
+    const typeChart = createChart($('#typeChart'), {
       type: 'bar',
       data: {
-        labels: ['智能工具', '安全', '功能', '小幅'],
+        labels: [],
         datasets: [{
-          label: '更新包数量',
-          data: [12, 8, 6, 4],
-          backgroundColor: ['#a855f7', '#10b981', '#0ea5e9']
+          label: '版本',
+          data: [],
+          backgroundColor: '#0ea5e9'
         }]
       },
       options: {
-        scales: { y: { beginAtZero: true } }
+        indexAxis: 'y',
+        scales: { x: { beginAtZero: true, max: 1, display: false } },
+        plugins: { legend: { display: false } }
       }
     });
 
-    function search() {
-      showToast('正在查询更新包...', 'info');
+    function renderTable(items) {
+      const tbody = $('#updatesTbody');
+      tbody.innerHTML = '';
+      for (const it of items) {
+        const tr = document.createElement('tr');
+
+        const tdId = document.createElement('td');
+        tdId.textContent = it.id;
+
+        const tdVer = document.createElement('td');
+        tdVer.textContent = it.version || '-';
+        tdVer.style.fontWeight = '600';
+
+        const tdDesc = document.createElement('td');
+        tdDesc.textContent = it.description || '-';
+
+        const tdStatus = document.createElement('td');
+        const badge = document.createElement('span');
+        const s = (it.status || '').toLowerCase();
+        badge.className = 'status-badge ' + (s === 'released' || s === 'installed' ? 'status-online' : 'status-warning');
+        badge.textContent = statusLabelMap[s] || it.status || '-';
+        tdStatus.appendChild(badge);
+
+        const tdTime = document.createElement('td');
+        tdTime.textContent = formatDate(it.created_at);
+
+        const tdActions = document.createElement('td');
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'btn btn-primary btn-action';
+        viewBtn.textContent = '查看';
+        viewBtn.onclick = () => {
+          alert(`版本: ${it.version}\n描述: ${it.description}\n状态: ${it.status}\n时间: ${formatDate(it.created_at)}`);
+        };
+        tdActions.appendChild(viewBtn);
+
+        tr.appendChild(tdId);
+        tr.appendChild(tdVer);
+        tr.appendChild(tdDesc);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdTime);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
     }
+
+    function updateCharts(items) {
+      const counts = { released: 0, pending: 0, installed: 0, other: 0 };
+      for (const it of items) {
+        const s = (it.status || '').toLowerCase();
+        if (counts.hasOwnProperty(s)) counts[s]++;
+        else counts.other++;
+      }
+      if (statusChart) {
+        statusChart.data.datasets[0].data = [counts.released, counts.pending, counts.installed, counts.other];
+        statusChart.update();
+      }
+      if (typeChart) {
+        const recent = items.slice(0, 8);
+        typeChart.data.labels = recent.map(it => it.version || '?');
+        typeChart.data.datasets[0].data = recent.map(() => 1);
+        typeChart.update();
+      }
+    }
+
+    async function loadUpdates() {
+      try {
+        const res = await api('/updates/list');
+        const data = await res.json();
+        allUpdates = Array.isArray(data.items) ? data.items : [];
+        visibleUpdates = allUpdates.slice();
+        renderTable(visibleUpdates);
+        updateCharts(visibleUpdates);
+      } catch (e) {
+        showToast(e.message || '加载失败', 'error');
+      }
+    }
+
+    function search() {
+      const keyword = ($('#filterKeyword').value || '').trim().toLowerCase();
+      const status = ($('#filterStatus').value || '').trim().toLowerCase();
+
+      visibleUpdates = allUpdates.filter((it) => {
+        if (status && (it.status || '').toLowerCase() !== status) return false;
+        if (keyword) {
+          const ver = (it.version || '').toLowerCase();
+          const desc = (it.description || '').toLowerCase();
+          if (!ver.includes(keyword) && !desc.includes(keyword)) return false;
+        }
+        return true;
+      });
+
+      renderTable(visibleUpdates);
+      updateCharts(visibleUpdates);
+      showToast(`已筛选：${visibleUpdates.length} 条`, 'success');
+    }
+
+    async function checkUpdate() {
+      try {
+        const res = await api('/updates/check');
+        const data = await res.json();
+        const card = $('#checkResultCard');
+        const result = $('#checkResult');
+        card.style.display = 'block';
+        if (data.has_update) {
+          result.innerHTML = `<span style="color: #0ea5e9; font-weight: 700;">🔔 发现新版本：${data.latest_version}</span><br><span style="color: #64748b;">建议尽快更新以获取最新功能与安全修复。</span>`;
+        } else {
+          result.innerHTML = `<span style="color: #10b981; font-weight: 700;">✅ 当前已是最新版本：${data.latest_version || '-'}</span>`;
+        }
+      } catch (e) {
+        showToast(e.message || '检查失败', 'error');
+      }
+    }
+
+    async function addUpdate() {
+      const version = (prompt('版本号（如 V1.2.0）', '') || '').trim();
+      if (!version) return;
+      const description = (prompt('版本描述', '') || '').trim();
+      if (!description) return;
+      const status = (prompt('状态（released/pending/installed）', 'released') || '').trim();
+      if (!status) return;
+
+      try {
+        const res = await api('/updates/add', {
+          method: 'POST',
+          body: { Version: version, Description: description, Status: status }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('新增成功', 'success');
+          await loadUpdates();
+        } else {
+          showToast(data.error || '新增失败', 'error');
+        }
+      } catch (e) {
+        showToast(e.message || '新增失败', 'error');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadUpdates();
+    });
   </script>
 </body>
 </html>

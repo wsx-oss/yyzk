@@ -19,11 +19,11 @@
       </div>
       <div class="filter-group">
         <label>操作人员</label>
-        <input type="text" placeholder="请输入人员/组合选择" />
+        <input id="filterOperator" type="text" placeholder="请输入人员/组合选择" />
       </div>
       <div class="filter-group">
         <label>操作内容类型</label>
-        <input type="text" placeholder="月自选" />
+        <input id="filterKeyword" type="text" placeholder="关键字(内容/备注/级别)" />
       </div>
     </div>
     <div class="filter-row" style="grid-template-columns: repeat(3, 1fr);">
@@ -37,8 +37,11 @@
       </div>
       <div class="filter-group">
         <label>日志级别</label>
-        <select>
-          <option>全部</option>
+        <select id="filterLevel">
+          <option value="">全部</option>
+          <option value="info">info</option>
+          <option value="warn">warn</option>
+          <option value="error">error</option>
         </select>
       </div>
       <div class="filter-group">
@@ -62,63 +65,14 @@
         <tr>
           <th>操作时间</th>
           <th>操作人员</th>
-          <th>操作时间</th>
-          <th>操作类型</th>
-          <th>记录类型</th>
+          <th>内容</th>
+          <th>备注</th>
+          <th>ID</th>
           <th>日志级别</th>
           <th>操作</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>系统操作</td>
-          <td>张三</td>
-          <td>2024-10-01 10:00</td>
-          <td>🟢 成功</td>
-          <td>空间操作1</td>
-          <td>信息</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>交换操作</td>
-          <td>李四</td>
-          <td>2024-10-02 14:30</td>
-          <td>🔴 失败</td>
-          <td>交换操作2</td>
-          <td>错误</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>删除操作</td>
-          <td>王五</td>
-          <td>2024-10-03 09:15</td>
-          <td>🟢 成功</td>
-          <td>删除内容3</td>
-          <td>信息</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>新恒操作</td>
-          <td>赵六</td>
-          <td>2024-10-04 16:45</td>
-          <td>🔴 失败</td>
-          <td>工作模块4</td>
-          <td>错误</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-      </tbody>
+      <tbody id="logsTbody"></tbody>
     </table>
   </div>
 
@@ -145,25 +99,28 @@
 
   <script src="/app/modules/common.js"></script>
   <script>
-    createChart($('#typeChart'), {
+    let allLogs = [];
+    let visibleLogs = [];
+
+    const typeChart = createChart($('#typeChart'), {
       type: 'doughnut',
       data: {
-        labels: ['系统操作', '交换操作', '删除操作'],
+        labels: ['info', 'warn', 'error'],
         datasets: [{
-          data: [40, 30, 30],
-          backgroundColor: ['#a855f7', '#0ea5e9', '#10b981']
+          data: [0, 0, 0],
+          backgroundColor: ['#0ea5e9', '#f59e0b', '#ef4444']
         }]
       }
     });
 
-    createChart($('#resultChart'), {
+    const resultChart = createChart($('#resultChart'), {
       type: 'bar',
       data: {
-        labels: ['成功', '失败'],
+        labels: ['info', 'warn', 'error'],
         datasets: [{
-          label: '操作次数',
-          data: [35, 15],
-          backgroundColor: ['#10b981', '#ef4444']
+          label: '数量',
+          data: [0, 0, 0],
+          backgroundColor: ['#0ea5e9', '#f59e0b', '#ef4444']
         }]
       },
       options: {
@@ -172,17 +129,165 @@
       }
     });
 
+    function escapeText(v) {
+      if (v === null || v === undefined) return '';
+      return String(v);
+    }
+
+    function renderTable(items) {
+      const tbody = $('#logsTbody');
+      tbody.innerHTML = '';
+      for (const it of items) {
+        const tr = document.createElement('tr');
+
+        const tdTime = document.createElement('td');
+        tdTime.textContent = formatDate(it.created_at);
+
+        const tdOp = document.createElement('td');
+        tdOp.textContent = it.meta ? it.meta : '-';
+
+        const tdMsg = document.createElement('td');
+        tdMsg.textContent = escapeText(it.message);
+
+        const tdMeta = document.createElement('td');
+        tdMeta.textContent = it.meta ? it.meta : '-';
+
+        const tdId = document.createElement('td');
+        tdId.textContent = String(it.id);
+
+        const tdLevel = document.createElement('td');
+        tdLevel.textContent = escapeText(it.level);
+
+        const tdActions = document.createElement('td');
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'btn btn-primary btn-action';
+        viewBtn.textContent = '查看';
+        viewBtn.onclick = () => {
+          alert(`时间: ${formatDate(it.created_at)}\n级别: ${escapeText(it.level)}\n内容: ${escapeText(it.message)}\n备注: ${escapeText(it.meta || '')}`);
+        };
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-danger btn-action';
+        delBtn.textContent = '删除';
+        delBtn.onclick = () => {
+          showToast('当前后端未提供删除接口', 'info');
+        };
+        tdActions.appendChild(viewBtn);
+        tdActions.appendChild(delBtn);
+
+        tr.appendChild(tdTime);
+        tr.appendChild(tdOp);
+        tr.appendChild(tdMsg);
+        tr.appendChild(tdMeta);
+        tr.appendChild(tdId);
+        tr.appendChild(tdLevel);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
+    }
+
+    function updateCharts(items) {
+      const counts = { info: 0, warn: 0, error: 0 };
+      for (const it of items) {
+        const lv = (it.level || '').toLowerCase();
+        if (lv === 'info' || lv === 'warn' || lv === 'error') counts[lv] += 1;
+      }
+      const data = [counts.info, counts.warn, counts.error];
+      if (typeChart) {
+        typeChart.data.datasets[0].data = data;
+        typeChart.update();
+      }
+      if (resultChart) {
+        resultChart.data.datasets[0].data = data;
+        resultChart.update();
+      }
+    }
+
+    async function loadLogs(page = 1, pageSize = 50) {
+      const res = await api(`/logs/list?page=${page}&page_size=${pageSize}`);
+      const data = await res.json();
+      allLogs = Array.isArray(data.items) ? data.items : [];
+      visibleLogs = allLogs.slice();
+      renderTable(visibleLogs);
+      updateCharts(visibleLogs);
+    }
+
     function search() {
-      showToast('正在查询操作日志...', 'info');
+      const operator = ($('#filterOperator').value || '').trim().toLowerCase();
+      const keyword = ($('#filterKeyword').value || '').trim().toLowerCase();
+      const level = ($('#filterLevel').value || '').trim().toLowerCase();
+
+      visibleLogs = allLogs.filter((it) => {
+        const meta = (it.meta || '').toLowerCase();
+        const msg = (it.message || '').toLowerCase();
+        const lv = (it.level || '').toLowerCase();
+
+        if (operator && !meta.includes(operator)) return false;
+        if (level && lv !== level) return false;
+        if (keyword && !(msg.includes(keyword) || meta.includes(keyword) || lv.includes(keyword))) return false;
+        return true;
+      });
+
+      renderTable(visibleLogs);
+      updateCharts(visibleLogs);
+      showToast(`已筛选：${visibleLogs.length} 条`, 'success');
     }
 
     function exportLogs() {
-      showToast('导出日志功能开发中', 'info');
+      const rows = [
+        ['id', 'created_at', 'level', 'message', 'meta'],
+        ...visibleLogs.map((it) => [
+          it.id,
+          it.created_at,
+          it.level,
+          it.message,
+          it.meta
+        ])
+      ];
+
+      const csv = rows
+        .map((r) => r.map((cell) => {
+          const s = cell === null || cell === undefined ? '' : String(cell);
+          const escaped = s.replace(/"/g, '""');
+          return `"${escaped}"`;
+        }).join(','))
+        .join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `logs_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     }
 
-    function addLog() {
-      showToast('新增日志功能开发中', 'info');
+    async function addLog() {
+      const level = (prompt('日志级别（info/warn/error）', 'info') || '').trim();
+      if (!level) return;
+      const message = (prompt('日志内容', '') || '').trim();
+      if (!message) return;
+      const meta = (prompt('备注/操作人员（可选）', '') || '').trim();
+
+      const res = await api('/logs/append', {
+        method: 'POST',
+        body: { level, message, meta }
+      });
+      const data = await res.json();
+      if (!data || data.ok !== true) {
+        showToast(data && data.error ? data.error : '新增失败', 'error');
+        return;
+      }
+      showToast('新增成功', 'success');
+      await loadLogs(1, 50);
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadLogs(1, 50).catch((e) => {
+        showToast(e.message || '加载失败', 'error');
+      });
+    });
   </script>
 </body>
 </html>

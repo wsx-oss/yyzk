@@ -10,169 +10,61 @@
 <body>
   <div class="module-header">
     <div class="module-title">硬件状态检测</div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label>硬件名称</label>
-        <input type="text" placeholder="请输入硬件名称" />
-      </div>
-      <div class="filter-group">
-        <label>硬件类型</label>
-        <select>
-          <option>全部</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>硬件ID类型</label>
-        <input type="text" placeholder="ID类型" />
-      </div>
-      <div class="filter-group">
-        <label>检测时间</label>
-        <select>
-          <option>请选择检测时间</option>
-        </select>
-      </div>
-    </div>
-    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
-      <div class="filter-group">
-        <label>状态选项</label>
-        <select>
-          <option>全部</option>
-          <option>正常</option>
-          <option>警告</option>
-          <option>异常</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>温度范围</label>
-        <input type="text" placeholder="例: 20-30℃" />
-      </div>
-    </div>
-    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
-      <div class="filter-group">
-        <label>CPU使用率范围</label>
-        <input type="text" placeholder="例: 10%-30%" />
-      </div>
-      <div class="filter-group">
-        <label>检测间隔时间</label>
-        <input type="text" placeholder="请输入检测间隔" />
-      </div>
-    </div>
     <div class="action-buttons">
-      <button class="btn btn-primary" onclick="search()">查询</button>
+      <button class="btn btn-primary" onclick="loadAll()">🔄 刷新数据</button>
       <button class="btn btn-secondary" onclick="exportData()">📤 导出详情</button>
-      <button class="btn btn-success" onclick="addMonitor()">➕ 添加监控</button>
     </div>
   </div>
 
   <div class="card">
+    <div class="card-title">硬件基本信息</div>
     <table class="data-table">
       <thead>
         <tr>
-          <th>硬件名称</th>
-          <th>硬件类型</th>
-          <th>硬件ID类型</th>
-          <th>状态</th>
-          <th>温度</th>
-          <th>CPU使用率</th>
-          <th>内存使用率</th>
-          <th>网络带宽</th>
-          <th>检测时间</th>
-          <th>操作</th>
+          <th>项目</th>
+          <th>值</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>服务器1</td>
-          <td>服务器</td>
-          <td>192.168.1.100</td>
-          <td><span class="status-badge status-online">● 在线</span></td>
-          <td>25℃</td>
-          <td>10%</td>
-          <td>15%</td>
-          <td>5Mbps</td>
-          <td>2024-10-15 10:00</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>路由器1</td>
-          <td>路由器</td>
-          <td>192.168.1.1</td>
-          <td><span class="status-badge status-offline">● 离线</span></td>
-          <td>23℃</td>
-          <td>10%</td>
-          <td>11%</td>
-          <td>5Mbps</td>
-          <td>2024-10-15 10:05</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>交换机1</td>
-          <td>交换机</td>
-          <td>192.168.1.20</td>
-          <td><span class="status-badge status-warning">● 警告</span></td>
-          <td>80℃</td>
-          <td>80%</td>
-          <td>70%</td>
-          <td>100Mbps</td>
-          <td>2024-10-15 10:10</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>交换机2</td>
-          <td>交换机</td>
-          <td>192.168.1.21</td>
-          <td><span class="status-badge status-warning">● 警告</span></td>
-          <td>52℃</td>
-          <td>82%</td>
-          <td>72%</td>
-          <td>120Mbps</td>
-          <td>2024-10-15 10:30</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>路由器2</td>
-          <td>路由器</td>
-          <td>192.168.1.2</td>
-          <td><span class="status-badge status-online">● 在线</span></td>
-          <td>23℃</td>
-          <td>8%</td>
-          <td>12%</td>
-          <td>5Mbps</td>
-          <td>2024-10-15 10:25</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>交换机3</td>
-          <td>交换机</td>
-          <td>192.168.1.21</td>
-          <td><span class="status-badge status-online">● 在线</span></td>
-          <td>31℃</td>
-          <td>16%</td>
-          <td>20%</td>
-          <td>2100Mbps</td>
-          <td>2024-10-15 10:35</td>
-          <td>
-            <button class="btn btn-primary btn-action">查看详情</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
+      <tbody id="hwInfoTbody">
+        <tr><td colspan="2" style="text-align:center; color:#94a3b8;">加载中...</td></tr>
       </tbody>
     </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">实时资源使用 <span id="refreshTimer" style="font-size:12px; color:#94a3b8; font-weight:normal;">(每5秒自动刷新)</span></div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px;">
+      <div style="text-align: center; padding: 20px; background: #f0f9ff; border-radius: 8px;">
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">CPU 使用率</div>
+        <div id="cpuVal" style="font-size: 28px; font-weight: 700; color: #0ea5e9;">-</div>
+      </div>
+      <div style="text-align: center; padding: 20px; background: #f0fdf4; border-radius: 8px;">
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">内存使用率</div>
+        <div id="memVal" style="font-size: 28px; font-weight: 700; color: #10b981;">-</div>
+      </div>
+      <div style="text-align: center; padding: 20px; background: #fffbeb; border-radius: 8px;">
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">磁盘使用率</div>
+        <div id="diskVal" style="font-size: 28px; font-weight: 700; color: #f59e0b;">-</div>
+      </div>
+      <div style="text-align: center; padding: 20px; background: #faf5ff; border-radius: 8px;">
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">系统运行时间</div>
+        <div id="uptimeVal" style="font-size: 28px; font-weight: 700; color: #a855f7;">-</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+      <div>
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 4px;">CPU</div>
+        <div class="progress-bar"><div id="cpuBar" class="progress-fill" style="width: 0%;"></div></div>
+      </div>
+      <div>
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 4px;">内存</div>
+        <div class="progress-bar"><div id="memBar" class="progress-fill" style="width: 0%; background: #10b981;"></div></div>
+      </div>
+      <div>
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 4px;">磁盘</div>
+        <div class="progress-bar"><div id="diskBar" class="progress-fill" style="width: 0%; background: #f59e0b;"></div></div>
+      </div>
+    </div>
   </div>
 
   <div class="hint-box">
@@ -183,59 +75,165 @@
   </div>
 
   <div class="card">
-    <div class="card-title">硬件状态统计</div>
+    <div class="card-title">资源使用统计</div>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">硬件状态分布</div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">资源使用分布</div>
         <canvas id="statusChart" width="300" height="300"></canvas>
       </div>
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">硬件类型分布</div>
-        <canvas id="typeChart" width="300" height="300"></canvas>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">网络流量</div>
+        <canvas id="netChart" width="300" height="300"></canvas>
       </div>
     </div>
   </div>
 
   <script src="/app/modules/common.js"></script>
   <script>
-    createChart($('#statusChart'), {
+    let refreshInterval = null;
+
+    const statusChart = createChart($('#statusChart'), {
       type: 'doughnut',
       data: {
-        labels: ['在线', '离线', '警告'],
+        labels: ['CPU', '内存', '磁盘', '空闲'],
         datasets: [{
-          data: [60, 20, 20],
-          backgroundColor: ['#10b981', '#ef4444', '#f59e0b']
+          data: [0, 0, 0, 100],
+          backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#e2e8f0']
         }]
       }
     });
 
-    createChart($('#typeChart'), {
+    const netChart = createChart($('#netChart'), {
       type: 'bar',
       data: {
-        labels: ['服务器1', '路由器2', '交换机3', '服务器4'],
+        labels: ['发送', '接收'],
         datasets: [{
-          label: '硬件数量',
-          data: [2, 2, 3, 1],
-          backgroundColor: ['#ef4444', '#a855f7', '#0ea5e9', '#10b981']
+          label: '流量',
+          data: [0, 0],
+          backgroundColor: ['#0ea5e9', '#10b981']
         }]
       },
       options: {
-        indexAxis: 'y',
-        scales: { x: { beginAtZero: true } }
+        scales: { y: { beginAtZero: true } }
       }
     });
 
-    function search() {
-      showToast('正在查询硬件状态...', 'info');
+    function formatUptime(seconds) {
+      const d = Math.floor(seconds / 86400);
+      const h = Math.floor((seconds % 86400) / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      if (d > 0) return `${d}天${h}时`;
+      if (h > 0) return `${h}时${m}分`;
+      return `${m}分`;
+    }
+
+    async function loadHardwareInfo() {
+      try {
+        const res = await api('/hardware/snapshot');
+        const data = await res.json();
+        const tbody = $('#hwInfoTbody');
+        tbody.innerHTML = '';
+        const fields = [
+          ['主机名', data.hostname],
+          ['操作系统', data.os],
+          ['平台', data.platform + ' ' + (data.platform_version || '')],
+          ['内核版本', data.kernel],
+          ['CPU 型号', data.cpu_model],
+          ['CPU 核心数', data.cpu_cores],
+          ['总内存', formatBytes(data.mem_total || 0)]
+        ];
+        for (const [label, val] of fields) {
+          const tr = document.createElement('tr');
+          const td1 = document.createElement('td');
+          td1.textContent = label;
+          td1.style.fontWeight = '600';
+          const td2 = document.createElement('td');
+          td2.textContent = val || '-';
+          tr.appendChild(td1);
+          tr.appendChild(td2);
+          tbody.appendChild(tr);
+        }
+      } catch (e) {
+        showToast(e.message || '硬件信息加载失败', 'error');
+      }
+    }
+
+    async function loadMetrics() {
+      try {
+        const res = await api('/metrics/snapshot');
+        const m = await res.json();
+
+        const cpu = (m.cpu_percent || 0).toFixed(1);
+        const mem = (m.mem_percent || 0).toFixed(1);
+        const disk = (m.disk_used_percent || 0).toFixed(1);
+
+        $('#cpuVal').textContent = cpu + '%';
+        $('#memVal').textContent = mem + '%';
+        $('#diskVal').textContent = disk + '%';
+        $('#uptimeVal').textContent = formatUptime(m.uptime || 0);
+
+        $('#cpuBar').style.width = cpu + '%';
+        $('#memBar').style.width = mem + '%';
+        $('#diskBar').style.width = disk + '%';
+
+        if (parseFloat(cpu) > 80) $('#cpuVal').style.color = '#ef4444';
+        else $('#cpuVal').style.color = '#0ea5e9';
+        if (parseFloat(mem) > 80) $('#memVal').style.color = '#ef4444';
+        else $('#memVal').style.color = '#10b981';
+
+        if (statusChart) {
+          const free = Math.max(0, 100 - parseFloat(cpu) - parseFloat(mem) - parseFloat(disk));
+          statusChart.data.datasets[0].data = [parseFloat(cpu), parseFloat(mem), parseFloat(disk), free > 0 ? free : 0];
+          statusChart.update();
+        }
+
+        if (netChart) {
+          const sent = ((m.net_bytes_sent || 0) / 1024 / 1024).toFixed(1);
+          const recv = ((m.net_bytes_recv || 0) / 1024 / 1024).toFixed(1);
+          netChart.data.datasets[0].data = [parseFloat(sent), parseFloat(recv)];
+          netChart.data.datasets[0].label = '流量 (MB)';
+          netChart.update();
+        }
+      } catch (e) {
+        // silent retry on next interval
+      }
     }
 
     function exportData() {
-      showToast('数据导出功能开发中', 'info');
+      const rows = [];
+      const tbody = $('#hwInfoTbody');
+      for (const tr of tbody.querySelectorAll('tr')) {
+        const cells = tr.querySelectorAll('td');
+        if (cells.length >= 2) {
+          rows.push([cells[0].textContent, cells[1].textContent]);
+        }
+      }
+      rows.push(['CPU使用率', $('#cpuVal').textContent]);
+      rows.push(['内存使用率', $('#memVal').textContent]);
+      rows.push(['磁盘使用率', $('#diskVal').textContent]);
+      rows.push(['运行时间', $('#uptimeVal').textContent]);
+
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hardware_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     }
 
-    function addMonitor() {
-      showToast('添加监控功能开发中', 'info');
+    async function loadAll() {
+      await Promise.all([loadHardwareInfo(), loadMetrics()]);
+      showToast('数据已刷新', 'success');
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadAll();
+      refreshInterval = setInterval(loadMetrics, 5000);
+    });
   </script>
 </body>
 </html>

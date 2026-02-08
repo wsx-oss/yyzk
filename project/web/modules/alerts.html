@@ -12,44 +12,34 @@
     <div class="module-title">异常报警记录</div>
     <div class="filter-row">
       <div class="filter-group">
-        <label>定制时间</label>
-        <input type="date" />
-      </div>
-      <div class="filter-group">
-        <label>结束时间</label>
-        <input type="date" />
-      </div>
-      <div class="filter-group">
         <label>报警类型</label>
-        <select>
-          <option>全部</option>
-          <option>系统警报</option>
-          <option>设备异常</option>
+        <select id="filterCategory">
+          <option value="">全部</option>
+          <option value="system">系统警报</option>
+          <option value="device">设备异常</option>
+          <option value="network">网络异常</option>
         </select>
       </div>
       <div class="filter-group">
         <label>报警等级</label>
-        <select>
-          <option>全部</option>
-          <option>高</option>
-          <option>中</option>
-          <option>低</option>
+        <select id="filterSeverity">
+          <option value="">全部</option>
+          <option value="critical">严重</option>
+          <option value="warning">警告</option>
+          <option value="info">信息</option>
         </select>
       </div>
-    </div>
-    <div class="filter-row" style="grid-template-columns: repeat(2, 1fr);">
       <div class="filter-group">
         <label>报警状态</label>
-        <select>
-          <option>全部</option>
-          <option>未处理</option>
-          <option>处理中</option>
-          <option>已解决</option>
+        <select id="filterAck">
+          <option value="">全部</option>
+          <option value="0">未确认</option>
+          <option value="1">已确认</option>
         </select>
       </div>
       <div class="filter-group">
         <label>关键词查找</label>
-        <input type="text" placeholder="请输入关键词" />
+        <input id="filterKeyword" type="text" placeholder="请输入关键词" />
       </div>
     </div>
     <div class="action-buttons">
@@ -63,53 +53,16 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>定制时间</th>
+          <th>ID</th>
+          <th>时间</th>
           <th>报警类型</th>
           <th>报警等级</th>
-          <th>设备ID/类型</th>
           <th>报警描述</th>
-          <th>报警状态</th>
+          <th>状态</th>
           <th>操作</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>2024-10-01 10:00</td>
-          <td>系统异常</td>
-          <td>🔴 高</td>
-          <td>网络连接1</td>
-          <td>网络断开·时间到延迟过高</td>
-          <td><button class="btn btn-success btn-action">标记已读</button></td>
-          <td><button class="btn btn-danger btn-action">删除记录</button></td>
-        </tr>
-        <tr>
-          <td>2024-10-02 14:30</td>
-          <td>问题提醒</td>
-          <td>🟡 中</td>
-          <td>硬件ID2</td>
-          <td>部分功能功能ID2</td>
-          <td><button class="btn btn-success btn-action">标记已读</button></td>
-          <td><button class="btn btn-danger btn-action">删除记录</button></td>
-        </tr>
-        <tr>
-          <td>2024-10-03 09:15</td>
-          <td>提醒查询</td>
-          <td>🟢 低</td>
-          <td>门控ID3</td>
-          <td>门控功能不3</td>
-          <td><button class="btn btn-success btn-action">标记已读</button></td>
-          <td><button class="btn btn-danger btn-action">删除记录</button></td>
-        </tr>
-        <tr>
-          <td>2024-10-04 16:45</td>
-          <td>系统异常</td>
-          <td>🔴 高</td>
-          <td>新恒功能起程ID4</td>
-          <td>新恒功能起程后程序4</td>
-          <td><button class="btn btn-success btn-action">标记已读</button></td>
-          <td><button class="btn btn-danger btn-action">删除记录</button></td>
-        </tr>
-      </tbody>
+      <tbody id="alertsTbody"></tbody>
     </table>
   </div>
 
@@ -128,7 +81,7 @@
         <canvas id="typeChart" width="300" height="300"></canvas>
       </div>
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">报警优先级分布</div>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">报警等级分布</div>
         <canvas id="priorityChart" width="300" height="300"></canvas>
       </div>
     </div>
@@ -136,24 +89,30 @@
 
   <script src="/app/modules/common.js"></script>
   <script>
-    createChart($('#typeChart'), {
+    let allAlerts = [];
+    let visibleAlerts = [];
+
+    const severityMap = { critical: '🔴 严重', warning: '🟡 警告', info: '🟢 信息' };
+    const categoryMap = { system: '系统警报', device: '设备异常', network: '网络异常' };
+
+    const typeChart = createChart($('#typeChart'), {
       type: 'doughnut',
       data: {
-        labels: ['系统异常', '问题提醒', '提醒查询'],
+        labels: ['系统警报', '设备异常', '网络异常', '其他'],
         datasets: [{
-          data: [45, 35, 20],
-          backgroundColor: ['#ef4444', '#f59e0b', '#0ea5e9']
+          data: [0, 0, 0, 0],
+          backgroundColor: ['#ef4444', '#f59e0b', '#0ea5e9', '#a855f7']
         }]
       }
     });
 
-    createChart($('#priorityChart'), {
+    const priorityChart = createChart($('#priorityChart'), {
       type: 'bar',
       data: {
-        labels: ['高', '中', '低'],
+        labels: ['严重', '警告', '信息'],
         datasets: [{
           label: '报警数量',
-          data: [15, 25, 10],
+          data: [0, 0, 0],
           backgroundColor: ['#ef4444', '#f59e0b', '#10b981']
         }]
       },
@@ -162,17 +121,191 @@
       }
     });
 
+    function renderTable(items) {
+      const tbody = $('#alertsTbody');
+      tbody.innerHTML = '';
+      for (const it of items) {
+        const tr = document.createElement('tr');
+
+        const tdId = document.createElement('td');
+        tdId.textContent = it.id;
+
+        const tdTime = document.createElement('td');
+        tdTime.textContent = formatDate(it.created_at);
+
+        const tdCat = document.createElement('td');
+        tdCat.textContent = categoryMap[it.category] || it.category || '-';
+
+        const tdSev = document.createElement('td');
+        tdSev.textContent = severityMap[it.severity] || it.severity || '-';
+
+        const tdMsg = document.createElement('td');
+        tdMsg.textContent = it.message || '';
+
+        const tdAck = document.createElement('td');
+        if (it.acknowledged) {
+          const badge = document.createElement('span');
+          badge.className = 'status-badge status-online';
+          badge.textContent = '已确认';
+          tdAck.appendChild(badge);
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'status-badge status-offline';
+          badge.textContent = '未确认';
+          tdAck.appendChild(badge);
+        }
+
+        const tdActions = document.createElement('td');
+        if (!it.acknowledged) {
+          const ackBtn = document.createElement('button');
+          ackBtn.className = 'btn btn-success btn-action';
+          ackBtn.textContent = '确认';
+          ackBtn.onclick = () => ackAlert(it.id);
+          tdActions.appendChild(ackBtn);
+        }
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'btn btn-primary btn-action';
+        viewBtn.textContent = '查看';
+        viewBtn.onclick = () => {
+          alert(`ID: ${it.id}\n时间: ${formatDate(it.created_at)}\n类型: ${categoryMap[it.category] || it.category}\n等级: ${severityMap[it.severity] || it.severity}\n内容: ${it.message}\n状态: ${it.acknowledged ? '已确认' : '未确认'}`);
+        };
+        tdActions.appendChild(viewBtn);
+
+        tr.appendChild(tdId);
+        tr.appendChild(tdTime);
+        tr.appendChild(tdCat);
+        tr.appendChild(tdSev);
+        tr.appendChild(tdMsg);
+        tr.appendChild(tdAck);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
+    }
+
+    function updateCharts(items) {
+      const catCounts = { system: 0, device: 0, network: 0, other: 0 };
+      const sevCounts = { critical: 0, warning: 0, info: 0 };
+      for (const it of items) {
+        const cat = (it.category || '').toLowerCase();
+        if (catCounts.hasOwnProperty(cat)) catCounts[cat]++;
+        else catCounts.other++;
+        const sev = (it.severity || '').toLowerCase();
+        if (sevCounts.hasOwnProperty(sev)) sevCounts[sev]++;
+      }
+      if (typeChart) {
+        typeChart.data.datasets[0].data = [catCounts.system, catCounts.device, catCounts.network, catCounts.other];
+        typeChart.update();
+      }
+      if (priorityChart) {
+        priorityChart.data.datasets[0].data = [sevCounts.critical, sevCounts.warning, sevCounts.info];
+        priorityChart.update();
+      }
+    }
+
+    async function loadAlerts(page = 1, pageSize = 50) {
+      try {
+        const res = await api(`/alerts/list?page=${page}&page_size=${pageSize}`);
+        const data = await res.json();
+        allAlerts = Array.isArray(data.items) ? data.items : [];
+        visibleAlerts = allAlerts.slice();
+        renderTable(visibleAlerts);
+        updateCharts(visibleAlerts);
+      } catch (e) {
+        showToast(e.message || '加载失败', 'error');
+      }
+    }
+
     function search() {
-      showToast('正在查询报警记录...', 'info');
+      const category = ($('#filterCategory').value || '').trim().toLowerCase();
+      const severity = ($('#filterSeverity').value || '').trim().toLowerCase();
+      const ackFilter = ($('#filterAck').value || '').trim();
+      const keyword = ($('#filterKeyword').value || '').trim().toLowerCase();
+
+      visibleAlerts = allAlerts.filter((it) => {
+        if (category && (it.category || '').toLowerCase() !== category) return false;
+        if (severity && (it.severity || '').toLowerCase() !== severity) return false;
+        if (ackFilter !== '') {
+          const wantAck = ackFilter === '1';
+          if (it.acknowledged !== wantAck) return false;
+        }
+        if (keyword) {
+          const msg = (it.message || '').toLowerCase();
+          const cat = (it.category || '').toLowerCase();
+          if (!msg.includes(keyword) && !cat.includes(keyword)) return false;
+        }
+        return true;
+      });
+
+      renderTable(visibleAlerts);
+      updateCharts(visibleAlerts);
+      showToast(`已筛选：${visibleAlerts.length} 条`, 'success');
     }
 
     function exportAlerts() {
-      showToast('导出报警功能开发中', 'info');
+      const rows = [
+        ['id', 'created_at', 'category', 'severity', 'message', 'acknowledged'],
+        ...visibleAlerts.map((it) => [
+          it.id, it.created_at, it.category, it.severity, it.message, it.acknowledged ? '是' : '否'
+        ])
+      ];
+      const csv = rows.map((r) => r.map((cell) => {
+        const s = cell === null || cell === undefined ? '' : String(cell);
+        return `"${s.replace(/"/g, '""')}"`;
+      }).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `alerts_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     }
 
-    function createAlert() {
-      showToast('新增报警功能开发中', 'info');
+    async function ackAlert(id) {
+      try {
+        const res = await api('/alerts/ack/' + id, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('已确认', 'success');
+          await loadAlerts();
+        } else {
+          showToast(data.error || '操作失败', 'error');
+        }
+      } catch (e) {
+        showToast(e.message || '操作失败', 'error');
+      }
     }
+
+    async function createAlert() {
+      const category = (prompt('报警类型（system/device/network）', 'system') || '').trim();
+      if (!category) return;
+      const severity = (prompt('报警等级（critical/warning/info）', 'warning') || '').trim();
+      if (!severity) return;
+      const message = (prompt('报警描述', '') || '').trim();
+      if (!message) return;
+
+      try {
+        const res = await api('/alerts/new', {
+          method: 'POST',
+          body: { Category: category, Severity: severity, Message: message }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('新增成功', 'success');
+          await loadAlerts();
+        } else {
+          showToast(data.error || '新增失败', 'error');
+        }
+      } catch (e) {
+        showToast(e.message || '新增失败', 'error');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadAlerts(1, 50);
+    });
   </script>
 </body>
 </html>

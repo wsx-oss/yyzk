@@ -9,199 +9,263 @@
 </head>
 <body>
   <div class="module-header">
-    <div class="module-title">视频监控信息</div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label>视频源名称</label>
-        <input type="text" placeholder="请输入视频源名称" />
-      </div>
-      <div class="filter-group">
-        <label>视频源地址</label>
-        <input type="text" placeholder="请输入视频源地址" />
-      </div>
-      <div class="filter-group">
-        <label>监控区域</label>
-        <select>
-          <option>全部区域</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>监控状态</label>
-        <select>
-          <option>正常</option>
-        </select>
-      </div>
-    </div>
-    <div class="filter-row" style="grid-template-columns: repeat(4, 1fr);">
-      <div class="filter-group">
-        <label>摄像源</label>
-        <select>
-          <option>摄像</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>开始时间</label>
-        <input type="datetime-local" />
-      </div>
-      <div class="filter-group">
-        <label>结束时间</label>
-        <input type="datetime-local" />
-      </div>
-      <div class="filter-group">
-        <label>视频活动</label>
-        <label style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;">
-          <input type="checkbox" />
-          <span style="font-size: 14px; font-weight: normal; color: #0f172a;">开启</span>
-        </label>
-      </div>
-    </div>
+    <div class="module-title">视频监控</div>
     <div class="action-buttons">
-      <button class="btn btn-primary" onclick="search()">查询</button>
-      <button class="btn btn-secondary" onclick="exportVideo()">📤 导出</button>
-      <button class="btn btn-success" onclick="showAddDialog()">➕ 新增视频源</button>
+      <button class="btn btn-success" id="cameraBtn" onclick="toggleCamera()">📷 开启摄像头</button>
+      <button class="btn btn-secondary" onclick="takeScreenshot()" id="screenshotBtn" disabled>📸 截图</button>
+      <button class="btn btn-primary" onclick="switchCamera()" id="switchBtn" disabled>🔄 切换摄像头</button>
     </div>
   </div>
 
   <div class="card">
+    <div class="card-title">🎥 实时视频预览 <span id="cameraStatus" style="font-size: 12px; font-weight: normal; color: #94a3b8;"></span></div>
+    <div style="position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 300px; display: flex; align-items: center; justify-content: center;">
+      <video id="videoPreview" autoplay playsinline muted style="width: 100%; max-height: 500px; display: none;"></video>
+      <div id="videoPlaceholder" style="color: #64748b; font-size: 16px; text-align: center; padding: 40px;">
+        <div style="font-size: 48px; margin-bottom: 12px;">📷</div>
+        <div>点击"开启摄像头"按钮开始视频预览</div>
+        <div style="font-size: 13px; margin-top: 8px; color: #94a3b8;">需要浏览器授权访问摄像头</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="screenshotCard" style="display: none;">
+    <div class="card-title">📸 截图预览</div>
+    <canvas id="screenshotCanvas" style="width: 100%; border-radius: 8px;"></canvas>
+    <div class="action-buttons" style="margin-top: 12px;">
+      <button class="btn btn-primary" onclick="downloadScreenshot()">💾 保存截图</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">摄像头信息</div>
     <table class="data-table">
       <thead>
         <tr>
-          <th>视频源名称</th>
-          <th>视频源地址</th>
-          <th>监控区域</th>
-          <th>摄像源</th>
-          <th>开始时间</th>
-          <th>结束时间</th>
-          <th>视频状态</th>
-          <th>操作</th>
+          <th>设备ID</th>
+          <th>设备名称</th>
+          <th>类型</th>
+          <th>状态</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>大门入口监控</td>
-          <td>http://example.com/video1.mp4</td>
-          <td>A区</td>
-          <td>正常</td>
-          <td>2024-10-01 08:00:00</td>
-          <td>2024-10-01 18:00:00</td>
-          <td><span class="status-badge status-online">✓</span></td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>大厅前坪监控</td>
-          <td>http://example.com/video2.mp4</td>
-          <td>A区</td>
-          <td>异常</td>
-          <td>2024-10-02 09:00:00</td>
-          <td>2024-10-02 17:00:00</td>
-          <td><span class="status-badge status-warning">⚠</span></td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>工作区监控</td>
-          <td>http://example.com/video3.mp4</td>
-          <td>C区</td>
-          <td>正常</td>
-          <td>2024-10-03 10:00:00</td>
-          <td>2024-10-03 16:00:00</td>
-          <td><span class="status-badge status-online">✓</span></td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
-        <tr>
-          <td>A区走廊前摄像头</td>
-          <td>http://example.com/video4.mp4</td>
-          <td>A区</td>
-          <td>正常</td>
-          <td>2024-10-04 11:00:00</td>
-          <td>2024-10-04 15:00:00</td>
-          <td><span class="status-badge status-online">✓</span></td>
-          <td>
-            <button class="btn btn-primary btn-action">查看</button>
-            <button class="btn btn-danger btn-action">删除</button>
-          </td>
-        </tr>
+      <tbody id="devicesTbody">
+        <tr><td colspan="4" style="text-align: center; color: #94a3b8;">点击"开启摄像头"后自动检测</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="hint-box">
     <div><strong>使用提示:</strong></div>
-    <div>1. 请在上方填写视频源的详细信息,支持RTSP、HTTP等多种协议</div>
-    <div>2. 可点击"查看"按钮实时预览视频画面,支持回放与截图</div>
-    <div>3. 新增视频源时需配置流地址、编码格式和存储策略</div>
+    <div>1. 点击"开启摄像头"按钮启动本机摄像头实时预览</div>
+    <div>2. 可点击"截图"按钮捕获当前画面并保存</div>
+    <div>3. 如有多个摄像头,可点击"切换摄像头"进行切换</div>
+    <div>4. 关闭页面或点击"关闭摄像头"会自动释放摄像头资源</div>
   </div>
 
   <div class="card">
     <div class="card-title">视频源统计</div>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">视频状态分布</div>
-        <canvas id="statusChart" width="300" height="300"></canvas>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">设备类型分布</div>
+        <canvas id="typeChart" width="300" height="300"></canvas>
       </div>
       <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">监控区域分布</div>
-        <canvas id="regionChart" width="300" height="300"></canvas>
+        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">设备状态</div>
+        <canvas id="statusChart" width="300" height="300"></canvas>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">🎥 视频预览窗口</div>
-    <video controls style="width: 100%; max-height: 500px; background: #000; border-radius: 8px;">
-      <source src="" type="video/mp4" />
-      您的浏览器不支持视频播放
-    </video>
-  </div>
-
   <script src="/app/modules/common.js"></script>
   <script>
-    createChart($('#statusChart'), {
+    let currentStream = null;
+    let devices = [];
+    let currentDeviceIndex = 0;
+
+    const typeChart = createChart($('#typeChart'), {
       type: 'doughnut',
       data: {
-        labels: ['正常', '异常', '离线'],
+        labels: ['视频输入', '音频输入', '音频输出'],
         datasets: [{
-          data: [70, 20, 10],
-          backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+          data: [0, 0, 0],
+          backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b']
         }]
       }
     });
 
-    createChart($('#regionChart'), {
+    const statusChart = createChart($('#statusChart'), {
       type: 'bar',
       data: {
-        labels: ['A区', 'B区', 'C区'],
+        labels: ['可用', '使用中'],
         datasets: [{
-          label: '摄像头数量',
-          data: [15, 10, 8],
-          backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b']
+          label: '设备数',
+          data: [0, 0],
+          backgroundColor: ['#10b981', '#0ea5e9']
         }]
       },
       options: {
-        indexAxis: 'y',
-        scales: { x: { beginAtZero: true } }
+        scales: { y: { beginAtZero: true } }
       }
     });
 
-    function search() {
-      showToast('正在查询视频源...', 'info');
+    async function enumerateDevices() {
+      try {
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        devices = allDevices.filter(d => d.kind === 'videoinput');
+
+        const tbody = $('#devicesTbody');
+        tbody.innerHTML = '';
+
+        const audioin = allDevices.filter(d => d.kind === 'audioinput').length;
+        const audioout = allDevices.filter(d => d.kind === 'audiooutput').length;
+
+        if (devices.length === 0) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 4;
+          td.style.textAlign = 'center';
+          td.style.color = '#ef4444';
+          td.textContent = '未检测到摄像头设备';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+        } else {
+          for (let i = 0; i < devices.length; i++) {
+            const d = devices[i];
+            const tr = document.createElement('tr');
+
+            const tdId = document.createElement('td');
+            tdId.textContent = d.deviceId ? d.deviceId.substring(0, 12) + '...' : '-';
+            tdId.title = d.deviceId;
+
+            const tdName = document.createElement('td');
+            tdName.textContent = d.label || `摄像头 ${i + 1}`;
+
+            const tdType = document.createElement('td');
+            tdType.textContent = '视频输入';
+
+            const tdStatus = document.createElement('td');
+            const badge = document.createElement('span');
+            badge.className = 'status-badge ' + (i === currentDeviceIndex && currentStream ? 'status-online' : 'status-warning');
+            badge.textContent = (i === currentDeviceIndex && currentStream) ? '使用中' : '可用';
+            tdStatus.appendChild(badge);
+
+            tr.appendChild(tdId);
+            tr.appendChild(tdName);
+            tr.appendChild(tdType);
+            tr.appendChild(tdStatus);
+            tbody.appendChild(tr);
+          }
+        }
+
+        if (typeChart) {
+          typeChart.data.datasets[0].data = [devices.length, audioin, audioout];
+          typeChart.update();
+        }
+        if (statusChart) {
+          const inUse = currentStream ? 1 : 0;
+          statusChart.data.datasets[0].data = [devices.length - inUse, inUse];
+          statusChart.update();
+        }
+
+        if (devices.length > 1) {
+          $('#switchBtn').disabled = false;
+        }
+      } catch (e) {
+        console.warn('enumerate devices failed:', e);
+      }
     }
 
-    function exportVideo() {
-      showToast('视频导出功能开发中', 'info');
+    async function startCamera(deviceId) {
+      stopCamera();
+      try {
+        const constraints = { video: deviceId ? { deviceId: { exact: deviceId } } : true, audio: false };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = $('#videoPreview');
+        video.srcObject = currentStream;
+        video.style.display = 'block';
+        $('#videoPlaceholder').style.display = 'none';
+        $('#cameraBtn').textContent = '⏹ 关闭摄像头';
+        $('#cameraBtn').className = 'btn btn-danger';
+        $('#screenshotBtn').disabled = false;
+        $('#cameraStatus').textContent = '🟢 摄像头已开启';
+        $('#cameraStatus').style.color = '#10b981';
+
+        await enumerateDevices();
+      } catch (e) {
+        showToast('无法访问摄像头: ' + (e.message || ''), 'error');
+        $('#cameraStatus').textContent = '🔴 摄像头访问失败';
+        $('#cameraStatus').style.color = '#ef4444';
+      }
     }
 
-    function showAddDialog() {
-      showToast('新增视频源功能开发中', 'info');
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+      }
+      const video = $('#videoPreview');
+      video.srcObject = null;
+      video.style.display = 'none';
+      $('#videoPlaceholder').style.display = 'block';
+      $('#cameraBtn').textContent = '📷 开启摄像头';
+      $('#cameraBtn').className = 'btn btn-success';
+      $('#screenshotBtn').disabled = true;
+      $('#cameraStatus').textContent = '';
+      enumerateDevices();
     }
+
+    function toggleCamera() {
+      if (currentStream) {
+        stopCamera();
+      } else {
+        const deviceId = devices[currentDeviceIndex] ? devices[currentDeviceIndex].deviceId : null;
+        startCamera(deviceId);
+      }
+    }
+
+    async function switchCamera() {
+      if (devices.length < 2) {
+        showToast('只有一个摄像头', 'info');
+        return;
+      }
+      currentDeviceIndex = (currentDeviceIndex + 1) % devices.length;
+      await startCamera(devices[currentDeviceIndex].deviceId);
+      showToast(`已切换到: ${devices[currentDeviceIndex].label || '摄像头 ' + (currentDeviceIndex + 1)}`, 'success');
+    }
+
+    function takeScreenshot() {
+      const video = $('#videoPreview');
+      if (!video.srcObject) {
+        showToast('请先开启摄像头', 'info');
+        return;
+      }
+      const canvas = $('#screenshotCanvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      $('#screenshotCard').style.display = 'block';
+      showToast('截图成功', 'success');
+    }
+
+    function downloadScreenshot() {
+      const canvas = $('#screenshotCanvas');
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `screenshot_${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      enumerateDevices();
+    });
+
+    window.addEventListener('beforeunload', () => {
+      stopCamera();
+    });
   </script>
 </body>
 </html>
