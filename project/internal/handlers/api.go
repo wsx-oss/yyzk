@@ -15,6 +15,7 @@ import (
 
     "github.com/gin-gonic/gin"
     "github.com/gorilla/websocket"
+    "golang.org/x/crypto/ssh"
     "smartcontrol/internal/monitor"
     "smartcontrol/internal/utils"
 )
@@ -30,7 +31,7 @@ func (a *API) DevicesList(c *gin.Context) {
 
     var args []any
     // 不做 WHERE 过滤，仅按匹配程度置顶
-    q := "SELECT id, name, ip, protocol, status, created_at, updated_at, last_connected_at FROM devices"
+    q := "SELECT id, name, ip, protocol, port, username, auto_connect, log_enabled, description, status, created_at, updated_at, last_connected_at FROM devices"
     // 按名称匹配、协议匹配进行权重排序，其次按创建时间倒序
     q += " ORDER BY (CASE WHEN ? != '' AND LOWER(name) LIKE LOWER(?) THEN 0 ELSE 1 END)"
     q += ", (CASE WHEN ? != '' AND UPPER(protocol) = ? THEN 0 ELSE 1 END)"
@@ -42,10 +43,12 @@ func (a *API) DevicesList(c *gin.Context) {
     defer rows.Close()
     items := []gin.H{}
     for rows.Next() {
-        var id int; var n, ip, proto, status string; var created, updated, last sql.NullString
-        if err := rows.Scan(&id, &n, &ip, &proto, &status, &created, &updated, &last); err == nil {
+        var id, port, autoConn, logEn int; var n, ip, proto, username, desc, status string; var created, updated, last sql.NullString
+        if err := rows.Scan(&id, &n, &ip, &proto, &port, &username, &autoConn, &logEn, &desc, &status, &created, &updated, &last); err == nil {
             items = append(items, gin.H{
-                "id": id, "name": n, "ip": ip, "protocol": proto, "status": status,
+                "id": id, "name": n, "ip": ip, "protocol": proto, "port": port,
+                "username": username, "auto_connect": autoConn == 1, "log_enabled": logEn == 1,
+                "description": desc, "status": status,
                 "created_at": created.String, "updated_at": updated.String, "last_connected_at": last.String,
             })
         }
@@ -55,7 +58,17 @@ func (a *API) DevicesList(c *gin.Context) {
 
 // DevicesCreate inserts a new device with offline status
 func (a *API) DevicesCreate(c *gin.Context) {
-    var p struct { Name, IP, Protocol string }
+    var p struct {
+        Name        string `json:"name"`
+        IP          string `json:"ip"`
+        Protocol    string `json:"protocol"`
+        Port        int    `json:"port"`
+        Username    string `json:"username"`
+        Password    string `json:"password"`
+        AutoConnect bool   `json:"auto_connect"`
+        LogEnabled  bool   `json:"log_enabled"`
+        Description string `json:"description"`
+    }
     if err := c.BindJSON(&p); err != nil { c.JSON(400, gin.H{"error": "bad json"}); return }
     p.Name = strings.TrimSpace(p.Name)
     p.IP = strings.TrimSpace(p.IP)
@@ -71,7 +84,17 @@ func (a *API) DevicesCreate(c *gin.Context) {
     if err := a.db.QueryRow(`SELECT COUNT(1) FROM devices WHERE name = ? AND ip = ? AND protocol = ?`, p.Name, p.IP, p.Protocol).Scan(&cnt); err == nil && cnt > 0 {
         c.JSON(409, gin.H{"error": "device already exists"}); return
     }
-    _, err := a.db.Exec(`INSERT INTO devices(name, ip, protocol, status, created_at, updated_at) VALUES(?,?,?,?,datetime('now'),datetime('now'))`, p.Name, p.IP, p.Protocol, "offline")
+    ac := 0; if p.AutoConnect { ac = 1 }
+    le := 0; if p.LogEnabled { le = 1 }
+    _, err := a.db.Exec(`INSERT INTO devices(name, ip, protocol, port, username, password, auto_connect, log_enabled, description, status, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`,
+        p.Name, p.IP, p.Protocol, p.Port, p.Username, p.Password, ac, le, p.Description, "offline")
+    if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
+    c.JSON(200, gin.H{"ok": true})
+}
+
+// DevicesDisconnectAll sets all online devices to offline
+func (a *API) DevicesDisconnectAll(c *gin.Context) {
+    _, err := a.db.Exec(`UPDATE devices SET status='offline', updated_at=datetime('now') WHERE status='online'`)
     if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
     c.JSON(200, gin.H{"ok": true})
 }
@@ -167,10 +190,12 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
         api.GET("/report/perf", a.ReportPerf)
 
         r.GET("/api/vnc/ws", a.VNCProxyWS)
+        r.GET("/api/ssh/ws", a.SSHProxyWS)
 
         // devices management
         api.GET("/devices", a.DevicesList)
         api.POST("/devices", a.DevicesCreate)
+        api.POST("/devices/disconnect-all", a.DevicesDisconnectAll)
         api.DELETE("/devices/:id", a.DevicesDelete)
         api.POST("/devices/:id/status", a.DeviceSetStatus)
 
@@ -558,3 +583,86 @@ func (a *API) VNCProxyWS(c *gin.Context) {
     <-done
 }
 
+// SSHProxyWS upgrades to WebSocket, connects to target via SSH, and bridges terminal I/O
+func (a *API) SSHProxyWS(c *gin.Context) {
+    host := c.Query("host")
+    port := c.Query("port")
+    user := c.Query("user")
+    pass := c.Query("pass")
+    if host == "" { host = "127.0.0.1" }
+    if port == "" { port = "22" }
+    if user == "" { c.JSON(400, gin.H{"error": "user required"}); return }
+
+    config := &ssh.ClientConfig{
+        User: user,
+        Auth: []ssh.AuthMethod{ssh.Password(pass)},
+        HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+        Timeout: 10 * time.Second,
+    }
+    addr := net.JoinHostPort(host, port)
+    client, err := ssh.Dial("tcp", addr, config)
+    if err != nil { c.String(502, "SSH dial failed: %v", err); return }
+    defer client.Close()
+
+    session, err := client.NewSession()
+    if err != nil { c.String(502, "SSH session failed: %v", err); return }
+    defer session.Close()
+
+    ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+    if err != nil { return }
+    defer ws.Close()
+
+    stdinPipe, _ := session.StdinPipe()
+    stdoutPipe, _ := session.StdoutPipe()
+    stderrPipe, _ := session.StderrPipe()
+
+    // request PTY
+    modes := ssh.TerminalModes{ssh.ECHO: 1, ssh.TTY_OP_ISPEED: 14400, ssh.TTY_OP_OSPEED: 14400}
+    if err := session.RequestPty("xterm-256color", 40, 120, modes); err != nil {
+        ws.WriteMessage(websocket.TextMessage, []byte("PTY request failed: "+err.Error()))
+        return
+    }
+    if err := session.Shell(); err != nil {
+        ws.WriteMessage(websocket.TextMessage, []byte("Shell failed: "+err.Error()))
+        return
+    }
+
+    done := make(chan struct{})
+
+    // stdout -> ws
+    go func() {
+        buf := make([]byte, 4096)
+        for {
+            n, err := stdoutPipe.Read(buf)
+            if n > 0 { ws.WriteMessage(websocket.TextMessage, buf[:n]) }
+            if err != nil { close(done); return }
+        }
+    }()
+    // stderr -> ws
+    go func() {
+        buf := make([]byte, 4096)
+        for {
+            n, err := stderrPipe.Read(buf)
+            if n > 0 { ws.WriteMessage(websocket.TextMessage, buf[:n]) }
+            if err != nil { return }
+        }
+    }()
+    // ws -> stdin (handle resize messages too)
+    go func() {
+        for {
+            _, data, err := ws.ReadMessage()
+            if err != nil { stdinPipe.Close(); return }
+            if len(data) > 0 && data[0] == '\x01' {
+                // resize message: \x01 + JSON {"cols":N,"rows":N}
+                var sz struct{ Cols int `json:"cols"`; Rows int `json:"rows"` }
+                if json.Unmarshal(data[1:], &sz) == nil && sz.Cols > 0 && sz.Rows > 0 {
+                    session.WindowChange(sz.Rows, sz.Cols)
+                }
+            } else {
+                stdinPipe.Write(data)
+            }
+        }
+    }()
+
+    <-done
+}

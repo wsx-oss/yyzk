@@ -129,7 +129,7 @@ func authMiddleware(token string) gin.HandlerFunc {
     return func(c *gin.Context) {
         p := c.Request.URL.Path
         // allow unauth for health, websocket metrics, vnc proxy and static
-        if p == "/api/healthz" || p == "/api/metrics/stream" || p == "/api/vnc/ws" || p == "/" || strings.HasPrefix(p, "/app/") {
+        if p == "/api/healthz" || p == "/api/metrics/stream" || p == "/api/vnc/ws" || p == "/api/ssh/ws" || p == "/" || strings.HasPrefix(p, "/app/") {
             c.Next(); return
         }
         if strings.HasPrefix(p, "/api/") {

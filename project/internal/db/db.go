@@ -99,6 +99,12 @@ func Migrate(db *sql.DB) error {
             name TEXT NOT NULL,
             ip TEXT NOT NULL,
             protocol TEXT NOT NULL, -- VNC/RDP/SSH
+            port INTEGER DEFAULT 0,
+            username TEXT DEFAULT '',
+            password TEXT DEFAULT '',
+            auto_connect INTEGER DEFAULT 0,
+            log_enabled INTEGER DEFAULT 0,
+            description TEXT DEFAULT '',
             status TEXT NOT NULL DEFAULT 'offline', -- online/offline
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -150,6 +156,18 @@ func Migrate(db *sql.DB) error {
     }
     for _, s := range alterCols {
         db.Exec(s) // ignore error if column already exists
+    }
+    // safely add new columns to devices
+    deviceCols := []string{
+        `ALTER TABLE devices ADD COLUMN port INTEGER DEFAULT 0`,
+        `ALTER TABLE devices ADD COLUMN username TEXT DEFAULT ''`,
+        `ALTER TABLE devices ADD COLUMN password TEXT DEFAULT ''`,
+        `ALTER TABLE devices ADD COLUMN auto_connect INTEGER DEFAULT 0`,
+        `ALTER TABLE devices ADD COLUMN log_enabled INTEGER DEFAULT 0`,
+        `ALTER TABLE devices ADD COLUMN description TEXT DEFAULT ''`,
+    }
+    for _, s := range deviceCols {
+        db.Exec(s)
     }
     return nil
 }

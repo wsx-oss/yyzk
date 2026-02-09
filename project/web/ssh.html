@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SSH 终端</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a2e; font-family: 'Consolas', 'Monaco', monospace; height: 100vh; display: flex; flex-direction: column; }
+    .header { background: #16213e; color: #e2e8f0; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; }
+    .header .title { font-size: 15px; font-weight: 600; }
+    .header .info { font-size: 12px; color: #94a3b8; }
+    .header .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .header .status.connected { background: #10b981; }
+    .header .status.disconnected { background: #ef4444; }
+    .header .status.connecting { background: #f59e0b; }
+    .header button { background: #ef4444; color: #fff; border: none; padding: 5px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .header button:hover { background: #dc2626; }
+    #terminal-container { flex: 1; padding: 4px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <span class="title">SSH 终端</span>
+      <span class="info" id="connInfo"> — 连接中...</span>
+    </div>
+    <div>
+      <span class="status connecting" id="statusDot"></span>
+      <span id="statusText" style="font-size:12px;color:#94a3b8;">连接中</span>
+      <button onclick="window.close()" style="margin-left:16px;">断开并关闭</button>
+    </div>
+  </div>
+  <div id="terminal-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var host = params.get('host') || '127.0.0.1';
+    var port = params.get('port') || '22';
+    var user = params.get('user') || '';
+    var pass = params.get('pass') || '';
+    var deviceName = params.get('name') || (user + '@' + host);
+
+    document.title = 'SSH - ' + deviceName;
+    document.getElementById('connInfo').textContent = ' — ' + user + '@' + host + ':' + port;
+
+    var term = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
+      theme: {
+        background: '#1a1a2e',
+        foreground: '#e2e8f0',
+        cursor: '#3b82f6',
+        selectionBackground: '#334155'
+      }
+    });
+    var fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal-container'));
+    fitAddon.fit();
+
+    window.addEventListener('resize', function() { fitAddon.fit(); sendResize(); });
+
+    var ws = null;
+
+    function setStatus(state, text) {
+      var dot = document.getElementById('statusDot');
+      var txt = document.getElementById('statusText');
+      dot.className = 'status ' + state;
+      txt.textContent = text;
+    }
+
+    function sendResize() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        var msg = '\x01' + JSON.stringify({ cols: term.cols, rows: term.rows });
+        ws.send(msg);
+      }
+    }
+
+    function connect() {
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      var url = proto + '//' + location.host + '/api/ssh/ws?host=' + encodeURIComponent(host) +
+        '&port=' + encodeURIComponent(port) +
+        '&user=' + encodeURIComponent(user) +
+        '&pass=' + encodeURIComponent(pass);
+
+      setStatus('connecting', '连接中...');
+      term.writeln('\x1b[33m正在连接 ' + user + '@' + host + ':' + port + ' ...\x1b[0m');
+
+      ws = new WebSocket(url);
+
+      ws.onopen = function() {
+        setStatus('connected', '已连接');
+        term.writeln('\x1b[32m连接成功！\x1b[0m\r\n');
+        sendResize();
+      };
+
+      ws.onmessage = function(e) {
+        if (typeof e.data === 'string') {
+          term.write(e.data);
+        } else if (e.data instanceof Blob) {
+          e.data.text().then(function(text) { term.write(text); });
+        }
+      };
+
+      ws.onclose = function() {
+        setStatus('disconnected', '已断开');
+        term.writeln('\r\n\x1b[31m连接已断开。\x1b[0m');
+      };
+
+      ws.onerror = function() {
+        setStatus('disconnected', '连接失败');
+        term.writeln('\r\n\x1b[31m连接失败，请检查目标设备是否开启 SSH 服务。\x1b[0m');
+      };
+
+      term.onData(function(data) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
+    }
+
+    connect();
+  </script>
+</body>
+</html>
