@@ -108,6 +108,21 @@ func Migrate(db *sql.DB) error {
         `CREATE INDEX IF NOT EXISTS idx_devices_protocol ON devices(protocol);`,
         `CREATE INDEX IF NOT EXISTS idx_devices_created ON devices(created_at);`,
         `CREATE UNIQUE INDEX IF NOT EXISTS uq_devices_name_ip_protocol ON devices(name, ip, protocol);`,
+        // video sources for video monitoring
+        `CREATE TABLE IF NOT EXISTS video_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            region TEXT DEFAULT '',
+            clarity TEXT DEFAULT '',
+            status TEXT DEFAULT '正常',
+            recording INTEGER DEFAULT 0,
+            start_time TEXT DEFAULT '',
+            end_time TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );`,
+        `CREATE INDEX IF NOT EXISTS idx_video_sources_name ON video_sources(name);`,
+        `CREATE INDEX IF NOT EXISTS idx_video_sources_region ON video_sources(region);`,
         // per-user stats
         `CREATE TABLE IF NOT EXISTS user_stats (
             user_id INTEGER PRIMARY KEY,

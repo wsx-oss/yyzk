@@ -174,6 +174,11 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
         api.DELETE("/devices/:id", a.DevicesDelete)
         api.POST("/devices/:id/status", a.DeviceSetStatus)
 
+        // video sources
+        api.GET("/video/list", a.VideoList)
+        api.POST("/video/add", a.VideoAdd)
+        api.DELETE("/video/:id", a.VideoDelete)
+
         // user stats
         api.GET("/user/stats", a.UserStatsGet)
         api.POST("/user/stats/incr_connection", a.UserStatsIncrConnection)
@@ -476,6 +481,50 @@ func (a *API) ReportPerf(c *gin.Context) {
         "notes": "本报告基于当前实时指标与历史事件计数，供快速评估使用",
     }
     c.JSON(200, summary)
+}
+
+func (a *API) VideoList(c *gin.Context) {
+    rows, err := a.db.Query(`SELECT id, name, url, region, clarity, status, recording, start_time, end_time, created_at FROM video_sources ORDER BY id DESC`)
+    if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
+    defer rows.Close()
+    var items []gin.H
+    for rows.Next() {
+        var id int; var name, url, region, clarity, status, startTime, endTime, created string; var recording int
+        if err := rows.Scan(&id, &name, &url, &region, &clarity, &status, &recording, &startTime, &endTime, &created); err == nil {
+            items = append(items, gin.H{"id": id, "name": name, "url": url, "region": region, "clarity": clarity, "status": status, "recording": recording == 1, "start_time": startTime, "end_time": endTime, "created_at": created})
+        }
+    }
+    c.JSON(200, gin.H{"items": items})
+}
+
+func (a *API) VideoAdd(c *gin.Context) {
+    var p struct {
+        Name      string `json:"name"`
+        Url       string `json:"url"`
+        Region    string `json:"region"`
+        Clarity   string `json:"clarity"`
+        Status    string `json:"status"`
+        Recording bool   `json:"recording"`
+        StartTime string `json:"start_time"`
+        EndTime   string `json:"end_time"`
+    }
+    if err := c.BindJSON(&p); err != nil { c.JSON(400, gin.H{"error": "bad json"}); return }
+    if p.Name == "" || p.Url == "" { c.JSON(400, gin.H{"error": "name and url required"}); return }
+    rec := 0; if p.Recording { rec = 1 }
+    res, err := a.db.Exec(`INSERT INTO video_sources(name, url, region, clarity, status, recording, start_time, end_time) VALUES(?,?,?,?,?,?,?,?)`,
+        p.Name, p.Url, p.Region, p.Clarity, p.Status, rec, p.StartTime, p.EndTime)
+    if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
+    newId, _ := res.LastInsertId()
+    c.JSON(200, gin.H{"ok": true, "id": newId})
+}
+
+func (a *API) VideoDelete(c *gin.Context) {
+    id := c.Param("id")
+    result, err := a.db.Exec(`DELETE FROM video_sources WHERE id = ?`, id)
+    if err != nil { c.JSON(500, gin.H{"error": err.Error()}); return }
+    affected, _ := result.RowsAffected()
+    if affected == 0 { c.JSON(404, gin.H{"error": "not found"}); return }
+    c.JSON(200, gin.H{"ok": true})
 }
 
 func (a *API) VNCProxyWS(c *gin.Context) {
