@@ -1,255 +1,828 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>软件更新管理</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before {
+      content: '📦';
+    }
+
+    .up-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .up-header .action-buttons {
+      margin-top: 0;
+      flex-shrink: 0;
+    }
+
+    /* Filters */
+    .filter-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .filter-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .filter-group label {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+    }
+
+    /* Toggle switch */
+    .toggle-row {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #334155;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      cursor: pointer;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #cbd5e1;
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+
+    .toggle-switch input:checked+.toggle-slider {
+      background: #0ea5e9;
+    }
+
+    .toggle-switch input:checked+.toggle-slider::before {
+      transform: translateX(20px);
+    }
+
+    /* Table */
+    .data-table {
+      font-size: 13px;
+    }
+
+    .data-table th {
+      white-space: nowrap;
+      font-size: 12px;
+      padding: 10px 8px;
+    }
+
+    .data-table td {
+      padding: 10px 8px;
+      white-space: nowrap;
+    }
+
+    .btn-edit {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #0ea5e9;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-edit:hover {
+      background: #0284c7;
+    }
+
+    .btn-del {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+
+    .btn-del:hover {
+      background: #dc2626;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 10px;
+      padding: 0;
+      width: 520px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #94a3b8;
+      padding: 4px 8px;
+    }
+
+    .modal-close:hover {
+      color: #0f172a;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .modal-footer {
+      padding: 12px 20px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #334155;
+      margin-bottom: 5px;
+    }
+
+    .form-group label .req {
+      color: #ef4444;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      font-family: inherit;
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+    }
+
+    .form-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    /* Charts */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .chart-box {
+      text-align: center;
+    }
+
+    .chart-box h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #334155;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .auto-tag,
+    .force-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .tag-on {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .tag-off {
+      background: #f1f5f9;
+      color: #94a3b8;
+    }
+  </style>
 </head>
+
 <body>
+  <!-- Header -->
   <div class="module-header">
-    <div class="module-title">软件更新管理</div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label>版本关键字</label>
-        <input id="filterKeyword" type="text" placeholder="请输入版本号或描述" />
-      </div>
-      <div class="filter-group">
-        <label>更新状态</label>
-        <select id="filterStatus">
-          <option value="">全部</option>
-          <option value="released">已发布</option>
-          <option value="pending">待发布</option>
-          <option value="installed">已安装</option>
-        </select>
+    <div class="up-header">
+      <div class="module-title">软件更新管理</div>
+      <div class="action-buttons" style="margin-top:0;">
+        <button class="btn btn-primary" onclick="openAddModal()">新增更新</button>
+        <button class="btn btn-secondary" onclick="importUpdates()">导入更新</button>
+        <button class="btn btn-secondary" onclick="exportUpdates()">导出更新</button>
       </div>
     </div>
-    <div class="action-buttons">
-      <button class="btn btn-primary" onclick="search()">查询</button>
-      <button class="btn btn-secondary" onclick="checkUpdate()">🔍 检查更新</button>
-      <button class="btn btn-success" onclick="addUpdate()">➕ 新增版本</button>
+
+    <!-- Filters -->
+    <div style="margin-top: 16px;">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>更新名称</label>
+          <input type="text" id="fName" placeholder="请输入更新名称" />
+        </div>
+        <div class="filter-group">
+          <label>更新版本号</label>
+          <input type="text" id="fVersion" placeholder="请输入更新版本号" />
+        </div>
+        <div class="filter-group">
+          <label>更新类型</label>
+          <select id="fType">
+            <option value="全部">全部</option>
+            <option value="功能更新">功能更新</option>
+            <option value="安全更新">安全更新</option>
+            <option value="性能优化">性能优化</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>更新状态</label>
+          <select id="fStatus">
+            <option value="全部">全部</option>
+            <option value="待发布">待发布</option>
+            <option value="已发布">已发布</option>
+            <option value="已撤回">已撤回</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-row-2">
+        <div class="filter-group">
+          <label>更新大小 (MB)</label>
+          <input type="text" id="fSize" placeholder="请输入更新大小 (MB)" />
+        </div>
+        <div class="filter-group">
+          <label>发布时间</label>
+          <input type="date" id="fDate" />
+        </div>
+        <div style="display:flex; gap:24px; align-items:end; padding-bottom:2px;">
+          <div class="toggle-item">
+            <label style="font-size:12px; color:#64748b; margin:0;">自动更新开关</label>
+            <label class="toggle-switch"><input type="checkbox" id="fAutoUpdate" /><span
+                class="toggle-slider"></span></label>
+            <span id="fAutoLabel" style="font-size:12px; color:#64748b;">启用</span>
+          </div>
+          <div class="toggle-item">
+            <label style="font-size:12px; color:#64748b; margin:0;">强制更新开关</label>
+            <label class="toggle-switch"><input type="checkbox" id="fForceUpdate" /><span
+                class="toggle-slider"></span></label>
+            <span id="fForceLabel" style="font-size:12px; color:#64748b;">启用</span>
+          </div>
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button class="btn btn-primary" onclick="searchUpdates()" style="width:100%;">搜索</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="card" id="checkResultCard" style="display: none;">
-    <div class="card-title">检查更新结果</div>
-    <div id="checkResult" style="padding: 12px; background: #f8fafc; border-radius: 8px;"></div>
-  </div>
-
-  <div class="card">
+  <!-- Data Table -->
+  <div class="card" style="overflow-x:auto;">
     <table class="data-table">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>版本号</th>
-          <th>描述</th>
-          <th>状态</th>
-          <th>创建时间</th>
+          <th>更新名称</th>
+          <th>更新版本号</th>
+          <th>更新类型</th>
+          <th>更新大小</th>
+          <th>更新状态</th>
+          <th>发布时间</th>
+          <th>自动更新</th>
+          <th>强制更新</th>
           <th>操作</th>
         </tr>
       </thead>
-      <tbody id="updatesTbody"></tbody>
+      <tbody id="updatesTbody">
+        <tr>
+          <td colspan="9" class="empty-state">加载中...</td>
+        </tr>
+      </tbody>
     </table>
   </div>
 
-  <div class="hint-box">
+  <!-- Usage Tips -->
+  <div class="hint-box" style="margin-bottom: 20px;">
     <div><strong>使用提示:</strong></div>
-    <div>1. 软件更新包包含功能改进、安全修复和性能优化等内容</div>
-    <div>2. 定期检查并安装更新,确保系统始终保持最新状态</div>
-    <div>3. 启用自动更新可在后台自动下载并提示安装</div>
+    <div>1. 软件更新管理用于发布和管理软件的更新信息，请谨慎操作。</div>
+    <div>2. 已发布的更新撤回后无法再次发布，已撤回的更新无法再次发布。</div>
+    <div>3. 强制更新会在用户下次启动软件时自动下载并安装软件。</div>
   </div>
 
+  <!-- Statistics -->
   <div class="card">
     <div class="card-title">更新统计</div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">更新状态分布</div>
-        <canvas id="statusChart" width="300" height="300"></canvas>
+    <div class="charts-row">
+      <div class="chart-box">
+        <h4>更新状态分布</h4>
+        <canvas id="statusChart" height="260"></canvas>
       </div>
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">版本发布时间线</div>
-        <canvas id="typeChart" width="300" height="300"></canvas>
+      <div class="chart-box">
+        <h4>更新类型分布</h4>
+        <canvas id="typeChart" height="260"></canvas>
       </div>
     </div>
   </div>
 
+  <!-- Add/Edit Modal -->
+  <div class="modal-overlay" id="formModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span id="formTitle">新增更新</span>
+        <button class="modal-close" onclick="closeFormModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editId" value="" />
+        <div class="form-group">
+          <label>更新名称 <span class="req">*</span></label>
+          <input type="text" id="mName" placeholder="请输入更新名称" />
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>版本号 <span class="req">*</span></label>
+            <input type="text" id="mVersion" placeholder="请输入版本号" />
+          </div>
+          <div class="form-group">
+            <label>更新类型 <span class="req">*</span></label>
+            <select id="mType">
+              <option value="功能更新">功能更新</option>
+              <option value="安全更新">安全更新</option>
+              <option value="性能优化">性能优化</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>更新大小</label>
+            <input type="text" id="mSize" placeholder="如: 20MB" />
+          </div>
+          <div class="form-group">
+            <label>状态 <span class="req">*</span></label>
+            <select id="mStatus">
+              <option value="待发布">待发布</option>
+              <option value="已发布">已发布</option>
+              <option value="已撤回">已撤回</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>发布时间</label>
+          <input type="date" id="mDate" />
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>自动更新</label>
+            <div class="form-toggle">
+              <label class="toggle-switch"><input type="checkbox" id="mAutoUpdate" /><span
+                  class="toggle-slider"></span></label>
+              <span style="font-size:13px; color:#475569;">启用</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>强制更新</label>
+            <div class="form-toggle">
+              <label class="toggle-switch"><input type="checkbox" id="mForceUpdate" /><span
+                  class="toggle-slider"></span></label>
+              <span style="font-size:13px; color:#475569;">启用</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>更新描述</label>
+          <textarea id="mDesc" placeholder="请输入更新描述信息"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeFormModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitForm()">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import file input (hidden) -->
+  <input type="file" id="importFile" accept=".json" style="display:none;" onchange="handleImportFile(event)" />
+
   <script src="/app/modules/common.js"></script>
   <script>
-    let allUpdates = [];
-    let visibleUpdates = [];
+    let allItems = [];
+    let statusChartInst = null;
+    let typeChartInst = null;
 
-    const statusLabelMap = { released: '已发布', pending: '待发布', installed: '已安装' };
-
-    const statusChart = createChart($('#statusChart'), {
-      type: 'doughnut',
-      data: {
-        labels: ['已发布', '待发布', '已安装', '其他'],
-        datasets: [{
-          data: [0, 0, 0, 0],
-          backgroundColor: ['#0ea5e9', '#f59e0b', '#10b981', '#94a3b8']
-        }]
-      }
-    });
-
-    const typeChart = createChart($('#typeChart'), {
-      type: 'bar',
-      data: {
-        labels: [],
-        datasets: [{
-          label: '版本',
-          data: [],
-          backgroundColor: '#0ea5e9'
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        scales: { x: { beginAtZero: true, max: 1, display: false } },
-        plugins: { legend: { display: false } }
-      }
-    });
-
-    function renderTable(items) {
-      const tbody = $('#updatesTbody');
-      tbody.innerHTML = '';
-      for (const it of items) {
-        const tr = document.createElement('tr');
-
-        const tdId = document.createElement('td');
-        tdId.textContent = it.id;
-
-        const tdVer = document.createElement('td');
-        tdVer.textContent = it.version || '-';
-        tdVer.style.fontWeight = '600';
-
-        const tdDesc = document.createElement('td');
-        tdDesc.textContent = it.description || '-';
-
-        const tdStatus = document.createElement('td');
-        const badge = document.createElement('span');
-        const s = (it.status || '').toLowerCase();
-        badge.className = 'status-badge ' + (s === 'released' || s === 'installed' ? 'status-online' : 'status-warning');
-        badge.textContent = statusLabelMap[s] || it.status || '-';
-        tdStatus.appendChild(badge);
-
-        const tdTime = document.createElement('td');
-        tdTime.textContent = formatDate(it.created_at);
-
-        const tdActions = document.createElement('td');
-        const viewBtn = document.createElement('button');
-        viewBtn.className = 'btn btn-primary btn-action';
-        viewBtn.textContent = '查看';
-        viewBtn.onclick = () => {
-          alert(`版本: ${it.version}\n描述: ${it.description}\n状态: ${it.status}\n时间: ${formatDate(it.created_at)}`);
-        };
-        tdActions.appendChild(viewBtn);
-
-        tr.appendChild(tdId);
-        tr.appendChild(tdVer);
-        tr.appendChild(tdDesc);
-        tr.appendChild(tdStatus);
-        tr.appendChild(tdTime);
-        tr.appendChild(tdActions);
-        tbody.appendChild(tr);
-      }
-    }
-
-    function updateCharts(items) {
-      const counts = { released: 0, pending: 0, installed: 0, other: 0 };
-      for (const it of items) {
-        const s = (it.status || '').toLowerCase();
-        if (counts.hasOwnProperty(s)) counts[s]++;
-        else counts.other++;
-      }
-      if (statusChart) {
-        statusChart.data.datasets[0].data = [counts.released, counts.pending, counts.installed, counts.other];
-        statusChart.update();
-      }
-      if (typeChart) {
-        const recent = items.slice(0, 8);
-        typeChart.data.labels = recent.map(it => it.version || '?');
-        typeChart.data.datasets[0].data = recent.map(() => 1);
-        typeChart.update();
-      }
-    }
-
-    async function loadUpdates() {
+    // ========== Load & Search ==========
+    async function loadList() {
       try {
-        const res = await api('/updates/list');
+        const res = await api('/updates/list?page_size=200');
         const data = await res.json();
-        allUpdates = Array.isArray(data.items) ? data.items : [];
-        visibleUpdates = allUpdates.slice();
-        renderTable(visibleUpdates);
-        updateCharts(visibleUpdates);
+        allItems = data.items || [];
+        renderTable(allItems);
       } catch (e) {
-        showToast(e.message || '加载失败', 'error');
+        showToast('加载更新列表失败', 'error');
       }
     }
 
-    function search() {
-      const keyword = ($('#filterKeyword').value || '').trim().toLowerCase();
-      const status = ($('#filterStatus').value || '').trim().toLowerCase();
+    async function loadStats() {
+      try {
+        const res = await api('/updates/stats');
+        const data = await res.json();
+        renderCharts(data);
+      } catch (e) { /* silent */ }
+    }
 
-      visibleUpdates = allUpdates.filter((it) => {
-        if (status && (it.status || '').toLowerCase() !== status) return false;
-        if (keyword) {
-          const ver = (it.version || '').toLowerCase();
-          const desc = (it.description || '').toLowerCase();
-          if (!ver.includes(keyword) && !desc.includes(keyword)) return false;
+    async function searchUpdates() {
+      try {
+        const params = new URLSearchParams();
+        const name = document.getElementById('fName').value.trim();
+        const version = document.getElementById('fVersion').value.trim();
+        const type = document.getElementById('fType').value;
+        const status = document.getElementById('fStatus').value;
+        const size = document.getElementById('fSize').value.trim();
+        const date = document.getElementById('fDate').value;
+        const autoUpdate = document.getElementById('fAutoUpdate').checked;
+        const forceUpdate = document.getElementById('fForceUpdate').checked;
+
+        if (name) params.set('name', name);
+        if (version) params.set('version', version);
+        if (type && type !== '全部') params.set('type', type);
+        if (status && status !== '全部') params.set('status', status);
+        if (size) params.set('size', size);
+        if (date) params.set('publish_date', date);
+        if (autoUpdate) params.set('auto_update', '1');
+        if (forceUpdate) params.set('force_update', '1');
+        params.set('page_size', '200');
+
+        const res = await api('/updates/list?' + params.toString());
+        const data = await res.json();
+        allItems = data.items || [];
+        renderTable(allItems);
+        showToast('搜索完成，共 ' + allItems.length + ' 条记录', 'success');
+      } catch (e) {
+        showToast('搜索失败', 'error');
+      }
+    }
+
+    // ========== Render Table ==========
+    function renderTable(items) {
+      const tbody = document.getElementById('updatesTbody');
+      if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">暂无更新数据，请点击"新增更新"按钮添加</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(it => {
+        const statusCls = it.status === '已发布' ? 'status-online' : it.status === '已撤回' ? 'status-offline' : 'status-warning';
+        const autoTag = it.auto_update ? '<span class="auto-tag tag-on">启用</span>' : '<span class="auto-tag tag-off">禁用</span>';
+        const forceTag = it.force_update ? '<span class="force-tag tag-on">启用</span>' : '<span class="force-tag tag-off">禁用</span>';
+        return `<tr>
+          <td>${esc(it.name)}</td>
+          <td style="font-weight:600;">${esc(it.version)}</td>
+          <td>${esc(it.type)}</td>
+          <td>${esc(it.size)}</td>
+          <td><span class="status-badge ${statusCls}">${esc(it.status)}</span></td>
+          <td>${esc(it.publish_date) || '-'}</td>
+          <td>${autoTag}</td>
+          <td>${forceTag}</td>
+          <td>
+            <button class="btn-edit" onclick="openEditModal(${it.id})">编辑</button>
+            <button class="btn-del" onclick="deleteUpdate(${it.id}, '${esc(it.name)}')">删除</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = String(str);
+      return div.innerHTML;
+    }
+
+    // ========== Charts ==========
+    function renderCharts(stats) {
+      const statusDist = stats.status_distribution || {};
+      const statusLabels = ['待发布', '已发布', '已撤回'];
+      const statusColors = ['#0ea5e9', '#10b981', '#ef4444'];
+      const statusData = statusLabels.map(l => statusDist[l] || 0);
+
+      if (statusChartInst) statusChartInst.destroy();
+      statusChartInst = new Chart(document.getElementById('statusChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: statusLabels,
+          datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'right', labels: { padding: 16, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 13 } } }
+          }
         }
-        return true;
       });
 
-      renderTable(visibleUpdates);
-      updateCharts(visibleUpdates);
-      showToast(`已筛选：${visibleUpdates.length} 条`, 'success');
-    }
+      const typeDist = stats.type_distribution || {};
+      const typeLabels = ['功能更新', '安全更新', '性能优化'];
+      const typeColors = ['#0ea5e9', '#10b981', '#a855f7'];
+      const typeData = typeLabels.map(l => typeDist[l] || 0);
 
-    async function checkUpdate() {
-      try {
-        const res = await api('/updates/check');
-        const data = await res.json();
-        const card = $('#checkResultCard');
-        const result = $('#checkResult');
-        card.style.display = 'block';
-        if (data.has_update) {
-          result.innerHTML = `<span style="color: #0ea5e9; font-weight: 700;">🔔 发现新版本：${data.latest_version}</span><br><span style="color: #64748b;">建议尽快更新以获取最新功能与安全修复。</span>`;
-        } else {
-          result.innerHTML = `<span style="color: #10b981; font-weight: 700;">✅ 当前已是最新版本：${data.latest_version || '-'}</span>`;
+      if (typeChartInst) typeChartInst.destroy();
+      typeChartInst = new Chart(document.getElementById('typeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: typeLabels,
+          datasets: [{ label: '数量', data: typeData, backgroundColor: typeColors, borderRadius: 4, barThickness: 28 }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f1f5f9' } },
+            y: { grid: { display: false } }
+          },
+          plugins: { legend: { display: false } }
         }
-      } catch (e) {
-        showToast(e.message || '检查失败', 'error');
-      }
+      });
     }
 
-    async function addUpdate() {
-      const version = (prompt('版本号（如 V1.2.0）', '') || '').trim();
-      if (!version) return;
-      const description = (prompt('版本描述', '') || '').trim();
-      if (!description) return;
-      const status = (prompt('状态（released/pending/installed）', 'released') || '').trim();
-      if (!status) return;
+    // ========== Add / Edit Modal ==========
+    function openAddModal() {
+      document.getElementById('formTitle').textContent = '新增更新';
+      document.getElementById('editId').value = '';
+      document.getElementById('mName').value = '';
+      document.getElementById('mVersion').value = '';
+      document.getElementById('mType').value = '功能更新';
+      document.getElementById('mSize').value = '';
+      document.getElementById('mStatus').value = '待发布';
+      document.getElementById('mDate').value = '';
+      document.getElementById('mAutoUpdate').checked = false;
+      document.getElementById('mForceUpdate').checked = false;
+      document.getElementById('mDesc').value = '';
+      document.getElementById('formModal').classList.add('active');
+    }
+
+    function openEditModal(id) {
+      const item = allItems.find(i => i.id === id);
+      if (!item) { showToast('未找到该记录', 'error'); return; }
+      document.getElementById('formTitle').textContent = '编辑更新';
+      document.getElementById('editId').value = id;
+      document.getElementById('mName').value = item.name || '';
+      document.getElementById('mVersion').value = item.version || '';
+      document.getElementById('mType').value = item.type || '功能更新';
+      document.getElementById('mSize').value = item.size || '';
+      document.getElementById('mStatus').value = item.status || '待发布';
+      document.getElementById('mDate').value = item.publish_date || '';
+      document.getElementById('mAutoUpdate').checked = !!item.auto_update;
+      document.getElementById('mForceUpdate').checked = !!item.force_update;
+      document.getElementById('mDesc').value = item.description || '';
+      document.getElementById('formModal').classList.add('active');
+    }
+
+    function closeFormModal() {
+      document.getElementById('formModal').classList.remove('active');
+    }
+
+    async function submitForm() {
+      const editId = document.getElementById('editId').value;
+      const name = document.getElementById('mName').value.trim();
+      const version = document.getElementById('mVersion').value.trim();
+      const type = document.getElementById('mType').value;
+      const size = document.getElementById('mSize').value.trim();
+      const status = document.getElementById('mStatus').value;
+      const publishDate = document.getElementById('mDate').value;
+      const autoUpdate = document.getElementById('mAutoUpdate').checked;
+      const forceUpdate = document.getElementById('mForceUpdate').checked;
+      const desc = document.getElementById('mDesc').value.trim();
+
+      if (!name) { showToast('请输入更新名称', 'error'); return; }
+      if (!version) { showToast('请输入版本号', 'error'); return; }
+
+      const body = { name, version, type, size, status, publish_date: publishDate, auto_update: autoUpdate, force_update: forceUpdate, description: desc };
 
       try {
-        const res = await api('/updates/add', {
-          method: 'POST',
-          body: { Version: version, Description: description, Status: status }
-        });
+        let res;
+        if (editId) {
+          res = await api('/updates/' + editId, { method: 'PUT', body });
+        } else {
+          res = await api('/updates/add', { method: 'POST', body });
+        }
         const data = await res.json();
         if (data.ok) {
-          showToast('新增成功', 'success');
-          await loadUpdates();
+          showToast(editId ? '更新成功' : '新增成功', 'success');
+          closeFormModal();
+          await Promise.all([loadList(), loadStats()]);
         } else {
-          showToast(data.error || '新增失败', 'error');
+          showToast(data.error || '操作失败', 'error');
         }
       } catch (e) {
-        showToast(e.message || '新增失败', 'error');
+        showToast('操作失败: ' + (e.message || ''), 'error');
       }
     }
 
+    // ========== Delete ==========
+    async function deleteUpdate(id, name) {
+      if (!confirm('确定要删除更新"' + name + '"吗？此操作不可恢复！')) return;
+      try {
+        const res = await api('/updates/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('删除成功', 'success');
+          await Promise.all([loadList(), loadStats()]);
+        } else {
+          showToast(data.error || '删除失败', 'error');
+        }
+      } catch (e) {
+        showToast('删除失败', 'error');
+      }
+    }
+
+    // ========== Import ==========
+    function importUpdates() {
+      document.getElementById('importFile').click();
+    }
+
+    function handleImportFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function (e) {
+        try {
+          const items = JSON.parse(e.target.result);
+          if (!Array.isArray(items)) { showToast('JSON文件格式错误，需要数组格式', 'error'); return; }
+          const res = await api('/updates/import', { method: 'POST', body: items });
+          const data = await res.json();
+          if (data.ok) {
+            showToast('成功导入 ' + data.imported + ' 条记录', 'success');
+            await Promise.all([loadList(), loadStats()]);
+          } else {
+            showToast(data.error || '导入失败', 'error');
+          }
+        } catch (err) {
+          showToast('导入失败: JSON格式解析错误', 'error');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    // ========== Export ==========
+    function exportUpdates() {
+      if (!allItems || allItems.length === 0) {
+        showToast('没有可导出的数据', 'error');
+        return;
+      }
+      const exportData = allItems.map(it => ({
+        name: it.name, version: it.version, type: it.type, size: it.size,
+        status: it.status, publish_date: it.publish_date,
+        auto_update: it.auto_update, force_update: it.force_update,
+        description: it.description
+      }));
+      const json = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '软件更新_' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('导出成功', 'success');
+    }
+
+    // ========== Init ==========
     window.addEventListener('DOMContentLoaded', () => {
-      loadUpdates();
+      loadList();
+      loadStats();
+    });
+
+    document.getElementById('formModal').addEventListener('click', function (e) {
+      if (e.target === this) closeFormModal();
     });
   </script>
 </body>
+
 </html>

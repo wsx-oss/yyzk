@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,6 +41,13 @@ func NewRateLimiter(rate int, duration time.Duration) *RateLimiter {
 // Middleware returns a Gin middleware handler
 func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip rate limiting for static files
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, "/app/") || path == "/" {
+			c.Next()
+			return
+		}
+		
 		ip := c.ClientIP()
 		
 		if !rl.allow(ip) {
@@ -72,7 +80,7 @@ func (rl *RateLimiter) allow(ip string) bool {
 	
 	// Refill tokens based on time passed
 	elapsed := now.Sub(v.lastSeen)
-	tokensToAdd := int(elapsed / rl.duration * time.Duration(rl.rate))
+	tokensToAdd := int(float64(elapsed) / float64(rl.duration) * float64(rl.rate))
 	v.tokens += tokensToAdd
 	if v.tokens > rl.rate {
 		v.tokens = rl.rate

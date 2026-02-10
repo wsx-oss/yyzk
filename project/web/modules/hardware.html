@@ -6,233 +6,578 @@
   <title>硬件状态检测</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before { content: '🔧'; }
+    .hw-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .hw-header .action-buttons { margin-top: 0; flex-shrink: 0; }
+
+    /* Filter area */
+    .filter-section { margin-bottom: 0; }
+    .filter-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+    .filter-row-3 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; align-items: end; }
+    .filter-group label { font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .filter-group input, .filter-group select {
+      width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 5px;
+      font-size: 13px; background: #fff;
+    }
+    .filter-group input:focus, .filter-group select:focus {
+      outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
+    }
+    .range-input { display: flex; align-items: center; gap: 4px; }
+    .range-input input { width: 50%; }
+    .range-input span { color: #94a3b8; font-size: 12px; }
+    .btn-search-row { display: flex; justify-content: flex-end; align-items: flex-end; }
+
+    /* Table */
+    .data-table { font-size: 13px; }
+    .data-table th { white-space: nowrap; font-size: 12px; padding: 10px 8px; }
+    .data-table td { padding: 10px 8px; white-space: nowrap; }
+    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .status-dot.online { background: #10b981; }
+    .status-dot.offline { background: #ef4444; }
+    .status-dot.warning { background: #f59e0b; }
+    .btn-detail { padding: 4px 12px; font-size: 12px; background: #0ea5e9; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-detail:hover { background: #0284c7; }
+    .btn-del { padding: 4px 12px; font-size: 12px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-left: 4px; }
+    .btn-del:hover { background: #dc2626; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #fff; border-radius: 10px; padding: 0; width: 480px; max-width: 95vw;
+      max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; font-weight: 600;
+    }
+    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #94a3b8; padding: 4px 8px; }
+    .modal-close:hover { color: #0f172a; }
+    .modal-body { padding: 20px; }
+    .modal-footer { padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; color: #334155; margin-bottom: 5px; }
+    .form-group label .required { color: #ef4444; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;
+      font-size: 13px; background: #fff; font-family: inherit;
+    }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
+    }
+
+    /* Detail modal */
+    .detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 8px 12px; font-size: 13px; }
+    .detail-label { color: #64748b; font-weight: 500; }
+    .detail-value { color: #0f172a; }
+
+    /* Charts */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .chart-box { text-align: center; }
+    .chart-box h4 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #334155; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 14px; }
+  </style>
 </head>
 <body>
+  <!-- Header -->
   <div class="module-header">
-    <div class="module-title">硬件状态检测</div>
-    <div class="action-buttons">
-      <button class="btn btn-primary" onclick="loadAll()">🔄 刷新数据</button>
-      <button class="btn btn-secondary" onclick="exportData()">📤 导出详情</button>
+    <div class="hw-header">
+      <div class="module-title">硬件状态检测</div>
+      <div class="action-buttons" style="margin-top:0;">
+        <button class="btn btn-primary" onclick="refreshData()">刷新数据</button>
+        <button class="btn btn-secondary" onclick="exportData()">导出数据</button>
+        <button class="btn btn-success" onclick="openAddModal()">添加硬件</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section" style="margin-top: 16px;">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>硬件名称</label>
+          <input type="text" id="filterName" placeholder="请输入硬件名称" />
+        </div>
+        <div class="filter-group">
+          <label>硬件类型</label>
+          <select id="filterType">
+            <option value="全部">全部</option>
+            <option value="服务器">服务器</option>
+            <option value="路由器">路由器</option>
+            <option value="交换机">交换机</option>
+            <option value="存储设备">存储设备</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>硬件IP地址</label>
+          <input type="text" id="filterIP" placeholder="请输入硬件IP地址" />
+        </div>
+        <div class="filter-group">
+          <label>检测时间范围</label>
+          <div style="display:flex; gap:4px;">
+            <input type="date" id="filterDateFrom" style="width:50%;" />
+            <input type="date" id="filterDateTo" style="width:50%;" />
+          </div>
+        </div>
+      </div>
+      <div class="filter-row-3">
+        <div class="filter-group">
+          <label>状态筛选</label>
+          <select id="filterStatus">
+            <option value="全部">全部</option>
+            <option value="在线">在线</option>
+            <option value="离线">离线</option>
+            <option value="警告">警告</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>温度范围</label>
+          <div class="range-input">
+            <input type="number" id="filterTempMin" placeholder="如: 20" />
+            <span>~</span>
+            <input type="number" id="filterTempMax" placeholder="如: 50" />
+            <span>℃</span>
+          </div>
+        </div>
+        <div class="filter-group">
+          <label>CPU使用率范围</label>
+          <div class="range-input">
+            <input type="number" id="filterCpuMin" placeholder="如: 10" />
+            <span>~</span>
+            <input type="number" id="filterCpuMax" placeholder="如: 80" />
+            <span>%</span>
+          </div>
+        </div>
+        <div class="btn-search-row">
+          <button class="btn btn-primary" onclick="loadList()" style="width:100%;">搜索</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">硬件基本信息</div>
-    <table class="data-table">
+  <!-- Data Table -->
+  <div class="card" style="overflow-x:auto;">
+    <table class="data-table" id="hwTable">
       <thead>
         <tr>
-          <th>项目</th>
-          <th>值</th>
+          <th>硬件名称</th>
+          <th>硬件类型</th>
+          <th>硬件IP地址</th>
+          <th>状态</th>
+          <th>温度</th>
+          <th>CPU使用率</th>
+          <th>内存使用率</th>
+          <th>网络带宽</th>
+          <th>检测时间</th>
+          <th>操作</th>
         </tr>
       </thead>
-      <tbody id="hwInfoTbody">
-        <tr><td colspan="2" style="text-align:center; color:#94a3b8;">加载中...</td></tr>
+      <tbody id="hwTbody">
+        <tr><td colspan="10" class="empty-state">加载中...</td></tr>
       </tbody>
     </table>
   </div>
 
-  <div class="card">
-    <div class="card-title">实时资源使用 <span id="refreshTimer" style="font-size:12px; color:#94a3b8; font-weight:normal;">(每5秒自动刷新)</span></div>
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px;">
-      <div style="text-align: center; padding: 20px; background: #f0f9ff; border-radius: 8px;">
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">CPU 使用率</div>
-        <div id="cpuVal" style="font-size: 28px; font-weight: 700; color: #0ea5e9;">-</div>
-      </div>
-      <div style="text-align: center; padding: 20px; background: #f0fdf4; border-radius: 8px;">
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">内存使用率</div>
-        <div id="memVal" style="font-size: 28px; font-weight: 700; color: #10b981;">-</div>
-      </div>
-      <div style="text-align: center; padding: 20px; background: #fffbeb; border-radius: 8px;">
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">磁盘使用率</div>
-        <div id="diskVal" style="font-size: 28px; font-weight: 700; color: #f59e0b;">-</div>
-      </div>
-      <div style="text-align: center; padding: 20px; background: #faf5ff; border-radius: 8px;">
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">系统运行时间</div>
-        <div id="uptimeVal" style="font-size: 28px; font-weight: 700; color: #a855f7;">-</div>
-      </div>
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-      <div>
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 4px;">CPU</div>
-        <div class="progress-bar"><div id="cpuBar" class="progress-fill" style="width: 0%;"></div></div>
-      </div>
-      <div>
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 4px;">内存</div>
-        <div class="progress-bar"><div id="memBar" class="progress-fill" style="width: 0%; background: #10b981;"></div></div>
-      </div>
-      <div>
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 4px;">磁盘</div>
-        <div class="progress-bar"><div id="diskBar" class="progress-fill" style="width: 0%; background: #f59e0b;"></div></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="hint-box">
+  <!-- Usage Tips -->
+  <div class="hint-box" style="margin-bottom: 20px;">
     <div><strong>使用提示:</strong></div>
-    <div>1. 硬件状态检测可监控温度、CPU、内存等关键指标,预防故障</div>
-    <div>2. 当硬件指标超出安全范围时,系统会自动告警</div>
-    <div>3. 定期检查和维护硬件状态,确保系统稳定运行</div>
+    <div>1. 硬件状态检测用于实时监控硬件设备的运行状态，请定期刷新数据。</div>
+    <div>2. 若硬件状态显示为警告，请及时检查硬件设备。</div>
+    <div>3. 删除硬件信息后不可恢复，请谨慎操作。</div>
   </div>
 
+  <!-- Statistics Charts -->
   <div class="card">
-    <div class="card-title">资源使用统计</div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">资源使用分布</div>
-        <canvas id="statusChart" width="300" height="300"></canvas>
+    <div class="card-title">硬件状态统计</div>
+    <div class="charts-row">
+      <div class="chart-box">
+        <h4>硬件状态分布</h4>
+        <canvas id="statusChart" height="260"></canvas>
       </div>
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">网络流量</div>
-        <canvas id="netChart" width="300" height="300"></canvas>
+      <div class="chart-box">
+        <h4>硬件类型分布</h4>
+        <canvas id="typeChart" height="260"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Hardware Modal -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span>添加硬件</span>
+        <button class="modal-close" onclick="closeAddModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>硬件名称 <span class="required">*</span></label>
+          <input type="text" id="addName" placeholder="请输入硬件名称" />
+        </div>
+        <div class="form-group">
+          <label>硬件类型 <span class="required">*</span></label>
+          <select id="addType">
+            <option value="服务器">服务器</option>
+            <option value="路由器">路由器</option>
+            <option value="交换机">交换机</option>
+            <option value="存储设备">存储设备</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>硬件IP地址 <span class="required">*</span></label>
+          <input type="text" id="addIP" placeholder="请输入硬件IP地址" />
+        </div>
+        <div class="form-group">
+          <label>初始状态 <span class="required">*</span></label>
+          <select id="addStatus">
+            <option value="在线">在线</option>
+            <option value="离线">离线</option>
+            <option value="警告">警告</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>描述信息</label>
+          <textarea id="addDesc" placeholder="请输入硬件描述信息"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeAddModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitAdd()">确认添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span>硬件详情</span>
+        <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid" id="detailContent"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
       </div>
     </div>
   </div>
 
   <script src="/app/modules/common.js"></script>
   <script>
-    let refreshInterval = null;
+    let allItems = [];
+    let statusChartInstance = null;
+    let typeChartInstance = null;
 
-    const statusChart = createChart($('#statusChart'), {
-      type: 'doughnut',
-      data: {
-        labels: ['CPU', '内存', '磁盘', '空闲'],
-        datasets: [{
-          data: [0, 0, 0, 100],
-          backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#e2e8f0']
-        }]
-      }
-    });
-
-    const netChart = createChart($('#netChart'), {
-      type: 'bar',
-      data: {
-        labels: ['发送', '接收'],
-        datasets: [{
-          label: '流量',
-          data: [0, 0],
-          backgroundColor: ['#0ea5e9', '#10b981']
-        }]
-      },
-      options: {
-        scales: { y: { beginAtZero: true } }
-      }
-    });
-
-    function formatUptime(seconds) {
-      const d = Math.floor(seconds / 86400);
-      const h = Math.floor((seconds % 86400) / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      if (d > 0) return `${d}天${h}时`;
-      if (h > 0) return `${h}时${m}分`;
-      return `${m}分`;
-    }
-
-    async function loadHardwareInfo() {
+    // ========== Data Loading ==========
+    async function loadList() {
       try {
-        const res = await api('/hardware/snapshot');
+        const params = new URLSearchParams();
+        const name = document.getElementById('filterName').value.trim();
+        const type = document.getElementById('filterType').value;
+        const ip = document.getElementById('filterIP').value.trim();
+        const status = document.getElementById('filterStatus').value;
+        const dateFrom = document.getElementById('filterDateFrom').value;
+        const dateTo = document.getElementById('filterDateTo').value;
+        const tempMin = document.getElementById('filterTempMin').value;
+        const tempMax = document.getElementById('filterTempMax').value;
+        const cpuMin = document.getElementById('filterCpuMin').value;
+        const cpuMax = document.getElementById('filterCpuMax').value;
+
+        if (name) params.set('name', name);
+        if (type && type !== '全部') params.set('type', type);
+        if (ip) params.set('ip', ip);
+        if (status && status !== '全部') params.set('status', status);
+        if (dateFrom) params.set('date_from', dateFrom);
+        if (dateTo) params.set('date_to', dateTo + 'T23:59:59');
+        if (tempMin) params.set('temp_min', tempMin);
+        if (tempMax) params.set('temp_max', tempMax);
+        if (cpuMin) params.set('cpu_min', cpuMin);
+        if (cpuMax) params.set('cpu_max', cpuMax);
+        params.set('page_size', '200');
+
+        const res = await api('/hardware/items?' + params.toString());
         const data = await res.json();
-        const tbody = $('#hwInfoTbody');
-        tbody.innerHTML = '';
-        const fields = [
-          ['主机名', data.hostname],
-          ['操作系统', data.os],
-          ['平台', data.platform + ' ' + (data.platform_version || '')],
-          ['内核版本', data.kernel],
-          ['CPU 型号', data.cpu_model],
-          ['CPU 核心数', data.cpu_cores],
-          ['总内存', formatBytes(data.mem_total || 0)]
-        ];
-        for (const [label, val] of fields) {
-          const tr = document.createElement('tr');
-          const td1 = document.createElement('td');
-          td1.textContent = label;
-          td1.style.fontWeight = '600';
-          const td2 = document.createElement('td');
-          td2.textContent = val || '-';
-          tr.appendChild(td1);
-          tr.appendChild(td2);
-          tbody.appendChild(tr);
-        }
+        allItems = data.items || [];
+        renderTable(allItems);
       } catch (e) {
-        showToast(e.message || '硬件信息加载失败', 'error');
+        showToast('加载硬件列表失败: ' + (e.message || ''), 'error');
       }
     }
 
-    async function loadMetrics() {
+    async function loadStats() {
       try {
-        const res = await api('/metrics/snapshot');
-        const m = await res.json();
-
-        const cpu = (m.cpu_percent || 0).toFixed(1);
-        const mem = (m.mem_percent || 0).toFixed(1);
-        const disk = (m.disk_used_percent || 0).toFixed(1);
-
-        $('#cpuVal').textContent = cpu + '%';
-        $('#memVal').textContent = mem + '%';
-        $('#diskVal').textContent = disk + '%';
-        $('#uptimeVal').textContent = formatUptime(m.uptime || 0);
-
-        $('#cpuBar').style.width = cpu + '%';
-        $('#memBar').style.width = mem + '%';
-        $('#diskBar').style.width = disk + '%';
-
-        if (parseFloat(cpu) > 80) $('#cpuVal').style.color = '#ef4444';
-        else $('#cpuVal').style.color = '#0ea5e9';
-        if (parseFloat(mem) > 80) $('#memVal').style.color = '#ef4444';
-        else $('#memVal').style.color = '#10b981';
-
-        if (statusChart) {
-          const free = Math.max(0, 100 - parseFloat(cpu) - parseFloat(mem) - parseFloat(disk));
-          statusChart.data.datasets[0].data = [parseFloat(cpu), parseFloat(mem), parseFloat(disk), free > 0 ? free : 0];
-          statusChart.update();
-        }
-
-        if (netChart) {
-          const sent = ((m.net_bytes_sent || 0) / 1024 / 1024).toFixed(1);
-          const recv = ((m.net_bytes_recv || 0) / 1024 / 1024).toFixed(1);
-          netChart.data.datasets[0].data = [parseFloat(sent), parseFloat(recv)];
-          netChart.data.datasets[0].label = '流量 (MB)';
-          netChart.update();
-        }
+        const res = await api('/hardware/items/stats');
+        const data = await res.json();
+        renderCharts(data);
       } catch (e) {
-        // silent retry on next interval
+        // silent
       }
     }
 
-    function exportData() {
-      const rows = [];
-      const tbody = $('#hwInfoTbody');
-      for (const tr of tbody.querySelectorAll('tr')) {
-        const cells = tr.querySelectorAll('td');
-        if (cells.length >= 2) {
-          rows.push([cells[0].textContent, cells[1].textContent]);
-        }
+    function renderTable(items) {
+      const tbody = document.getElementById('hwTbody');
+      if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="empty-state">暂无硬件数据，请点击"添加硬件"按钮添加</td></tr>';
+        return;
       }
-      rows.push(['CPU使用率', $('#cpuVal').textContent]);
-      rows.push(['内存使用率', $('#memVal').textContent]);
-      rows.push(['磁盘使用率', $('#diskVal').textContent]);
-      rows.push(['运行时间', $('#uptimeVal').textContent]);
+      tbody.innerHTML = items.map(item => {
+        const statusClass = item.status === '在线' ? 'online' : item.status === '离线' ? 'offline' : 'warning';
+        return `<tr>
+          <td>${esc(item.name)}</td>
+          <td>${esc(item.type)}</td>
+          <td>${esc(item.ip)}</td>
+          <td><span class="status-dot ${statusClass}"></span>${esc(item.status)}</td>
+          <td>${item.temperature}℃</td>
+          <td>${item.cpu_usage}%</td>
+          <td>${item.mem_usage}%</td>
+          <td>${esc(item.network_bandwidth)}</td>
+          <td>${formatDetectedAt(item.detected_at)}</td>
+          <td>
+            <button class="btn-detail" onclick="viewDetail(${item.id})">查看详情</button>
+            <button class="btn-del" onclick="deleteItem(${item.id}, '${esc(item.name)}')">删除</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
 
-      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    function esc(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function formatDetectedAt(dateStr) {
+      if (!dateStr) return '-';
+      try {
+        const d = new Date(dateStr.replace(' ', 'T') + 'Z');
+        if (isNaN(d.getTime())) return dateStr;
+        const y = d.getFullYear();
+        const mo = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const h = String(d.getHours()).padStart(2, '0');
+        const mi = String(d.getMinutes()).padStart(2, '0');
+        return `${y}-${mo}-${day} ${h}:${mi}`;
+      } catch (e) {
+        return dateStr;
+      }
+    }
+
+    // ========== Charts ==========
+    function renderCharts(stats) {
+      // Status distribution - Doughnut
+      const statusDist = stats.status_distribution || {};
+      const statusLabels = ['在线', '离线', '警告'];
+      const statusColors = ['#10b981', '#ef4444', '#f59e0b'];
+      const statusData = statusLabels.map(l => statusDist[l] || 0);
+
+      if (statusChartInstance) statusChartInstance.destroy();
+      const ctx1 = document.getElementById('statusChart').getContext('2d');
+      statusChartInstance = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: statusLabels,
+          datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'right', labels: { padding: 16, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 13 } } }
+          }
+        }
+      });
+
+      // Type distribution - Horizontal Bar
+      const typeDist = stats.type_distribution || {};
+      const typeLabels = ['服务器', '路由器', '交换机', '存储设备'];
+      const typeColors = ['#0ea5e9', '#10b981', '#f59e0b', '#a855f7'];
+      const typeData = typeLabels.map(l => typeDist[l] || 0);
+
+      if (typeChartInstance) typeChartInstance.destroy();
+      const ctx2 = document.getElementById('typeChart').getContext('2d');
+      typeChartInstance = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: typeLabels,
+          datasets: [{
+            label: '数量',
+            data: typeData,
+            backgroundColor: typeColors,
+            borderRadius: 4,
+            barThickness: 28
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f1f5f9' } },
+            y: { grid: { display: false } }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.x + ' 台'; } } }
+          }
+        }
+      });
+    }
+
+    // ========== Refresh ==========
+    async function refreshData() {
+      try {
+        await api('/hardware/items/refresh', { method: 'POST' });
+        await Promise.all([loadList(), loadStats()]);
+        showToast('数据已刷新', 'success');
+      } catch (e) {
+        showToast('刷新失败: ' + (e.message || ''), 'error');
+      }
+    }
+
+    // ========== Export ==========
+    function exportData() {
+      if (!allItems || allItems.length === 0) {
+        showToast('没有可导出的数据', 'error');
+        return;
+      }
+      const header = ['硬件名称', '硬件类型', 'IP地址', '状态', '温度(℃)', 'CPU使用率(%)', '内存使用率(%)', '网络带宽', '检测时间', '描述'];
+      const rows = allItems.map(item => [
+        item.name, item.type, item.ip, item.status,
+        item.temperature, item.cpu_usage, item.mem_usage,
+        item.network_bandwidth, formatDetectedAt(item.detected_at), item.description || ''
+      ]);
+      const bom = '\uFEFF';
+      const csv = bom + [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `hardware_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `硬件状态检测_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      showToast('数据导出成功', 'success');
     }
 
-    async function loadAll() {
-      await Promise.all([loadHardwareInfo(), loadMetrics()]);
-      showToast('数据已刷新', 'success');
+    // ========== Add Hardware ==========
+    function openAddModal() {
+      document.getElementById('addName').value = '';
+      document.getElementById('addType').value = '服务器';
+      document.getElementById('addIP').value = '';
+      document.getElementById('addStatus').value = '在线';
+      document.getElementById('addDesc').value = '';
+      document.getElementById('addModal').classList.add('active');
     }
 
+    function closeAddModal() {
+      document.getElementById('addModal').classList.remove('active');
+    }
+
+    async function submitAdd() {
+      const name = document.getElementById('addName').value.trim();
+      const type = document.getElementById('addType').value;
+      const ip = document.getElementById('addIP').value.trim();
+      const status = document.getElementById('addStatus').value;
+      const desc = document.getElementById('addDesc').value.trim();
+
+      if (!name) { showToast('请输入硬件名称', 'error'); return; }
+      if (!ip) { showToast('请输入硬件IP地址', 'error'); return; }
+
+      // Basic IP format validation
+      if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
+        showToast('请输入正确的IP地址格式', 'error');
+        return;
+      }
+
+      try {
+        const res = await api('/hardware/items', {
+          method: 'POST',
+          body: { name, type, ip, status, description: desc, temperature: 0, cpu_usage: 0, mem_usage: 0, network_bandwidth: '0Mbps' }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('硬件添加成功', 'success');
+          closeAddModal();
+          await Promise.all([loadList(), loadStats()]);
+        } else {
+          showToast(data.error || '添加失败', 'error');
+        }
+      } catch (e) {
+        showToast('添加失败: ' + (e.message || ''), 'error');
+      }
+    }
+
+    // ========== View Detail ==========
+    async function viewDetail(id) {
+      try {
+        const res = await api('/hardware/items/' + id);
+        const item = await res.json();
+        if (item.error) { showToast(item.error, 'error'); return; }
+
+        const statusClass = item.status === '在线' ? 'online' : item.status === '离线' ? 'offline' : 'warning';
+        const fields = [
+          ['硬件名称', item.name],
+          ['硬件类型', item.type],
+          ['IP地址', item.ip],
+          ['状态', `<span class="status-dot ${statusClass}"></span>${esc(item.status)}`],
+          ['温度', item.temperature + '℃'],
+          ['CPU使用率', item.cpu_usage + '%'],
+          ['内存使用率', item.mem_usage + '%'],
+          ['网络带宽', item.network_bandwidth],
+          ['描述', item.description || '-'],
+          ['检测时间', formatDetectedAt(item.detected_at)],
+          ['创建时间', formatDetectedAt(item.created_at)],
+          ['更新时间', formatDetectedAt(item.updated_at)],
+        ];
+
+        document.getElementById('detailContent').innerHTML = fields.map(([label, val]) =>
+          `<div class="detail-label">${label}</div><div class="detail-value">${val}</div>`
+        ).join('');
+        document.getElementById('detailModal').classList.add('active');
+      } catch (e) {
+        showToast('获取详情失败', 'error');
+      }
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detailModal').classList.remove('active');
+    }
+
+    // ========== Delete ==========
+    async function deleteItem(id, name) {
+      if (!confirm(`确定要删除硬件"${name}"吗？此操作不可恢复！`)) return;
+      try {
+        const res = await api('/hardware/items/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('删除成功', 'success');
+          await Promise.all([loadList(), loadStats()]);
+        } else {
+          showToast(data.error || '删除失败', 'error');
+        }
+      } catch (e) {
+        showToast('删除失败: ' + (e.message || ''), 'error');
+      }
+    }
+
+    // ========== Init ==========
     window.addEventListener('DOMContentLoaded', () => {
-      loadAll();
-      refreshInterval = setInterval(loadMetrics, 5000);
+      loadList();
+      loadStats();
+    });
+
+    // Close modals on overlay click
+    document.getElementById('addModal').addEventListener('click', function(e) {
+      if (e.target === this) closeAddModal();
+    });
+    document.getElementById('detailModal').addEventListener('click', function(e) {
+      if (e.target === this) closeDetailModal();
     });
   </script>
 </body>

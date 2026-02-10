@@ -53,7 +53,7 @@ func main() {
     r.Use(corsMiddleware())
     
     // Rate limiting: 100 requests per minute per IP
-    rateLimiter := middleware.NewRateLimiter(100, 1*time.Minute)
+    rateLimiter := middleware.NewRateLimiter(500, 1*time.Minute)
     r.Use(rateLimiter.Middleware())
     
     r.GET("/api/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })

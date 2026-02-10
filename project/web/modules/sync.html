@@ -1,272 +1,982 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>数据同步状态</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before {
+      content: '📊';
+    }
+
+    .sync-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .sync-header .action-buttons {
+      margin-top: 0;
+      flex-shrink: 0;
+      gap: 6px;
+      display: flex;
+    }
+
+    /* Filters */
+    .filter-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .filter-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 12px;
+    }
+
+    .filter-group label {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+    }
+
+    /* Toggle switch */
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #334155;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #cbd5e1;
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+
+    .toggle-switch input:checked+.toggle-slider {
+      background: #0ea5e9;
+    }
+
+    .toggle-switch input:checked+.toggle-slider::before {
+      transform: translateX(20px);
+    }
+
+    /* Action bar */
+    .action-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .action-bar .btn {
+      flex: 1;
+    }
+
+    /* Table */
+    .data-table {
+      font-size: 13px;
+    }
+
+    .data-table th {
+      white-space: nowrap;
+      font-size: 12px;
+      padding: 10px 8px;
+    }
+
+    .data-table td {
+      padding: 10px 8px;
+      white-space: nowrap;
+    }
+
+    .btn-edit {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #0ea5e9;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-edit:hover {
+      background: #0284c7;
+    }
+
+    .btn-del {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+
+    .btn-del:hover {
+      background: #dc2626;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 10px;
+      padding: 0;
+      width: 560px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #94a3b8;
+      padding: 4px 8px;
+    }
+
+    .modal-close:hover {
+      color: #0f172a;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .modal-footer {
+      padding: 12px 20px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #334155;
+      margin-bottom: 5px;
+    }
+
+    .form-group label .req {
+      color: #ef4444;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      font-family: inherit;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+    }
+
+    .form-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    /* Charts */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .chart-box {
+      text-align: center;
+    }
+
+    .chart-box h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #334155;
+    }
+
+    /* Progress */
+    .progress-section {
+      position: relative;
+    }
+
+    .progress-bar-wrap {
+      background: #e2e8f0;
+      border-radius: 6px;
+      height: 28px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+      border-radius: 6px;
+      transition: width 0.5s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      min-width: 40px;
+    }
+
+    /* Info cards */
+    .info-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .info-card {
+      padding: 16px 20px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border-left: 4px solid #0ea5e9;
+    }
+
+    .info-card .info-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0ea5e9;
+      margin-bottom: 4px;
+    }
+
+    .info-card .info-value {
+      font-size: 15px;
+      font-weight: 500;
+      color: #1e293b;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .status-running {
+      color: #10b981;
+      font-weight: 600;
+    }
+
+    .status-stopped {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    .status-pending {
+      color: #f59e0b;
+      font-weight: 600;
+    }
+  </style>
 </head>
+
 <body>
+  <!-- Header -->
   <div class="module-header">
-    <div class="module-title">数据同步状态</div>
-    <div class="action-buttons">
-      <button class="btn btn-primary" onclick="loadSyncStatus()">🔄 刷新状态</button>
-      <button class="btn btn-secondary" id="syncBtn" onclick="syncNow()">📤 执行/立即同步</button>
+    <div class="sync-header">
+      <div class="module-title">数据同步状态</div>
+      <div class="action-buttons">
+        <button class="btn btn-primary" onclick="openAddModal()">开始同步</button>
+        <button class="btn btn-secondary" onclick="pauseSync()">暂停同步</button>
+        <button class="btn btn-secondary" style="background:#ef4444; border-color:#ef4444; color:#fff;"
+          onclick="stopSync()">停止同步</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="margin-top: 16px;">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>数据源</label>
+          <input type="text" id="fSource" placeholder="请输入数据源地址" />
+        </div>
+        <div class="filter-group">
+          <label>目标地址</label>
+          <input type="text" id="fTarget" placeholder="请输入目标地址" />
+        </div>
+        <div class="filter-group">
+          <label>同步频率</label>
+          <select id="fFrequency">
+            <option value="">全部</option>
+            <option value="1分钟">1分钟</option>
+            <option value="5分钟">5分钟</option>
+            <option value="10分钟">10分钟</option>
+            <option value="30分钟">30分钟</option>
+            <option value="1小时">1小时</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>同步模式</label>
+          <select id="fMode">
+            <option value="">全部</option>
+            <option value="全量同步">全量同步</option>
+            <option value="增量同步">增量同步</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-row-2">
+        <div class="filter-group">
+          <label>开始时间</label>
+          <input type="datetime-local" id="fStartTime" />
+        </div>
+        <div class="filter-group">
+          <label>结束时间</label>
+          <input type="datetime-local" id="fEndTime" />
+        </div>
+        <div style="display:flex; gap:24px; align-items:end; padding-bottom:2px;">
+          <div class="toggle-item">
+            <label style="font-size:12px; color:#64748b; margin:0;">同步状态</label>
+            <label class="toggle-switch"><input type="checkbox" id="fSyncStatus" /><span
+                class="toggle-slider"></span></label>
+            <span style="font-size:12px; color:#64748b;">启用</span>
+          </div>
+          <div class="toggle-item">
+            <label style="font-size:12px; color:#64748b; margin:0;">日志记录</label>
+            <label class="toggle-switch"><input type="checkbox" id="fLogEnabled" /><span
+                class="toggle-slider"></span></label>
+            <span style="font-size:12px; color:#64748b;">启用</span>
+          </div>
+        </div>
+        <div></div>
+      </div>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar" style="margin-top: 12px;">
+      <button class="btn btn-primary" onclick="searchTasks()" style="flex:2;">搜索</button>
+      <button class="btn btn-secondary" onclick="exportConfig()">导出配置</button>
+      <button class="btn btn-secondary" onclick="importConfig()">导入配置</button>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">当前同步状态</div>
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">同步状态</div>
-        <div id="syncStatusBadge" style="font-size: 18px; font-weight: 700;">-</div>
-      </div>
-      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">状态消息</div>
-        <div id="syncMessage" style="font-size: 14px; font-weight: 600;">-</div>
-      </div>
-      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">最后同步时间</div>
-        <div id="syncLastTime" style="font-size: 14px; font-weight: 600;">-</div>
-      </div>
-      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px;">
-        <div style="font-size: 13px; color: #64748b; margin-bottom: 6px;">更新时间</div>
-        <div id="syncUpdatedAt" style="font-size: 14px; font-weight: 600;">-</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">实时同步进度</div>
-    <div class="progress-bar" style="height: 24px; margin-bottom: 8px;">
-      <div id="progressFill" class="progress-fill" style="width: 0%; background: #0ea5e9; transition: width 0.5s;">
-        <span id="progressText" style="color: #fff; font-size: 13px; padding-left: 10px;"></span>
-      </div>
-    </div>
-    <div id="progressDetail" style="font-size: 13px; color: #64748b;">等待同步...</div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">同步历史记录</div>
+  <!-- Task Table -->
+  <div class="card" style="overflow-x:auto;">
     <table class="data-table">
       <thead>
         <tr>
-          <th>时间</th>
+          <th>同步任务ID</th>
+          <th>数据源</th>
+          <th>目标地址</th>
+          <th>同步频率</th>
+          <th>同步模式</th>
+          <th>开始时间</th>
+          <th>结束时间</th>
           <th>状态</th>
-          <th>消息</th>
+          <th>操作</th>
         </tr>
       </thead>
-      <tbody id="syncHistoryTbody"></tbody>
+      <tbody id="tasksTbody">
+        <tr>
+          <td colspan="9" class="empty-state">加载中...</td>
+        </tr>
+      </tbody>
     </table>
   </div>
 
-  <div class="hint-box">
+  <!-- Usage Tips -->
+  <div class="hint-box" style="margin-bottom: 20px;">
     <div><strong>使用提示:</strong></div>
-    <div>1. 通过配置同步任务实现多服务器之间的数据一致性</div>
-    <div>2. 定期检查同步状态,确保数据准确无误</div>
-    <div>3. 同步失败时请检查网络连接和目标端状态</div>
+    <div>1. 请确保数据源和目标地址的正确性，避免同步失败。</div>
+    <div>2. 不同的同步模式和频率适用于不同场景，请根据实际情况选择。</div>
+    <div>3. 启用日志记录可以方便后续问题排查。</div>
   </div>
 
+  <!-- Statistics -->
   <div class="card">
-    <div class="card-title">同步状态统计</div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">同步状态分布</div>
-        <canvas id="statusChart" width="300" height="300"></canvas>
+    <div class="card-title">数据同步统计</div>
+    <div class="charts-row">
+      <div class="chart-box">
+        <h4>同步状态分布</h4>
+        <canvas id="statusChart" height="260"></canvas>
       </div>
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">同步操作时间线</div>
-        <canvas id="timelineChart" width="300" height="300"></canvas>
+      <div class="chart-box">
+        <h4>同步模式分布</h4>
+        <canvas id="modeChart" height="260"></canvas>
       </div>
     </div>
   </div>
 
+  <!-- Real-time Progress -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+      <div class="card-title" style="margin:0;">实时同步进度</div>
+      <button class="btn btn-secondary" onclick="refreshProgress()"
+        style="padding:4px 16px; font-size:12px;">刷新</button>
+    </div>
+    <div class="progress-bar-wrap">
+      <div id="progressFill" class="progress-bar-fill" style="width: 0%;">
+        <span id="progressText">0%</span>
+      </div>
+    </div>
+    <div id="progressDetail" style="font-size: 13px; color: #64748b; margin-top: 6px;">已同步数据量: 0MB / 0MB</div>
+  </div>
+
+  <!-- Sync Info -->
+  <div class="card">
+    <div class="card-title">同步信息</div>
+    <div class="info-cards">
+      <div class="info-card">
+        <div class="info-label">最新同步时间</div>
+        <div class="info-value" id="infoLastSync">-</div>
+      </div>
+      <div class="info-card">
+        <div class="info-label">同步成功率</div>
+        <div class="info-value" id="infoSuccessRate">-</div>
+      </div>
+      <div class="info-card">
+        <div class="info-label">平均同步时长</div>
+        <div class="info-value" id="infoAvgDuration">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal-overlay" id="formModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span id="formTitle">新增同步任务</span>
+        <button class="modal-close" onclick="closeFormModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editId" value="" />
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>数据源 <span class="req">*</span></label>
+            <input type="text" id="mSource" placeholder="请输入数据源地址" />
+          </div>
+          <div class="form-group">
+            <label>目标地址 <span class="req">*</span></label>
+            <input type="text" id="mTarget" placeholder="请输入目标地址" />
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>同步频率 <span class="req">*</span></label>
+            <select id="mFrequency">
+              <option value="1分钟">1分钟</option>
+              <option value="5分钟" selected>5分钟</option>
+              <option value="10分钟">10分钟</option>
+              <option value="30分钟">30分钟</option>
+              <option value="1小时">1小时</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>同步模式 <span class="req">*</span></label>
+            <select id="mMode">
+              <option value="全量同步">全量同步</option>
+              <option value="增量同步">增量同步</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>开始时间</label>
+            <input type="datetime-local" id="mStartTime" />
+          </div>
+          <div class="form-group">
+            <label>结束时间</label>
+            <input type="datetime-local" id="mEndTime" />
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>同步状态</label>
+            <div class="form-toggle">
+              <label class="toggle-switch"><input type="checkbox" id="mSyncStatus" /><span
+                  class="toggle-slider"></span></label>
+              <span style="font-size:13px; color:#475569;">启用</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>日志记录</label>
+            <div class="form-toggle">
+              <label class="toggle-switch"><input type="checkbox" id="mLogEnabled" /><span
+                  class="toggle-slider"></span></label>
+              <span style="font-size:13px; color:#475569;">启用</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeFormModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitForm()">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import file input (hidden) -->
+  <input type="file" id="importFile" accept=".json" style="display:none;" onchange="handleImportFile(event)" />
+
   <script src="/app/modules/common.js"></script>
   <script>
-    let syncHistory = [];
-    let isSyncing = false;
+    let allTasks = [];
+    let statusChartInst = null;
+    let modeChartInst = null;
 
-    const statusColorMap = {
-      success: '#10b981',
-      syncing: '#0ea5e9',
-      failed: '#ef4444',
-      idle: '#94a3b8'
-    };
-    const statusLabelMap = {
-      success: '✅ 已完成',
-      syncing: '🔄 同步中',
-      failed: '❌ 失败',
-      idle: '⏸ 空闲',
-      '': '⏸ 空闲'
-    };
-
-    const statusChart = createChart($('#statusChart'), {
-      type: 'doughnut',
-      data: {
-        labels: ['已完成', '失败', '同步中', '空闲'],
-        datasets: [{
-          data: [0, 0, 0, 1],
-          backgroundColor: ['#10b981', '#ef4444', '#0ea5e9', '#94a3b8']
-        }]
-      }
-    });
-
-    const timelineChart = createChart($('#timelineChart'), {
-      type: 'bar',
-      data: {
-        labels: [],
-        datasets: [{
-          label: '同步操作',
-          data: [],
-          backgroundColor: []
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        scales: { x: { beginAtZero: true, max: 1, display: false } },
-        plugins: { legend: { display: false } }
-      }
-    });
-
-    function updateStatusDisplay(data) {
-      const status = data.status || 'idle';
-      $('#syncStatusBadge').textContent = statusLabelMap[status] || status;
-      $('#syncStatusBadge').style.color = statusColorMap[status] || '#64748b';
-      $('#syncMessage').textContent = data.message || '-';
-      $('#syncLastTime').textContent = data.last_synced_at ? formatDate(data.last_synced_at) : '-';
-      $('#syncUpdatedAt').textContent = data.updated_at ? formatDate(data.updated_at) : '-';
-
-      if (status === 'syncing') {
-        isSyncing = true;
-        $('#syncBtn').disabled = true;
-        $('#syncBtn').textContent = '⏳ 同步中...';
-      } else {
-        isSyncing = false;
-        $('#syncBtn').disabled = false;
-        $('#syncBtn').textContent = '📤 执行/立即同步';
-      }
-    }
-
-    function updateCharts() {
-      const counts = { success: 0, failed: 0, syncing: 0, idle: 0 };
-      for (const h of syncHistory) {
-        const s = (h.status || 'idle').toLowerCase();
-        if (counts.hasOwnProperty(s)) counts[s]++;
-        else counts.idle++;
-      }
-      if (syncHistory.length === 0) counts.idle = 1;
-
-      if (statusChart) {
-        statusChart.data.datasets[0].data = [counts.success, counts.failed, counts.syncing, counts.idle];
-        statusChart.update();
-      }
-
-      if (timelineChart) {
-        const recent = syncHistory.slice(-8);
-        timelineChart.data.labels = recent.map(h => formatDate(h.time));
-        timelineChart.data.datasets[0].data = recent.map(() => 1);
-        timelineChart.data.datasets[0].backgroundColor = recent.map(h => statusColorMap[h.status] || '#94a3b8');
-        timelineChart.update();
-      }
-    }
-
-    function addHistoryRow(time, status, message) {
-      syncHistory.push({ time, status, message });
-      const tbody = $('#syncHistoryTbody');
-      const tr = document.createElement('tr');
-
-      const tdTime = document.createElement('td');
-      tdTime.textContent = formatDate(time);
-
-      const tdStatus = document.createElement('td');
-      const badge = document.createElement('span');
-      badge.className = 'status-badge ' + (status === 'success' ? 'status-online' : status === 'failed' ? 'status-offline' : 'status-warning');
-      badge.textContent = statusLabelMap[status] || status;
-      tdStatus.appendChild(badge);
-
-      const tdMsg = document.createElement('td');
-      tdMsg.textContent = message || '-';
-
-      tr.appendChild(tdTime);
-      tr.appendChild(tdStatus);
-      tr.appendChild(tdMsg);
-      tbody.insertBefore(tr, tbody.firstChild);
-      updateCharts();
-    }
-
-    async function loadSyncStatus() {
+    // ========== Load ==========
+    async function loadTasks() {
       try {
-        const res = await api('/sync/status');
+        const res = await api('/sync/tasks?page_size=200');
         const data = await res.json();
-        updateStatusDisplay(data);
-        if (data.last_synced_at) {
-          addHistoryRow(data.last_synced_at, data.status || 'success', data.message || '');
-        }
-        showToast('状态已刷新', 'success');
+        allTasks = data.items || [];
+        renderTable(allTasks);
       } catch (e) {
-        showToast(e.message || '加载失败', 'error');
+        showToast('加载同步任务失败', 'error');
       }
     }
 
-    async function syncNow() {
-      if (isSyncing) return;
+    async function loadStats() {
       try {
-        const res = await api('/sync/status', {
-          method: 'POST',
-          body: { Status: 'syncing', Message: '手动触发同步' }
-        });
+        const res = await api('/sync/tasks/stats');
         const data = await res.json();
-        if (!data.ok) {
-          showToast(data.error || '触发失败', 'error');
-          return;
-        }
+        renderCharts(data);
+      } catch (e) { /* silent */ }
+    }
 
-        isSyncing = true;
-        $('#syncBtn').disabled = true;
-        $('#syncBtn').textContent = '⏳ 同步中...';
-        $('#syncStatusBadge').textContent = statusLabelMap.syncing;
-        $('#syncStatusBadge').style.color = statusColorMap.syncing;
-        $('#syncMessage').textContent = '手动触发同步';
-        addHistoryRow(new Date().toISOString(), 'syncing', '手动触发同步');
+    async function loadProgress() {
+      try {
+        const res = await api('/sync/tasks/progress');
+        const data = await res.json();
+        const pct = data.progress || 0;
+        const synced = data.synced_data || 0;
+        const total = data.total_data || 0;
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('progressText').textContent = pct + '%';
+        document.getElementById('progressDetail').textContent = '已同步数据量: ' + synced + 'MB / ' + total + 'MB';
+      } catch (e) { /* silent */ }
+    }
 
-        let progress = 0;
-        const interval = setInterval(() => {
-          progress += Math.random() * 15 + 5;
-          if (progress > 100) progress = 100;
-          $('#progressFill').style.width = progress.toFixed(0) + '%';
-          $('#progressText').textContent = '已完成 ' + progress.toFixed(0) + '%';
-          $('#progressDetail').textContent = `已同步数据量: ${(progress * 10).toFixed(0)}MB / 1000MB`;
+    async function loadInfo() {
+      try {
+        const res = await api('/sync/tasks/info');
+        const data = await res.json();
+        document.getElementById('infoLastSync').textContent = data.last_synced_at || '-';
+        document.getElementById('infoSuccessRate').textContent = (data.success_rate || 0).toFixed(0) + '%';
+        document.getElementById('infoAvgDuration').textContent = (data.avg_duration || 0).toFixed(0) + '分钟';
+      } catch (e) { /* silent */ }
+    }
 
-          if (progress >= 100) {
-            clearInterval(interval);
-            completeSyncTask();
+    function refreshProgress() {
+      loadProgress();
+      showToast('进度已刷新', 'success');
+    }
+
+    // ========== Search ==========
+    async function searchTasks() {
+      try {
+        const params = new URLSearchParams();
+        const source = document.getElementById('fSource').value.trim();
+        const target = document.getElementById('fTarget').value.trim();
+        const frequency = document.getElementById('fFrequency').value;
+        const mode = document.getElementById('fMode').value;
+        const startTime = document.getElementById('fStartTime').value;
+        const endTime = document.getElementById('fEndTime').value;
+        const syncStatus = document.getElementById('fSyncStatus').checked;
+        const logEnabled = document.getElementById('fLogEnabled').checked;
+
+        if (source) params.set('source', source);
+        if (target) params.set('target', target);
+        if (frequency) params.set('frequency', frequency);
+        if (mode) params.set('mode', mode);
+        if (startTime) params.set('start_time', startTime.replace('T', ' '));
+        if (endTime) params.set('end_time', endTime.replace('T', ' '));
+        if (syncStatus) params.set('sync_status_enabled', '1');
+        if (logEnabled) params.set('log_enabled', '1');
+        params.set('page_size', '200');
+
+        const res = await api('/sync/tasks?' + params.toString());
+        const data = await res.json();
+        allTasks = data.items || [];
+        renderTable(allTasks);
+        showToast('搜索完成，共 ' + allTasks.length + ' 条记录', 'success');
+      } catch (e) {
+        showToast('搜索失败', 'error');
+      }
+    }
+
+    // ========== Render Table ==========
+    function renderTable(items) {
+      const tbody = document.getElementById('tasksTbody');
+      if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">暂无同步任务，请点击"开始同步"按钮添加</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(it => {
+        let statusCls = 'status-pending';
+        if (it.status === '运行中') statusCls = 'status-running';
+        else if (it.status === '已停止') statusCls = 'status-stopped';
+        return `<tr>
+          <td>${it.id}</td>
+          <td>${esc(it.source)}</td>
+          <td>${esc(it.target)}</td>
+          <td>${esc(it.frequency)}</td>
+          <td>${esc(it.mode)}</td>
+          <td>${esc(it.start_time) || '-'}</td>
+          <td>${esc(it.end_time) || '-'}</td>
+          <td><span class="${statusCls}">${esc(it.status)}</span></td>
+          <td>
+            <button class="btn-edit" onclick="openEditModal(${it.id})">编辑</button>
+            <button class="btn-del" onclick="deleteTask(${it.id})">删除</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = String(str);
+      return div.innerHTML;
+    }
+
+    // ========== Charts ==========
+    function renderCharts(stats) {
+      const statusDist = stats.status_distribution || {};
+      const statusLabels = ['运行中', '已停止', '待启动'];
+      const statusColors = ['#10b981', '#ef4444', '#f59e0b'];
+      const statusData = statusLabels.map(l => statusDist[l] || 0);
+
+      if (statusChartInst) statusChartInst.destroy();
+      statusChartInst = new Chart(document.getElementById('statusChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: statusLabels,
+          datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'right', labels: { padding: 16, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 13 } } }
           }
-        }, 500);
+        }
+      });
 
+      const modeDist = stats.mode_distribution || {};
+      const modeLabels = ['增量同步', '全量同步'];
+      const modeColors = ['#10b981', '#0ea5e9'];
+      const modeData = modeLabels.map(l => modeDist[l] || 0);
+
+      if (modeChartInst) modeChartInst.destroy();
+      modeChartInst = new Chart(document.getElementById('modeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: modeLabels,
+          datasets: [{ label: '数量', data: modeData, backgroundColor: modeColors, borderRadius: 4, barThickness: 28 }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f1f5f9' } },
+            y: { grid: { display: false } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // ========== Task Controls ==========
+    async function pauseSync() {
+      const running = allTasks.filter(t => t.status === '运行中');
+      if (running.length === 0) { showToast('没有正在运行的同步任务', 'error'); return; }
+      let paused = 0;
+      for (const t of running) {
+        try {
+          await api('/sync/tasks/' + t.id, { method: 'PUT', body: { status: '已停止' } });
+          paused++;
+        } catch (e) { /* skip */ }
+      }
+      showToast('已暂停 ' + paused + ' 个同步任务', 'success');
+      await loadAll();
+    }
+
+    async function stopSync() {
+      const active = allTasks.filter(t => t.status === '运行中' || t.status === '待启动');
+      if (active.length === 0) { showToast('没有可停止的同步任务', 'error'); return; }
+      if (!confirm('确定要停止所有同步任务吗？')) return;
+      let stopped = 0;
+      for (const t of active) {
+        try {
+          await api('/sync/tasks/' + t.id, { method: 'PUT', body: { status: '已停止' } });
+          stopped++;
+        } catch (e) { /* skip */ }
+      }
+      showToast('已停止 ' + stopped + ' 个同步任务', 'success');
+      await loadAll();
+    }
+
+    // ========== Add / Edit Modal ==========
+    function openAddModal() {
+      document.getElementById('formTitle').textContent = '新增同步任务';
+      document.getElementById('editId').value = '';
+      document.getElementById('mSource').value = '';
+      document.getElementById('mTarget').value = '';
+      document.getElementById('mFrequency').value = '5分钟';
+      document.getElementById('mMode').value = '全量同步';
+      document.getElementById('mStartTime').value = '';
+      document.getElementById('mEndTime').value = '';
+      document.getElementById('mSyncStatus').checked = false;
+      document.getElementById('mLogEnabled').checked = false;
+      document.getElementById('formModal').classList.add('active');
+    }
+
+    function openEditModal(id) {
+      const item = allTasks.find(i => i.id === id);
+      if (!item) { showToast('未找到该任务', 'error'); return; }
+      document.getElementById('formTitle').textContent = '编辑同步任务';
+      document.getElementById('editId').value = id;
+      document.getElementById('mSource').value = item.source || '';
+      document.getElementById('mTarget').value = item.target || '';
+      document.getElementById('mFrequency').value = item.frequency || '5分钟';
+      document.getElementById('mMode').value = item.mode || '全量同步';
+      document.getElementById('mStartTime').value = (item.start_time || '').replace(' ', 'T');
+      document.getElementById('mEndTime').value = (item.end_time || '').replace(' ', 'T');
+      document.getElementById('mSyncStatus').checked = !!item.sync_status_enabled;
+      document.getElementById('mLogEnabled').checked = !!item.log_enabled;
+      document.getElementById('formModal').classList.add('active');
+    }
+
+    function closeFormModal() {
+      document.getElementById('formModal').classList.remove('active');
+    }
+
+    async function submitForm() {
+      const editId = document.getElementById('editId').value;
+      const source = document.getElementById('mSource').value.trim();
+      const target = document.getElementById('mTarget').value.trim();
+      const frequency = document.getElementById('mFrequency').value;
+      const mode = document.getElementById('mMode').value;
+      const startTime = document.getElementById('mStartTime').value.replace('T', ' ');
+      const endTime = document.getElementById('mEndTime').value.replace('T', ' ');
+      const syncStatusEnabled = document.getElementById('mSyncStatus').checked;
+      const logEnabled = document.getElementById('mLogEnabled').checked;
+
+      if (!source) { showToast('请输入数据源地址', 'error'); return; }
+      if (!target) { showToast('请输入目标地址', 'error'); return; }
+
+      const body = {
+        source, target, frequency, mode,
+        start_time: startTime, end_time: endTime,
+        sync_status_enabled: syncStatusEnabled, log_enabled: logEnabled,
+        status: '运行中'
+      };
+
+      try {
+        let res;
+        if (editId) {
+          res = await api('/sync/tasks/' + editId, { method: 'PUT', body });
+        } else {
+          res = await api('/sync/tasks', { method: 'POST', body });
+        }
+        const data = await res.json();
+        if (data.ok) {
+          showToast(editId ? '更新成功' : '任务创建成功', 'success');
+          closeFormModal();
+          await loadAll();
+        } else {
+          showToast(data.error || '操作失败', 'error');
+        }
       } catch (e) {
-        showToast(e.message || '触发失败', 'error');
+        showToast('操作失败: ' + (e.message || ''), 'error');
       }
     }
 
-    async function completeSyncTask() {
+    // ========== Delete ==========
+    async function deleteTask(id) {
+      if (!confirm('确定要删除该同步任务吗？此操作不可恢复！')) return;
       try {
-        await api('/sync/status', {
-          method: 'POST',
-          body: { Status: 'success', Message: '同步完成' }
-        });
-        updateStatusDisplay({ status: 'success', message: '同步完成', last_synced_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-        addHistoryRow(new Date().toISOString(), 'success', '同步完成');
-        showToast('同步完成', 'success');
+        const res = await api('/sync/tasks/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('删除成功', 'success');
+          await loadAll();
+        } else {
+          showToast(data.error || '删除失败', 'error');
+        }
       } catch (e) {
-        showToast(e.message || '完成状态写入失败', 'error');
+        showToast('删除失败', 'error');
       }
+    }
+
+    // ========== Import / Export ==========
+    function importConfig() {
+      document.getElementById('importFile').click();
+    }
+
+    function handleImportFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function (e) {
+        try {
+          const items = JSON.parse(e.target.result);
+          if (!Array.isArray(items)) { showToast('JSON文件格式错误，需要数组格式', 'error'); return; }
+          const res = await api('/sync/tasks/import', { method: 'POST', body: items });
+          const data = await res.json();
+          if (data.ok) {
+            showToast('成功导入 ' + data.imported + ' 条配置', 'success');
+            await loadAll();
+          } else {
+            showToast(data.error || '导入失败', 'error');
+          }
+        } catch (err) {
+          showToast('导入失败: JSON格式解析错误', 'error');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function exportConfig() {
+      if (!allTasks || allTasks.length === 0) {
+        showToast('没有可导出的配置', 'error');
+        return;
+      }
+      const exportData = allTasks.map(it => ({
+        source: it.source, target: it.target, frequency: it.frequency,
+        mode: it.mode, start_time: it.start_time, end_time: it.end_time,
+        status: it.status, sync_status_enabled: it.sync_status_enabled,
+        log_enabled: it.log_enabled
+      }));
+      const json = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '同步配置_' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('导出成功', 'success');
+    }
+
+    // ========== Init ==========
+    async function loadAll() {
+      await Promise.all([loadTasks(), loadStats(), loadProgress(), loadInfo()]);
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-      loadSyncStatus();
+      loadAll();
+    });
+
+    document.getElementById('formModal').addEventListener('click', function (e) {
+      if (e.target === this) closeFormModal();
     });
   </script>
 </body>
+
 </html>
