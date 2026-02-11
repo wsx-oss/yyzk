@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"smartcontrol/internal/monitor"
@@ -433,6 +435,14 @@ func (a *API) HardwareItemsCreate(c *gin.Context) {
 		p.Bandwidth = "0Mbps"
 	}
 
+	// Check IP uniqueness
+	var existCount int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM hardware_items WHERE ip = ?", p.IP).Scan(&existCount)
+	if existCount > 0 {
+		c.JSON(400, gin.H{"error": "该IP地址已存在，不能重复添加"})
+		return
+	}
+
 	res, err := a.db.Exec(`INSERT INTO hardware_items(name, type, ip, status, description, temperature, cpu_usage, mem_usage, network_bandwidth, detected_at, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'),datetime('now'))`,
 		p.Name, p.Type, p.IP, p.Status, p.Description, p.Temperature, p.CPUUsage, p.MemUsage, p.Bandwidth)
 	if err != nil {
@@ -498,8 +508,16 @@ func (a *API) HardwareItemsUpdate(c *gin.Context) {
 		args = append(args, strings.TrimSpace(*p.Type))
 	}
 	if p.IP != nil {
+		newIP := strings.TrimSpace(*p.IP)
+		// Check IP uniqueness (exclude current record)
+		var ipCount int
+		_ = a.db.QueryRow("SELECT COUNT(*) FROM hardware_items WHERE ip = ? AND id != ?", newIP, id).Scan(&ipCount)
+		if ipCount > 0 {
+			c.JSON(400, gin.H{"error": "该IP地址已被其他硬件使用，不能重复"})
+			return
+		}
 		sets = append(sets, "ip = ?")
-		args = append(args, strings.TrimSpace(*p.IP))
+		args = append(args, newIP)
 	}
 	if p.Status != nil {
 		sets = append(sets, "status = ?")
@@ -606,7 +624,7 @@ type agentMetrics struct {
 
 // fetchAgentMetrics connects to the hw-agent running on targetIP:9100 and returns real metrics
 func fetchAgentMetrics(targetIP string) (*agentMetrics, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 2 * time.Second}
 	url := "http://" + targetIP + ":9100/metrics"
 	resp, err := client.Get(url)
 	if err != nil {
@@ -657,17 +675,24 @@ func (a *API) HardwareItemsRefresh(c *gin.Context) {
 			items = append(items, h)
 		}
 	}
-	online := 0
-	offline := 0
+
+	// Concurrent refresh for all devices
+	var wg sync.WaitGroup
+	var onlineCount, offlineCount int64
 	for _, h := range items {
-		ok, _ := a.updateHardwareFromAgent(h.id, h.ip)
-		if ok {
-			online++
-		} else {
-			offline++
-		}
+		wg.Add(1)
+		go func(id int, ip string) {
+			defer wg.Done()
+			ok, _ := a.updateHardwareFromAgent(id, ip)
+			if ok {
+				atomic.AddInt64(&onlineCount, 1)
+			} else {
+				atomic.AddInt64(&offlineCount, 1)
+			}
+		}(h.id, h.ip)
 	}
-	c.JSON(200, gin.H{"ok": true, "refreshed": len(items), "online": online, "offline": offline})
+	wg.Wait()
+	c.JSON(200, gin.H{"ok": true, "refreshed": len(items), "online": onlineCount, "offline": offlineCount})
 }
 
 // HardwareItemsRefreshOne refreshes a single hardware item by fetching real data from its agent
