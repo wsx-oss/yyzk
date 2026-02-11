@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,84 +8,378 @@
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    .module-title::before { content: '🔧'; }
-    .hw-header { display: flex; justify-content: space-between; align-items: flex-start; }
-    .hw-header .action-buttons { margin-top: 0; flex-shrink: 0; }
+    .module-title::before {
+      content: '🔧';
+    }
+
+    .hw-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .hw-header .action-buttons {
+      margin-top: 0;
+      flex-shrink: 0;
+    }
 
     /* Filter area */
-    .filter-section { margin-bottom: 0; }
-    .filter-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
-    .filter-row-3 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; align-items: end; }
-    .filter-group label { font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
-    .filter-group input, .filter-group select {
-      width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 5px;
-      font-size: 13px; background: #fff;
+    .filter-section {
+      margin-bottom: 0;
     }
-    .filter-group input:focus, .filter-group select:focus {
-      outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
+
+    .filter-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 12px;
     }
-    .range-input { display: flex; align-items: center; gap: 4px; }
-    .range-input input { width: 50%; }
-    .range-input span { color: #94a3b8; font-size: 12px; }
-    .btn-search-row { display: flex; justify-content: flex-end; align-items: flex-end; }
+
+    .filter-row-3 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      align-items: end;
+    }
+
+    .filter-group label {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+    }
+
+    .range-input {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .range-input input {
+      width: 50%;
+    }
+
+    .range-input span {
+      color: #94a3b8;
+      font-size: 12px;
+    }
+
+    .btn-search-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-end;
+    }
 
     /* Table */
-    .data-table { font-size: 13px; }
-    .data-table th { white-space: nowrap; font-size: 12px; padding: 10px 8px; }
-    .data-table td { padding: 10px 8px; white-space: nowrap; }
-    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-    .status-dot.online { background: #10b981; }
-    .status-dot.offline { background: #ef4444; }
-    .status-dot.warning { background: #f59e0b; }
-    .btn-detail { padding: 4px 12px; font-size: 12px; background: #0ea5e9; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
-    .btn-detail:hover { background: #0284c7; }
-    .btn-del { padding: 4px 12px; font-size: 12px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-left: 4px; }
-    .btn-del:hover { background: #dc2626; }
+    .data-table {
+      font-size: 13px;
+    }
+
+    .data-table th {
+      white-space: nowrap;
+      font-size: 12px;
+      padding: 10px 8px;
+    }
+
+    .data-table td {
+      padding: 10px 8px;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .status-dot.online {
+      background: #10b981;
+    }
+
+    .status-dot.offline {
+      background: #ef4444;
+    }
+
+    .status-dot.warning {
+      background: #f59e0b;
+    }
+
+    .btn-detail {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #0ea5e9;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-detail:hover {
+      background: #0284c7;
+    }
+
+    .btn-del {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+
+    .btn-del:hover {
+      background: #dc2626;
+    }
+
+    .btn-refresh-one {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #10b981;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+
+    .btn-refresh-one:hover {
+      background: #059669;
+    }
+
+    .auto-refresh-wrap {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 10px;
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 4px 10px;
+      gap: 6px;
+    }
+
+    .auto-refresh-wrap label {
+      font-size: 12px;
+      color: #475569;
+      font-weight: 500;
+      white-space: nowrap;
+      margin: 0;
+    }
+
+    .auto-refresh-wrap select {
+      font-size: 12px;
+      padding: 2px 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .auto-refresh-wrap select:focus {
+      border-color: #0ea5e9;
+    }
+
+    .auto-refresh-wrap .refresh-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
 
     /* Modal */
     .modal-overlay {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
     }
-    .modal-overlay.active { display: flex; }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
     .modal {
-      background: #fff; border-radius: 10px; padding: 0; width: 480px; max-width: 95vw;
-      max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      background: #fff;
+      border-radius: 10px;
+      padding: 0;
+      width: 480px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     }
+
     .modal-header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-size: 16px; font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 16px;
+      font-weight: 600;
     }
-    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #94a3b8; padding: 4px 8px; }
-    .modal-close:hover { color: #0f172a; }
-    .modal-body { padding: 20px; }
-    .modal-footer { padding: 12px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px; }
-    .form-group { margin-bottom: 14px; }
-    .form-group label { display: block; font-size: 13px; font-weight: 500; color: #334155; margin-bottom: 5px; }
-    .form-group label .required { color: #ef4444; }
-    .form-group input, .form-group select, .form-group textarea {
-      width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px;
-      font-size: 13px; background: #fff; font-family: inherit;
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #94a3b8;
+      padding: 4px 8px;
     }
-    .form-group textarea { resize: vertical; min-height: 70px; }
-    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-      outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
+
+    .modal-close:hover {
+      color: #0f172a;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .modal-footer {
+      padding: 12px 20px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #334155;
+      margin-bottom: 5px;
+    }
+
+    .form-group label .required {
+      color: #ef4444;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      font-family: inherit;
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 70px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
     }
 
     /* Detail modal */
-    .detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 8px 12px; font-size: 13px; }
-    .detail-label { color: #64748b; font-weight: 500; }
-    .detail-value { color: #0f172a; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 8px 12px;
+      font-size: 13px;
+    }
+
+    .detail-label {
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      color: #0f172a;
+    }
 
     /* Charts */
-    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-    .chart-box { text-align: center; }
-    .chart-box h4 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #334155; }
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .chart-box {
+      text-align: center;
+      padding: 4px;
+    }
+
+    .chart-box h4 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #334155;
+    }
+
+    .chart-canvas-wrap {
+      height: 180px;
+      position: relative;
+    }
 
     /* Empty state */
-    .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 14px; }
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+      font-size: 14px;
+    }
   </style>
 </head>
+
 <body>
   <!-- Header -->
   <div class="module-header">
@@ -94,6 +389,18 @@
         <button class="btn btn-primary" onclick="refreshData()">刷新数据</button>
         <button class="btn btn-secondary" onclick="exportData()">导出数据</button>
         <button class="btn btn-success" onclick="openAddModal()">添加硬件</button>
+        <span class="auto-refresh-wrap">
+          <span class="refresh-dot"></span>
+          <label>自动刷新</label>
+          <select id="refreshInterval" onchange="changeRefreshInterval()">
+            <option value="0">关闭</option>
+            <option value="5000">5秒</option>
+            <option value="10000" selected>10秒</option>
+            <option value="30000">30秒</option>
+            <option value="60000">1分钟</option>
+            <option value="300000">5分钟</option>
+          </select>
+        </span>
       </div>
     </div>
 
@@ -179,7 +486,9 @@
         </tr>
       </thead>
       <tbody id="hwTbody">
-        <tr><td colspan="10" class="empty-state">加载中...</td></tr>
+        <tr>
+          <td colspan="10" class="empty-state">加载中...</td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -193,16 +502,16 @@
   </div>
 
   <!-- Statistics Charts -->
-  <div class="card">
-    <div class="card-title">硬件状态统计</div>
+  <div class="card" style="padding: 14px 16px;">
+    <div class="card-title" style="font-size:14px; margin-bottom:10px;">硬件状态统计</div>
     <div class="charts-row">
       <div class="chart-box">
         <h4>硬件状态分布</h4>
-        <canvas id="statusChart" height="260"></canvas>
+        <div class="chart-canvas-wrap"><canvas id="statusChart"></canvas></div>
       </div>
       <div class="chart-box">
         <h4>硬件类型分布</h4>
-        <canvas id="typeChart" height="260"></canvas>
+        <div class="chart-canvas-wrap"><canvas id="typeChart"></canvas></div>
       </div>
     </div>
   </div>
@@ -340,6 +649,7 @@
           <td>${formatDetectedAt(item.detected_at)}</td>
           <td>
             <button class="btn-detail" onclick="viewDetail(${item.id})">查看详情</button>
+            <button class="btn-refresh-one" onclick="refreshOne(${item.id})">刷新</button>
             <button class="btn-del" onclick="deleteItem(${item.id}, '${esc(item.name)}')">删除</button>
           </td>
         </tr>`;
@@ -388,7 +698,7 @@
         options: {
           responsive: true,
           plugins: {
-            legend: { position: 'right', labels: { padding: 16, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 13 } } }
+            legend: { position: 'right', labels: { padding: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 } } }
           }
         }
       });
@@ -422,7 +732,7 @@
           },
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.x + ' 台'; } } }
+            tooltip: { callbacks: { label: function (ctx) { return ctx.parsed.x + ' 台'; } } }
           }
         }
       });
@@ -431,9 +741,25 @@
     // ========== Refresh ==========
     async function refreshData() {
       try {
-        await api('/hardware/items/refresh', { method: 'POST' });
+        const res = await api('/hardware/items/refresh', { method: 'POST' });
+        const data = await res.json();
         await Promise.all([loadList(), loadStats()]);
-        showToast('数据已刷新', 'success');
+        showToast('刷新完成: ' + (data.online || 0) + ' 台在线, ' + (data.offline || 0) + ' 台离线', 'success');
+      } catch (e) {
+        showToast('刷新失败: ' + (e.message || ''), 'error');
+      }
+    }
+
+    async function refreshOne(id) {
+      try {
+        const res = await api('/hardware/items/' + id + '/refresh', { method: 'POST' });
+        const data = await res.json();
+        await Promise.all([loadList(), loadStats()]);
+        if (data.ok) {
+          showToast('设备在线，数据已更新', 'success');
+        } else {
+          showToast(data.message || 'Agent不可达，设备标记为离线', 'error');
+        }
       } catch (e) {
         showToast('刷新失败: ' + (e.message || ''), 'error');
       }
@@ -495,6 +821,20 @@
         return;
       }
 
+      // Pre-check: verify agent is reachable and returns valid data
+      try {
+        showToast('正在检测目标设备Agent...', 'info');
+        const checkRes = await api('/hardware/items/check-agent', { method: 'POST', body: { ip } });
+        const checkData = await checkRes.json();
+        if (!checkData.ok) {
+          showToast(checkData.message || '该IP地址无效，无法连接到Agent', 'error');
+          return;
+        }
+      } catch (e) {
+        showToast('Agent检测失败: ' + (e.message || '网络错误'), 'error');
+        return;
+      }
+
       try {
         const res = await api('/hardware/items', {
           method: 'POST',
@@ -502,7 +842,7 @@
         });
         const data = await res.json();
         if (data.ok) {
-          showToast('硬件添加成功', 'success');
+          showToast('硬件添加成功，Agent已连接，数据已采集', 'success');
           closeAddModal();
           await Promise.all([loadList(), loadStats()]);
         } else {
@@ -566,19 +906,41 @@
       }
     }
 
+    // ========== Auto Refresh ==========
+    let autoRefreshTimer = null;
+
+    function changeRefreshInterval() {
+      if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+      const ms = parseInt(document.getElementById('refreshInterval').value);
+      const dot = document.querySelector('.refresh-dot');
+      if (ms <= 0) {
+        if (dot) dot.style.background = '#94a3b8';
+        return;
+      }
+      if (dot) dot.style.background = '#10b981';
+      autoRefreshTimer = setInterval(async () => {
+        try {
+          await api('/hardware/items/refresh', { method: 'POST' });
+          await Promise.all([loadList(), loadStats()]);
+        } catch (e) { /* silent */ }
+      }, ms);
+    }
+
     // ========== Init ==========
     window.addEventListener('DOMContentLoaded', () => {
       loadList();
       loadStats();
+      changeRefreshInterval();
     });
 
     // Close modals on overlay click
-    document.getElementById('addModal').addEventListener('click', function(e) {
+    document.getElementById('addModal').addEventListener('click', function (e) {
       if (e.target === this) closeAddModal();
     });
-    document.getElementById('detailModal').addEventListener('click', function(e) {
+    document.getElementById('detailModal').addEventListener('click', function (e) {
       if (e.target === this) closeDetailModal();
     });
   </script>
 </body>
+
 </html>
