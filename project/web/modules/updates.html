@@ -290,18 +290,26 @@
     .charts-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      gap: 16px;
+      max-width: 680px;
+      margin: 0 auto;
     }
 
     .chart-box {
       text-align: center;
+      padding: 4px;
     }
 
     .chart-box h4 {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
-      margin-bottom: 12px;
+      margin-bottom: 6px;
       color: #334155;
+    }
+
+    .chart-canvas-wrap {
+      height: 180px;
+      position: relative;
     }
 
     .empty-state {
@@ -437,16 +445,16 @@
   </div>
 
   <!-- Statistics -->
-  <div class="card">
-    <div class="card-title">更新统计</div>
+  <div class="card" style="padding: 14px 16px;">
+    <div class="card-title" style="font-size:14px; margin-bottom:10px;">更新统计</div>
     <div class="charts-row">
       <div class="chart-box">
         <h4>更新状态分布</h4>
-        <canvas id="statusChart" height="260"></canvas>
+        <div class="chart-canvas-wrap"><canvas id="statusChart"></canvas></div>
       </div>
       <div class="chart-box">
         <h4>更新类型分布</h4>
-        <canvas id="typeChart" height="260"></canvas>
+        <div class="chart-canvas-wrap"><canvas id="typeChart"></canvas></div>
       </div>
     </div>
   </div>
@@ -639,7 +647,7 @@
         options: {
           responsive: true,
           plugins: {
-            legend: { position: 'right', labels: { padding: 16, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 13 } } }
+            legend: { position: 'right', labels: { padding: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 } } }
           }
         }
       });

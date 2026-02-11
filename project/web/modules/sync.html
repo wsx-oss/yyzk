@@ -176,6 +176,36 @@
       background: #dc2626;
     }
 
+    .btn-start {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #10b981;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+
+    .btn-start:hover {
+      background: #059669;
+    }
+
+    .btn-stop {
+      padding: 4px 12px;
+      font-size: 12px;
+      background: #f59e0b;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+
+    .btn-stop:hover {
+      background: #d97706;
+    }
+
     /* Modal */
     .modal-overlay {
       display: none;
@@ -291,18 +321,26 @@
     .charts-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      gap: 16px;
+      max-width: 680px;
+      margin: 0 auto;
     }
 
     .chart-box {
       text-align: center;
+      padding: 4px;
     }
 
     .chart-box h4 {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
-      margin-bottom: 12px;
+      margin-bottom: 6px;
       color: #334155;
+    }
+
+    .chart-canvas-wrap {
+      height: 180px;
+      position: relative;
     }
 
     /* Progress */
@@ -389,10 +427,9 @@
     <div class="sync-header">
       <div class="module-title">数据同步状态</div>
       <div class="action-buttons">
-        <button class="btn btn-primary" onclick="openAddModal()">开始同步</button>
-        <button class="btn btn-secondary" onclick="pauseSync()">暂停同步</button>
+        <button class="btn btn-primary" onclick="openAddModal()">新增同步任务</button>
         <button class="btn btn-secondary" style="background:#ef4444; border-color:#ef4444; color:#fff;"
-          onclick="stopSync()">停止同步</button>
+          onclick="stopAllSync()">停止所有同步</button>
       </div>
     </div>
 
@@ -467,7 +504,7 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>同步任务ID</th>
+          <th>ID</th>
           <th>数据源</th>
           <th>目标地址</th>
           <th>同步频率</th>
@@ -475,12 +512,13 @@
           <th>开始时间</th>
           <th>结束时间</th>
           <th>状态</th>
+          <th>进度</th>
           <th>操作</th>
         </tr>
       </thead>
       <tbody id="tasksTbody">
         <tr>
-          <td colspan="9" class="empty-state">加载中...</td>
+          <td colspan="10" class="empty-state">加载中...</td>
         </tr>
       </tbody>
     </table>
@@ -495,16 +533,16 @@
   </div>
 
   <!-- Statistics -->
-  <div class="card">
-    <div class="card-title">数据同步统计</div>
+  <div class="card" style="padding: 14px 16px;">
+    <div class="card-title" style="font-size:14px; margin-bottom:10px;">数据同步统计</div>
     <div class="charts-row">
       <div class="chart-box">
         <h4>同步状态分布</h4>
-        <canvas id="statusChart" height="260"></canvas>
+        <div class="chart-canvas-wrap"><canvas id="statusChart"></canvas></div>
       </div>
       <div class="chart-box">
         <h4>同步模式分布</h4>
-        <canvas id="modeChart" height="260"></canvas>
+        <div class="chart-canvas-wrap"><canvas id="modeChart"></canvas></div>
       </div>
     </div>
   </div>
@@ -625,6 +663,7 @@
     let allTasks = [];
     let statusChartInst = null;
     let modeChartInst = null;
+    let progressTimer = null;
 
     // ========== Load ==========
     async function loadTasks() {
@@ -653,9 +692,19 @@
         const pct = data.progress || 0;
         const synced = data.synced_data || 0;
         const total = data.total_data || 0;
+        const running = data.running_count || 0;
+        const taskCount = data.task_count || 0;
         document.getElementById('progressFill').style.width = pct + '%';
         document.getElementById('progressText').textContent = pct + '%';
-        document.getElementById('progressDetail').textContent = '已同步数据量: ' + synced + 'MB / ' + total + 'MB';
+        document.getElementById('progressDetail').textContent =
+          '已同步: ' + synced + '/' + total + ' 张表 | 运行中: ' + running + '/' + taskCount + ' 个任务';
+
+        // Update per-task progress in table if available
+        const tasks = data.tasks || [];
+        tasks.forEach(t => {
+          const el = document.getElementById('prog-' + t.id);
+          if (el) el.textContent = t.progress + '%';
+        });
       } catch (e) { /* silent */ }
     }
 
@@ -665,12 +714,13 @@
         const data = await res.json();
         document.getElementById('infoLastSync').textContent = data.last_synced_at || '-';
         document.getElementById('infoSuccessRate').textContent = (data.success_rate || 0).toFixed(0) + '%';
-        document.getElementById('infoAvgDuration').textContent = (data.avg_duration || 0).toFixed(0) + '分钟';
+        document.getElementById('infoAvgDuration').textContent = (data.avg_duration || 0).toFixed(1) + '分钟';
       } catch (e) { /* silent */ }
     }
 
     function refreshProgress() {
       loadProgress();
+      loadInfo();
       showToast('进度已刷新', 'success');
     }
 
@@ -711,13 +761,17 @@
     function renderTable(items) {
       const tbody = document.getElementById('tasksTbody');
       if (!items || items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">暂无同步任务，请点击"开始同步"按钮添加</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="empty-state">暂无同步任务，请点击"新增同步任务"按钮添加</td></tr>';
         return;
       }
       tbody.innerHTML = items.map(it => {
         let statusCls = 'status-pending';
         if (it.status === '运行中') statusCls = 'status-running';
         else if (it.status === '已停止') statusCls = 'status-stopped';
+        const isRunning = it.status === '运行中';
+        const toggleBtn = isRunning
+          ? `<button class="btn-stop" onclick="stopTask(${it.id})">停止</button>`
+          : `<button class="btn-start" onclick="startTask(${it.id})">启动</button>`;
         return `<tr>
           <td>${it.id}</td>
           <td>${esc(it.source)}</td>
@@ -727,7 +781,9 @@
           <td>${esc(it.start_time) || '-'}</td>
           <td>${esc(it.end_time) || '-'}</td>
           <td><span class="${statusCls}">${esc(it.status)}</span></td>
-          <td>
+          <td><span id="prog-${it.id}">${it.progress || 0}%</span></td>
+          <td style="white-space:nowrap;">
+            ${toggleBtn}
             <button class="btn-edit" onclick="openEditModal(${it.id})">编辑</button>
             <button class="btn-del" onclick="deleteTask(${it.id})">删除</button>
           </td>
@@ -759,7 +815,7 @@
         options: {
           responsive: true,
           plugins: {
-            legend: { position: 'right', labels: { padding: 16, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 13 } } }
+            legend: { position: 'right', labels: { padding: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 } } }
           }
         }
       });
@@ -788,34 +844,65 @@
       });
     }
 
-    // ========== Task Controls ==========
-    async function pauseSync() {
-      const running = allTasks.filter(t => t.status === '运行中');
-      if (running.length === 0) { showToast('没有正在运行的同步任务', 'error'); return; }
-      let paused = 0;
-      for (const t of running) {
-        try {
-          await api('/sync/tasks/' + t.id, { method: 'PUT', body: { status: '已停止' } });
-          paused++;
-        } catch (e) { /* skip */ }
+    // ========== Per-task Start / Stop ==========
+    async function startTask(id) {
+      try {
+        showToast('正在启动同步任务...', 'info');
+        const res = await api('/sync/tasks/' + id + '/start', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(data.message || '同步任务已启动', 'success');
+          await loadAll();
+        } else {
+          showToast(data.error || '启动失败', 'error');
+        }
+      } catch (e) {
+        showToast('启动失败: ' + (e.message || ''), 'error');
       }
-      showToast('已暂停 ' + paused + ' 个同步任务', 'success');
-      await loadAll();
     }
 
-    async function stopSync() {
-      const active = allTasks.filter(t => t.status === '运行中' || t.status === '待启动');
-      if (active.length === 0) { showToast('没有可停止的同步任务', 'error'); return; }
-      if (!confirm('确定要停止所有同步任务吗？')) return;
-      let stopped = 0;
-      for (const t of active) {
-        try {
-          await api('/sync/tasks/' + t.id, { method: 'PUT', body: { status: '已停止' } });
-          stopped++;
-        } catch (e) { /* skip */ }
+    async function stopTask(id) {
+      try {
+        const res = await api('/sync/tasks/' + id + '/stop', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(data.message || '同步任务已停止', 'success');
+          await loadAll();
+        } else {
+          showToast(data.error || '停止失败', 'error');
+        }
+      } catch (e) {
+        showToast('停止失败: ' + (e.message || ''), 'error');
       }
-      showToast('已停止 ' + stopped + ' 个同步任务', 'success');
-      await loadAll();
+    }
+
+    async function stopAllSync() {
+      const active = allTasks.filter(t => t.status === '运行中');
+      if (active.length === 0) { showToast('没有正在运行的同步任务', 'error'); return; }
+      if (!confirm('确定要停止所有同步任务吗？')) return;
+      try {
+        const res = await api('/sync/tasks/stop-all', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(data.message || '已停止所有同步任务', 'success');
+          await loadAll();
+        } else {
+          showToast(data.error || '操作失败', 'error');
+        }
+      } catch (e) {
+        showToast('操作失败: ' + (e.message || ''), 'error');
+      }
+    }
+
+    // ========== IP Validation ==========
+    async function checkSyncIP(ip) {
+      try {
+        const res = await api('/sync/tasks/check-ip', { method: 'POST', body: { ip } });
+        const data = await res.json();
+        return data;
+      } catch (e) {
+        return { ok: false, message: '网络错误: ' + (e.message || '') };
+      }
     }
 
     // ========== Add / Edit Modal ==========
@@ -866,12 +953,35 @@
 
       if (!source) { showToast('请输入数据源地址', 'error'); return; }
       if (!target) { showToast('请输入目标地址', 'error'); return; }
+      if (source === target) { showToast('数据源和目标地址不能相同', 'error'); return; }
+
+      // Validate time
+      if (startTime && endTime && startTime >= endTime) {
+        showToast('开始时间必须小于结束时间', 'error');
+        return;
+      }
+
+      // IP validation for new tasks
+      if (!editId) {
+        showToast('正在检测数据源设备...', 'info');
+        const srcCheck = await checkSyncIP(source);
+        if (!srcCheck.ok) {
+          showToast('数据源无效: ' + srcCheck.message, 'error');
+          return;
+        }
+        showToast('正在检测目标设备...', 'info');
+        const tgtCheck = await checkSyncIP(target);
+        if (!tgtCheck.ok) {
+          showToast('目标地址无效: ' + tgtCheck.message, 'error');
+          return;
+        }
+      }
 
       const body = {
         source, target, frequency, mode,
         start_time: startTime, end_time: endTime,
         sync_status_enabled: syncStatusEnabled, log_enabled: logEnabled,
-        status: '运行中'
+        status: '待启动'
       };
 
       try {
@@ -898,6 +1008,11 @@
     async function deleteTask(id) {
       if (!confirm('确定要删除该同步任务吗？此操作不可恢复！')) return;
       try {
+        // Stop the task first if running
+        const task = allTasks.find(t => t.id === id);
+        if (task && task.status === '运行中') {
+          await api('/sync/tasks/' + id + '/stop', { method: 'POST' });
+        }
         const res = await api('/sync/tasks/' + id, { method: 'DELETE' });
         const data = await res.json();
         if (data.ok) {
@@ -971,6 +1086,11 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       loadAll();
+      // Auto-refresh progress every 10 seconds
+      progressTimer = setInterval(() => {
+        loadProgress();
+        loadInfo();
+      }, 10000);
     });
 
     document.getElementById('formModal').addEventListener('click', function (e) {

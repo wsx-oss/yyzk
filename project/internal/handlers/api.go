@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"smartcontrol/internal/monitor"
+	"smartcontrol/internal/syncengine"
 	"smartcontrol/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +24,8 @@ import (
 )
 
 type API struct {
-	db *sql.DB
+	db      *sql.DB
+	syncEng *syncengine.Engine
 }
 
 // DevicesList returns devices filtered by optional name and protocol, ordered with matching items first
@@ -213,7 +216,7 @@ func (a *API) UserStatsIncrConnection(c *gin.Context) {
 }
 
 func RegisterRoutes(r *gin.Engine, database *sql.DB) {
-	a := &API{db: database}
+	a := &API{db: database, syncEng: syncengine.New(database)}
 	api := r.Group("/api")
 	{
 		api.GET("/metrics/snapshot", a.MetricsSnapshot)
@@ -253,6 +256,13 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/sync/tasks/stats", a.SyncTasksStats)
 		api.GET("/sync/tasks/progress", a.SyncTasksProgress)
 		api.GET("/sync/tasks/info", a.SyncTasksInfo)
+		api.POST("/sync/tasks/:id/start", a.SyncTaskStart)
+		api.POST("/sync/tasks/:id/stop", a.SyncTaskStop)
+		api.POST("/sync/tasks/stop-all", a.SyncTaskStopAll)
+		api.POST("/sync/tasks/check-ip", a.SyncCheckIP)
+		api.GET("/sync/ping", a.SyncPing)
+		api.GET("/sync/export-data", a.SyncExportData)
+		api.POST("/sync/import-data", a.SyncImportData)
 
 		api.GET("/report/perf", a.ReportPerf)
 
@@ -279,6 +289,8 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/hardware/items/:id", a.HardwareItemsGet)
 		api.PUT("/hardware/items/:id", a.HardwareItemsUpdate)
 		api.DELETE("/hardware/items/:id", a.HardwareItemsDelete)
+		api.POST("/hardware/items/:id/refresh", a.HardwareItemsRefreshOne)
+		api.POST("/hardware/items/check-agent", a.HardwareCheckAgent)
 
 		// user stats
 		api.GET("/user/stats", a.UserStatsGet)
@@ -428,7 +440,10 @@ func (a *API) HardwareItemsCreate(c *gin.Context) {
 		return
 	}
 	newId, _ := res.LastInsertId()
-	c.JSON(200, gin.H{"ok": true, "id": newId})
+
+	// Auto-probe: try to fetch real data from agent on the target IP
+	agentOk, _ := a.updateHardwareFromAgent(int(newId), p.IP)
+	c.JSON(200, gin.H{"ok": true, "id": newId, "agent_connected": agentOk})
 }
 
 func (a *API) HardwareItemsGet(c *gin.Context) {
@@ -580,29 +595,128 @@ func (a *API) HardwareItemsStats(c *gin.Context) {
 	c.JSON(200, gin.H{"total": total, "status_distribution": statusDist, "type_distribution": typeDist})
 }
 
+// agentMetrics represents the JSON response from hw-agent
+type agentMetrics struct {
+	Hostname         string  `json:"hostname"`
+	CPUUsage         float64 `json:"cpu_usage"`
+	MemUsage         float64 `json:"mem_usage"`
+	Temperature      float64 `json:"temperature"`
+	NetworkBandwidth string  `json:"network_bandwidth"`
+}
+
+// fetchAgentMetrics connects to the hw-agent running on targetIP:9100 and returns real metrics
+func fetchAgentMetrics(targetIP string) (*agentMetrics, error) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	url := "http://" + targetIP + ":9100/metrics"
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("agent returned status %d", resp.StatusCode)
+	}
+	var m agentMetrics
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// updateHardwareFromAgent fetches real metrics from agent and updates the database record
+func (a *API) updateHardwareFromAgent(id int, ip string) (bool, string) {
+	m, err := fetchAgentMetrics(ip)
+	if err != nil {
+		// Agent unreachable, mark as offline
+		_, _ = a.db.Exec("UPDATE hardware_items SET status = '离线', detected_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", id)
+		return false, err.Error()
+	}
+	// Agent reachable, update with real data
+	_, _ = a.db.Exec(`UPDATE hardware_items SET 
+		status = '在线', temperature = ?, cpu_usage = ?, mem_usage = ?, network_bandwidth = ?,
+		detected_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+		m.Temperature, m.CPUUsage, m.MemUsage, m.NetworkBandwidth, id)
+	return true, ""
+}
+
 func (a *API) HardwareItemsRefresh(c *gin.Context) {
-	// Simulate refreshing hardware data: randomize temperature/cpu/mem slightly for demo
-	rows, err := a.db.Query("SELECT id, temperature, cpu_usage, mem_usage FROM hardware_items")
+	rows, err := a.db.Query("SELECT id, ip FROM hardware_items")
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 	defer rows.Close()
 	type hw struct {
-		id             int
-		temp, cpu, mem float64
+		id int
+		ip string
 	}
 	var items []hw
 	for rows.Next() {
 		var h hw
-		if err := rows.Scan(&h.id, &h.temp, &h.cpu, &h.mem); err == nil {
+		if err := rows.Scan(&h.id, &h.ip); err == nil {
 			items = append(items, h)
 		}
 	}
+	online := 0
+	offline := 0
 	for _, h := range items {
-		_, _ = a.db.Exec("UPDATE hardware_items SET detected_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", h.id)
+		ok, _ := a.updateHardwareFromAgent(h.id, h.ip)
+		if ok {
+			online++
+		} else {
+			offline++
+		}
 	}
-	c.JSON(200, gin.H{"ok": true, "refreshed": len(items)})
+	c.JSON(200, gin.H{"ok": true, "refreshed": len(items), "online": online, "offline": offline})
+}
+
+// HardwareItemsRefreshOne refreshes a single hardware item by fetching real data from its agent
+func (a *API) HardwareItemsRefreshOne(c *gin.Context) {
+	id := c.Param("id")
+	var hwId int
+	var ip string
+	err := a.db.QueryRow("SELECT id, ip FROM hardware_items WHERE id = ?", id).Scan(&hwId, &ip)
+	if err == sql.ErrNoRows {
+		c.JSON(404, gin.H{"error": "硬件不存在"})
+		return
+	}
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	ok, errMsg := a.updateHardwareFromAgent(hwId, ip)
+	if ok {
+		c.JSON(200, gin.H{"ok": true, "status": "在线", "message": "数据已从Agent采集更新"})
+	} else {
+		c.JSON(200, gin.H{"ok": false, "status": "离线", "message": "Agent不可达: " + errMsg})
+	}
+}
+
+// HardwareCheckAgent pre-checks if the agent is reachable on the given IP before adding
+func (a *API) HardwareCheckAgent(c *gin.Context) {
+	var p struct {
+		IP string `json:"ip"`
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"ok": false, "message": "参数格式错误"})
+		return
+	}
+	p.IP = strings.TrimSpace(p.IP)
+	if p.IP == "" {
+		c.JSON(400, gin.H{"ok": false, "message": "IP地址不能为空"})
+		return
+	}
+	m, err := fetchAgentMetrics(p.IP)
+	if err != nil {
+		c.JSON(200, gin.H{"ok": false, "message": "无法连接到目标设备的Agent（" + p.IP + ":9100），请确保目标设备已运行hw-agent程序且9100端口已放行"})
+		return
+	}
+	// Check if all metrics are zero (invalid agent data)
+	if m.CPUUsage == 0 && m.MemUsage == 0 && m.Temperature == 0 && m.NetworkBandwidth == "0B" {
+		c.JSON(200, gin.H{"ok": false, "message": "Agent返回的数据全部为零，可能是无效设备"})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "message": "Agent连接成功", "metrics": m})
 }
 
 func (a *API) MetricsSnapshot(c *gin.Context) {
@@ -1357,7 +1471,6 @@ func (a *API) SyncTasksCreate(c *gin.Context) {
 		Status            string `json:"status"`
 		SyncStatusEnabled bool   `json:"sync_status_enabled"`
 		LogEnabled        bool   `json:"log_enabled"`
-		TotalData         int    `json:"total_data"`
 	}
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(400, gin.H{"error": "参数格式错误"})
@@ -1373,6 +1486,17 @@ func (a *API) SyncTasksCreate(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "目标地址不能为空"})
 		return
 	}
+	if p.Source == p.Target {
+		c.JSON(400, gin.H{"error": "数据源和目标地址不能相同"})
+		return
+	}
+	// Validate start_time < end_time if both provided
+	if p.StartTime != "" && p.EndTime != "" {
+		if p.StartTime >= p.EndTime {
+			c.JSON(400, gin.H{"error": "开始时间必须小于结束时间"})
+			return
+		}
+	}
 	if p.Frequency == "" {
 		p.Frequency = "5分钟"
 	}
@@ -1382,9 +1506,7 @@ func (a *API) SyncTasksCreate(c *gin.Context) {
 	if p.Status == "" {
 		p.Status = "待启动"
 	}
-	if p.TotalData <= 0 {
-		p.TotalData = 1000
-	}
+	totalTables := len(syncengine.SyncableTables)
 	sse := 0
 	if p.SyncStatusEnabled {
 		sse = 1
@@ -1394,7 +1516,7 @@ func (a *API) SyncTasksCreate(c *gin.Context) {
 		le = 1
 	}
 	res, err := a.db.Exec(`INSERT INTO sync_tasks(source, target, frequency, mode, start_time, end_time, status, sync_status_enabled, log_enabled, total_data, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`,
-		p.Source, p.Target, p.Frequency, p.Mode, p.StartTime, p.EndTime, p.Status, sse, le, p.TotalData)
+		p.Source, p.Target, p.Frequency, p.Mode, p.StartTime, p.EndTime, p.Status, sse, le, totalTables)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -1450,6 +1572,13 @@ func (a *API) SyncTasksEdit(c *gin.Context) {
 	if p.EndTime != nil {
 		sets = append(sets, "end_time = ?")
 		args = append(args, *p.EndTime)
+	}
+	// Validate start_time < end_time when both are being set
+	if p.StartTime != nil && p.EndTime != nil && *p.StartTime != "" && *p.EndTime != "" {
+		if *p.StartTime >= *p.EndTime {
+			c.JSON(400, gin.H{"error": "开始时间必须小于结束时间"})
+			return
+		}
 	}
 	if p.Status != nil {
 		sets = append(sets, "status = ?")
@@ -1613,14 +1742,58 @@ func (a *API) SyncTasksStats(c *gin.Context) {
 }
 
 func (a *API) SyncTasksProgress(c *gin.Context) {
-	// Return aggregated progress across all running tasks
-	var totalSynced, totalData, runningCount int
-	_ = a.db.QueryRow("SELECT COALESCE(SUM(synced_data),0), COALESCE(SUM(total_data),0), COUNT(*) FROM sync_tasks WHERE status = '运行中'").Scan(&totalSynced, &totalData, &runningCount)
-	progress := 0
-	if totalData > 0 {
-		progress = totalSynced * 100 / totalData
+	// Return per-task progress from engine + DB, aggregated with equal weight
+	rows, err := a.db.Query("SELECT id, status, progress, synced_data, total_data FROM sync_tasks")
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
 	}
-	c.JSON(200, gin.H{"progress": progress, "synced_data": totalSynced, "total_data": totalData, "running_count": runningCount})
+	defer rows.Close()
+
+	var taskProgresses []gin.H
+	totalProgress := 0
+	taskCount := 0
+	totalSynced := 0
+	totalData := 0
+	runningCount := 0
+
+	for rows.Next() {
+		var id, progress, syncedData, tData int
+		var status string
+		if err := rows.Scan(&id, &status, &progress, &syncedData, &tData); err != nil {
+			continue
+		}
+		// Override with live engine state if running
+		if state := a.syncEng.GetState(id); state != nil && state.Running {
+			progress = state.Progress
+			syncedData = state.SyncedTables
+			tData = state.TotalTables
+			runningCount++
+		} else if status == "运行中" {
+			runningCount++
+		}
+		taskProgresses = append(taskProgresses, gin.H{
+			"id": id, "status": status, "progress": progress,
+			"synced_data": syncedData, "total_data": tData,
+		})
+		totalProgress += progress
+		totalSynced += syncedData
+		totalData += tData
+		taskCount++
+	}
+
+	avgProgress := 0
+	if taskCount > 0 {
+		avgProgress = totalProgress / taskCount
+	}
+	c.JSON(200, gin.H{
+		"progress":      avgProgress,
+		"synced_data":   totalSynced,
+		"total_data":    totalData,
+		"running_count": runningCount,
+		"task_count":    taskCount,
+		"tasks":         taskProgresses,
+	})
 }
 
 func (a *API) SyncTasksInfo(c *gin.Context) {
@@ -1636,6 +1809,100 @@ func (a *API) SyncTasksInfo(c *gin.Context) {
 		"avg_duration":   avgDuration,
 		"total":          total,
 	})
+}
+
+// SyncTaskStart starts a single sync task
+func (a *API) SyncTaskStart(c *gin.Context) {
+	id := c.Param("id")
+	var source, target, mode, frequency, status string
+	err := a.db.QueryRow("SELECT source, target, mode, frequency, status FROM sync_tasks WHERE id = ?", id).Scan(&source, &target, &mode, &frequency, &status)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "同步任务不存在"})
+		return
+	}
+	if status == "运行中" {
+		c.JSON(400, gin.H{"error": "任务已在运行中"})
+		return
+	}
+	idInt, _ := strconv.Atoi(id)
+	if err := a.syncEng.StartTask(idInt, source, target, mode, frequency); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '运行中', last_synced_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", id)
+	c.JSON(200, gin.H{"ok": true, "message": "同步任务已启动"})
+}
+
+// SyncTaskStop stops a single sync task
+func (a *API) SyncTaskStop(c *gin.Context) {
+	id := c.Param("id")
+	idInt, _ := strconv.Atoi(id)
+	a.syncEng.StopTask(idInt)
+	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '已停止', updated_at = datetime('now') WHERE id = ?", id)
+	c.JSON(200, gin.H{"ok": true, "message": "同步任务已停止"})
+}
+
+// SyncTaskStopAll stops all running sync tasks
+func (a *API) SyncTaskStopAll(c *gin.Context) {
+	stopped := a.syncEng.StopAll()
+	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '已停止', updated_at = datetime('now') WHERE status = '运行中'")
+	c.JSON(200, gin.H{"ok": true, "stopped": stopped, "message": fmt.Sprintf("已停止 %d 个同步任务", stopped)})
+}
+
+// SyncCheckIP validates that a device IP is reachable and running smartcontrol
+func (a *API) SyncCheckIP(c *gin.Context) {
+	var p struct {
+		IP string `json:"ip"`
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"ok": false, "message": "参数格式错误"})
+		return
+	}
+	p.IP = strings.TrimSpace(p.IP)
+	if p.IP == "" {
+		c.JSON(400, gin.H{"ok": false, "message": "IP地址不能为空"})
+		return
+	}
+	if err := syncengine.CheckIP(p.IP); err != nil {
+		c.JSON(200, gin.H{"ok": false, "message": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "message": "设备连接成功"})
+}
+
+// SyncPing is a health check endpoint that remote devices call to verify connectivity
+func (a *API) SyncPing(c *gin.Context) {
+	c.JSON(200, gin.H{"ok": true, "time": time.Now().Format(time.RFC3339)})
+}
+
+// SyncExportData exports all syncable tables from the local database
+func (a *API) SyncExportData(c *gin.Context) {
+	since := strings.TrimSpace(c.Query("since"))
+	payload, err := syncengine.ExportLocalData(a.db, since)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "导出数据失败: " + err.Error()})
+		return
+	}
+	c.JSON(200, payload)
+}
+
+// SyncImportData imports data from a remote device into the local database
+func (a *API) SyncImportData(c *gin.Context) {
+	mode := strings.TrimSpace(c.Query("mode"))
+	if mode == "" {
+		mode = "full"
+	}
+	var payload syncengine.ExportPayload
+	if err := c.BindJSON(&payload); err != nil {
+		c.JSON(400, gin.H{"ok": false, "message": "数据格式错误"})
+		return
+	}
+	synced, total, err := syncengine.ImportData(a.db, &payload, mode)
+	if err != nil {
+		c.JSON(500, gin.H{"ok": false, "message": "导入失败: " + err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "synced": synced, "total": total, "message": fmt.Sprintf("成功同步 %d/%d 张表", synced, total)})
 }
 
 func (a *API) ReportPerf(c *gin.Context) {
