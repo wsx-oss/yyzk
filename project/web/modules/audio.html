@@ -101,11 +101,17 @@
   </div>
 
   <!-- Charts -->
-  <div class="stats-section">
-    <div style="font-size:16px;font-weight:700;margin-bottom:16px;">交互统计</div>
-    <div class="chart-grid">
-      <div class="chart-wrap"><h4>交互类型分布</h4><canvas id="typeChart" height="260"></canvas></div>
-      <div class="chart-wrap"><h4>交互成功率统计</h4><canvas id="successChart" height="260"></canvas></div>
+  <div class="card">
+    <div class="card-title">交互统计</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;">
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">交互类型分布</div>
+        <canvas id="typeChart" style="max-height:240px;"></canvas>
+      </div>
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">交互成功率统计</div>
+        <canvas id="successChart" style="max-height:240px;"></canvas>
+      </div>
     </div>
   </div>
 
@@ -149,8 +155,8 @@
   <script>
     var allRecords=[], visibleRecords=[], pendingDeleteIdx=-1;
 
-    var typeChart=createChart($('#typeChart'),{type:'doughnut',data:{labels:['查询','指令','反馈'],datasets:[{data:[0,0,0],backgroundColor:['#3b82f6','#10b981','#ef4444']}]},options:{plugins:{legend:{position:'right'}}}});
-    var successChart=createChart($('#successChart'),{type:'bar',data:{labels:['查询','指令','反馈'],datasets:[{label:'成功率 %',data:[0,0,0],backgroundColor:['#3b82f6','#10b981','#ef4444']}]},options:{scales:{y:{beginAtZero:true,max:100}},plugins:{legend:{display:false}}}});
+    var typeChart=createChart($('#typeChart'),{type:'doughnut',data:{labels:['查询','指令','反馈'],datasets:[{data:[0,0,0],backgroundColor:['#3b82f6','#10b981','#ef4444']}]},options:{maintainAspectRatio:false,plugins:{legend:{position:'right'}}}});
+    var successChart=createChart($('#successChart'),{type:'bar',data:{labels:['查询','指令','反馈'],datasets:[{label:'成功率 %',data:[0,0,0],backgroundColor:['#3b82f6','#10b981','#ef4444']}]},options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100}},plugins:{legend:{display:false}}}});
 
     window.addEventListener('DOMContentLoaded',function(){loadData();});
 

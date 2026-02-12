@@ -503,16 +503,16 @@
   </div>
 
   <!-- Statistics Charts -->
-  <div class="card" style="padding: 14px 16px;">
-    <div class="card-title" style="font-size:14px; margin-bottom:10px;">硬件状态统计</div>
-    <div class="charts-row">
-      <div class="chart-box">
-        <h4>硬件状态分布</h4>
-        <div class="chart-canvas-wrap"><canvas id="statusChart"></canvas></div>
+  <div class="card">
+    <div class="card-title">硬件状态统计</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;">
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">硬件状态分布</div>
+        <canvas id="statusChart" style="max-height:240px;"></canvas>
       </div>
-      <div class="chart-box">
-        <h4>硬件类型分布</h4>
-        <div class="chart-canvas-wrap"><canvas id="typeChart"></canvas></div>
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">硬件类型分布</div>
+        <canvas id="typeChart" style="max-height:240px;"></canvas>
       </div>
     </div>
   </div>
@@ -698,6 +698,7 @@
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           plugins: {
             legend: { position: 'right', labels: { padding: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 } } }
           }
@@ -727,6 +728,7 @@
         options: {
           indexAxis: 'y',
           responsive: true,
+          maintainAspectRatio: false,
           scales: {
             x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f1f5f9' } },
             y: { grid: { display: false } }
@@ -911,6 +913,31 @@
     let autoRefreshTimer = null;
     let isRefreshing = false;
 
+    // Render live data directly into the table (bypasses DB for minimal latency)
+    function renderLiveData(items) {
+      const tbody = document.getElementById('hwTbody');
+      if (!items || items.length === 0) return;
+      tbody.innerHTML = items.map(item => {
+        const statusClass = item.status === '在线' ? 'online' : item.status === '离线' ? 'offline' : 'warning';
+        return `<tr>
+          <td>${esc(item.name)}</td>
+          <td>${esc(item.type)}</td>
+          <td>${esc(item.ip)}</td>
+          <td><span class="status-dot ${statusClass}"></span>${esc(item.status)}</td>
+          <td>${item.temperature}℃</td>
+          <td>${item.cpu_usage}%</td>
+          <td>${item.mem_usage}%</td>
+          <td>${esc(item.network_bandwidth || '0B/s')}</td>
+          <td>${formatDetectedAt(item.detected_at)}</td>
+          <td>
+            <button class="btn-detail" onclick="viewDetail(${item.id})">查看详情</button>
+            <button class="btn-refresh-one" onclick="refreshOne(${item.id})">刷新</button>
+            <button class="btn-del" onclick="deleteItem(${item.id}, '${esc(item.name)}')">删除</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
     function changeRefreshInterval() {
       if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
       const ms = parseInt(document.getElementById('refreshInterval').value);
@@ -924,14 +951,15 @@
         if (isRefreshing) return;
         isRefreshing = true;
         try {
-          // For fast intervals (<=2s), call lightweight refresh to avoid overload
-          // For slower intervals, do full agent probe refresh
-          if (ms <= 2000) {
-            await api('/hardware/items/refresh', { method: 'POST' });
-            await loadList();
-          } else {
-            await api('/hardware/items/refresh', { method: 'POST' });
-            await Promise.all([loadList(), loadStats()]);
+          // Use /live endpoint: fetches from agents directly, no DB round-trip
+          const res = await api('/hardware/items/live');
+          const data = await res.json();
+          if (data.items) {
+            renderLiveData(data.items);
+          }
+          // Update stats less frequently (every 5th tick or slow intervals)
+          if (ms > 2000) {
+            loadStats();
           }
         } catch (e) { /* silent */ }
         isRefreshing = false;

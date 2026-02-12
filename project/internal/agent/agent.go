@@ -41,10 +41,84 @@ var (
 	cacheMu       sync.RWMutex
 	cachedMetrics Metrics
 	cacheReady    bool
+
+	// Temperature is collected in a separate goroutine to avoid blocking the main loop
+	tempMu    sync.RWMutex
+	tempValue float64
+
+	// CPU is collected in a separate goroutine with blocking 1s sample for accuracy
+	cpuMu    sync.RWMutex
+	cpuValue float64
 )
 
-// backgroundCollector continuously samples CPU, temperature, and network in a loop.
-// It updates the cache every ~1 second so that HTTP requests return instantly.
+// backgroundCPUCollector samples CPU usage in a dedicated goroutine.
+// cpu.Percent(1s) blocks for 1 second to get an accurate reading.
+// A sliding window of 3 samples (~3s rolling average) smooths the value.
+func backgroundCPUCollector() {
+	cpu.Percent(time.Second, false) // prime (first call returns 0)
+	const windowSize = 3
+	window := make([]float64, 0, windowSize)
+	for {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[Agent] backgroundCPUCollector recovered from panic: %v", r)
+				}
+			}()
+			if percents, err := cpu.Percent(time.Second, false); err == nil && len(percents) > 0 {
+				window = append(window, percents[0])
+				if len(window) > windowSize {
+					window = window[1:]
+				}
+				var sum float64
+				for _, v := range window {
+					sum += v
+				}
+				avg := math.Round(sum/float64(len(window))*100) / 100
+				cpuMu.Lock()
+				cpuValue = avg
+				cpuMu.Unlock()
+			}
+		}()
+	}
+}
+
+// backgroundTempCollector collects temperature in a separate goroutine.
+// Temperature collection on Windows requires spawning PowerShell (~1-3s),
+// so we run it independently to avoid blocking the fast metrics loop.
+func backgroundTempCollector() {
+	for {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[Agent] backgroundTempCollector recovered from panic: %v", r)
+				}
+			}()
+			var t float64
+			if temps, err := host.SensorsTemperatures(); err == nil && len(temps) > 0 {
+				var maxTemp float64
+				for _, s := range temps {
+					if s.Temperature > maxTemp && s.Temperature < 150 {
+						maxTemp = s.Temperature
+					}
+				}
+				t = math.Round(maxTemp*100) / 100
+			}
+			if t == 0 && runtime.GOOS == "windows" {
+				t = readWindowsTemperature()
+			}
+			if t > 0 {
+				tempMu.Lock()
+				tempValue = t
+				tempMu.Unlock()
+			}
+		}()
+		time.Sleep(5 * time.Second)
+	}
+}
+
+// backgroundCollector continuously samples memory, network, and assembles all metrics.
+// CPU and temperature are collected by their own dedicated goroutines.
 func backgroundCollector() {
 	// Collect static info once
 	var hostname, osName, cpuModel string
@@ -74,9 +148,6 @@ func backgroundCollector() {
 		prevNetTime = time.Now()
 	}
 
-	// Prime the CPU sampler (first call returns 0)
-	cpu.Percent(500*time.Millisecond, false)
-
 	for {
 		func() {
 			defer func() {
@@ -94,10 +165,10 @@ func backgroundCollector() {
 				MemTotalMB: memTotalMB,
 			}
 
-			// CPU usage - sample over 500ms for faster response while still accurate
-			if percents, err := cpu.Percent(500*time.Millisecond, false); err == nil && len(percents) > 0 {
-				m.CPUUsage = math.Round(percents[0]*100) / 100
-			}
+			// CPU usage - read from dedicated collector (accurate 1s blocking sample)
+			cpuMu.RLock()
+			m.CPUUsage = cpuValue
+			cpuMu.RUnlock()
 
 			// Memory - instant call
 			if vm, err := mem.VirtualMemory(); err == nil {
@@ -110,20 +181,10 @@ func backgroundCollector() {
 				m.Uptime = h.Uptime
 			}
 
-			// Temperature - try gopsutil first
-			if temps, err := host.SensorsTemperatures(); err == nil && len(temps) > 0 {
-				var maxTemp float64
-				for _, t := range temps {
-					if t.Temperature > maxTemp && t.Temperature < 150 {
-						maxTemp = t.Temperature
-					}
-				}
-				m.Temperature = math.Round(maxTemp*100) / 100
-			}
-			// Fallback: on Windows, use WMI
-			if m.Temperature == 0 && runtime.GOOS == "windows" {
-				m.Temperature = readWindowsTemperature()
-			}
+			// Temperature - read from separate collector (non-blocking)
+			tempMu.RLock()
+			m.Temperature = tempValue
+			tempMu.RUnlock()
 
 			// Network bandwidth - calculate real-time speed (bytes/sec delta)
 			if ios, err := netio.IOCounters(false); err == nil && len(ios) > 0 {
@@ -149,7 +210,6 @@ func backgroundCollector() {
 			cacheMu.Unlock()
 		}()
 
-		// Sleep briefly before next collection cycle (~500ms gap after the 500ms CPU sample = ~1s total)
 		time.Sleep(500 * time.Millisecond)
 	}
 }
@@ -221,13 +281,69 @@ func collectMetricsSync() Metrics {
 	return m
 }
 
-// readWindowsTemperature reads CPU temperature on Windows via WMI MSAcpi_ThermalZoneTemperature.
-// Returns temperature in Celsius, or 0 if unavailable.
+// readWindowsTemperature tries multiple methods to read CPU temperature on Windows.
+// Fallback order:
+//  1. Performance Counter ThermalZoneInformation (NO admin required)
+//  2. WMI MSAcpi_ThermalZoneTemperature (requires admin privileges)
+//  3. OpenHardwareMonitor / LibreHardwareMonitor WMI interface
+//  4. wmic command line as final fallback
+//
+// Returns temperature in Celsius, or 0 if all methods fail.
 func readWindowsTemperature() float64 {
+	// Method 1: Performance Counter (no admin needed, works with go run)
+	if t := readTempPerfCounter(); t > 0 {
+		return t
+	}
+	// Method 2: WMI MSAcpi_ThermalZoneTemperature (needs admin)
+	if t := readTempWMIAcpi(); t > 0 {
+		return t
+	}
+	// Method 3: OpenHardwareMonitor / LibreHardwareMonitor WMI
+	if t := readTempOpenHardwareMonitor(); t > 0 {
+		return t
+	}
+	// Method 4: wmic command line fallback
+	if t := readTempWmic(); t > 0 {
+		return t
+	}
+	log.Printf("[Agent] WARNING: All Windows temperature methods failed.")
+	return 0
+}
+
+// readTempPerfCounter reads temperature via Win32_PerfFormattedData_Counters_ThermalZoneInformation.
+// This method does NOT require administrator privileges.
+// Uses HighPrecisionTemperature (tenths of Kelvin) for better precision.
+func readTempPerfCounter() float64 {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
-		"(Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace 'root/wmi' -ErrorAction SilentlyContinue | Select-Object -First 1).CurrentTemperature")
+		"(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue | Sort-Object HighPrecisionTemperature -Descending | Select-Object -First 1).HighPrecisionTemperature")
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	s := strings.TrimSpace(string(out))
+	if s == "" {
+		return 0
+	}
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil || val <= 0 {
+		return 0
+	}
+	// HighPrecisionTemperature is in tenths of Kelvin, convert to Celsius
+	celsius := (val / 10.0) - 273.15
+	if celsius < 0 || celsius > 150 {
+		return 0
+	}
+	return math.Round(celsius*100) / 100
+}
+
+// readTempWMIAcpi reads temperature via MSAcpi_ThermalZoneTemperature (requires admin).
+func readTempWMIAcpi() float64 {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+		"(Get-CimInstance -Namespace 'root/wmi' -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1).CurrentTemperature")
 	out, err := cmd.Output()
 	if err != nil {
 		return 0
@@ -248,10 +364,66 @@ func readWindowsTemperature() float64 {
 	return math.Round(celsius*100) / 100
 }
 
+// readTempOpenHardwareMonitor reads temperature from OpenHardwareMonitor or LibreHardwareMonitor WMI interface.
+// These tools expose sensor data via WMI namespace root/OpenHardwareMonitor or root/LibreHardwareMonitor.
+func readTempOpenHardwareMonitor() float64 {
+	namespaces := []string{"root/LibreHardwareMonitor", "root/OpenHardwareMonitor"}
+	for _, ns := range namespaces {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+			fmt.Sprintf("(Get-CimInstance -Namespace '%s' -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -First 1).Value", ns))
+		out, err := cmd.Output()
+		cancel()
+		if err != nil {
+			continue
+		}
+		s := strings.TrimSpace(string(out))
+		if s == "" {
+			continue
+		}
+		val, err := strconv.ParseFloat(s, 64)
+		if err != nil || val <= 0 || val > 150 {
+			continue
+		}
+		return math.Round(val*100) / 100
+	}
+	return 0
+}
+
+// readTempWmic uses the wmic command line tool as a final fallback.
+func readTempWmic() float64 {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "wmic", "/namespace:\\\\root\\wmi", "PATH", "MSAcpi_ThermalZoneTemperature", "get", "CurrentTemperature")
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		s := strings.TrimSpace(line)
+		if s == "" || strings.Contains(strings.ToLower(s), "currenttemperature") {
+			continue
+		}
+		val, err := strconv.ParseFloat(s, 64)
+		if err != nil || val <= 0 {
+			continue
+		}
+		celsius := (val / 10.0) - 273.15
+		if celsius < 0 || celsius > 150 {
+			continue
+		}
+		return math.Round(celsius*100) / 100
+	}
+	return 0
+}
+
 // StartBackground starts the hardware agent HTTP server in the background on the given port.
 // It returns immediately. The server runs until the process exits.
 func StartBackground(port int) {
-	// Start the background metrics collector
+	// Start dedicated collectors and the main metrics assembler
+	go backgroundCPUCollector()
+	go backgroundTempCollector()
 	go backgroundCollector()
 
 	addr := fmt.Sprintf(":%d", port)

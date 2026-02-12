@@ -3,308 +3,609 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>异常报警</title>
+  <title>异常报警记录</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before { content: "\26A0\FE0F"; }
+    .alert-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .alert-header-row .module-title { margin-bottom: 0; }
+    .alert-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .filter-row-2 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
+    .action-buttons { justify-content: flex-end; margin-top: 12px; }
+    .priority-high { background: #fee2e2; color: #991b1b; }
+    .priority-mid { background: #fef3c7; color: #92400e; }
+    .priority-low { background: #dbeafe; color: #1e40af; }
+    .status-resolved { background: #d1fae5; color: #065f46; }
+    .status-unresolved { background: #fee2e2; color: #991b1b; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .modal-form .full-width { grid-column: 1 / -1; }
+    .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .modal-form textarea { resize: vertical; min-height: 60px; }
+    .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* Detail modal */
+    .detail-grid { display: grid; grid-template-columns: 100px 1fr; gap: 10px 16px; font-size: 14px; }
+    .detail-label { color: #64748b; font-weight: 500; text-align: right; }
+    .detail-value { color: #0f172a; }
+
+    .hint-box { margin-top: 20px; margin-bottom: 20px; }
+    .chart-section-title { font-weight: 600; margin-bottom: 12px; text-align: center; font-size: 14px; }
+    .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #64748b; }
+    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
+  </style>
 </head>
 <body>
+  <!-- Header with filters -->
   <div class="module-header">
-    <div class="module-title">异常报警记录</div>
+    <div class="alert-header-row">
+      <div class="module-title">异常报警记录</div>
+      <div class="alert-header-btns">
+        <button class="btn btn-primary" onclick="openNewModal()">新增报警记录</button>
+        <button class="btn btn-secondary" onclick="importAlerts()">导入</button>
+        <button class="btn btn-secondary" onclick="exportAlerts()">导出</button>
+        <button class="btn btn-danger" onclick="clearResolved()">清空已解决报警</button>
+      </div>
+    </div>
     <div class="filter-row">
+      <div class="filter-group">
+        <label>报警时间范围</label>
+        <input id="filterDateFrom" type="date" placeholder="开始日期" />
+      </div>
+      <div class="filter-group">
+        <label>&nbsp;</label>
+        <input id="filterDateTo" type="date" placeholder="结束日期" />
+      </div>
       <div class="filter-group">
         <label>报警类型</label>
         <select id="filterCategory">
           <option value="">全部</option>
-          <option value="system">系统警报</option>
-          <option value="device">设备异常</option>
-          <option value="network">网络异常</option>
+          <option value="系统故障">系统故障</option>
+          <option value="网络异常">网络异常</option>
+          <option value="设备故障">设备故障</option>
         </select>
       </div>
       <div class="filter-group">
-        <label>报警等级</label>
-        <select id="filterSeverity">
+        <label>报警优先级</label>
+        <select id="filterPriority">
           <option value="">全部</option>
-          <option value="critical">严重</option>
-          <option value="warning">警告</option>
-          <option value="info">信息</option>
+          <option value="高">高</option>
+          <option value="中">中</option>
+          <option value="低">低</option>
         </select>
-      </div>
-      <div class="filter-group">
-        <label>报警状态</label>
-        <select id="filterAck">
-          <option value="">全部</option>
-          <option value="0">未确认</option>
-          <option value="1">已确认</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>关键词查找</label>
-        <input id="filterKeyword" type="text" placeholder="请输入关键词" />
       </div>
     </div>
-    <div class="action-buttons">
-      <button class="btn btn-primary" onclick="search()">查询</button>
-      <button class="btn btn-secondary" onclick="exportAlerts()">📤 导出报警</button>
-      <button class="btn btn-success" onclick="createAlert()">➕ 新增报警记录</button>
+    <div class="filter-row-2">
+      <div class="filter-group">
+        <label>报警状态</label>
+        <select id="filterStatus">
+          <option value="">全部</option>
+          <option value="未解决">未解决</option>
+          <option value="已解决">已解决</option>
+          <option value="处理中">处理中</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>关联设备</label>
+        <input id="filterDevice" type="text" placeholder="请输入设备名称" />
+      </div>
+      <div class="filter-group">
+        <label>报警描述关键词</label>
+        <input id="filterKeyword" type="text" placeholder="请输入关键词" />
+      </div>
+      <div class="filter-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="search()" style="width:100%;">搜索</button>
+      </div>
     </div>
   </div>
 
+  <!-- Table -->
   <div class="card">
     <table class="data-table">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>时间</th>
+          <th>报警时间</th>
           <th>报警类型</th>
-          <th>报警等级</th>
+          <th>报警优先级</th>
+          <th>报警状态</th>
+          <th>关联设备</th>
           <th>报警描述</th>
-          <th>状态</th>
           <th>操作</th>
         </tr>
       </thead>
       <tbody id="alertsTbody"></tbody>
     </table>
+    <div class="pagination-bar">
+      <span id="paginationInfo">共 0 条</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button id="btnPrev" onclick="changePage(-1)" disabled>&lt; 上一页</button>
+        <span id="pageIndicator">1/1</span>
+        <button id="btnNext" onclick="changePage(1)" disabled>下一页 &gt;</button>
+      </div>
+    </div>
   </div>
 
+  <!-- Usage tips -->
   <div class="hint-box">
-    <div><strong>使用提示:</strong></div>
-    <div>1. 定期查看异常报警,及时发现和处理问题</div>
-    <div>2. 不同等级的报警需采取相应的处理措施</div>
-    <div>3. 建议关闭已处理的报警,保持界面整洁</div>
+    <div><strong>使用提示</strong></div>
+    <div>1. 可根据报警时间范围、类型、优先级等条件进行筛选查询。</div>
+    <div>2. 标记已解决的报警记录将不再显示在未解决列表中。</div>
+    <div>3. 清空已解决报警将永久删除已解决的报警记录，请谨慎操作。</div>
   </div>
 
+  <!-- Stats charts -->
   <div class="card">
     <div class="card-title">报警统计</div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">报警类型分布</div>
-        <canvas id="typeChart" width="300" height="300"></canvas>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;">
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">报警类型分布</div>
+        <canvas id="typeChart" style="max-height:240px;"></canvas>
       </div>
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">报警等级分布</div>
-        <canvas id="priorityChart" width="300" height="300"></canvas>
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">报警优先级分布</div>
+        <canvas id="priorityChart" style="max-height:240px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Alert Modal -->
+  <div class="modal-overlay" id="newAlertModal">
+    <div class="modal-box">
+      <div class="modal-title">新增报警记录</div>
+      <div class="modal-form">
+        <div>
+          <label>报警时间</label>
+          <input id="newAlertTime" type="datetime-local" />
+        </div>
+        <div>
+          <label>报警类型</label>
+          <select id="newCategory">
+            <option value="系统故障">系统故障</option>
+            <option value="网络异常">网络异常</option>
+            <option value="设备故障">设备故障</option>
+          </select>
+        </div>
+        <div>
+          <label>报警优先级</label>
+          <select id="newPriority">
+            <option value="高">高</option>
+            <option value="中" selected>中</option>
+            <option value="低">低</option>
+          </select>
+        </div>
+        <div>
+          <label>报警状态</label>
+          <select id="newStatus">
+            <option value="未解决" selected>未解决</option>
+            <option value="处理中">处理中</option>
+            <option value="已解决">已解决</option>
+          </select>
+        </div>
+        <div class="full-width">
+          <label>关联设备</label>
+          <input id="newDevice" type="text" placeholder="请输入关联设备名称" />
+        </div>
+        <div class="full-width">
+          <label>报警描述</label>
+          <textarea id="newDescription" placeholder="请输入报警描述"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeNewModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitNewAlert()">确认新增</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-box">
+      <div class="modal-title">报警详情</div>
+      <div class="detail-grid" id="detailContent"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal-box">
+      <div class="modal-title">导入报警记录</div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;color:#64748b;">选择 JSON 文件</label>
+        <input id="importFile" type="file" accept=".json" style="margin-top:6px;" />
+      </div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:16px;">
+        JSON 格式示例：[{"category":"系统故障","priority":"高","device":"服务器01","description":"CPU使用率超限","alert_time":"2024-10-01 10:00","status":"未解决"}]
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeImportModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitImport()">确认导入</button>
       </div>
     </div>
   </div>
 
   <script src="/app/modules/common.js"></script>
   <script>
-    let allAlerts = [];
-    let visibleAlerts = [];
+    let currentPage = 1;
+    const pageSize = 20;
+    let totalItems = 0;
+    let typeChart = null;
+    let priorityChart = null;
 
-    const severityMap = { critical: '🔴 严重', warning: '🟡 警告', info: '🟢 信息' };
-    const categoryMap = { system: '系统警报', device: '设备异常', network: '网络异常' };
-
-    const typeChart = createChart($('#typeChart'), {
-      type: 'doughnut',
-      data: {
-        labels: ['系统警报', '设备异常', '网络异常', '其他'],
-        datasets: [{
-          data: [0, 0, 0, 0],
-          backgroundColor: ['#ef4444', '#f59e0b', '#0ea5e9', '#a855f7']
-        }]
-      }
-    });
-
-    const priorityChart = createChart($('#priorityChart'), {
-      type: 'bar',
-      data: {
-        labels: ['严重', '警告', '信息'],
-        datasets: [{
-          label: '报警数量',
-          data: [0, 0, 0],
-          backgroundColor: ['#ef4444', '#f59e0b', '#10b981']
-        }]
-      },
-      options: {
-        scales: { y: { beginAtZero: true } }
-      }
-    });
-
-    function renderTable(items) {
-      const tbody = $('#alertsTbody');
-      tbody.innerHTML = '';
-      for (const it of items) {
-        const tr = document.createElement('tr');
-
-        const tdId = document.createElement('td');
-        tdId.textContent = it.id;
-
-        const tdTime = document.createElement('td');
-        tdTime.textContent = formatDate(it.created_at);
-
-        const tdCat = document.createElement('td');
-        tdCat.textContent = categoryMap[it.category] || it.category || '-';
-
-        const tdSev = document.createElement('td');
-        tdSev.textContent = severityMap[it.severity] || it.severity || '-';
-
-        const tdMsg = document.createElement('td');
-        tdMsg.textContent = it.message || '';
-
-        const tdAck = document.createElement('td');
-        if (it.acknowledged) {
-          const badge = document.createElement('span');
-          badge.className = 'status-badge status-online';
-          badge.textContent = '已确认';
-          tdAck.appendChild(badge);
-        } else {
-          const badge = document.createElement('span');
-          badge.className = 'status-badge status-offline';
-          badge.textContent = '未确认';
-          tdAck.appendChild(badge);
+    // ========== Init Charts ==========
+    function initCharts() {
+      typeChart = createChart($('#typeChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['系统故障', '网络异常', '设备故障'],
+          datasets: [{
+            data: [0, 0, 0],
+            backgroundColor: ['#3b82f6', '#f59e0b', '#10b981']
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'right', labels: { font: { size: 12 }, padding: 12 } } }
         }
-
-        const tdActions = document.createElement('td');
-        if (!it.acknowledged) {
-          const ackBtn = document.createElement('button');
-          ackBtn.className = 'btn btn-success btn-action';
-          ackBtn.textContent = '确认';
-          ackBtn.onclick = () => ackAlert(it.id);
-          tdActions.appendChild(ackBtn);
+      });
+      priorityChart = createChart($('#priorityChart'), {
+        type: 'bar',
+        data: {
+          labels: ['高', '中', '低'],
+          datasets: [{
+            label: '报警数量',
+            data: [0, 0, 0],
+            backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6'],
+            barThickness: 28,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1 } },
+            y: { grid: { display: false } }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: true }
+          }
         }
-        const viewBtn = document.createElement('button');
-        viewBtn.className = 'btn btn-primary btn-action';
-        viewBtn.textContent = '查看';
-        viewBtn.onclick = () => {
-          alert(`ID: ${it.id}\n时间: ${formatDate(it.created_at)}\n类型: ${categoryMap[it.category] || it.category}\n等级: ${severityMap[it.severity] || it.severity}\n内容: ${it.message}\n状态: ${it.acknowledged ? '已确认' : '未确认'}`);
-        };
-        tdActions.appendChild(viewBtn);
-
-        tr.appendChild(tdId);
-        tr.appendChild(tdTime);
-        tr.appendChild(tdCat);
-        tr.appendChild(tdSev);
-        tr.appendChild(tdMsg);
-        tr.appendChild(tdAck);
-        tr.appendChild(tdActions);
-        tbody.appendChild(tr);
-      }
+      });
     }
 
-    function updateCharts(items) {
-      const catCounts = { system: 0, device: 0, network: 0, other: 0 };
-      const sevCounts = { critical: 0, warning: 0, info: 0 };
-      for (const it of items) {
-        const cat = (it.category || '').toLowerCase();
-        if (catCounts.hasOwnProperty(cat)) catCounts[cat]++;
-        else catCounts.other++;
-        const sev = (it.severity || '').toLowerCase();
-        if (sevCounts.hasOwnProperty(sev)) sevCounts[sev]++;
-      }
-      if (typeChart) {
-        typeChart.data.datasets[0].data = [catCounts.system, catCounts.device, catCounts.network, catCounts.other];
-        typeChart.update();
-      }
-      if (priorityChart) {
-        priorityChart.data.datasets[0].data = [sevCounts.critical, sevCounts.warning, sevCounts.info];
-        priorityChart.update();
-      }
-    }
-
-    async function loadAlerts(page = 1, pageSize = 50) {
+    // ========== Load Data ==========
+    async function loadAlerts() {
       try {
-        const res = await api(`/alerts/list?page=${page}&page_size=${pageSize}`);
+        const params = buildFilterParams();
+        params.append('page', currentPage);
+        params.append('page_size', pageSize);
+        const res = await api('/alerts/list?' + params.toString());
         const data = await res.json();
-        allAlerts = Array.isArray(data.items) ? data.items : [];
-        visibleAlerts = allAlerts.slice();
-        renderTable(visibleAlerts);
-        updateCharts(visibleAlerts);
+        const items = Array.isArray(data.items) ? data.items : [];
+        totalItems = data.total || 0;
+        renderTable(items);
+        updatePagination();
+        loadStats();
       } catch (e) {
         showToast(e.message || '加载失败', 'error');
       }
     }
 
+    function buildFilterParams() {
+      const p = new URLSearchParams();
+      const dateFrom = $('#filterDateFrom').value;
+      const dateTo = $('#filterDateTo').value;
+      const category = $('#filterCategory').value;
+      const priority = $('#filterPriority').value;
+      const status = $('#filterStatus').value;
+      const device = $('#filterDevice').value.trim();
+      const keyword = $('#filterKeyword').value.trim();
+      if (dateFrom) p.append('date_from', dateFrom);
+      if (dateTo) p.append('date_to', dateTo);
+      if (category) p.append('category', category);
+      if (priority) p.append('priority', priority);
+      if (status) p.append('status', status);
+      if (device) p.append('device', device);
+      if (keyword) p.append('keyword', keyword);
+      return p;
+    }
+
     function search() {
-      const category = ($('#filterCategory').value || '').trim().toLowerCase();
-      const severity = ($('#filterSeverity').value || '').trim().toLowerCase();
-      const ackFilter = ($('#filterAck').value || '').trim();
-      const keyword = ($('#filterKeyword').value || '').trim().toLowerCase();
-
-      visibleAlerts = allAlerts.filter((it) => {
-        if (category && (it.category || '').toLowerCase() !== category) return false;
-        if (severity && (it.severity || '').toLowerCase() !== severity) return false;
-        if (ackFilter !== '') {
-          const wantAck = ackFilter === '1';
-          if (it.acknowledged !== wantAck) return false;
-        }
-        if (keyword) {
-          const msg = (it.message || '').toLowerCase();
-          const cat = (it.category || '').toLowerCase();
-          if (!msg.includes(keyword) && !cat.includes(keyword)) return false;
-        }
-        return true;
-      });
-
-      renderTable(visibleAlerts);
-      updateCharts(visibleAlerts);
-      showToast(`已筛选：${visibleAlerts.length} 条`, 'success');
+      currentPage = 1;
+      loadAlerts();
     }
 
-    function exportAlerts() {
-      const rows = [
-        ['id', 'created_at', 'category', 'severity', 'message', 'acknowledged'],
-        ...visibleAlerts.map((it) => [
-          it.id, it.created_at, it.category, it.severity, it.message, it.acknowledged ? '是' : '否'
-        ])
-      ];
-      const csv = rows.map((r) => r.map((cell) => {
-        const s = cell === null || cell === undefined ? '' : String(cell);
-        return `"${s.replace(/"/g, '""')}"`;
-      }).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `alerts_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+    function changePage(delta) {
+      currentPage += delta;
+      loadAlerts();
     }
 
-    async function ackAlert(id) {
-      try {
-        const res = await api('/alerts/ack/' + id, { method: 'POST' });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('已确认', 'success');
-          await loadAlerts();
-        } else {
-          showToast(data.error || '操作失败', 'error');
+    function updatePagination() {
+      const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+      $('#paginationInfo').textContent = `共 ${totalItems} 条`;
+      $('#pageIndicator').textContent = `${currentPage}/${totalPages}`;
+      $('#btnPrev').disabled = currentPage <= 1;
+      $('#btnNext').disabled = currentPage >= totalPages;
+    }
+
+    // ========== Render Table ==========
+    function renderTable(items) {
+      const tbody = $('#alertsTbody');
+      tbody.innerHTML = '';
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:32px;">暂无报警记录</td></tr>';
+        return;
+      }
+      for (const it of items) {
+        const tr = document.createElement('tr');
+
+        const tdTime = document.createElement('td');
+        tdTime.textContent = it.alert_time || formatDate(it.created_at);
+
+        const tdCat = document.createElement('td');
+        tdCat.textContent = it.category || '-';
+
+        const tdPri = document.createElement('td');
+        const priBadge = document.createElement('span');
+        priBadge.className = 'status-badge ' + getPriorityClass(it.priority);
+        priBadge.textContent = it.priority || '中';
+        tdPri.appendChild(priBadge);
+
+        const tdStatus = document.createElement('td');
+        const stBadge = document.createElement('span');
+        stBadge.className = 'status-badge ' + getStatusClass(it.status);
+        stBadge.textContent = it.status || '未解决';
+        tdStatus.appendChild(stBadge);
+
+        const tdDevice = document.createElement('td');
+        tdDevice.textContent = it.device || '-';
+
+        const tdDesc = document.createElement('td');
+        tdDesc.textContent = it.description || it.message || '-';
+        tdDesc.style.maxWidth = '200px';
+        tdDesc.style.overflow = 'hidden';
+        tdDesc.style.textOverflow = 'ellipsis';
+        tdDesc.style.whiteSpace = 'nowrap';
+
+        const tdActions = document.createElement('td');
+        tdActions.style.whiteSpace = 'nowrap';
+
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'btn btn-primary btn-action';
+        viewBtn.textContent = '查看详情';
+        viewBtn.onclick = () => showDetail(it);
+        tdActions.appendChild(viewBtn);
+
+        if (it.status !== '已解决') {
+          const resolveBtn = document.createElement('button');
+          resolveBtn.className = 'btn btn-success btn-action';
+          resolveBtn.textContent = '标记已解决';
+          resolveBtn.style.marginLeft = '6px';
+          resolveBtn.onclick = () => resolveAlert(it.id);
+          tdActions.appendChild(resolveBtn);
         }
-      } catch (e) {
-        showToast(e.message || '操作失败', 'error');
+
+        tr.appendChild(tdTime);
+        tr.appendChild(tdCat);
+        tr.appendChild(tdPri);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdDevice);
+        tr.appendChild(tdDesc);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
       }
     }
 
-    async function createAlert() {
-      const category = (prompt('报警类型（system/device/network）', 'system') || '').trim();
-      if (!category) return;
-      const severity = (prompt('报警等级（critical/warning/info）', 'warning') || '').trim();
-      if (!severity) return;
-      const message = (prompt('报警描述', '') || '').trim();
-      if (!message) return;
+    function getPriorityClass(p) {
+      if (p === '高') return 'priority-high';
+      if (p === '低') return 'priority-low';
+      return 'priority-mid';
+    }
+    function getStatusClass(s) {
+      if (s === '已解决') return 'status-resolved';
+      if (s === '处理中') return 'status-warning';
+      return 'status-unresolved';
+    }
+
+    // ========== Stats ==========
+    async function loadStats() {
+      try {
+        const res = await api('/alerts/stats');
+        const data = await res.json();
+        const catDist = data.category_distribution || {};
+        const priDist = data.priority_distribution || {};
+
+        if (typeChart) {
+          const catLabels = Object.keys(catDist);
+          const catValues = Object.values(catDist);
+          const colors = ['#3b82f6', '#f59e0b', '#10b981', '#a855f7', '#ef4444', '#06b6d4'];
+          typeChart.data.labels = catLabels.length ? catLabels : ['暂无数据'];
+          typeChart.data.datasets[0].data = catValues.length ? catValues : [1];
+          typeChart.data.datasets[0].backgroundColor = catLabels.length ? colors.slice(0, catLabels.length) : ['#e2e8f0'];
+          typeChart.update();
+        }
+        if (priorityChart) {
+          const priLabels = ['高', '中', '低'];
+          const priValues = priLabels.map(l => priDist[l] || 0);
+          priorityChart.data.labels = priLabels;
+          priorityChart.data.datasets[0].data = priValues;
+          priorityChart.update();
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    // ========== New Alert Modal ==========
+    function openNewModal() {
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      $('#newAlertTime').value = local;
+      $('#newCategory').value = '系统故障';
+      $('#newPriority').value = '中';
+      $('#newStatus').value = '未解决';
+      $('#newDevice').value = '';
+      $('#newDescription').value = '';
+      $('#newAlertModal').classList.add('active');
+    }
+    function closeNewModal() { $('#newAlertModal').classList.remove('active'); }
+
+    async function submitNewAlert() {
+      const alertTime = $('#newAlertTime').value.replace('T', ' ');
+      const category = $('#newCategory').value;
+      const priority = $('#newPriority').value;
+      const status = $('#newStatus').value;
+      const device = $('#newDevice').value.trim();
+      const description = $('#newDescription').value.trim();
+      if (!description) { showToast('请输入报警描述', 'error'); return; }
 
       try {
         const res = await api('/alerts/new', {
           method: 'POST',
-          body: { Category: category, Severity: severity, Message: message }
+          body: { category, severity: priority, message: description, alert_time: alertTime, priority, device, description, status }
         });
         const data = await res.json();
         if (data.ok) {
-          showToast('新增成功', 'success');
-          await loadAlerts();
+          showToast('新增报警记录成功', 'success');
+          closeNewModal();
+          loadAlerts();
         } else {
           showToast(data.error || '新增失败', 'error');
         }
-      } catch (e) {
-        showToast(e.message || '新增失败', 'error');
-      }
+      } catch (e) { showToast(e.message || '新增失败', 'error'); }
     }
 
+    // ========== Detail Modal ==========
+    function showDetail(it) {
+      const fields = [
+        ['报警时间', it.alert_time || formatDate(it.created_at)],
+        ['报警类型', it.category || '-'],
+        ['报警优先级', it.priority || '中'],
+        ['报警状态', it.status || '未解决'],
+        ['关联设备', it.device || '-'],
+        ['报警描述', it.description || it.message || '-'],
+        ['创建时间', formatDate(it.created_at)]
+      ];
+      const html = fields.map(([label, value]) =>
+        `<div class="detail-label">${label}</div><div class="detail-value">${value}</div>`
+      ).join('');
+      $('#detailContent').innerHTML = html;
+      $('#detailModal').classList.add('active');
+    }
+    function closeDetailModal() { $('#detailModal').classList.remove('active'); }
+
+    // ========== Resolve ==========
+    async function resolveAlert(id) {
+      if (!confirm('确定将此报警标记为已解决？')) return;
+      try {
+        const res = await api('/alerts/resolve/' + id, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('已标记为已解决', 'success');
+          loadAlerts();
+        } else {
+          showToast(data.error || '操作失败', 'error');
+        }
+      } catch (e) { showToast(e.message || '操作失败', 'error'); }
+    }
+
+    // ========== Clear Resolved ==========
+    async function clearResolved() {
+      if (!confirm('确定要永久删除所有已解决的报警记录吗？此操作不可恢复！')) return;
+      try {
+        const res = await api('/alerts/clear-resolved', { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`已清空 ${data.deleted} 条已解决报警`, 'success');
+          loadAlerts();
+        } else {
+          showToast(data.error || '操作失败', 'error');
+        }
+      } catch (e) { showToast(e.message || '操作失败', 'error'); }
+    }
+
+    // ========== Export ==========
+    function exportAlerts() {
+      // Export current filtered data by re-fetching all
+      (async () => {
+        try {
+          const params = buildFilterParams();
+          params.append('page', 1);
+          params.append('page_size', 10000);
+          const res = await api('/alerts/list?' + params.toString());
+          const data = await res.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          const rows = [
+            ['报警时间', '报警类型', '报警优先级', '报警状态', '关联设备', '报警描述'],
+            ...items.map(it => [
+              it.alert_time || it.created_at, it.category, it.priority, it.status, it.device, it.description || it.message
+            ])
+          ];
+          const csv = '\uFEFF' + rows.map(r => r.map(cell => {
+            const s = cell === null || cell === undefined ? '' : String(cell);
+            return `"${s.replace(/"/g, '""')}"`;
+          }).join(',')).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `alerts_${new Date().toISOString().slice(0, 10)}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          showToast(`已导出 ${items.length} 条记录`, 'success');
+        } catch (e) { showToast(e.message || '导出失败', 'error'); }
+      })();
+    }
+
+    // ========== Import ==========
+    function importAlerts() { $('#importFile').value = ''; $('#importModal').classList.add('active'); }
+    function closeImportModal() { $('#importModal').classList.remove('active'); }
+
+    async function submitImport() {
+      const file = $('#importFile').files[0];
+      if (!file) { showToast('请选择文件', 'error'); return; }
+      try {
+        const text = await file.text();
+        const items = JSON.parse(text);
+        if (!Array.isArray(items)) { showToast('文件格式错误，需要JSON数组', 'error'); return; }
+        const res = await api('/alerts/import', { method: 'POST', body: items });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`成功导入 ${data.imported} 条记录`, 'success');
+          closeImportModal();
+          loadAlerts();
+        } else {
+          showToast(data.error || '导入失败', 'error');
+        }
+      } catch (e) { showToast(e.message || '导入失败（请检查JSON格式）', 'error'); }
+    }
+
+    // ========== Init ==========
     window.addEventListener('DOMContentLoaded', () => {
-      loadAlerts(1, 50);
+      initCharts();
+      loadAlerts();
+    });
+
+    // Close modals on overlay click
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-overlay')) {
+        e.target.classList.remove('active');
+      }
     });
   </script>
 </body>

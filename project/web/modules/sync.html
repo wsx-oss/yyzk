@@ -533,16 +533,16 @@
   </div>
 
   <!-- Statistics -->
-  <div class="card" style="padding: 14px 16px;">
-    <div class="card-title" style="font-size:14px; margin-bottom:10px;">数据同步统计</div>
-    <div class="charts-row">
-      <div class="chart-box">
-        <h4>同步状态分布</h4>
-        <div class="chart-canvas-wrap"><canvas id="statusChart"></canvas></div>
+  <div class="card">
+    <div class="card-title">数据同步统计</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;">
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">同步状态分布</div>
+        <canvas id="statusChart" style="max-height:240px;"></canvas>
       </div>
-      <div class="chart-box">
-        <h4>同步模式分布</h4>
-        <div class="chart-canvas-wrap"><canvas id="modeChart"></canvas></div>
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">同步模式分布</div>
+        <canvas id="modeChart" style="max-height:240px;"></canvas>
       </div>
     </div>
   </div>
@@ -814,6 +814,7 @@
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           plugins: {
             legend: { position: 'right', labels: { padding: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 } } }
           }
@@ -835,6 +836,7 @@
         options: {
           indexAxis: 'y',
           responsive: true,
+          maintainAspectRatio: false,
           scales: {
             x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f1f5f9' } },
             y: { grid: { display: false } }

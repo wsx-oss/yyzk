@@ -6,287 +6,541 @@
   <title>维护操作日志</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before { content: "\1F527"; }
+    .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .log-header .module-title { margin-bottom: 0; }
+    .log-header-btns { display: flex; gap: 8px; }
+    .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .filter-row-2 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
+    .toggle-switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; border-radius: 22px; transition: 0.3s; }
+    .toggle-slider::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.3s; }
+    .toggle-switch input:checked + .toggle-slider { background: #0ea5e9; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }
+    .result-success { color: #059669; font-weight: 600; }
+    .result-fail { color: #dc2626; font-weight: 600; }
+    .hint-box { margin-top: 20px; margin-bottom: 20px; }
+    .chart-section-title { font-weight: 600; margin-bottom: 12px; text-align: center; font-size: 14px; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; }
+    .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .modal-form .full-width { grid-column: 1 / -1; }
+    .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .modal-form textarea { resize: vertical; min-height: 60px; }
+    .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #64748b; }
+    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
+  </style>
 </head>
 <body>
+  <!-- Header -->
   <div class="module-header">
-    <div class="module-title">维护操作日志</div>
+    <div class="log-header">
+      <div class="module-title">维护操作日志</div>
+      <div class="log-header-btns">
+        <button class="btn btn-primary" onclick="openNewModal()">新增日志</button>
+        <button class="btn btn-secondary" onclick="importLogs()">导入日志</button>
+        <button class="btn btn-secondary" onclick="exportLogs()">导出日志</button>
+      </div>
+    </div>
     <div class="filter-row">
       <div class="filter-group">
-        <label>操作时间</label>
-        <select>
-          <option>全部</option>
+        <label>操作类型</label>
+        <select id="filterOpType">
+          <option value="">全部</option>
+          <option value="系统更新">系统更新</option>
+          <option value="设备维护">设备维护</option>
+          <option value="数据备份">数据备份</option>
+          <option value="系统重启">系统重启</option>
         </select>
       </div>
       <div class="filter-group">
         <label>操作人员</label>
-        <input id="filterOperator" type="text" placeholder="请输入人员/组合选择" />
+        <input id="filterOperator" type="text" placeholder="请输入操作人员姓名" />
       </div>
       <div class="filter-group">
-        <label>操作内容类型</label>
-        <input id="filterKeyword" type="text" placeholder="关键字(内容/备注/级别)" />
+        <label>操作时间范围</label>
+        <input id="filterDateFrom" type="date" />
+      </div>
+      <div class="filter-group">
+        <label>&nbsp;</label>
+        <input id="filterDateTo" type="date" />
       </div>
     </div>
-    <div class="filter-row" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="filter-row-2">
       <div class="filter-group">
         <label>操作结果</label>
-        <select>
-          <option>全部</option>
-          <option>成功</option>
-          <option>失败</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>日志级别</label>
-        <select id="filterLevel">
+        <select id="filterResult">
           <option value="">全部</option>
-          <option value="info">info</option>
-          <option value="warn">warn</option>
-          <option value="error">error</option>
+          <option value="成功">成功</option>
+          <option value="失败">失败</option>
         </select>
       </div>
       <div class="filter-group">
-        <label>已读过滤</label>
-        <label style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;">
-          <input type="checkbox" />
-          <span style="font-size: 14px; font-weight: normal; color: #0f172a;">启用</span>
-        </label>
+        <label>设备名称</label>
+        <input id="filterDevice" type="text" placeholder="请输入设备名称" />
       </div>
-    </div>
-    <div class="action-buttons">
-      <button class="btn btn-primary" onclick="search()">查询</button>
-      <button class="btn btn-secondary" onclick="exportLogs()">📤 导出</button>
-      <button class="btn btn-success" onclick="addLog()">➕ 新增日志</button>
+      <div class="filter-group">
+        <label>日志状态</label>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+          <label class="toggle-switch">
+            <input type="checkbox" id="filterStatusToggle" checked />
+            <span class="toggle-slider"></span>
+          </label>
+          <span style="font-size:14px;" id="filterStatusLabel">启用</span>
+        </div>
+      </div>
+      <div class="filter-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="search()" style="width:100%;">搜索</button>
+      </div>
     </div>
   </div>
 
+  <!-- Table -->
   <div class="card">
     <table class="data-table">
       <thead>
         <tr>
-          <th>操作时间</th>
+          <th>操作类型</th>
           <th>操作人员</th>
-          <th>内容</th>
-          <th>备注</th>
-          <th>ID</th>
-          <th>日志级别</th>
+          <th>操作时间</th>
+          <th>操作结果</th>
+          <th>设备名称</th>
+          <th>日志状态</th>
           <th>操作</th>
         </tr>
       </thead>
       <tbody id="logsTbody"></tbody>
     </table>
-  </div>
-
-  <div class="hint-box">
-    <div><strong>使用提示:</strong></div>
-    <div>1. 不车做用户活动,便于追溯和审计操作行为</div>
-    <div>2. 定期检查所安装日志,识别异常操作和潜在风险</div>
-    <div>3. 操作日志自动记录,无法修改,确保信息准确可靠</div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">日志统计柱状图</div>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">操作类型分布</div>
-        <canvas id="typeChart" width="300" height="300"></canvas>
+    <div class="pagination-bar">
+      <span id="paginationInfo">共 0 条</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button id="btnPrev" onclick="changePage(-1)" disabled>&lt; 上一页</button>
+        <span id="pageIndicator">1/1</span>
+        <button id="btnNext" onclick="changePage(1)" disabled>下一页 &gt;</button>
       </div>
-      <div>
-        <div style="font-weight: 600; margin-bottom: 12px; text-align: center;">操作结果分布</div>
-        <canvas id="resultChart" width="300" height="300"></canvas>
+    </div>
+  </div>
+
+  <!-- Usage Tips -->
+  <div class="hint-box">
+    <div><strong>使用提示</strong></div>
+    <div>1. 可通过操作类型、操作人员等条件进行日志搜索。</div>
+    <div>2. 点击新增日志可手动添加维护操作日志。</div>
+    <div>3. 导入导出功能可方便批量处理日志数据。</div>
+  </div>
+
+  <!-- Stats Charts -->
+  <div class="card">
+    <div class="card-title">日志统计信息</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;">
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">操作类型分布</div>
+        <canvas id="typeChart" style="max-height:240px;"></canvas>
+      </div>
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">操作结果分布</div>
+        <canvas id="resultChart" style="max-height:240px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- New/Edit Modal -->
+  <div class="modal-overlay" id="logModal">
+    <div class="modal-box">
+      <div class="modal-title" id="logModalTitle">新增日志</div>
+      <div class="modal-form">
+        <input type="hidden" id="editLogId" value="" />
+        <div>
+          <label>操作类型</label>
+          <select id="modalOpType">
+            <option value="系统更新">系统更新</option>
+            <option value="设备维护">设备维护</option>
+            <option value="数据备份">数据备份</option>
+            <option value="系统重启">系统重启</option>
+          </select>
+        </div>
+        <div>
+          <label>操作人员</label>
+          <input id="modalOperator" type="text" placeholder="请输入操作人员" />
+        </div>
+        <div>
+          <label>操作时间</label>
+          <input id="modalOpTime" type="datetime-local" />
+        </div>
+        <div>
+          <label>操作结果</label>
+          <select id="modalOpResult">
+            <option value="成功">成功</option>
+            <option value="失败">失败</option>
+          </select>
+        </div>
+        <div>
+          <label>设备名称</label>
+          <input id="modalDevice" type="text" placeholder="请输入设备名称" />
+        </div>
+        <div>
+          <label>日志状态</label>
+          <select id="modalLogStatus">
+            <option value="启用">启用</option>
+            <option value="禁用">禁用</option>
+          </select>
+        </div>
+        <div class="full-width">
+          <label>操作详情</label>
+          <textarea id="modalDetail" placeholder="请输入操作详情"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeLogModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitLog()">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal-box">
+      <div class="modal-title">导入日志</div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;color:#64748b;">选择 JSON 文件</label>
+        <input id="importFile" type="file" accept=".json" style="margin-top:6px;" />
+      </div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:16px;">
+        JSON 格式示例：[{"op_type":"系统更新","operator":"张三","op_time":"2024-10-01 10:00","op_result":"成功","device_name":"服务器01","log_status":"启用"}]
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeImportModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitImport()">确认导入</button>
       </div>
     </div>
   </div>
 
   <script src="/app/modules/common.js"></script>
   <script>
-    let allLogs = [];
-    let visibleLogs = [];
+    let currentPage = 1;
+    const pageSize = 20;
+    let totalItems = 0;
+    let typeChart = null, resultChart = null;
 
-    const typeChart = createChart($('#typeChart'), {
-      type: 'doughnut',
-      data: {
-        labels: ['info', 'warn', 'error'],
-        datasets: [{
-          data: [0, 0, 0],
-          backgroundColor: ['#0ea5e9', '#f59e0b', '#ef4444']
-        }]
-      }
+    // Toggle label
+    $('#filterStatusToggle').addEventListener('change', function() {
+      $('#filterStatusLabel').textContent = this.checked ? '启用' : '禁用';
     });
 
-    const resultChart = createChart($('#resultChart'), {
-      type: 'bar',
-      data: {
-        labels: ['info', 'warn', 'error'],
-        datasets: [{
-          label: '数量',
-          data: [0, 0, 0],
-          backgroundColor: ['#0ea5e9', '#f59e0b', '#ef4444']
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        scales: { x: { beginAtZero: true } }
-      }
-    });
-
-    function escapeText(v) {
-      if (v === null || v === undefined) return '';
-      return String(v);
+    // ========== Init Charts ==========
+    function initCharts() {
+      typeChart = createChart($('#typeChart'), {
+        type: 'doughnut',
+        data: {
+          labels: [],
+          datasets: [{ data: [], backgroundColor: ['#3b82f6', '#10b981', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'] }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'right', labels: { font: { size: 12 }, padding: 10 } } }
+        }
+      });
+      resultChart = createChart($('#resultChart'), {
+        type: 'bar',
+        data: {
+          labels: ['成功', '失败'],
+          datasets: [{
+            label: '数量',
+            data: [0, 0],
+            backgroundColor: ['#10b981', '#ef4444'],
+            barThickness: 28,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } }, y: { grid: { display: false } } },
+          plugins: { legend: { display: false } }
+        }
+      });
     }
 
+    // ========== Load Data ==========
+    async function loadLogs() {
+      try {
+        const params = buildFilterParams();
+        params.append('page', currentPage);
+        params.append('page_size', pageSize);
+        const res = await api('/logs/list?' + params.toString());
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        totalItems = data.total || 0;
+        renderTable(items);
+        updatePagination();
+        loadStats();
+      } catch (e) {
+        showToast(e.message || '加载失败', 'error');
+      }
+    }
+
+    function buildFilterParams() {
+      const p = new URLSearchParams();
+      const opType = $('#filterOpType').value;
+      const operator = $('#filterOperator').value.trim();
+      const dateFrom = $('#filterDateFrom').value;
+      const dateTo = $('#filterDateTo').value;
+      const opResult = $('#filterResult').value;
+      const device = $('#filterDevice').value.trim();
+      const statusEnabled = $('#filterStatusToggle').checked;
+      if (opType) p.append('op_type', opType);
+      if (operator) p.append('operator', operator);
+      if (dateFrom) p.append('date_from', dateFrom);
+      if (dateTo) p.append('date_to', dateTo);
+      if (opResult) p.append('op_result', opResult);
+      if (device) p.append('device_name', device);
+      p.append('log_status', statusEnabled ? '启用' : '禁用');
+      return p;
+    }
+
+    function search() { currentPage = 1; loadLogs(); }
+    function changePage(delta) { currentPage += delta; loadLogs(); }
+
+    function updatePagination() {
+      const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+      $('#paginationInfo').textContent = `共 ${totalItems} 条`;
+      $('#pageIndicator').textContent = `${currentPage}/${totalPages}`;
+      $('#btnPrev').disabled = currentPage <= 1;
+      $('#btnNext').disabled = currentPage >= totalPages;
+    }
+
+    // ========== Render Table ==========
     function renderTable(items) {
       const tbody = $('#logsTbody');
       tbody.innerHTML = '';
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:32px;">暂无日志记录</td></tr>';
+        return;
+      }
       for (const it of items) {
         const tr = document.createElement('tr');
 
+        const tdType = document.createElement('td');
+        tdType.textContent = it.op_type || '-';
+
+        const tdOper = document.createElement('td');
+        tdOper.textContent = it.operator || '-';
+
         const tdTime = document.createElement('td');
-        tdTime.textContent = formatDate(it.created_at);
+        tdTime.textContent = it.op_time || formatDate(it.created_at);
 
-        const tdOp = document.createElement('td');
-        tdOp.textContent = it.meta ? it.meta : '-';
+        const tdResult = document.createElement('td');
+        const resSpan = document.createElement('span');
+        resSpan.textContent = it.op_result || '-';
+        resSpan.className = it.op_result === '成功' ? 'result-success' : it.op_result === '失败' ? 'result-fail' : '';
+        tdResult.appendChild(resSpan);
 
-        const tdMsg = document.createElement('td');
-        tdMsg.textContent = escapeText(it.message);
+        const tdDevice = document.createElement('td');
+        tdDevice.textContent = it.device_name || '-';
 
-        const tdMeta = document.createElement('td');
-        tdMeta.textContent = it.meta ? it.meta : '-';
-
-        const tdId = document.createElement('td');
-        tdId.textContent = String(it.id);
-
-        const tdLevel = document.createElement('td');
-        tdLevel.textContent = escapeText(it.level);
+        const tdStatus = document.createElement('td');
+        tdStatus.textContent = it.log_status || '启用';
 
         const tdActions = document.createElement('td');
-        const viewBtn = document.createElement('button');
-        viewBtn.className = 'btn btn-primary btn-action';
-        viewBtn.textContent = '查看';
-        viewBtn.onclick = () => {
-          alert(`时间: ${formatDate(it.created_at)}\n级别: ${escapeText(it.level)}\n内容: ${escapeText(it.message)}\n备注: ${escapeText(it.meta || '')}`);
-        };
+        tdActions.style.whiteSpace = 'nowrap';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-primary btn-action';
+        editBtn.textContent = '编辑';
+        editBtn.onclick = () => openEditModal(it);
+        tdActions.appendChild(editBtn);
+
         const delBtn = document.createElement('button');
         delBtn.className = 'btn btn-danger btn-action';
         delBtn.textContent = '删除';
-        delBtn.onclick = () => {
-          showToast('当前后端未提供删除接口', 'info');
-        };
-        tdActions.appendChild(viewBtn);
+        delBtn.style.marginLeft = '6px';
+        delBtn.onclick = () => deleteLog(it.id);
         tdActions.appendChild(delBtn);
 
+        tr.appendChild(tdType);
+        tr.appendChild(tdOper);
         tr.appendChild(tdTime);
-        tr.appendChild(tdOp);
-        tr.appendChild(tdMsg);
-        tr.appendChild(tdMeta);
-        tr.appendChild(tdId);
-        tr.appendChild(tdLevel);
+        tr.appendChild(tdResult);
+        tr.appendChild(tdDevice);
+        tr.appendChild(tdStatus);
         tr.appendChild(tdActions);
         tbody.appendChild(tr);
       }
     }
 
-    function updateCharts(items) {
-      const counts = { info: 0, warn: 0, error: 0 };
-      for (const it of items) {
-        const lv = (it.level || '').toLowerCase();
-        if (lv === 'info' || lv === 'warn' || lv === 'error') counts[lv] += 1;
-      }
-      const data = [counts.info, counts.warn, counts.error];
-      if (typeChart) {
-        typeChart.data.datasets[0].data = data;
-        typeChart.update();
-      }
-      if (resultChart) {
-        resultChart.data.datasets[0].data = data;
-        resultChart.update();
-      }
+    // ========== Stats ==========
+    async function loadStats() {
+      try {
+        const res = await api('/logs/stats');
+        const data = await res.json();
+        const typeDist = data.type_distribution || {};
+        const resDist = data.result_distribution || {};
+
+        if (typeChart) {
+          const labels = Object.keys(typeDist);
+          const values = Object.values(typeDist);
+          const colors = ['#3b82f6', '#10b981', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'];
+          typeChart.data.labels = labels.length ? labels : ['暂无数据'];
+          typeChart.data.datasets[0].data = values.length ? values : [1];
+          typeChart.data.datasets[0].backgroundColor = labels.length ? colors.slice(0, labels.length) : ['#e2e8f0'];
+          typeChart.update();
+        }
+        if (resultChart) {
+          resultChart.data.datasets[0].data = [resDist['成功'] || 0, resDist['失败'] || 0];
+          resultChart.update();
+        }
+      } catch (e) { /* ignore */ }
     }
 
-    async function loadLogs(page = 1, pageSize = 50) {
-      const res = await api(`/logs/list?page=${page}&page_size=${pageSize}`);
-      const data = await res.json();
-      allLogs = Array.isArray(data.items) ? data.items : [];
-      visibleLogs = allLogs.slice();
-      renderTable(visibleLogs);
-      updateCharts(visibleLogs);
+    // ========== New/Edit Modal ==========
+    function openNewModal() {
+      $('#editLogId').value = '';
+      $('#logModalTitle').textContent = '新增日志';
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      $('#modalOpTime').value = local;
+      $('#modalOpType').value = '系统更新';
+      $('#modalOperator').value = '';
+      $('#modalOpResult').value = '成功';
+      $('#modalDevice').value = '';
+      $('#modalLogStatus').value = '启用';
+      $('#modalDetail').value = '';
+      $('#logModal').classList.add('active');
     }
 
-    function search() {
-      const operator = ($('#filterOperator').value || '').trim().toLowerCase();
-      const keyword = ($('#filterKeyword').value || '').trim().toLowerCase();
-      const level = ($('#filterLevel').value || '').trim().toLowerCase();
-
-      visibleLogs = allLogs.filter((it) => {
-        const meta = (it.meta || '').toLowerCase();
-        const msg = (it.message || '').toLowerCase();
-        const lv = (it.level || '').toLowerCase();
-
-        if (operator && !meta.includes(operator)) return false;
-        if (level && lv !== level) return false;
-        if (keyword && !(msg.includes(keyword) || meta.includes(keyword) || lv.includes(keyword))) return false;
-        return true;
-      });
-
-      renderTable(visibleLogs);
-      updateCharts(visibleLogs);
-      showToast(`已筛选：${visibleLogs.length} 条`, 'success');
+    function openEditModal(it) {
+      $('#editLogId').value = it.id;
+      $('#logModalTitle').textContent = '编辑日志';
+      $('#modalOpType').value = it.op_type || '系统更新';
+      $('#modalOperator').value = it.operator || '';
+      const t = (it.op_time || '').replace(' ', 'T');
+      $('#modalOpTime').value = t;
+      $('#modalOpResult').value = it.op_result || '成功';
+      $('#modalDevice').value = it.device_name || '';
+      $('#modalLogStatus').value = it.log_status || '启用';
+      $('#modalDetail').value = it.detail || '';
+      $('#logModal').classList.add('active');
     }
 
+    function closeLogModal() { $('#logModal').classList.remove('active'); }
+
+    async function submitLog() {
+      const id = $('#editLogId').value;
+      const opType = $('#modalOpType').value;
+      const operator = $('#modalOperator').value.trim();
+      const opTime = $('#modalOpTime').value.replace('T', ' ');
+      const opResult = $('#modalOpResult').value;
+      const deviceName = $('#modalDevice').value.trim();
+      const logStatus = $('#modalLogStatus').value;
+      const detail = $('#modalDetail').value.trim();
+
+      if (!operator) { showToast('请输入操作人员', 'error'); return; }
+
+      try {
+        let res;
+        if (id) {
+          res = await api('/logs/' + id, { method: 'PUT', body: { op_type: opType, operator, op_time: opTime, op_result: opResult, device_name: deviceName, log_status: logStatus, detail } });
+        } else {
+          res = await api('/logs/append', { method: 'POST', body: { level: 'info', message: detail, meta: operator, op_type: opType, operator, op_time: opTime, op_result: opResult, device_name: deviceName, log_status: logStatus, detail } });
+        }
+        const data = await res.json();
+        if (data.ok) {
+          showToast(id ? '编辑成功' : '新增成功', 'success');
+          closeLogModal();
+          loadLogs();
+        } else {
+          showToast(data.error || '操作失败', 'error');
+        }
+      } catch (e) { showToast(e.message || '操作失败', 'error'); }
+    }
+
+    // ========== Delete ==========
+    async function deleteLog(id) {
+      if (!confirm('确定要删除这条日志记录吗？')) return;
+      try {
+        const res = await api('/logs/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('删除成功', 'success');
+          loadLogs();
+        } else {
+          showToast(data.error || '删除失败', 'error');
+        }
+      } catch (e) { showToast(e.message || '删除失败', 'error'); }
+    }
+
+    // ========== Export ==========
     function exportLogs() {
-      const rows = [
-        ['id', 'created_at', 'level', 'message', 'meta'],
-        ...visibleLogs.map((it) => [
-          it.id,
-          it.created_at,
-          it.level,
-          it.message,
-          it.meta
-        ])
-      ];
-
-      const csv = rows
-        .map((r) => r.map((cell) => {
-          const s = cell === null || cell === undefined ? '' : String(cell);
-          const escaped = s.replace(/"/g, '""');
-          return `"${escaped}"`;
-        }).join(','))
-        .join('\n');
-
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `logs_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      (async () => {
+        try {
+          const params = buildFilterParams();
+          params.append('page', 1);
+          params.append('page_size', 10000);
+          const res = await api('/logs/list?' + params.toString());
+          const data = await res.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          const rows = [
+            ['操作类型', '操作人员', '操作时间', '操作结果', '设备名称', '日志状态', '操作详情'],
+            ...items.map(it => [it.op_type, it.operator, it.op_time, it.op_result, it.device_name, it.log_status, it.detail])
+          ];
+          const csv = '\uFEFF' + rows.map(r => r.map(cell => {
+            const s = cell === null || cell === undefined ? '' : String(cell);
+            return `"${s.replace(/"/g, '""')}"`;
+          }).join(',')).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `logs_${new Date().toISOString().slice(0, 10)}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          showToast(`已导出 ${items.length} 条记录`, 'success');
+        } catch (e) { showToast(e.message || '导出失败', 'error'); }
+      })();
     }
 
-    async function addLog() {
-      const level = (prompt('日志级别（info/warn/error）', 'info') || '').trim();
-      if (!level) return;
-      const message = (prompt('日志内容', '') || '').trim();
-      if (!message) return;
-      const meta = (prompt('备注/操作人员（可选）', '') || '').trim();
+    // ========== Import ==========
+    function importLogs() { $('#importFile').value = ''; $('#importModal').classList.add('active'); }
+    function closeImportModal() { $('#importModal').classList.remove('active'); }
 
-      const res = await api('/logs/append', {
-        method: 'POST',
-        body: { level, message, meta }
-      });
-      const data = await res.json();
-      if (!data || data.ok !== true) {
-        showToast(data && data.error ? data.error : '新增失败', 'error');
-        return;
-      }
-      showToast('新增成功', 'success');
-      await loadLogs(1, 50);
+    async function submitImport() {
+      const file = $('#importFile').files[0];
+      if (!file) { showToast('请选择文件', 'error'); return; }
+      try {
+        const text = await file.text();
+        const items = JSON.parse(text);
+        if (!Array.isArray(items)) { showToast('文件格式错误，需要JSON数组', 'error'); return; }
+        const res = await api('/logs/import', { method: 'POST', body: items });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`成功导入 ${data.imported} 条记录`, 'success');
+          closeImportModal();
+          loadLogs();
+        } else {
+          showToast(data.error || '导入失败', 'error');
+        }
+      } catch (e) { showToast(e.message || '导入失败（请检查JSON格式）', 'error'); }
     }
 
+    // ========== Init ==========
     window.addEventListener('DOMContentLoaded', () => {
-      loadLogs(1, 50).catch((e) => {
-        showToast(e.message || '加载失败', 'error');
-      });
+      initCharts();
+      loadLogs();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('active');
     });
   </script>
 </body>

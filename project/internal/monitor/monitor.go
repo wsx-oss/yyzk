@@ -43,7 +43,7 @@ func rootPath() string {
 
 func CollectMetrics() (MetricsSnapshot, error) {
     m := MetricsSnapshot{}
-    cpuPercents, err := cpu.Percent(0, false)
+    cpuPercents, err := cpu.Percent(500*time.Millisecond, false)
     if err == nil && len(cpuPercents) > 0 {
         m.CPUPercent = cpuPercents[0]
     }

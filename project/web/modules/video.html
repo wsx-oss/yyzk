@@ -147,14 +147,14 @@
   <!-- 视频监控统计 -->
   <div class="card">
     <div class="card-title">视频监控统计</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
-      <div>
-        <div style="font-weight:600;margin-bottom:12px;text-align:center;">视频状态分布</div>
-        <canvas id="statusChart" width="300" height="300"></canvas>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;">
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">视频状态分布</div>
+        <canvas id="statusChart" style="max-height:240px;"></canvas>
       </div>
-      <div>
-        <div style="font-weight:600;margin-bottom:12px;text-align:center;">监控区域分布</div>
-        <canvas id="regionChart" width="300" height="300"></canvas>
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-weight:600;margin-bottom:8px;text-align:center;">监控区域分布</div>
+        <canvas id="regionChart" style="max-height:240px;"></canvas>
       </div>
     </div>
   </div>
@@ -267,7 +267,7 @@
         labels: ['正常', '故障', '维护'],
         datasets: [{ data: [0, 0, 0], backgroundColor: ['#10b981', '#ef4444', '#f59e0b'] }]
       },
-      options: { plugins: { legend: { position: 'right' } } }
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
     });
 
     var regionChart = createChart($('#regionChart'), {
@@ -277,6 +277,7 @@
         datasets: [{ label: '视频数量', data: [0, 0, 0, 0], backgroundColor: ['#8b5cf6', '#ef4444', '#10b981', '#3b82f6'] }]
       },
       options: {
+        maintainAspectRatio: false,
         indexAxis: 'y',
         scales: { x: { beginAtZero: true } },
         plugins: { legend: { display: false } }

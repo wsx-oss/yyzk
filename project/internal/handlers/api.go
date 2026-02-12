@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -234,9 +235,17 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/alerts/list", a.AlertsList)
 		api.POST("/alerts/ack/:id", a.AlertAck)
 		api.POST("/alerts/new", a.AlertNew)
+		api.POST("/alerts/import", a.AlertsImport)
+		api.DELETE("/alerts/clear-resolved", a.AlertsClearResolved)
+		api.GET("/alerts/stats", a.AlertsStats)
+		api.POST("/alerts/resolve/:id", a.AlertResolve)
 
 		api.POST("/logs/append", a.LogAppend)
 		api.GET("/logs/list", a.LogList)
+		api.PUT("/logs/:id", a.LogEdit)
+		api.DELETE("/logs/:id", a.LogDelete)
+		api.POST("/logs/import", a.LogImport)
+		api.GET("/logs/stats", a.LogStats)
 
 		api.GET("/updates/list", a.UpdatesList)
 		api.POST("/updates/add", a.UpdatesAdd)
@@ -267,6 +276,11 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.POST("/sync/import-data", a.SyncImportData)
 
 		api.GET("/report/perf", a.ReportPerf)
+		api.GET("/report/perf-list", a.PerfReportList)
+		api.POST("/report/perf-add", a.PerfReportAdd)
+		api.POST("/report/perf-import", a.PerfReportImport)
+		api.DELETE("/report/perf-delete/:id", a.PerfReportDelete)
+		api.POST("/report/perf-collect", a.PerfCollect)
 
 		r.GET("/api/vnc/ws", a.VNCProxyWS)
 		r.GET("/api/ssh/ws", a.SSHProxyWS)
@@ -293,6 +307,8 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.DELETE("/hardware/items/:id", a.HardwareItemsDelete)
 		api.POST("/hardware/items/:id/refresh", a.HardwareItemsRefreshOne)
 		api.POST("/hardware/items/check-agent", a.HardwareCheckAgent)
+		api.GET("/hardware/items/live", a.HardwareItemsLive)
+		api.POST("/hardware/push", a.HardwarePush)
 
 		// user stats
 		api.GET("/user/stats", a.UserStatsGet)
@@ -744,6 +760,152 @@ func (a *API) HardwareCheckAgent(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true, "message": "Agent连接成功", "metrics": m})
 }
 
+// HardwareItemsLive fetches real-time metrics from all agents concurrently and returns
+// the merged result directly. This bypasses the DB write→read round-trip for minimal latency.
+// DB is updated asynchronously in the background so persistent data stays fresh.
+func (a *API) HardwareItemsLive(c *gin.Context) {
+	rows, err := a.db.Query("SELECT id, name, type, ip, description FROM hardware_items")
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type hwItem struct {
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		IP          string `json:"ip"`
+		Description string `json:"description"`
+	}
+	var items []hwItem
+	for rows.Next() {
+		var h hwItem
+		if err := rows.Scan(&h.ID, &h.Name, &h.Type, &h.IP, &h.Description); err == nil {
+			items = append(items, h)
+		}
+	}
+
+	type liveResult struct {
+		ID               int     `json:"id"`
+		Name             string  `json:"name"`
+		Type             string  `json:"type"`
+		IP               string  `json:"ip"`
+		Status           string  `json:"status"`
+		Temperature      float64 `json:"temperature"`
+		CPUUsage         float64 `json:"cpu_usage"`
+		MemUsage         float64 `json:"mem_usage"`
+		NetworkBandwidth string  `json:"network_bandwidth"`
+		DetectedAt       string  `json:"detected_at"`
+	}
+
+	results := make([]liveResult, len(items))
+	var wg sync.WaitGroup
+	for i, h := range items {
+		wg.Add(1)
+		go func(idx int, item hwItem) {
+			defer wg.Done()
+			r := liveResult{
+				ID:   item.ID,
+				Name: item.Name,
+				Type: item.Type,
+				IP:   item.IP,
+			}
+			m, err := fetchAgentMetrics(item.IP)
+			if err != nil {
+				r.Status = "离线"
+				r.NetworkBandwidth = "0B/s"
+				r.DetectedAt = time.Now().UTC().Format("2006-01-02T15:04:05Z")
+				// Update DB status asynchronously
+				go func() {
+					_, _ = a.db.Exec("UPDATE hardware_items SET status='离线', detected_at=datetime('now'), updated_at=datetime('now') WHERE id=?", item.ID)
+				}()
+			} else {
+				r.Status = "在线"
+				r.Temperature = m.Temperature
+				r.CPUUsage = m.CPUUsage
+				r.MemUsage = m.MemUsage
+				r.NetworkBandwidth = m.NetworkBandwidth
+				r.DetectedAt = time.Now().UTC().Format("2006-01-02T15:04:05Z")
+				// Update DB asynchronously
+				go func() {
+					_, _ = a.db.Exec(`UPDATE hardware_items SET status='在线', temperature=?, cpu_usage=?, mem_usage=?, network_bandwidth=?, detected_at=datetime('now'), updated_at=datetime('now') WHERE id=?`,
+						m.Temperature, m.CPUUsage, m.MemUsage, m.NetworkBandwidth, item.ID)
+				}()
+			}
+			results[idx] = r
+		}(i, h)
+	}
+	wg.Wait()
+	c.JSON(200, gin.H{"items": results})
+}
+
+// HardwarePush receives metrics actively pushed from a remote agent (e.g. drone).
+// The agent identifies itself via agent_id. If a matching hardware_item (by agent_id stored in ip field)
+// exists, it is updated; otherwise a new record is auto-created.
+func (a *API) HardwarePush(c *gin.Context) {
+	var p struct {
+		AgentID          string  `json:"agent_id"`
+		Hostname         string  `json:"hostname"`
+		CPUUsage         float64 `json:"cpu_usage"`
+		MemUsage         float64 `json:"mem_usage"`
+		Temperature      float64 `json:"temperature"`
+		NetworkBandwidth string  `json:"network_bandwidth"`
+		OS               string  `json:"os"`
+		CPUModel         string  `json:"cpu_model"`
+		CPUCores         int     `json:"cpu_cores"`
+		MemTotalMB       uint64  `json:"mem_total_mb"`
+		Uptime           uint64  `json:"uptime"`
+		Timestamp        int64   `json:"timestamp"`
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"ok": false, "message": "参数格式错误"})
+		return
+	}
+	if p.AgentID == "" {
+		c.JSON(400, gin.H{"ok": false, "message": "agent_id 不能为空"})
+		return
+	}
+
+	// Try to find existing hardware_item by agent_id (stored in ip field)
+	var id int
+	err := a.db.QueryRow("SELECT id FROM hardware_items WHERE ip = ?", p.AgentID).Scan(&id)
+	if err == sql.ErrNoRows {
+		// Auto-create a new hardware item for this agent
+		name := p.Hostname
+		if name == "" {
+			name = p.AgentID
+		}
+		res, err := a.db.Exec(`INSERT INTO hardware_items(name, type, ip, status, description, temperature, cpu_usage, mem_usage, network_bandwidth, detected_at, created_at, updated_at)
+			VALUES(?, '无人机', ?, '在线', ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))`,
+			name, p.AgentID,
+			fmt.Sprintf("OS:%s CPU:%s Cores:%d Mem:%dMB", p.OS, p.CPUModel, p.CPUCores, p.MemTotalMB),
+			p.Temperature, p.CPUUsage, p.MemUsage, p.NetworkBandwidth)
+		if err != nil {
+			c.JSON(500, gin.H{"ok": false, "message": "创建设备失败: " + err.Error()})
+			return
+		}
+		newID, _ := res.LastInsertId()
+		log.Printf("[Push] Auto-created hardware_item id=%d for agent %s (%s)", newID, p.AgentID, name)
+		c.JSON(200, gin.H{"ok": true, "message": "设备已自动注册", "id": newID})
+		return
+	} else if err != nil {
+		c.JSON(500, gin.H{"ok": false, "message": err.Error()})
+		return
+	}
+
+	// Update existing record
+	_, err = a.db.Exec(`UPDATE hardware_items SET
+		status = '在线', temperature = ?, cpu_usage = ?, mem_usage = ?, network_bandwidth = ?,
+		detected_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+		p.Temperature, p.CPUUsage, p.MemUsage, p.NetworkBandwidth, id)
+	if err != nil {
+		c.JSON(500, gin.H{"ok": false, "message": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "id": id})
+}
+
 func (a *API) MetricsSnapshot(c *gin.Context) {
 	m, err := monitor.CollectMetrics()
 	if err != nil {
@@ -945,11 +1107,58 @@ func (a *API) AudioDelete(c *gin.Context) {
 func (a *API) AlertsList(c *gin.Context) {
 	pagination := utils.GetPagination(c)
 
-	var total int
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM alerts`).Scan(&total)
+	// Filtering
+	category := strings.TrimSpace(c.Query("category"))
+	severity := strings.TrimSpace(c.Query("severity"))
+	priority := strings.TrimSpace(c.Query("priority"))
+	status := strings.TrimSpace(c.Query("status"))
+	device := strings.TrimSpace(c.Query("device"))
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	dateFrom := strings.TrimSpace(c.Query("date_from"))
+	dateTo := strings.TrimSpace(c.Query("date_to"))
 
-	rows, err := a.db.Query(`SELECT id, category, severity, message, acknowledged, created_at FROM alerts ORDER BY id DESC LIMIT ? OFFSET ?`,
-		pagination.PageSize, pagination.Offset)
+	where := []string{"1=1"}
+	args := []any{}
+	if category != "" && category != "全部" {
+		where = append(where, "category = ?")
+		args = append(args, category)
+	}
+	if severity != "" && severity != "全部" {
+		where = append(where, "severity = ?")
+		args = append(args, severity)
+	}
+	if priority != "" && priority != "全部" {
+		where = append(where, "priority = ?")
+		args = append(args, priority)
+	}
+	if status != "" && status != "全部" {
+		where = append(where, "status = ?")
+		args = append(args, status)
+	}
+	if device != "" {
+		where = append(where, "LOWER(device) LIKE LOWER(?)")
+		args = append(args, "%"+device+"%")
+	}
+	if keyword != "" {
+		where = append(where, "(LOWER(message) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))")
+		args = append(args, "%"+keyword+"%", "%"+keyword+"%")
+	}
+	if dateFrom != "" {
+		where = append(where, "alert_time >= ?")
+		args = append(args, dateFrom)
+	}
+	if dateTo != "" {
+		where = append(where, "alert_time <= ?")
+		args = append(args, dateTo)
+	}
+
+	whereClause := strings.Join(where, " AND ")
+
+	var total int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE "+whereClause, args...).Scan(&total)
+
+	queryArgs := append(args, pagination.PageSize, pagination.Offset)
+	rows, err := a.db.Query("SELECT id, category, severity, message, acknowledged, created_at, alert_time, priority, device, description, status FROM alerts WHERE "+whereClause+" ORDER BY id DESC LIMIT ? OFFSET ?", queryArgs...)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -957,12 +1166,16 @@ func (a *API) AlertsList(c *gin.Context) {
 	defer rows.Close()
 	var items []gin.H
 	for rows.Next() {
-		var id int
-		var cat, sev, msg string
-		var ack int
-		var created string
-		if err := rows.Scan(&id, &cat, &sev, &msg, &ack, &created); err == nil {
-			items = append(items, gin.H{"id": id, "category": cat, "severity": sev, "message": msg, "acknowledged": ack == 1, "created_at": created})
+		var id, ack int
+		var cat, sev, msg, created string
+		var alertTime, pri, dev, desc, st sql.NullString
+		if err := rows.Scan(&id, &cat, &sev, &msg, &ack, &created, &alertTime, &pri, &dev, &desc, &st); err == nil {
+			items = append(items, gin.H{
+				"id": id, "category": cat, "severity": sev, "message": msg,
+				"acknowledged": ack == 1, "created_at": created,
+				"alert_time": alertTime.String, "priority": pri.String,
+				"device": dev.String, "description": desc.String, "status": st.String,
+			})
 		}
 	}
 	c.JSON(200, gin.H{
@@ -984,12 +1197,132 @@ func (a *API) AlertAck(c *gin.Context) {
 }
 
 func (a *API) AlertNew(c *gin.Context) {
-	var p struct{ Category, Severity, Message string }
+	var p struct {
+		Category    string `json:"category"`
+		Severity    string `json:"severity"`
+		Message     string `json:"message"`
+		AlertTime   string `json:"alert_time"`
+		Priority    string `json:"priority"`
+		Device      string `json:"device"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+	}
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(400, gin.H{"error": "bad json"})
 		return
 	}
-	_, err := a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, p.Category, p.Severity, p.Message)
+	if p.Priority == "" {
+		p.Priority = "中"
+	}
+	if p.Status == "" {
+		p.Status = "未解决"
+	}
+	if p.AlertTime == "" {
+		p.AlertTime = time.Now().Format("2006-01-02 15:04")
+	}
+	_, err := a.db.Exec(`INSERT INTO alerts(category, severity, message, alert_time, priority, device, description, status) VALUES(?,?,?,?,?,?,?,?)`,
+		p.Category, p.Severity, p.Message, p.AlertTime, p.Priority, p.Device, p.Description, p.Status)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (a *API) AlertsImport(c *gin.Context) {
+	var items []struct {
+		Category    string `json:"category"`
+		Severity    string `json:"severity"`
+		Message     string `json:"message"`
+		AlertTime   string `json:"alert_time"`
+		Priority    string `json:"priority"`
+		Device      string `json:"device"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+	}
+	if err := c.BindJSON(&items); err != nil {
+		c.JSON(400, gin.H{"error": "参数格式错误，需要JSON数组"})
+		return
+	}
+	imported := 0
+	for _, p := range items {
+		if p.Priority == "" {
+			p.Priority = "中"
+		}
+		if p.Status == "" {
+			p.Status = "未解决"
+		}
+		if p.AlertTime == "" {
+			p.AlertTime = time.Now().Format("2006-01-02 15:04")
+		}
+		_, err := a.db.Exec(`INSERT INTO alerts(category, severity, message, alert_time, priority, device, description, status) VALUES(?,?,?,?,?,?,?,?)`,
+			p.Category, p.Severity, p.Message, p.AlertTime, p.Priority, p.Device, p.Description, p.Status)
+		if err == nil {
+			imported++
+		}
+	}
+	c.JSON(200, gin.H{"ok": true, "imported": imported})
+}
+
+func (a *API) AlertsClearResolved(c *gin.Context) {
+	result, err := a.db.Exec(`DELETE FROM alerts WHERE status = '已解决'`)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	affected, _ := result.RowsAffected()
+	c.JSON(200, gin.H{"ok": true, "deleted": affected})
+}
+
+func (a *API) AlertsStats(c *gin.Context) {
+	// Category distribution
+	catRows, err := a.db.Query("SELECT category, COUNT(*) FROM alerts GROUP BY category")
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer catRows.Close()
+	catDist := gin.H{}
+	for catRows.Next() {
+		var cat string
+		var cnt int
+		if err := catRows.Scan(&cat, &cnt); err == nil {
+			catDist[cat] = cnt
+		}
+	}
+	// Priority distribution
+	priRows, err := a.db.Query("SELECT priority, COUNT(*) FROM alerts GROUP BY priority")
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer priRows.Close()
+	priDist := gin.H{}
+	for priRows.Next() {
+		var pri string
+		var cnt int
+		if err := priRows.Scan(&pri, &cnt); err == nil {
+			priDist[pri] = cnt
+		}
+	}
+	var total int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM alerts").Scan(&total)
+	var resolved int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE status = '已解决'").Scan(&resolved)
+	var unresolved int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE status != '已解决'").Scan(&unresolved)
+	c.JSON(200, gin.H{
+		"total":                 total,
+		"resolved":              resolved,
+		"unresolved":            unresolved,
+		"category_distribution": catDist,
+		"priority_distribution": priDist,
+	})
+}
+
+func (a *API) AlertResolve(c *gin.Context) {
+	id := c.Param("id")
+	_, err := a.db.Exec(`UPDATE alerts SET status = '已解决', acknowledged = 1 WHERE id = ?`, id)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -998,12 +1331,30 @@ func (a *API) AlertNew(c *gin.Context) {
 }
 
 func (a *API) LogAppend(c *gin.Context) {
-	var p struct{ Level, Message, Meta string }
+	var p struct {
+		Level      string `json:"level"`
+		Message    string `json:"message"`
+		Meta       string `json:"meta"`
+		OpType     string `json:"op_type"`
+		Operator   string `json:"operator"`
+		OpTime     string `json:"op_time"`
+		OpResult   string `json:"op_result"`
+		DeviceName string `json:"device_name"`
+		LogStatus  string `json:"log_status"`
+		Detail     string `json:"detail"`
+	}
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(400, gin.H{"error": "bad json"})
 		return
 	}
-	_, err := a.db.Exec(`INSERT INTO logs(level, message, meta) VALUES(?,?,?)`, p.Level, p.Message, p.Meta)
+	if p.LogStatus == "" {
+		p.LogStatus = "启用"
+	}
+	if p.OpTime == "" {
+		p.OpTime = time.Now().Format("2006-01-02 15:04")
+	}
+	_, err := a.db.Exec(`INSERT INTO logs(level, message, meta, op_type, operator, op_time, op_result, device_name, log_status, detail) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		p.Level, p.Message, p.Meta, p.OpType, p.Operator, p.OpTime, p.OpResult, p.DeviceName, p.LogStatus, p.Detail)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -1014,11 +1365,52 @@ func (a *API) LogAppend(c *gin.Context) {
 func (a *API) LogList(c *gin.Context) {
 	pagination := utils.GetPagination(c)
 
-	var total int
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM logs`).Scan(&total)
+	opType := strings.TrimSpace(c.Query("op_type"))
+	operator := strings.TrimSpace(c.Query("operator"))
+	dateFrom := strings.TrimSpace(c.Query("date_from"))
+	dateTo := strings.TrimSpace(c.Query("date_to"))
+	opResult := strings.TrimSpace(c.Query("op_result"))
+	deviceName := strings.TrimSpace(c.Query("device_name"))
+	logStatus := strings.TrimSpace(c.Query("log_status"))
 
-	rows, err := a.db.Query(`SELECT id, level, message, meta, created_at FROM logs ORDER BY id DESC LIMIT ? OFFSET ?`,
-		pagination.PageSize, pagination.Offset)
+	where := []string{"1=1"}
+	args := []any{}
+	if opType != "" && opType != "全部" {
+		where = append(where, "op_type = ?")
+		args = append(args, opType)
+	}
+	if operator != "" {
+		where = append(where, "LOWER(operator) LIKE LOWER(?)")
+		args = append(args, "%"+operator+"%")
+	}
+	if dateFrom != "" {
+		where = append(where, "op_time >= ?")
+		args = append(args, dateFrom)
+	}
+	if dateTo != "" {
+		where = append(where, "op_time <= ?")
+		args = append(args, dateTo)
+	}
+	if opResult != "" && opResult != "全部" {
+		where = append(where, "op_result = ?")
+		args = append(args, opResult)
+	}
+	if deviceName != "" {
+		where = append(where, "LOWER(device_name) LIKE LOWER(?)")
+		args = append(args, "%"+deviceName+"%")
+	}
+	if logStatus == "启用" || logStatus == "禁用" {
+		where = append(where, "log_status = ?")
+		args = append(args, logStatus)
+	}
+
+	whereClause := strings.Join(where, " AND ")
+
+	var total int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM logs WHERE "+whereClause, args...).Scan(&total)
+
+	queryArgs := append(args, pagination.PageSize, pagination.Offset)
+	rows, err := a.db.Query("SELECT id, level, message, meta, created_at, op_type, operator, op_time, op_result, device_name, log_status, detail FROM logs WHERE "+whereClause+" ORDER BY id DESC LIMIT ? OFFSET ?", queryArgs...)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -1028,16 +1420,123 @@ func (a *API) LogList(c *gin.Context) {
 	for rows.Next() {
 		var id int
 		var level, message, meta, created string
-		if err := rows.Scan(&id, &level, &message, &meta, &created); err == nil {
-			items = append(items, gin.H{"id": id, "level": level, "message": message, "meta": meta, "created_at": created})
+		var opT, oper, opTm, opRes, devN, logSt, det sql.NullString
+		if err := rows.Scan(&id, &level, &message, &meta, &created, &opT, &oper, &opTm, &opRes, &devN, &logSt, &det); err == nil {
+			items = append(items, gin.H{
+				"id": id, "level": level, "message": message, "meta": meta, "created_at": created,
+				"op_type": opT.String, "operator": oper.String, "op_time": opTm.String,
+				"op_result": opRes.String, "device_name": devN.String,
+				"log_status": logSt.String, "detail": det.String,
+			})
 		}
 	}
-	c.JSON(200, gin.H{
-		"items":     items,
-		"total":     total,
-		"page":      pagination.Page,
-		"page_size": pagination.PageSize,
-	})
+	c.JSON(200, gin.H{"items": items, "total": total, "page": pagination.Page, "page_size": pagination.PageSize})
+}
+
+func (a *API) LogEdit(c *gin.Context) {
+	id := c.Param("id")
+	var p struct {
+		OpType     string `json:"op_type"`
+		Operator   string `json:"operator"`
+		OpTime     string `json:"op_time"`
+		OpResult   string `json:"op_result"`
+		DeviceName string `json:"device_name"`
+		LogStatus  string `json:"log_status"`
+		Detail     string `json:"detail"`
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"error": "参数格式错误"})
+		return
+	}
+	_, err := a.db.Exec(`UPDATE logs SET op_type=?, operator=?, op_time=?, op_result=?, device_name=?, log_status=?, detail=? WHERE id=?`,
+		p.OpType, p.Operator, p.OpTime, p.OpResult, p.DeviceName, p.LogStatus, p.Detail, id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (a *API) LogDelete(c *gin.Context) {
+	id := c.Param("id")
+	result, err := a.db.Exec("DELETE FROM logs WHERE id = ?", id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		c.JSON(404, gin.H{"error": "记录不存在"})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+func (a *API) LogImport(c *gin.Context) {
+	var items []struct {
+		OpType     string `json:"op_type"`
+		Operator   string `json:"operator"`
+		OpTime     string `json:"op_time"`
+		OpResult   string `json:"op_result"`
+		DeviceName string `json:"device_name"`
+		LogStatus  string `json:"log_status"`
+		Detail     string `json:"detail"`
+	}
+	if err := c.BindJSON(&items); err != nil {
+		c.JSON(400, gin.H{"error": "参数格式错误，需要JSON数组"})
+		return
+	}
+	imported := 0
+	for _, p := range items {
+		if p.LogStatus == "" {
+			p.LogStatus = "启用"
+		}
+		if p.OpTime == "" {
+			p.OpTime = time.Now().Format("2006-01-02 15:04")
+		}
+		_, err := a.db.Exec(`INSERT INTO logs(level, message, meta, op_type, operator, op_time, op_result, device_name, log_status, detail) VALUES('info','','',?,?,?,?,?,?,?)`,
+			p.OpType, p.Operator, p.OpTime, p.OpResult, p.DeviceName, p.LogStatus, p.Detail)
+		if err == nil {
+			imported++
+		}
+	}
+	c.JSON(200, gin.H{"ok": true, "imported": imported})
+}
+
+func (a *API) LogStats(c *gin.Context) {
+	// Op type distribution
+	typeRows, err := a.db.Query("SELECT op_type, COUNT(*) FROM logs WHERE op_type != '' GROUP BY op_type")
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer typeRows.Close()
+	typeDist := gin.H{}
+	for typeRows.Next() {
+		var t string
+		var cnt int
+		if err := typeRows.Scan(&t, &cnt); err == nil && t != "" {
+			typeDist[t] = cnt
+		}
+	}
+	// Op result distribution
+	resRows, err := a.db.Query("SELECT op_result, COUNT(*) FROM logs WHERE op_result != '' GROUP BY op_result")
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer resRows.Close()
+	resDist := gin.H{}
+	for resRows.Next() {
+		var r string
+		var cnt int
+		if err := resRows.Scan(&r, &cnt); err == nil && r != "" {
+			resDist[r] = cnt
+		}
+	}
+	var total int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM logs").Scan(&total)
+	c.JSON(200, gin.H{"total": total, "type_distribution": typeDist, "result_distribution": resDist})
 }
 
 // ==================== Software Updates API ====================
@@ -1946,6 +2445,288 @@ func (a *API) ReportPerf(c *gin.Context) {
 		"notes":            "本报告基于当前实时指标与历史事件计数，供快速评估使用",
 	}
 	c.JSON(200, summary)
+}
+
+func (a *API) PerfReportList(c *gin.Context) {
+	pagination := utils.GetPagination(c)
+	moduleName := strings.TrimSpace(c.Query("module_name"))
+	userId := strings.TrimSpace(c.Query("user_id"))
+	analysisType := strings.TrimSpace(c.Query("analysis_type"))
+	dateFrom := strings.TrimSpace(c.Query("date_from"))
+	dateTo := strings.TrimSpace(c.Query("date_to"))
+	sortBy := strings.TrimSpace(c.Query("sort_by"))
+	sortOrder := strings.TrimSpace(c.Query("sort_order"))
+	dataFilter := strings.TrimSpace(c.Query("data_filter"))
+
+	where := []string{"1=1"}
+	args := []any{}
+	if moduleName != "" {
+		where = append(where, "LOWER(module_name) LIKE LOWER(?)")
+		args = append(args, "%"+moduleName+"%")
+	}
+	if userId != "" {
+		where = append(where, "LOWER(user_id) LIKE LOWER(?)")
+		args = append(args, "%"+userId+"%")
+	}
+	if analysisType != "" && analysisType != "全部" {
+		where = append(where, "analysis_type = ?")
+		args = append(args, analysisType)
+	}
+	if dateFrom != "" {
+		where = append(where, "analysis_time >= ?")
+		args = append(args, dateFrom)
+	}
+	if dateTo != "" {
+		where = append(where, "analysis_time <= ?")
+		args = append(args, dateTo)
+	}
+	whereClause := strings.Join(where, " AND ")
+
+	var total int
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM perf_reports WHERE "+whereClause, args...).Scan(&total)
+
+	orderCol := "id"
+	switch sortBy {
+	case "response_time":
+		orderCol = "response_time"
+	case "throughput":
+		orderCol = "throughput"
+	case "error_rate":
+		orderCol = "error_rate"
+	case "analysis_time":
+		orderCol = "analysis_time"
+	}
+	order := "DESC"
+	if sortOrder == "asc" || sortOrder == "升序" {
+		order = "ASC"
+	}
+
+	limit := pagination.PageSize
+	offset := pagination.Offset
+	if dataFilter == "前10条数据" {
+		limit = 10
+		offset = 0
+		order = "ASC"
+	} else if dataFilter == "后10条数据" {
+		limit = 10
+		offset = 0
+		order = "DESC"
+	}
+
+	queryArgs := append(args, limit, offset)
+	rows, err := a.db.Query("SELECT id, analysis_time, module_name, user_id, response_time, throughput, error_rate, description, analysis_type, created_at FROM perf_reports WHERE "+whereClause+" ORDER BY "+orderCol+" "+order+" LIMIT ? OFFSET ?", queryArgs...)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+	var items []gin.H
+	for rows.Next() {
+		var id int
+		var analysisTime, modName, uid, respTime, tp, errRate, desc, aType, created string
+		if err := rows.Scan(&id, &analysisTime, &modName, &uid, &respTime, &tp, &errRate, &desc, &aType, &created); err == nil {
+			items = append(items, gin.H{
+				"id": id, "analysis_time": analysisTime, "module_name": modName,
+				"user_id": uid, "response_time": respTime, "throughput": tp,
+				"error_rate": errRate, "description": desc, "analysis_type": aType,
+				"created_at": created,
+			})
+		}
+	}
+	c.JSON(200, gin.H{"items": items, "total": total, "page": pagination.Page, "page_size": pagination.PageSize})
+}
+
+func (a *API) PerfReportAdd(c *gin.Context) {
+	var p struct {
+		AnalysisTime string `json:"analysis_time"`
+		ModuleName   string `json:"module_name"`
+		UserID       string `json:"user_id"`
+		ResponseTime string `json:"response_time"`
+		Throughput   string `json:"throughput"`
+		ErrorRate    string `json:"error_rate"`
+		Description  string `json:"description"`
+		AnalysisType string `json:"analysis_type"`
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"error": "参数格式错误"})
+		return
+	}
+	if p.ModuleName == "" {
+		c.JSON(400, gin.H{"error": "模块名称不能为空"})
+		return
+	}
+	if p.AnalysisType == "" {
+		p.AnalysisType = "整体性能"
+	}
+	if p.AnalysisTime == "" {
+		p.AnalysisTime = time.Now().Format("2006-01-02 15:04")
+	}
+	res, err := a.db.Exec(`INSERT INTO perf_reports(analysis_time, module_name, user_id, response_time, throughput, error_rate, description, analysis_type) VALUES(?,?,?,?,?,?,?,?)`,
+		p.AnalysisTime, p.ModuleName, p.UserID, p.ResponseTime, p.Throughput, p.ErrorRate, p.Description, p.AnalysisType)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	newId, _ := res.LastInsertId()
+	c.JSON(200, gin.H{"ok": true, "id": newId})
+}
+
+func (a *API) PerfReportImport(c *gin.Context) {
+	var items []struct {
+		AnalysisTime string `json:"analysis_time"`
+		ModuleName   string `json:"module_name"`
+		UserID       string `json:"user_id"`
+		ResponseTime string `json:"response_time"`
+		Throughput   string `json:"throughput"`
+		ErrorRate    string `json:"error_rate"`
+		Description  string `json:"description"`
+		AnalysisType string `json:"analysis_type"`
+	}
+	if err := c.BindJSON(&items); err != nil {
+		c.JSON(400, gin.H{"error": "参数格式错误，需要JSON数组"})
+		return
+	}
+	imported := 0
+	for _, p := range items {
+		if p.ModuleName == "" {
+			continue
+		}
+		if p.AnalysisType == "" {
+			p.AnalysisType = "整体性能"
+		}
+		if p.AnalysisTime == "" {
+			p.AnalysisTime = time.Now().Format("2006-01-02 15:04")
+		}
+		_, err := a.db.Exec(`INSERT INTO perf_reports(analysis_time, module_name, user_id, response_time, throughput, error_rate, description, analysis_type) VALUES(?,?,?,?,?,?,?,?)`,
+			p.AnalysisTime, p.ModuleName, p.UserID, p.ResponseTime, p.Throughput, p.ErrorRate, p.Description, p.AnalysisType)
+		if err == nil {
+			imported++
+		}
+	}
+	c.JSON(200, gin.H{"ok": true, "imported": imported})
+}
+
+func (a *API) PerfReportDelete(c *gin.Context) {
+	id := c.Param("id")
+	result, err := a.db.Exec("DELETE FROM perf_reports WHERE id = ?", id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		c.JSON(404, gin.H{"error": "记录不存在"})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true})
+}
+
+// PerfCollect automatically probes each module API to collect performance data
+func (a *API) PerfCollect(c *gin.Context) {
+	// Get the token from the incoming request for internal API calls
+	token := c.GetHeader("Authorization")
+
+	// Define modules and their probe endpoints
+	type probeTarget struct {
+		Module   string
+		Endpoint string
+	}
+	targets := []probeTarget{
+		{"远程桌面控制", "/api/devices"},
+		{"语音交互", "/api/audio/list"},
+		{"异常报警", "/api/alerts/list"},
+		{"操作日志", "/api/logs/list"},
+		{"软件更新", "/api/updates/list"},
+		{"数据同步", "/api/sync/tasks"},
+		{"视频监控", "/api/video/list"},
+		{"硬件检测", "/api/hardware/items"},
+		{"性能分析", "/api/report/perf-list"},
+		{"用户统计", "/api/user/stats"},
+	}
+
+	// Determine base URL from the request
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	baseURL := scheme + "://" + c.Request.Host
+
+	var body struct {
+		UserID string `json:"user_id"`
+	}
+	_ = c.BindJSON(&body)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	now := time.Now().Format("2006-01-02 15:04")
+	userId := strings.TrimSpace(body.UserID)
+	if userId == "" {
+		userId = "system"
+	}
+
+	inserted := 0
+	var results []gin.H
+
+	for _, t := range targets {
+		url := baseURL + t.Endpoint + "?page_size=1"
+
+		// Probe multiple times for throughput estimation
+		const probeCount = 3
+		var totalMs float64
+		errCount := 0
+
+		for i := 0; i < probeCount; i++ {
+			req, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				errCount++
+				continue
+			}
+			if token != "" {
+				req.Header.Set("Authorization", token)
+			}
+			start := time.Now()
+			resp, err := client.Do(req)
+			elapsed := time.Since(start).Milliseconds()
+			if err != nil {
+				errCount++
+				totalMs += float64(elapsed)
+				continue
+			}
+			resp.Body.Close()
+			if resp.StatusCode >= 400 {
+				errCount++
+			}
+			totalMs += float64(elapsed)
+		}
+
+		avgMs := totalMs / float64(probeCount)
+		errRate := float64(errCount) / float64(probeCount) * 100
+		// Estimate throughput: requests per second based on average response time
+		throughput := 0.0
+		if avgMs > 0 {
+			throughput = 1000.0 / avgMs
+		}
+
+		respTimeStr := fmt.Sprintf("%.0fms", avgMs)
+		throughputStr := fmt.Sprintf("%.0f req/s", throughput)
+		errRateStr := fmt.Sprintf("%.1f%%", errRate)
+
+		_, err := a.db.Exec(`INSERT INTO perf_reports(analysis_time, module_name, user_id, response_time, throughput, error_rate, description, analysis_type) VALUES(?,?,?,?,?,?,?,?)`,
+			now, t.Module, userId, respTimeStr, throughputStr, errRateStr,
+			fmt.Sprintf("自动采集 - 探测接口: %s, 采样%d次", t.Endpoint, probeCount),
+			"整体性能")
+		if err == nil {
+			inserted++
+		}
+
+		results = append(results, gin.H{
+			"module":        t.Module,
+			"response_time": respTimeStr,
+			"throughput":    throughputStr,
+			"error_rate":    errRateStr,
+		})
+	}
+
+	c.JSON(200, gin.H{"ok": true, "collected": inserted, "results": results})
 }
 
 func (a *API) VideoList(c *gin.Context) {

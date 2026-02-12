@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -40,9 +42,77 @@ var (
 	cacheMu       sync.RWMutex
 	cachedMetrics AgentMetrics
 	cacheReady    bool
+
+	tempMu    sync.RWMutex
+	tempValue float64
+
+	cpuMu    sync.RWMutex
+	cpuValue float64
 )
 
-// backgroundCollector continuously samples CPU, temperature, and network in a loop.
+// backgroundCPUCollector samples CPU usage in a dedicated goroutine.
+func backgroundCPUCollector() {
+	cpu.Percent(time.Second, false) // prime
+	const windowSize = 3
+	window := make([]float64, 0, windowSize)
+	for {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[Agent] backgroundCPUCollector recovered from panic: %v", r)
+				}
+			}()
+			if percents, err := cpu.Percent(time.Second, false); err == nil && len(percents) > 0 {
+				window = append(window, percents[0])
+				if len(window) > windowSize {
+					window = window[1:]
+				}
+				var sum float64
+				for _, v := range window {
+					sum += v
+				}
+				avg := math.Round(sum/float64(len(window))*100) / 100
+				cpuMu.Lock()
+				cpuValue = avg
+				cpuMu.Unlock()
+			}
+		}()
+	}
+}
+
+// backgroundTempCollector collects temperature in a separate goroutine.
+func backgroundTempCollector() {
+	for {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[Agent] backgroundTempCollector recovered from panic: %v", r)
+				}
+			}()
+			var t float64
+			if temps, err := host.SensorsTemperatures(); err == nil && len(temps) > 0 {
+				var maxTemp float64
+				for _, s := range temps {
+					if s.Temperature > maxTemp && s.Temperature < 150 {
+						maxTemp = s.Temperature
+					}
+				}
+				t = math.Round(maxTemp*100) / 100
+			}
+			if t == 0 && runtime.GOOS == "windows" {
+				t = readWindowsTemperature()
+			}
+			if t > 0 {
+				tempMu.Lock()
+				tempValue = t
+				tempMu.Unlock()
+			}
+		}()
+		time.Sleep(5 * time.Second)
+	}
+}
+
+// backgroundCollector continuously samples memory, network, and assembles all metrics.
 func backgroundCollector() {
 	var hostname, osName, cpuModel string
 	var cpuCores int
@@ -70,8 +140,6 @@ func backgroundCollector() {
 		prevNetTime = time.Now()
 	}
 
-	cpu.Percent(500*time.Millisecond, false)
-
 	for {
 		func() {
 			defer func() {
@@ -89,9 +157,9 @@ func backgroundCollector() {
 				MemTotalMB: memTotalMB,
 			}
 
-			if percents, err := cpu.Percent(500*time.Millisecond, false); err == nil && len(percents) > 0 {
-				m.CPUUsage = math.Round(percents[0]*100) / 100
-			}
+			cpuMu.RLock()
+			m.CPUUsage = cpuValue
+			cpuMu.RUnlock()
 
 			if vm, err := mem.VirtualMemory(); err == nil {
 				m.MemUsage = math.Round(vm.UsedPercent*100) / 100
@@ -102,18 +170,9 @@ func backgroundCollector() {
 				m.Uptime = h.Uptime
 			}
 
-			if temps, err := host.SensorsTemperatures(); err == nil && len(temps) > 0 {
-				var maxTemp float64
-				for _, t := range temps {
-					if t.Temperature > maxTemp && t.Temperature < 150 {
-						maxTemp = t.Temperature
-					}
-				}
-				m.Temperature = math.Round(maxTemp*100) / 100
-			}
-			if m.Temperature == 0 && runtime.GOOS == "windows" {
-				m.Temperature = readWindowsTemperature()
-			}
+			tempMu.RLock()
+			m.Temperature = tempValue
+			tempMu.RUnlock()
 
 			if ios, err := netio.IOCounters(false); err == nil && len(ios) > 0 {
 				now := time.Now()
@@ -163,12 +222,133 @@ func getMetrics() AgentMetrics {
 	return AgentMetrics{Timestamp: time.Now().Unix(), OS: runtime.GOOS, NetworkBandwidth: "0B/s"}
 }
 
-// readWindowsTemperature reads CPU temperature on Windows via WMI MSAcpi_ThermalZoneTemperature.
+// pushPayload wraps AgentMetrics with an agent_id for the server to identify this device.
+type pushPayload struct {
+	AgentID          string  `json:"agent_id"`
+	Hostname         string  `json:"hostname"`
+	CPUUsage         float64 `json:"cpu_usage"`
+	MemUsage         float64 `json:"mem_usage"`
+	Temperature      float64 `json:"temperature"`
+	NetworkBandwidth string  `json:"network_bandwidth"`
+	OS               string  `json:"os"`
+	CPUModel         string  `json:"cpu_model"`
+	CPUCores         int     `json:"cpu_cores"`
+	MemTotalMB       uint64  `json:"mem_total_mb"`
+	Uptime           uint64  `json:"uptime"`
+	Timestamp        int64   `json:"timestamp"`
+}
+
+// backgroundPusher periodically pushes metrics to the remote server.
+// If the server is unreachable, it retries with exponential backoff.
+func backgroundPusher(serverURL, agentID string, interval time.Duration) {
+	pushURL := strings.TrimRight(serverURL, "/") + "/api/hardware/push"
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	// Resolve a stable agent ID
+	if agentID == "" {
+		if h, err := os.Hostname(); err == nil {
+			agentID = h
+		} else {
+			agentID = "agent-unknown"
+		}
+	}
+
+	backoff := interval
+	maxBackoff := 30 * time.Second
+	consecutiveFails := 0
+
+	log.Printf("[Push] Pushing metrics to %s every %v (agent_id=%s)", pushURL, interval, agentID)
+
+	for {
+		m := getMetrics()
+		payload := pushPayload{
+			AgentID:          agentID,
+			Hostname:         m.Hostname,
+			CPUUsage:         m.CPUUsage,
+			MemUsage:         m.MemUsage,
+			Temperature:      m.Temperature,
+			NetworkBandwidth: m.NetworkBandwidth,
+			OS:               m.OS,
+			CPUModel:         m.CPUModel,
+			CPUCores:         m.CPUCores,
+			MemTotalMB:       m.MemTotalMB,
+			Uptime:           m.Uptime,
+			Timestamp:        m.Timestamp,
+		}
+
+		body, _ := json.Marshal(payload)
+		resp, err := client.Post(pushURL, "application/json", bytes.NewReader(body))
+		if err != nil {
+			consecutiveFails++
+			backoff = interval * time.Duration(1<<min(consecutiveFails, 4)) // max 16x
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			log.Printf("[Push] Failed to push to %s: %v (retry in %v)", pushURL, err, backoff)
+			time.Sleep(backoff)
+			continue
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode == 200 {
+			if consecutiveFails > 0 {
+				log.Printf("[Push] Reconnected to server after %d failures", consecutiveFails)
+			}
+			consecutiveFails = 0
+			backoff = interval
+		} else {
+			consecutiveFails++
+			log.Printf("[Push] Server returned HTTP %d", resp.StatusCode)
+		}
+
+		time.Sleep(interval)
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// readWindowsTemperature tries multiple methods to read CPU temperature on Windows.
+// Fallback order:
+//  1. Performance Counter ThermalZoneInformation (NO admin required)
+//  2. WMI MSAcpi_ThermalZoneTemperature (requires admin privileges)
+//  3. OpenHardwareMonitor / LibreHardwareMonitor WMI interface
+//  4. wmic command line as final fallback
+//
+// Returns temperature in Celsius, or 0 if all methods fail.
 func readWindowsTemperature() float64 {
+	// Method 1: Performance Counter (no admin needed, works with go run)
+	if t := readTempPerfCounter(); t > 0 {
+		return t
+	}
+	// Method 2: WMI MSAcpi_ThermalZoneTemperature (needs admin)
+	if t := readTempWMIAcpi(); t > 0 {
+		return t
+	}
+	// Method 3: OpenHardwareMonitor / LibreHardwareMonitor WMI
+	if t := readTempOpenHardwareMonitor(); t > 0 {
+		return t
+	}
+	// Method 4: wmic command line fallback
+	if t := readTempWmic(); t > 0 {
+		return t
+	}
+	log.Printf("[Agent] WARNING: All Windows temperature methods failed.")
+	return 0
+}
+
+// readTempPerfCounter reads temperature via Win32_PerfFormattedData_Counters_ThermalZoneInformation.
+// This method does NOT require administrator privileges.
+// Uses HighPrecisionTemperature (tenths of Kelvin) for better precision.
+func readTempPerfCounter() float64 {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
-		"(Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace 'root/wmi' -ErrorAction SilentlyContinue | Select-Object -First 1).CurrentTemperature")
+		"(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue | Sort-Object HighPrecisionTemperature -Descending | Select-Object -First 1).HighPrecisionTemperature")
 	out, err := cmd.Output()
 	if err != nil {
 		return 0
@@ -181,6 +361,7 @@ func readWindowsTemperature() float64 {
 	if err != nil || val <= 0 {
 		return 0
 	}
+	// HighPrecisionTemperature is in tenths of Kelvin, convert to Celsius
 	celsius := (val / 10.0) - 273.15
 	if celsius < 0 || celsius > 150 {
 		return 0
@@ -188,11 +369,101 @@ func readWindowsTemperature() float64 {
 	return math.Round(celsius*100) / 100
 }
 
+// readTempWMIAcpi reads temperature via MSAcpi_ThermalZoneTemperature (requires admin).
+func readTempWMIAcpi() float64 {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+		"(Get-CimInstance -Namespace 'root/wmi' -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -First 1).CurrentTemperature")
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	s := strings.TrimSpace(string(out))
+	if s == "" {
+		return 0
+	}
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil || val <= 0 {
+		return 0
+	}
+	// WMI returns tenths of Kelvin, convert to Celsius
+	celsius := (val / 10.0) - 273.15
+	if celsius < 0 || celsius > 150 {
+		return 0
+	}
+	return math.Round(celsius*100) / 100
+}
+
+// readTempOpenHardwareMonitor reads temperature from OpenHardwareMonitor or LibreHardwareMonitor WMI interface.
+func readTempOpenHardwareMonitor() float64 {
+	namespaces := []string{"root/LibreHardwareMonitor", "root/OpenHardwareMonitor"}
+	for _, ns := range namespaces {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+			fmt.Sprintf("(Get-CimInstance -Namespace '%s' -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq 'Temperature' -and $_.Name -like '*CPU*' } | Select-Object -First 1).Value", ns))
+		out, err := cmd.Output()
+		cancel()
+		if err != nil {
+			continue
+		}
+		s := strings.TrimSpace(string(out))
+		if s == "" {
+			continue
+		}
+		val, err := strconv.ParseFloat(s, 64)
+		if err != nil || val <= 0 || val > 150 {
+			continue
+		}
+		return math.Round(val*100) / 100
+	}
+	return 0
+}
+
+// readTempWmic uses the wmic command line tool as a final fallback.
+func readTempWmic() float64 {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "wmic", "/namespace:\\\\root\\wmi", "PATH", "MSAcpi_ThermalZoneTemperature", "get", "CurrentTemperature")
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, line := range lines {
+		s := strings.TrimSpace(line)
+		if s == "" || strings.Contains(strings.ToLower(s), "currenttemperature") {
+			continue
+		}
+		val, err := strconv.ParseFloat(s, 64)
+		if err != nil || val <= 0 {
+			continue
+		}
+		celsius := (val / 10.0) - 273.15
+		if celsius < 0 || celsius > 150 {
+			continue
+		}
+		return math.Round(celsius*100) / 100
+	}
+	return 0
+}
+
 func main() {
 	port := flag.Int("port", 9100, "Agent HTTP listen port")
+	serverURL := flag.String("server", "", "Ground station server URL for Push mode (e.g. http://192.168.1.100:8080)")
+	agentID := flag.String("id", "", "Unique agent ID (defaults to hostname)")
+	pushInterval := flag.Int("push-interval", 2, "Push interval in seconds")
 	flag.Parse()
 
+	go backgroundCPUCollector()
+	go backgroundTempCollector()
 	go backgroundCollector()
+
+	// Start Push mode if -server is specified
+	if *serverURL != "" {
+		log.Printf("[Agent] Push mode enabled → %s", *serverURL)
+		go backgroundPusher(*serverURL, *agentID, time.Duration(*pushInterval)*time.Second)
+	}
 
 	addr := fmt.Sprintf(":%d", *port)
 
@@ -210,7 +481,12 @@ func main() {
 	})
 
 	log.Printf("Hardware Agent started on %s", addr)
-	log.Printf("  GET /metrics  - collect hardware metrics")
+	log.Printf("  GET /metrics  - collect hardware metrics (Pull mode)")
 	log.Printf("  GET /health   - health check")
+	if *serverURL != "" {
+		log.Printf("  PUSH → %s every %ds (Push mode)", *serverURL, *pushInterval)
+	} else {
+		log.Printf("  Push mode disabled. Use -server to enable.")
+	}
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

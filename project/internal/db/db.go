@@ -174,6 +174,22 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_sync_tasks_status ON sync_tasks(status);`,
 		`CREATE INDEX IF NOT EXISTS idx_sync_tasks_mode ON sync_tasks(mode);`,
 		`CREATE INDEX IF NOT EXISTS idx_sync_tasks_created ON sync_tasks(created_at);`,
+		// performance analysis reports
+		`CREATE TABLE IF NOT EXISTS perf_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            analysis_time TEXT NOT NULL DEFAULT '',
+            module_name TEXT NOT NULL DEFAULT '',
+            user_id TEXT NOT NULL DEFAULT '',
+            response_time TEXT NOT NULL DEFAULT '',
+            throughput TEXT NOT NULL DEFAULT '',
+            error_rate TEXT NOT NULL DEFAULT '',
+            description TEXT DEFAULT '',
+            analysis_type TEXT DEFAULT '整体性能',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );`,
+		`CREATE INDEX IF NOT EXISTS idx_perf_reports_module ON perf_reports(module_name);`,
+		`CREATE INDEX IF NOT EXISTS idx_perf_reports_user ON perf_reports(user_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_perf_reports_time ON perf_reports(analysis_time);`,
 		// per-user stats
 		`CREATE TABLE IF NOT EXISTS user_stats (
             user_id INTEGER PRIMARY KEY,
@@ -202,6 +218,19 @@ func Migrate(db *sql.DB) error {
 	for _, s := range alterCols {
 		db.Exec(s) // ignore error if column already exists
 	}
+	// safely add new columns to logs
+	logCols := []string{
+		`ALTER TABLE logs ADD COLUMN op_type TEXT DEFAULT ''`,
+		`ALTER TABLE logs ADD COLUMN operator TEXT DEFAULT ''`,
+		`ALTER TABLE logs ADD COLUMN op_time TEXT DEFAULT ''`,
+		`ALTER TABLE logs ADD COLUMN op_result TEXT DEFAULT ''`,
+		`ALTER TABLE logs ADD COLUMN device_name TEXT DEFAULT ''`,
+		`ALTER TABLE logs ADD COLUMN log_status TEXT DEFAULT '启用'`,
+		`ALTER TABLE logs ADD COLUMN detail TEXT DEFAULT ''`,
+	}
+	for _, s := range logCols {
+		db.Exec(s)
+	}
 	// safely add new columns to devices
 	deviceCols := []string{
 		`ALTER TABLE devices ADD COLUMN port INTEGER DEFAULT 0`,
@@ -212,6 +241,17 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE devices ADD COLUMN description TEXT DEFAULT ''`,
 	}
 	for _, s := range deviceCols {
+		db.Exec(s)
+	}
+	// safely add new columns to alerts
+	alertCols := []string{
+		`ALTER TABLE alerts ADD COLUMN alert_time TEXT DEFAULT ''`,
+		`ALTER TABLE alerts ADD COLUMN priority TEXT DEFAULT '中'`,
+		`ALTER TABLE alerts ADD COLUMN device TEXT DEFAULT ''`,
+		`ALTER TABLE alerts ADD COLUMN description TEXT DEFAULT ''`,
+		`ALTER TABLE alerts ADD COLUMN status TEXT DEFAULT '未解决'`,
+	}
+	for _, s := range alertCols {
 		db.Exec(s)
 	}
 	// safely add new columns to updates

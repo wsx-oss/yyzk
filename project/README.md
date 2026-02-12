@@ -336,7 +336,31 @@ kill -9 <进程ID>
 - ✅ 防火墙已放行 5900 端口
 - ✅ 网络连通性正常
 
-### 3. 数据库锁定
+### 3. 硬件温度显示为 0℃
+
+**原因**: Windows 系统下读取 CPU 温度需要特殊权限或第三方工具支持。
+
+**解决方案（任选其一）**:
+
+- **方案一：以管理员权限运行**（推荐）
+  - 右键点击 `smartcontrol.exe` 或 `hw-agent.exe` → "以管理员身份运行"
+  - 管理员权限下 WMI `MSAcpi_ThermalZoneTemperature` 接口可正常返回温度数据
+
+- **方案二：安装 LibreHardwareMonitor**
+  - 下载 [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
+  - 以管理员身份运行 LibreHardwareMonitor，保持后台运行
+  - Agent 会自动通过其 WMI 接口读取温度（无需主程序管理员权限）
+
+- **方案三：安装 OpenHardwareMonitor**
+  - 与 LibreHardwareMonitor 类似，Agent 同样支持
+
+**温度采集优先级**:
+1. gopsutil SensorsTemperatures（Linux 原生支持）
+2. WMI MSAcpi_ThermalZoneTemperature（Windows，需管理员）
+3. LibreHardwareMonitor / OpenHardwareMonitor WMI 接口
+4. wmic 命令行回退
+
+### 4. 数据库锁定
 
 ```bash
 # 关闭所有实例
