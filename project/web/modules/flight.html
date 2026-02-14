@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>飞行任务管理</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before { content: "\2708\FE0F"; }
+    .flight-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .flight-header-row .module-title { margin-bottom: 0; }
+    .flight-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .filter-row-2 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
+
+    /* Status badges */
+    .status-pending { background: #e0e7ff; color: #3730a3; }
+    .status-flying { background: #dbeafe; color: #1e40af; }
+    .status-returning { background: #fef3c7; color: #92400e; }
+    .status-completed { background: #d1fae5; color: #065f46; }
+
+    /* Phase badges */
+    .phase-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .phase-standby { background: #f1f5f9; color: #475569; }
+    .phase-takeoff { background: #dbeafe; color: #1e40af; }
+    .phase-cruise { background: #e0e7ff; color: #4338ca; }
+    .phase-execute { background: #fef3c7; color: #92400e; }
+    .phase-return { background: #fed7aa; color: #9a3412; }
+    .phase-land { background: #d1fae5; color: #065f46; }
+
+    /* Progress bar */
+    .mission-progress { display: flex; align-items: center; gap: 8px; }
+    .mission-progress .progress-bar { flex: 1; height: 10px; }
+    .mission-progress .progress-text { font-size: 12px; color: #64748b; min-width: 36px; text-align: right; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 560px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .modal-form .full-width { grid-column: 1 / -1; }
+    .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .modal-form textarea { resize: vertical; min-height: 60px; }
+    .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* Detail modal */
+    .detail-grid { display: grid; grid-template-columns: 110px 1fr; gap: 10px 16px; font-size: 14px; }
+    .detail-label { color: #64748b; font-weight: 500; text-align: right; }
+    .detail-value { color: #0f172a; }
+
+    /* Phase control */
+    .phase-control { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+    .phase-control .btn { padding: 6px 14px; font-size: 13px; }
+
+    /* Log timeline */
+    .log-timeline { margin-top: 16px; }
+    .log-item { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+    .log-time { color: #94a3b8; min-width: 140px; }
+    .log-phase { font-weight: 500; color: #0ea5e9; min-width: 60px; }
+    .log-msg { color: #334155; }
+
+    .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #64748b; }
+    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+  <!-- Header with filters -->
+  <div class="module-header">
+    <div class="flight-header-row">
+      <div class="module-title">飞行任务管理</div>
+      <div class="flight-header-btns">
+        <button class="btn btn-primary" onclick="openNewModal()">创建任务</button>
+        <button class="btn btn-secondary" onclick="importMissions()">导入</button>
+        <button class="btn btn-secondary" onclick="exportMissions()">导出</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>任务名称</label>
+        <input id="filterName" type="text" placeholder="请输入任务名称" />
+      </div>
+      <div class="filter-group">
+        <label>任务状态</label>
+        <select id="filterStatus">
+          <option value="">全部</option>
+          <option value="待起飞">待起飞</option>
+          <option value="飞行中">飞行中</option>
+          <option value="返航中">返航中</option>
+          <option value="已完成">已完成</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>任务目标</label>
+        <input id="filterTarget" type="text" placeholder="请输入任务目标" />
+      </div>
+      <div class="filter-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="search()" style="width:100%;">搜索</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-label">任务总数</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">待起飞</div>
+      <div class="stat-value" id="statPending" style="color:#6366f1;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">飞行中</div>
+      <div class="stat-value" id="statFlying" style="color:#0ea5e9;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">返航中</div>
+      <div class="stat-value" id="statReturning" style="color:#f59e0b;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">已完成</div>
+      <div class="stat-value" id="statCompleted" style="color:#10b981;">0</div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>任务名称</th>
+          <th>飞行路线</th>
+          <th>任务目标</th>
+          <th>预计时长</th>
+          <th>当前阶段</th>
+          <th>任务状态</th>
+          <th>进度</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="missionsTbody"></tbody>
+    </table>
+    <div class="pagination-bar">
+      <span id="paginationInfo">共 0 条</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button id="btnPrev" onclick="changePage(-1)" disabled>&lt; 上一页</button>
+        <span id="pageIndicator">1/1</span>
+        <button id="btnNext" onclick="changePage(1)" disabled>下一页 &gt;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Usage tips -->
+  <div class="hint-box">
+    <div><strong>使用提示</strong></div>
+    <div>1. 创建任务后，可通过"状态跟踪"按钮控制飞行阶段：待命 → 起飞 → 巡航 → 执行任务 → 返航 → 降落。</div>
+    <div>2. 每次阶段变更会自动记录到任务日志中，可在详情中查看完整日志。</div>
+    <div>3. 支持批量导入/导出任务数据（JSON格式）。</div>
+  </div>
+
+  <!-- Stats charts -->
+  <div class="card">
+    <div class="card-title">任务统计</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;">
+      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">任务状态分布</div>
+        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">飞行阶段分布</div>
+        <div style="flex:1;width:100%;position:relative;"><canvas id="phaseChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New/Edit Mission Modal -->
+  <div class="modal-overlay" id="missionModal">
+    <div class="modal-box">
+      <div class="modal-title" id="missionModalTitle">创建飞行任务</div>
+      <div class="modal-form">
+        <div class="full-width">
+          <label>任务名称 *</label>
+          <input id="missionName" type="text" placeholder="请输入任务名称" />
+        </div>
+        <div class="full-width">
+          <label>飞行路线 *</label>
+          <input id="missionRoute" type="text" placeholder="例如：A基地 → B区域 → C目标点 → A基地" />
+        </div>
+        <div>
+          <label>任务目标</label>
+          <input id="missionTarget" type="text" placeholder="例如：区域巡检" />
+        </div>
+        <div>
+          <label>预计时长</label>
+          <input id="missionDuration" type="text" placeholder="例如：2小时30分" />
+        </div>
+        <div class="full-width">
+          <label>任务描述</label>
+          <textarea id="missionDesc" placeholder="请输入任务描述"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeMissionModal()">取消</button>
+        <button class="btn btn-primary" id="btnSubmitMission" onclick="submitMission()">确认创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-box" style="width:640px;">
+      <div class="modal-title">任务详情</div>
+      <div class="detail-grid" id="detailContent"></div>
+      <div class="phase-control" id="phaseControl"></div>
+      <div class="log-timeline" id="logTimeline"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal-box">
+      <div class="modal-title">导入飞行任务</div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;color:#64748b;">选择 JSON 文件</label>
+        <input id="importFile" type="file" accept=".json" style="margin-top:6px;" />
+      </div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:16px;">
+        JSON 格式示例：[{"name":"巡检任务A","route":"A→B→A","target":"区域巡检","estimated_duration":"1小时","description":"例行巡检"}]
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeImportModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitImport()">确认导入</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    let currentPage = 1;
+    const pageSize = 20;
+    let totalItems = 0;
+    let editingId = null;
+    let statusChart = null;
+    let phaseChart = null;
+
+    // ========== Init Charts ==========
+    function initCharts() {
+      statusChart = createChart($('#statusChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['待起飞', '飞行中', '返航中', '已完成'],
+          datasets: [{
+            data: [0, 0, 0, 0],
+            backgroundColor: ['#6366f1', '#0ea5e9', '#f59e0b', '#10b981']
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
+        }
+      });
+      phaseChart = createChart($('#phaseChart'), {
+        type: 'bar',
+        data: {
+          labels: ['待命', '起飞', '巡航', '执行任务', '返航', '降落'],
+          datasets: [{
+            label: '任务数量',
+            data: [0, 0, 0, 0, 0, 0],
+            backgroundColor: ['#94a3b8', '#6366f1', '#0ea5e9', '#f59e0b', '#f97316', '#10b981'],
+            barThickness: 24,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1 } },
+            y: { grid: { display: false } }
+          },
+          plugins: { legend: { display: false }, tooltip: { enabled: true } }
+        }
+      });
+    }
+
+    // ========== Load Data ==========
+    async function loadMissions() {
+      try {
+        const params = new URLSearchParams();
+        const name = $('#filterName').value.trim();
+        const status = $('#filterStatus').value;
+        const target = $('#filterTarget').value.trim();
+        if (name) params.append('name', name);
+        if (status) params.append('status', status);
+        if (target) params.append('target', target);
+        params.append('page', currentPage);
+        params.append('page_size', pageSize);
+
+        const res = await api('/flight/missions?' + params.toString());
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        totalItems = data.total || 0;
+        renderTable(items);
+        updatePagination();
+      } catch (e) {
+        console.error('loadMissions error:', e);
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await api('/flight/missions/stats');
+        const s = await res.json();
+        $('#statTotal').textContent = s.total || 0;
+        $('#statPending').textContent = s.pending || 0;
+        $('#statFlying').textContent = s.flying || 0;
+        $('#statReturning').textContent = s.returning || 0;
+        $('#statCompleted').textContent = s.completed || 0;
+
+        if (statusChart) {
+          statusChart.data.datasets[0].data = [s.pending||0, s.flying||0, s.returning||0, s.completed||0];
+          statusChart.update();
+        }
+        if (phaseChart) {
+          phaseChart.data.datasets[0].data = [
+            s.phase_standby||0, s.phase_takeoff||0, s.phase_cruise||0,
+            s.phase_execute||0, s.phase_return||0, s.phase_land||0
+          ];
+          phaseChart.update();
+        }
+      } catch (e) {}
+    }
+
+    // ========== Render ==========
+    function renderTable(items) {
+      const tbody = $('#missionsTbody');
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:40px;">暂无飞行任务数据</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(m => `
+        <tr>
+          <td><strong>${esc(m.name)}</strong></td>
+          <td>${esc(m.route)}</td>
+          <td>${esc(m.target)}</td>
+          <td>${esc(m.estimated_duration) || '-'}</td>
+          <td>${phaseTag(m.current_phase)}</td>
+          <td>${statusTag(m.status)}</td>
+          <td>
+            <div class="mission-progress">
+              <div class="progress-bar"><div class="progress-fill" style="width:${m.progress}%;background:${progressColor(m.progress)};"></div></div>
+              <span class="progress-text">${m.progress}%</span>
+            </div>
+          </td>
+          <td>${formatDate(m.created_at)}</td>
+          <td>
+            <button class="btn btn-primary btn-action" onclick="viewDetail(${m.id})">详情</button>
+            <button class="btn btn-secondary btn-action" onclick="editMission(${m.id})" ${m.status==='已完成'?'disabled':''}>编辑</button>
+            <button class="btn btn-danger btn-action" onclick="deleteMission(${m.id})">删除</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function statusTag(s) {
+      const cls = { '待起飞': 'status-pending', '飞行中': 'status-flying', '返航中': 'status-returning', '已完成': 'status-completed' };
+      return `<span class="status-badge ${cls[s]||''}">${esc(s)}</span>`;
+    }
+
+    function phaseTag(p) {
+      const cls = { '待命': 'phase-standby', '起飞': 'phase-takeoff', '巡航': 'phase-cruise', '执行任务': 'phase-execute', '返航': 'phase-return', '降落': 'phase-land' };
+      return `<span class="phase-badge ${cls[p]||''}">${esc(p)}</span>`;
+    }
+
+    function progressColor(v) {
+      if (v >= 100) return '#10b981';
+      if (v >= 60) return '#f59e0b';
+      return '#0ea5e9';
+    }
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // ========== Pagination ==========
+    function updatePagination() {
+      const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+      $('#paginationInfo').textContent = `共 ${totalItems} 条`;
+      $('#pageIndicator').textContent = `${currentPage}/${totalPages}`;
+      $('#btnPrev').disabled = currentPage <= 1;
+      $('#btnNext').disabled = currentPage >= totalPages;
+    }
+
+    function changePage(delta) {
+      currentPage += delta;
+      loadMissions();
+    }
+
+    function search() {
+      currentPage = 1;
+      loadMissions();
+      loadStats();
+    }
+
+    // ========== Create / Edit Modal ==========
+    function openNewModal() {
+      editingId = null;
+      $('#missionModalTitle').textContent = '创建飞行任务';
+      $('#btnSubmitMission').textContent = '确认创建';
+      $('#missionName').value = '';
+      $('#missionRoute').value = '';
+      $('#missionTarget').value = '';
+      $('#missionDuration').value = '';
+      $('#missionDesc').value = '';
+      $('#missionModal').classList.add('active');
+    }
+
+    async function editMission(id) {
+      try {
+        const res = await api('/flight/missions/' + id);
+        const m = await res.json();
+        editingId = id;
+        $('#missionModalTitle').textContent = '编辑飞行任务';
+        $('#btnSubmitMission').textContent = '确认保存';
+        $('#missionName').value = m.name || '';
+        $('#missionRoute').value = m.route || '';
+        $('#missionTarget').value = m.target || '';
+        $('#missionDuration').value = m.estimated_duration || '';
+        $('#missionDesc').value = m.description || '';
+        $('#missionModal').classList.add('active');
+      } catch (e) {
+        showToast('加载任务失败', 'error');
+      }
+    }
+
+    function closeMissionModal() {
+      $('#missionModal').classList.remove('active');
+      editingId = null;
+    }
+
+    async function submitMission() {
+      const body = {
+        name: $('#missionName').value.trim(),
+        route: $('#missionRoute').value.trim(),
+        target: $('#missionTarget').value.trim(),
+        estimated_duration: $('#missionDuration').value.trim(),
+        description: $('#missionDesc').value.trim()
+      };
+      if (!body.name) { showToast('请输入任务名称', 'error'); return; }
+      if (!body.route) { showToast('请输入飞行路线', 'error'); return; }
+
+      try {
+        let res;
+        if (editingId) {
+          res = await api('/flight/missions/' + editingId, { method: 'PUT', body });
+        } else {
+          res = await api('/flight/missions', { method: 'POST', body });
+        }
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast(editingId ? '任务已更新' : '任务已创建', 'success');
+        closeMissionModal();
+        loadMissions();
+        loadStats();
+      } catch (e) {
+        showToast('操作失败', 'error');
+      }
+    }
+
+    // ========== Detail Modal ==========
+    async function viewDetail(id) {
+      try {
+        const [mRes, lRes] = await Promise.all([
+          api('/flight/missions/' + id),
+          api('/flight/missions/' + id + '/logs')
+        ]);
+        const m = await mRes.json();
+        const logs = await lRes.json();
+
+        const dc = $('#detailContent');
+        dc.innerHTML = `
+          <div class="detail-label">任务名称</div><div class="detail-value"><strong>${esc(m.name)}</strong></div>
+          <div class="detail-label">飞行路线</div><div class="detail-value">${esc(m.route)}</div>
+          <div class="detail-label">任务目标</div><div class="detail-value">${esc(m.target) || '-'}</div>
+          <div class="detail-label">预计时长</div><div class="detail-value">${esc(m.estimated_duration) || '-'}</div>
+          <div class="detail-label">当前阶段</div><div class="detail-value">${phaseTag(m.current_phase)}</div>
+          <div class="detail-label">任务状态</div><div class="detail-value">${statusTag(m.status)}</div>
+          <div class="detail-label">任务进度</div><div class="detail-value">
+            <div class="mission-progress" style="max-width:300px;">
+              <div class="progress-bar"><div class="progress-fill" style="width:${m.progress}%;background:${progressColor(m.progress)};"></div></div>
+              <span class="progress-text">${m.progress}%</span>
+            </div>
+          </div>
+          <div class="detail-label">开始时间</div><div class="detail-value">${m.start_time || '-'}</div>
+          <div class="detail-label">结束时间</div><div class="detail-value">${m.end_time || '-'}</div>
+          <div class="detail-label">任务描述</div><div class="detail-value">${esc(m.description) || '-'}</div>
+          <div class="detail-label">创建时间</div><div class="detail-value">${formatDate(m.created_at)}</div>
+        `;
+
+        // Phase control buttons
+        const pc = $('#phaseControl');
+        if (m.status === '已完成') {
+          pc.innerHTML = '<span style="color:#10b981;font-weight:500;">任务已完成</span>';
+        } else {
+          const phases = ['待命', '起飞', '巡航', '执行任务', '返航', '降落'];
+          const currentIdx = phases.indexOf(m.current_phase);
+          pc.innerHTML = '<strong style="font-size:13px;color:#475569;">状态跟踪：</strong>' +
+            phases.map((p, i) => {
+              const isCurrent = p === m.current_phase;
+              const isNext = i === currentIdx + 1;
+              const isPast = i < currentIdx;
+              let cls = 'btn btn-secondary';
+              if (isCurrent) cls = 'btn btn-primary';
+              if (isPast) cls = 'btn btn-success';
+              return `<button class="${cls} btn-action" ${isNext ? '' : 'disabled'} onclick="changePhase(${m.id},'${p}')">${p}</button>`;
+            }).join('');
+        }
+
+        // Logs timeline
+        const lt = $('#logTimeline');
+        const logItems = Array.isArray(logs.items) ? logs.items : [];
+        if (logItems.length) {
+          lt.innerHTML = '<strong style="font-size:13px;color:#475569;display:block;margin-bottom:8px;">任务日志：</strong>' +
+            logItems.map(l => `
+              <div class="log-item">
+                <span class="log-time">${formatDate(l.created_at)}</span>
+                <span class="log-phase">${esc(l.phase)}</span>
+                <span class="log-msg">${esc(l.message)}</span>
+              </div>
+            `).join('');
+        } else {
+          lt.innerHTML = '<div style="color:#94a3b8;font-size:13px;margin-top:8px;">暂无日志记录</div>';
+        }
+
+        $('#detailModal').classList.add('active');
+      } catch (e) {
+        showToast('加载详情失败', 'error');
+      }
+    }
+
+    function closeDetailModal() {
+      $('#detailModal').classList.remove('active');
+    }
+
+    async function changePhase(id, phase) {
+      try {
+        const res = await api('/flight/missions/' + id + '/phase', {
+          method: 'POST',
+          body: { phase }
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('阶段已更新: ' + phase, 'success');
+        closeDetailModal();
+        loadMissions();
+        loadStats();
+      } catch (e) {
+        showToast('阶段更新失败', 'error');
+      }
+    }
+
+    // ========== Delete ==========
+    async function deleteMission(id) {
+      if (!confirm('确定删除该飞行任务？此操作不可恢复。')) return;
+      try {
+        const res = await api('/flight/missions/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('任务已删除', 'success');
+        loadMissions();
+        loadStats();
+      } catch (e) {
+        showToast('删除失败', 'error');
+      }
+    }
+
+    // ========== Import / Export ==========
+    function importMissions() {
+      $('#importFile').value = '';
+      $('#importModal').classList.add('active');
+    }
+
+    function closeImportModal() {
+      $('#importModal').classList.remove('active');
+    }
+
+    async function submitImport() {
+      const file = $('#importFile').files[0];
+      if (!file) { showToast('请选择文件', 'error'); return; }
+      try {
+        const text = await file.text();
+        const items = JSON.parse(text);
+        if (!Array.isArray(items)) { showToast('JSON格式错误，需要数组', 'error'); return; }
+        const res = await api('/flight/missions/import', { method: 'POST', body: items });
+        const data = await res.json();
+        showToast(`成功导入 ${data.imported || 0} 条任务`, 'success');
+        closeImportModal();
+        loadMissions();
+        loadStats();
+      } catch (e) {
+        showToast('导入失败: ' + e.message, 'error');
+      }
+    }
+
+    async function exportMissions() {
+      try {
+        const res = await api('/flight/missions?page_size=9999');
+        const data = await res.json();
+        const items = (data.items || []).map(m => ({
+          name: m.name, route: m.route, target: m.target,
+          estimated_duration: m.estimated_duration, description: m.description,
+          status: m.status, current_phase: m.current_phase, progress: m.progress
+        }));
+        const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'flight_missions_' + new Date().toISOString().slice(0,10) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('导出成功', 'success');
+      } catch (e) {
+        showToast('导出失败', 'error');
+      }
+    }
+
+    // ========== Init ==========
+    initCharts();
+    loadMissions();
+    loadStats();
+  </script>
+</body>
+</html>

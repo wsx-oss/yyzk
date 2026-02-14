@@ -197,6 +197,35 @@ func Migrate(db *sql.DB) error {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );`,
+		// flight missions management
+		`CREATE TABLE IF NOT EXISTS flight_missions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            route TEXT NOT NULL DEFAULT '',
+            target TEXT NOT NULL DEFAULT '',
+            estimated_duration TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT '待起飞',
+            current_phase TEXT NOT NULL DEFAULT '待命',
+            progress INTEGER DEFAULT 0,
+            start_time TEXT DEFAULT '',
+            end_time TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );`,
+		`CREATE INDEX IF NOT EXISTS idx_flight_missions_name ON flight_missions(name);`,
+		`CREATE INDEX IF NOT EXISTS idx_flight_missions_status ON flight_missions(status);`,
+		`CREATE INDEX IF NOT EXISTS idx_flight_missions_created ON flight_missions(created_at);`,
+		// mission logs (linked to flight missions)
+		`CREATE TABLE IF NOT EXISTS mission_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id INTEGER NOT NULL,
+            phase TEXT NOT NULL DEFAULT '',
+            message TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (mission_id) REFERENCES flight_missions(id) ON DELETE CASCADE
+        );`,
+		`CREATE INDEX IF NOT EXISTS idx_mission_logs_mission ON mission_logs(mission_id);`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {

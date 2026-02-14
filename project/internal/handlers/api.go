@@ -313,6 +313,17 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		// user stats
 		api.GET("/user/stats", a.UserStatsGet)
 		api.POST("/user/stats/incr_connection", a.UserStatsIncrConnection)
+
+		// flight missions management
+		api.GET("/flight/missions", a.FlightMissionsList)
+		api.POST("/flight/missions", a.FlightMissionsCreate)
+		api.GET("/flight/missions/stats", a.FlightMissionsStats)
+		api.POST("/flight/missions/import", a.FlightMissionsImport)
+		api.GET("/flight/missions/:id", a.FlightMissionsGet)
+		api.PUT("/flight/missions/:id", a.FlightMissionsUpdate)
+		api.DELETE("/flight/missions/:id", a.FlightMissionsDelete)
+		api.POST("/flight/missions/:id/phase", a.FlightMissionsUpdatePhase)
+		api.GET("/flight/missions/:id/logs", a.FlightMissionsLogs)
 	}
 }
 
