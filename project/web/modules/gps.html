@@ -13,7 +13,7 @@
     .gps-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
     .gps-header-row .module-title { margin-bottom: 0; }
     .gps-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
-    .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
+    .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
 
     /* Map */
     .map-card { background: #fff; border-radius: 8px; padding: 0; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
@@ -83,18 +83,8 @@
     </div>
     <div class="filter-row">
       <div class="filter-group">
-        <label>设备名称</label>
-        <input id="filterName" type="text" placeholder="请输入设备名称" />
-      </div>
-      <div class="filter-group">
-        <label>设备类型</label>
-        <select id="filterType">
-          <option value="">全部</option>
-          <option value="无人机">无人机</option>
-          <option value="车辆">车辆</option>
-          <option value="人员">人员</option>
-          <option value="传感器">传感器</option>
-        </select>
+        <label>无人机名称</label>
+        <input id="filterName" type="text" placeholder="请输入无人机名称" />
       </div>
       <div class="filter-group">
         <label>设备状态</label>
@@ -159,8 +149,7 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>设备名称</th>
-            <th>类型</th>
+            <th>无人机名称</th>
             <th>经度</th>
             <th>纬度</th>
             <th>海拔(m)</th>
@@ -230,8 +219,8 @@
         <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="statusChart"></canvas></div>
       </div>
       <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
-        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">设备类型分布</div>
-        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="typeChart"></canvas></div>
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">围栏状态分布</div>
+        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="fenceChart"></canvas></div>
       </div>
     </div>
   </div>
@@ -239,20 +228,11 @@
   <!-- New/Edit Device Modal -->
   <div class="modal-overlay" id="deviceModal">
     <div class="modal-box">
-      <div class="modal-title" id="deviceModalTitle">添加GPS设备</div>
+      <div class="modal-title" id="deviceModalTitle">添加无人机</div>
       <div class="modal-form">
         <div class="full-width">
-          <label>设备名称 *</label>
-          <input id="devName" type="text" placeholder="请输入设备名称" />
-        </div>
-        <div>
-          <label>设备类型</label>
-          <select id="devType">
-            <option value="无人机">无人机</option>
-            <option value="车辆">车辆</option>
-            <option value="人员">人员</option>
-            <option value="传感器">传感器</option>
-          </select>
+          <label>无人机名称 *</label>
+          <input id="devName" type="text" placeholder="请输入无人机名称" />
         </div>
         <div>
           <label>初始经度</label>
@@ -369,7 +349,7 @@
     let editingId = null, pushDeviceId = null, currentDetailId = null;
     let map = null, markers = {}, fenceCircles = {};
     let detailMap = null, historyMap = null;
-    let statusChart = null, typeChart = null;
+    let statusChart = null, fenceChart = null;
     let allDevices = [];
 
     // ========== Map Init ==========
@@ -399,7 +379,7 @@
         });
         const m = L.marker([d.latitude, d.longitude], { icon })
           .addTo(map)
-          .bindPopup(`<b>${esc(d.name)}</b><br>类型: ${esc(d.device_type)}<br>经度: ${d.longitude.toFixed(6)}<br>纬度: ${d.latitude.toFixed(6)}<br>速度: ${d.speed} m/s<br>状态: ${d.status}`);
+          .bindPopup(`<b>${esc(d.name)}</b><br>经度: ${d.longitude.toFixed(6)}<br>纬度: ${d.latitude.toFixed(6)}<br>速度: ${d.speed} m/s<br>状态: ${d.status}`);
         markers[d.id] = m;
         bounds.push([d.latitude, d.longitude]);
 
@@ -430,11 +410,11 @@
           plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
         }
       });
-      typeChart = createChart($('#typeChart'), {
+      fenceChart = createChart($('#fenceChart'), {
         type: 'doughnut',
         data: {
-          labels: ['无人机', '车辆', '人员', '传感器'],
-          datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#0ea5e9', '#f59e0b', '#6366f1', '#10b981'] }]
+          labels: ['围栏已启用', '围栏未启用'],
+          datasets: [{ data: [0, 0], backgroundColor: ['#6366f1', '#cbd5e1'] }]
         },
         options: {
           maintainAspectRatio: false,
@@ -448,10 +428,8 @@
       try {
         const params = new URLSearchParams();
         const name = $('#filterName').value.trim();
-        const type = $('#filterType').value;
         const status = $('#filterStatus').value;
         if (name) params.append('name', name);
-        if (type) params.append('type', type);
         if (status) params.append('status', status);
         params.append('page', currentPage);
         params.append('page_size', pageSize);
@@ -464,7 +442,7 @@
         renderDeviceTable(items);
         updatePagination();
         updateMapMarkers(items);
-        updateTypeChart(items);
+        updateFenceChart(items);
       } catch (e) {
         console.error('loadDevices error:', e);
       }
@@ -483,6 +461,10 @@
           statusChart.data.datasets[0].data = [s.online||0, s.offline||0];
           statusChart.update();
         }
+        if (fenceChart) {
+          fenceChart.data.datasets[0].data = [s.fence_enabled||0, (s.total||0)-(s.fence_enabled||0)];
+          fenceChart.update();
+        }
       } catch (e) {}
     }
 
@@ -497,25 +479,24 @@
       } catch (e) {}
     }
 
-    function updateTypeChart(items) {
-      if (!typeChart) return;
-      const counts = { '无人机': 0, '车辆': 0, '人员': 0, '传感器': 0 };
-      items.forEach(d => { counts[d.device_type] = (counts[d.device_type] || 0) + 1; });
-      typeChart.data.datasets[0].data = [counts['无人机'], counts['车辆'], counts['人员'], counts['传感器']];
-      typeChart.update();
+    function updateFenceChart(items) {
+      if (!fenceChart) return;
+      let fOn = 0, fOff = 0;
+      items.forEach(d => { d.fence_enabled ? fOn++ : fOff++; });
+      fenceChart.data.datasets[0].data = [fOn, fOff];
+      fenceChart.update();
     }
 
     // ========== Render ==========
     function renderDeviceTable(items) {
       const tbody = $('#devicesTbody');
       if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:40px;">暂无GPS设备数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:40px;">暂无无人机设备数据</td></tr>';
         return;
       }
       tbody.innerHTML = items.map(d => `
         <tr>
           <td><strong>${esc(d.name)}</strong></td>
-          <td>${esc(d.device_type)}</td>
           <td>${d.longitude.toFixed(6)}</td>
           <td>${d.latitude.toFixed(6)}</td>
           <td>${d.altitude.toFixed(1)}</td>
@@ -586,9 +567,9 @@
     // ========== Device Modal ==========
     function openNewDeviceModal() {
       editingId = null;
-      $('#deviceModalTitle').textContent = '添加GPS设备';
+      $('#deviceModalTitle').textContent = '添加无人机';
       $('#btnSubmitDevice').textContent = '确认添加';
-      $('#devName').value = ''; $('#devType').value = '无人机';
+      $('#devName').value = '';
       $('#devLng').value = '116.397'; $('#devLat').value = '39.908'; $('#devAlt').value = '0';
       $('#devFenceEnabled').checked = false; toggleFenceFields();
       $('#devFenceLng').value = ''; $('#devFenceLat').value = ''; $('#devFenceRadius').value = '500';
@@ -600,10 +581,9 @@
         const res = await api('/gps/devices/' + id);
         const d = await res.json();
         editingId = id;
-        $('#deviceModalTitle').textContent = '编辑GPS设备';
+        $('#deviceModalTitle').textContent = '编辑无人机';
         $('#btnSubmitDevice').textContent = '确认保存';
         $('#devName').value = d.name || '';
-        $('#devType').value = d.device_type || '无人机';
         $('#devLng').value = d.longitude; $('#devLat').value = d.latitude; $('#devAlt').value = d.altitude;
         $('#devFenceEnabled').checked = d.fence_enabled; toggleFenceFields();
         $('#devFenceLng').value = d.fence_lng || ''; $('#devFenceLat').value = d.fence_lat || '';
@@ -618,7 +598,6 @@
     async function submitDevice() {
       const body = {
         name: $('#devName').value.trim(),
-        device_type: $('#devType').value,
         longitude: parseFloat($('#devLng').value) || 0,
         latitude: parseFloat($('#devLat').value) || 0,
         altitude: parseFloat($('#devAlt').value) || 0,
@@ -627,7 +606,7 @@
         fence_lat: parseFloat($('#devFenceLat').value) || 0,
         fence_radius: parseFloat($('#devFenceRadius').value) || 0,
       };
-      if (!body.name) { showToast('请输入设备名称', 'error'); return; }
+      if (!body.name) { showToast('请输入无人机名称', 'error'); return; }
       try {
         let res;
         if (editingId) {
@@ -644,7 +623,7 @@
 
     // ========== Delete ==========
     async function deleteDevice(id) {
-      if (!confirm('确定删除该GPS设备及其所有历史数据？')) return;
+      if (!confirm('确定删除该无人机及其所有历史数据？')) return;
       try {
         const res = await api('/gps/devices/' + id, { method: 'DELETE' });
         const data = await res.json();
@@ -692,8 +671,7 @@
         const res = await api('/gps/devices/' + id);
         const d = await res.json();
         $('#detailContent').innerHTML = `
-          <div class="detail-label">设备名称</div><div class="detail-value"><strong>${esc(d.name)}</strong></div>
-          <div class="detail-label">设备类型</div><div class="detail-value">${esc(d.device_type)}</div>
+          <div class="detail-label">无人机名称</div><div class="detail-value"><strong>${esc(d.name)}</strong></div>
           <div class="detail-label">经度</div><div class="detail-value">${d.longitude.toFixed(6)}</div>
           <div class="detail-label">纬度</div><div class="detail-value">${d.latitude.toFixed(6)}</div>
           <div class="detail-label">海拔</div><div class="detail-value">${d.altitude.toFixed(1)} m</div>

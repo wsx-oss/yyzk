@@ -336,6 +336,15 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/gps/devices/:id/history", a.GpsDevicesHistory)
 		api.GET("/gps/fence-alerts", a.GpsFenceAlerts)
 		api.POST("/gps/fence-alerts/:id/ack", a.GpsFenceAlertAck)
+
+		// Battery monitoring
+		api.GET("/battery/records", a.BatteryRecordsList)
+		api.POST("/battery/report", a.BatteryReport)
+		api.GET("/battery/latest", a.BatteryLatest)
+		api.GET("/battery/history/:device_id", a.BatteryHistory)
+		api.GET("/battery/stats", a.BatteryStats)
+		api.GET("/battery/alerts", a.BatteryAlertsList)
+		api.POST("/battery/alerts/:id/ack", a.BatteryAlertAck)
 	}
 }
 

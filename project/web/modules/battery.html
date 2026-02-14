@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>电池监控</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before { content: "\1F50B"; }
+    .bat-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .bat-header-row .module-title { margin-bottom: 0; }
+    .bat-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
+
+    /* Battery level bar */
+    .bat-level-bar { display: flex; align-items: center; gap: 6px; }
+    .bat-level-track { width: 80px; height: 18px; background: #e2e8f0; border-radius: 4px; overflow: hidden; position: relative; }
+    .bat-level-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .bat-level-text { font-size: 13px; font-weight: 600; min-width: 36px; }
+
+    /* Status badges */
+    .bat-status-normal { background: #d1fae5; color: #065f46; }
+    .bat-status-low { background: #fef3c7; color: #92400e; }
+    .bat-status-critical { background: #fee2e2; color: #991b1b; }
+    .bat-status-temp { background: #fce7f3; color: #9d174d; }
+    .bat-status-health { background: #e0e7ff; color: #3730a3; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 560px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .modal-form .full-width { grid-column: 1 / -1; }
+    .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .modal-form input, .modal-form select { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .modal-form input:focus, .modal-form select:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* Detail grid */
+    .detail-grid { display: grid; grid-template-columns: 110px 1fr; gap: 10px 16px; font-size: 14px; }
+    .detail-label { color: #64748b; font-weight: 500; text-align: right; }
+    .detail-value { color: #0f172a; }
+
+    /* Tabs */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+    .tab-item { padding: 10px 24px; cursor: pointer; font-size: 14px; font-weight: 500; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+    .tab-item:hover { color: #0ea5e9; }
+    .tab-item.active { color: #0ea5e9; border-bottom-color: #0ea5e9; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* History chart */
+    .history-chart-container { height: 280px; position: relative; margin-top: 16px; }
+  </style>
+</head>
+<body>
+
+  <div class="module-header">
+    <div class="bat-header-row">
+      <div class="module-title">电池监控</div>
+      <div class="bat-header-btns">
+        <button class="btn btn-primary" onclick="openReportModal()">上报电池数据</button>
+        <button class="btn btn-secondary" onclick="refreshAll()">刷新数据</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>无人机设备</label>
+        <select id="filterDevice">
+          <option value="">全部</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>电池状态</label>
+        <select id="filterStatus">
+          <option value="">全部</option>
+          <option value="正常">正常</option>
+          <option value="电量低">电量低</option>
+          <option value="严重不足">严重不足</option>
+          <option value="温度过高">温度过高</option>
+          <option value="健康度低">健康度低</option>
+        </select>
+      </div>
+      <div class="filter-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="search()" style="width:100%;">搜索</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-label">监控设备数</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">正常</div>
+      <div class="stat-value" id="statNormal" style="color:#10b981;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">电量低/严重</div>
+      <div class="stat-value" id="statLow" style="color:#f59e0b;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">平均电量</div>
+      <div class="stat-value" id="statAvgLevel" style="color:#0ea5e9;">0%</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">未处理报警</div>
+      <div class="stat-value" id="statAlerts" style="color:#ef4444;">0</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <div class="tab-item active" data-tab="latest" onclick="switchTab('latest')">实时电池状态</div>
+    <div class="tab-item" data-tab="records" onclick="switchTab('records')">历史记录</div>
+    <div class="tab-item" data-tab="alerts" onclick="switchTab('alerts')">电池报警</div>
+  </div>
+
+  <!-- Latest status per drone -->
+  <div class="tab-content active" id="tabLatest">
+    <div class="card" style="margin-top:0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>无人机</th>
+            <th>电量</th>
+            <th>电压(V)</th>
+            <th>电流(A)</th>
+            <th>温度(°C)</th>
+            <th>健康度</th>
+            <th>状态</th>
+            <th>充电次数</th>
+            <th>剩余时间</th>
+            <th>更新时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="latestTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- History records -->
+  <div class="tab-content" id="tabRecords">
+    <div class="card" style="margin-top:0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>无人机</th>
+            <th>电量</th>
+            <th>电压(V)</th>
+            <th>电流(A)</th>
+            <th>温度(°C)</th>
+            <th>健康度</th>
+            <th>状态</th>
+            <th>记录时间</th>
+          </tr>
+        </thead>
+        <tbody id="recordsTbody"></tbody>
+      </table>
+      <div class="pagination-bar">
+        <span id="paginationInfo">共 0 条</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button id="btnPrev" onclick="changePage(-1)" disabled>&lt; 上一页</button>
+          <span id="pageIndicator">1/1</span>
+          <button id="btnNext" onclick="changePage(1)" disabled>下一页 &gt;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Battery alerts -->
+  <div class="tab-content" id="tabAlerts">
+    <div class="card" style="margin-top:0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>无人机</th>
+            <th>报警类型</th>
+            <th>电量</th>
+            <th>电压(V)</th>
+            <th>温度(°C)</th>
+            <th>报警信息</th>
+            <th>状态</th>
+            <th>时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="alertsTbody"></tbody>
+      </table>
+      <div class="pagination-bar">
+        <span id="alertPaginationInfo">共 0 条</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button id="alertBtnPrev" onclick="changeAlertPage(-1)" disabled>&lt; 上一页</button>
+          <span id="alertPageIndicator">1/1</span>
+          <button id="alertBtnNext" onclick="changeAlertPage(1)" disabled>下一页 &gt;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Usage tips -->
+  <div class="hint-box">
+    <div><strong>使用提示</strong></div>
+    <div>1. 先在"GPS/位置信息"模块中添加无人机设备，然后在此处上报电池数据进行监控。</div>
+    <div>2. 当电量低于20%、温度超过50°C或健康度低于50%时，系统会自动生成电池报警。</div>
+    <div>3. 点击"详情"可查看该无人机的电池历史趋势图表，点击"上报"可快速为该无人机上报新数据。</div>
+  </div>
+
+  <!-- Stats charts -->
+  <div class="card">
+    <div class="card-title">电池统计</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;">
+      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">电池状态分布</div>
+        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">平均电量与健康度</div>
+        <div style="flex:1;width:100%;position:relative;"><canvas id="gaugeChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Modal -->
+  <div class="modal-overlay" id="reportModal">
+    <div class="modal-box">
+      <div class="modal-title">上报电池数据</div>
+      <div class="modal-form">
+        <div class="full-width">
+          <label>无人机设备 *</label>
+          <select id="reportDevice"><option value="0">请选择无人机</option></select>
+        </div>
+        <div>
+          <label>电量(%)</label>
+          <input id="reportLevel" type="number" min="0" max="100" value="80" />
+        </div>
+        <div>
+          <label>电压(V)</label>
+          <input id="reportVoltage" type="number" step="0.1" value="11.8" />
+        </div>
+        <div>
+          <label>电流(A)</label>
+          <input id="reportCurrent" type="number" step="0.1" value="5.2" />
+        </div>
+        <div>
+          <label>温度(°C)</label>
+          <input id="reportTemp" type="number" step="0.1" value="35" />
+        </div>
+        <div>
+          <label>健康度(%)</label>
+          <input id="reportHealth" type="number" min="0" max="100" value="95" />
+        </div>
+        <div>
+          <label>充电次数</label>
+          <input id="reportCycles" type="number" min="0" value="50" />
+        </div>
+        <div>
+          <label>剩余飞行时间</label>
+          <input id="reportRemaining" type="text" placeholder="例如: 25分钟" value="25分钟" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeReportModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitReport()">确认上报</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-box" style="width:700px;">
+      <div class="modal-title">电池详情</div>
+      <div class="detail-grid" id="detailContent"></div>
+      <div class="history-chart-container"><canvas id="historyChart"></canvas></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    let currentPage = 1, pageSize = 10, totalItems = 0;
+    let alertPage = 1, alertPageSize = 5, alertTotal = 0;
+    let statusChart = null, gaugeChart = null, historyChart = null;
+    let droneList = [];
+
+    // ========== Load Drones ==========
+    async function loadDrones() {
+      try {
+        const res = await api('/gps/devices?page_size=200');
+        const data = await res.json();
+        droneList = Array.isArray(data.items) ? data.items : [];
+        // update filter dropdown
+        const filterSel = $('#filterDevice');
+        filterSel.innerHTML = '<option value="">全部</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+        // update report dropdown
+        const reportSel = $('#reportDevice');
+        reportSel.innerHTML = '<option value="0">请选择无人机</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+      } catch (e) { console.error('loadDrones error:', e); }
+    }
+
+    // ========== Charts ==========
+    function initCharts() {
+      statusChart = createChart($('#statusChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['正常', '电量低', '严重不足', '温度过高', '健康度低'],
+          datasets: [{ data: [0, 0, 0, 0, 0], backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'] }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
+        }
+      });
+      gaugeChart = createChart($('#gaugeChart'), {
+        type: 'bar',
+        data: {
+          labels: ['平均电量', '平均健康度'],
+          datasets: [{
+            data: [0, 0],
+            backgroundColor: ['#0ea5e9', '#10b981'],
+            borderRadius: 6,
+            barThickness: 48
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          scales: { x: { min: 0, max: 100, ticks: { callback: v => v + '%' } }, y: { grid: { display: false } } },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // ========== Load Data ==========
+    async function loadLatest() {
+      try {
+        const res = await api('/battery/latest');
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        renderLatestTable(items);
+      } catch (e) { console.error('loadLatest error:', e); }
+    }
+
+    async function loadRecords() {
+      try {
+        const params = new URLSearchParams();
+        const deviceId = $('#filterDevice').value;
+        const status = $('#filterStatus').value;
+        if (deviceId) params.append('device_id', deviceId);
+        if (status) params.append('status', status);
+        params.append('page', currentPage);
+        params.append('page_size', pageSize);
+
+        const res = await api('/battery/records?' + params.toString());
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        totalItems = data.total || 0;
+        renderRecordsTable(items);
+        updatePagination();
+      } catch (e) { console.error('loadRecords error:', e); }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await api('/battery/stats');
+        const s = await res.json();
+        $('#statTotal').textContent = s.total_drones || 0;
+        $('#statNormal').textContent = s.normal || 0;
+        $('#statLow').textContent = (s.low || 0) + (s.critical || 0);
+        $('#statAvgLevel').textContent = (s.avg_level || 0) + '%';
+        $('#statAlerts').textContent = s.alert_count || 0;
+        if (statusChart) {
+          statusChart.data.datasets[0].data = [s.normal||0, s.low||0, s.critical||0, s.temp_high||0, s.health_low||0];
+          statusChart.update();
+        }
+        if (gaugeChart) {
+          gaugeChart.data.datasets[0].data = [s.avg_level||0, s.avg_health||0];
+          gaugeChart.update();
+        }
+      } catch (e) {}
+    }
+
+    async function loadAlerts() {
+      try {
+        const res = await api('/battery/alerts?page=' + alertPage + '&page_size=' + alertPageSize);
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        alertTotal = data.total || 0;
+        renderAlertsTable(items);
+        updateAlertPagination();
+      } catch (e) {}
+    }
+
+    // ========== Render ==========
+    function levelColor(lv) {
+      if (lv <= 10) return '#ef4444';
+      if (lv <= 20) return '#f59e0b';
+      if (lv <= 50) return '#0ea5e9';
+      return '#10b981';
+    }
+
+    function statusBadge(s) {
+      const cls = { '正常': 'bat-status-normal', '电量低': 'bat-status-low', '严重不足': 'bat-status-critical', '温度过高': 'bat-status-temp', '健康度低': 'bat-status-health' };
+      return `<span class="status-badge ${cls[s]||''}">${esc(s)}</span>`;
+    }
+
+    function levelBar(lv) {
+      const c = levelColor(lv);
+      return `<div class="bat-level-bar">
+        <div class="bat-level-track"><div class="bat-level-fill" style="width:${lv}%;background:${c};"></div></div>
+        <span class="bat-level-text" style="color:${c};">${lv}%</span>
+      </div>`;
+    }
+
+    function renderLatestTable(items) {
+      const tbody = $('#latestTbody');
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:40px;">暂无电池监控数据，请先上报电池数据</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(r => `
+        <tr>
+          <td><strong>${esc(r.device_name)}</strong></td>
+          <td>${levelBar(r.level)}</td>
+          <td>${r.voltage.toFixed(1)}</td>
+          <td>${r.current_val.toFixed(1)}</td>
+          <td>${r.temperature.toFixed(1)}</td>
+          <td>${r.health}%</td>
+          <td>${statusBadge(r.status)}</td>
+          <td>${r.charge_cycles}</td>
+          <td>${esc(r.remaining_time) || '-'}</td>
+          <td>${formatDate(r.created_at)}</td>
+          <td>
+            <button class="btn btn-primary btn-action" onclick="viewDetail(${r.device_id})">详情</button>
+            <button class="btn btn-success btn-action" onclick="quickReport(${r.device_id})">上报</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderRecordsTable(items) {
+      const tbody = $('#recordsTbody');
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:40px;">暂无历史记录</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(r => `
+        <tr>
+          <td><strong>${esc(r.device_name)}</strong></td>
+          <td>${levelBar(r.level)}</td>
+          <td>${r.voltage.toFixed(1)}</td>
+          <td>${r.current_val.toFixed(1)}</td>
+          <td>${r.temperature.toFixed(1)}</td>
+          <td>${r.health}%</td>
+          <td>${statusBadge(r.status)}</td>
+          <td>${formatDate(r.created_at)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAlertsTable(items) {
+      const tbody = $('#alertsTbody');
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:40px;">暂无电池报警记录</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(a => `
+        <tr>
+          <td><strong>${esc(a.device_name)}</strong></td>
+          <td><span class="status-badge bat-status-critical">${esc(a.alert_type)}</span></td>
+          <td>${a.level}%</td>
+          <td>${a.voltage.toFixed(1)}</td>
+          <td>${a.temperature.toFixed(1)}</td>
+          <td style="max-width:200px;white-space:normal;">${esc(a.message)}</td>
+          <td>${a.acknowledged ? '<span style="color:#10b981;">已确认</span>' : '<span style="color:#ef4444;">未确认</span>'}</td>
+          <td>${formatDate(a.created_at)}</td>
+          <td>${!a.acknowledged ? `<button class="btn btn-primary btn-action" onclick="ackAlert(${a.id})">确认</button>` : '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // ========== Tabs ==========
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      $('#tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+      if (tab === 'records') loadRecords();
+      if (tab === 'alerts') loadAlerts();
+    }
+
+    // ========== Pagination ==========
+    function updatePagination() {
+      const tp = Math.max(1, Math.ceil(totalItems / pageSize));
+      $('#paginationInfo').textContent = `共 ${totalItems} 条`;
+      $('#pageIndicator').textContent = `${currentPage}/${tp}`;
+      $('#btnPrev').disabled = currentPage <= 1;
+      $('#btnNext').disabled = currentPage >= tp;
+    }
+    function changePage(d) { currentPage += d; loadRecords(); }
+    function updateAlertPagination() {
+      const tp = Math.max(1, Math.ceil(alertTotal / alertPageSize));
+      $('#alertPaginationInfo').textContent = `共 ${alertTotal} 条`;
+      $('#alertPageIndicator').textContent = `${alertPage}/${tp}`;
+      $('#alertBtnPrev').disabled = alertPage <= 1;
+      $('#alertBtnNext').disabled = alertPage >= tp;
+    }
+    function changeAlertPage(d) { alertPage += d; loadAlerts(); }
+    function search() { currentPage = 1; loadRecords(); loadStats(); }
+    function refreshAll() { loadLatest(); loadRecords(); loadStats(); loadAlerts(); loadDrones(); showToast('数据已刷新', 'success'); }
+
+    // ========== Report Modal ==========
+    function openReportModal() {
+      loadDrones().then(() => {
+        $('#reportDevice').value = '0';
+        $('#reportLevel').value = '80';
+        $('#reportVoltage').value = '11.8';
+        $('#reportCurrent').value = '5.2';
+        $('#reportTemp').value = '35';
+        $('#reportHealth').value = '95';
+        $('#reportCycles').value = '50';
+        $('#reportRemaining').value = '25分钟';
+        $('#reportModal').classList.add('active');
+      });
+    }
+
+    function quickReport(deviceId) {
+      loadDrones().then(() => {
+        $('#reportDevice').value = deviceId;
+        // randomize values slightly for testing
+        const lv = Math.max(0, Math.min(100, 80 + Math.floor(Math.random() * 40 - 20)));
+        $('#reportLevel').value = lv;
+        $('#reportVoltage').value = (10 + lv * 0.028).toFixed(1);
+        $('#reportCurrent').value = (3 + Math.random() * 5).toFixed(1);
+        $('#reportTemp').value = (30 + Math.random() * 15).toFixed(1);
+        $('#reportHealth').value = Math.max(50, 100 - Math.floor(Math.random() * 20));
+        $('#reportCycles').value = Math.floor(Math.random() * 200);
+        const mins = Math.floor(lv * 0.4);
+        $('#reportRemaining').value = mins + '分钟';
+        $('#reportModal').classList.add('active');
+      });
+    }
+
+    function closeReportModal() { $('#reportModal').classList.remove('active'); }
+
+    async function submitReport() {
+      const body = {
+        device_id: parseInt($('#reportDevice').value) || 0,
+        level: parseInt($('#reportLevel').value) || 0,
+        voltage: parseFloat($('#reportVoltage').value) || 0,
+        current_val: parseFloat($('#reportCurrent').value) || 0,
+        temperature: parseFloat($('#reportTemp').value) || 0,
+        health: parseInt($('#reportHealth').value) || 0,
+        charge_cycles: parseInt($('#reportCycles').value) || 0,
+        remaining_time: $('#reportRemaining').value.trim(),
+      };
+      if (!body.device_id) { showToast('请选择无人机设备', 'error'); return; }
+      try {
+        const res = await api('/battery/report', { method: 'POST', body });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('电池数据已上报', 'success');
+        closeReportModal();
+        loadLatest(); loadStats(); loadAlerts();
+      } catch (e) { showToast('上报失败', 'error'); }
+    }
+
+    // ========== Detail Modal ==========
+    async function viewDetail(deviceId) {
+      try {
+        const res = await api('/battery/history/' + deviceId + '?limit=50');
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        if (!items.length) { showToast('暂无该设备的电池数据', 'error'); return; }
+
+        const latest = items[0];
+        $('#detailContent').innerHTML = `
+          <div class="detail-label">无人机</div><div class="detail-value"><strong>${esc(latest.device_name)}</strong></div>
+          <div class="detail-label">当前电量</div><div class="detail-value">${levelBar(latest.level)}</div>
+          <div class="detail-label">电压</div><div class="detail-value">${latest.voltage.toFixed(1)} V</div>
+          <div class="detail-label">电流</div><div class="detail-value">${latest.current_val.toFixed(1)} A</div>
+          <div class="detail-label">温度</div><div class="detail-value">${latest.temperature.toFixed(1)} °C</div>
+          <div class="detail-label">健康度</div><div class="detail-value">${latest.health}%</div>
+          <div class="detail-label">状态</div><div class="detail-value">${statusBadge(latest.status)}</div>
+          <div class="detail-label">充电次数</div><div class="detail-value">${latest.charge_cycles} 次</div>
+          <div class="detail-label">剩余时间</div><div class="detail-value">${esc(latest.remaining_time) || '-'}</div>
+          <div class="detail-label">最后更新</div><div class="detail-value">${formatDate(latest.created_at)}</div>
+        `;
+
+        // draw history chart
+        const reversed = items.slice().reverse();
+        const labels = reversed.map(r => {
+          const d = r.created_at || '';
+          return d.length > 16 ? d.substring(11, 16) : d;
+        });
+
+        if (historyChart) { historyChart.destroy(); historyChart = null; }
+        historyChart = new Chart($('#historyChart'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: '电量(%)', data: reversed.map(r => r.level), borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
+              { label: '温度(°C)', data: reversed.map(r => r.temperature), borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2 },
+              { label: '健康度(%)', data: reversed.map(r => r.health), borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2 }
+            ]
+          },
+          options: {
+            maintainAspectRatio: false,
+            scales: { y: { min: 0, max: 100 } },
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
+          }
+        });
+
+        $('#detailModal').classList.add('active');
+      } catch (e) { showToast('加载详情失败', 'error'); }
+    }
+
+    function closeDetailModal() { $('#detailModal').classList.remove('active'); }
+
+    // ========== Alert Ack ==========
+    async function ackAlert(id) {
+      try {
+        const res = await api('/battery/alerts/' + id + '/ack', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('报警已确认', 'success');
+        loadAlerts(); loadStats();
+      } catch (e) { showToast('操作失败', 'error'); }
+    }
+
+    // ========== Init ==========
+    (async function init() {
+      initCharts();
+      await loadDrones();
+      loadLatest();
+      loadStats();
+    })();
+  </script>
+</body>
+</html>

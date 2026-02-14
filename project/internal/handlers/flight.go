@@ -58,7 +58,7 @@ func (a *API) FlightMissionsList(c *gin.Context) {
 
 	// query
 	offset := (page - 1) * pageSize
-	q := "SELECT id, name, route, target, estimated_duration, status, current_phase, progress, start_time, end_time, description, created_at, updated_at FROM flight_missions WHERE " + wc + " ORDER BY datetime(created_at) DESC LIMIT ? OFFSET ?"
+	q := "SELECT f.id, f.name, f.route, f.target, f.estimated_duration, f.status, f.current_phase, f.progress, f.start_time, f.end_time, f.description, f.created_at, f.updated_at, f.device_id, COALESCE(g.name,'') FROM flight_missions f LEFT JOIN gps_devices g ON f.device_id=g.id WHERE " + wc + " ORDER BY datetime(f.created_at) DESC LIMIT ? OFFSET ?"
 	qArgs := append(args, pageSize, offset)
 	rows, err := a.db.Query(q, qArgs...)
 	if err != nil {
@@ -69,15 +69,16 @@ func (a *API) FlightMissionsList(c *gin.Context) {
 
 	items := []gin.H{}
 	for rows.Next() {
-		var id, progress int
-		var name, route, target, estDur, status, phase, desc string
+		var id, progress, deviceID int
+		var name, route, target, estDur, status, phase, desc, droneName string
 		var startTime, endTime, created, updated sql.NullString
-		if err := rows.Scan(&id, &name, &route, &target, &estDur, &status, &phase, &progress, &startTime, &endTime, &desc, &created, &updated); err == nil {
+		if err := rows.Scan(&id, &name, &route, &target, &estDur, &status, &phase, &progress, &startTime, &endTime, &desc, &created, &updated, &deviceID, &droneName); err == nil {
 			items = append(items, gin.H{
 				"id": id, "name": name, "route": route, "target": target,
 				"estimated_duration": estDur, "status": status, "current_phase": phase,
 				"progress": progress, "start_time": startTime.String, "end_time": endTime.String,
 				"description": desc, "created_at": created.String, "updated_at": updated.String,
+				"device_id": deviceID, "drone_name": droneName,
 			})
 		}
 	}
@@ -92,6 +93,7 @@ func (a *API) FlightMissionsCreate(c *gin.Context) {
 		Target            string `json:"target"`
 		EstimatedDuration string `json:"estimated_duration"`
 		Description       string `json:"description"`
+		DeviceID          int    `json:"device_id"`
 	}
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(400, gin.H{"error": "bad json"})
@@ -110,8 +112,8 @@ func (a *API) FlightMissionsCreate(c *gin.Context) {
 	}
 
 	res, err := a.db.Exec(
-		`INSERT INTO flight_missions(name, route, target, estimated_duration, description, status, current_phase, progress) VALUES(?,?,?,?,?,?,?,?)`,
-		p.Name, p.Route, p.Target, p.EstimatedDuration, p.Description, "待起飞", "待命", 0,
+		`INSERT INTO flight_missions(name, route, target, estimated_duration, description, status, current_phase, progress, device_id) VALUES(?,?,?,?,?,?,?,?,?)`,
+		p.Name, p.Route, p.Target, p.EstimatedDuration, p.Description, "待起飞", "待命", 0, p.DeviceID,
 	)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -131,12 +133,13 @@ func (a *API) FlightMissionsGet(c *gin.Context) {
 	var m struct {
 		ID                                               int
 		Name, Route, Target, EstDur, Status, Phase, Desc string
-		Progress                                         int
+		Progress, DeviceID                               int
+		DroneName                                        string
 		StartTime, EndTime, Created, Updated             sql.NullString
 	}
 	err := a.db.QueryRow(
-		`SELECT id, name, route, target, estimated_duration, status, current_phase, progress, start_time, end_time, description, created_at, updated_at FROM flight_missions WHERE id=?`, id,
-	).Scan(&m.ID, &m.Name, &m.Route, &m.Target, &m.EstDur, &m.Status, &m.Phase, &m.Progress, &m.StartTime, &m.EndTime, &m.Desc, &m.Created, &m.Updated)
+		`SELECT f.id, f.name, f.route, f.target, f.estimated_duration, f.status, f.current_phase, f.progress, f.start_time, f.end_time, f.description, f.created_at, f.updated_at, f.device_id, COALESCE(g.name,'') FROM flight_missions f LEFT JOIN gps_devices g ON f.device_id=g.id WHERE f.id=?`, id,
+	).Scan(&m.ID, &m.Name, &m.Route, &m.Target, &m.EstDur, &m.Status, &m.Phase, &m.Progress, &m.StartTime, &m.EndTime, &m.Desc, &m.Created, &m.Updated, &m.DeviceID, &m.DroneName)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "任务不存在"})
 		return
@@ -146,6 +149,7 @@ func (a *API) FlightMissionsGet(c *gin.Context) {
 		"estimated_duration": m.EstDur, "status": m.Status, "current_phase": m.Phase,
 		"progress": m.Progress, "start_time": m.StartTime.String, "end_time": m.EndTime.String,
 		"description": m.Desc, "created_at": m.Created.String, "updated_at": m.Updated.String,
+		"device_id": m.DeviceID, "drone_name": m.DroneName,
 	})
 }
 
@@ -158,6 +162,7 @@ func (a *API) FlightMissionsUpdate(c *gin.Context) {
 		Target            string `json:"target"`
 		EstimatedDuration string `json:"estimated_duration"`
 		Description       string `json:"description"`
+		DeviceID          int    `json:"device_id"`
 	}
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(400, gin.H{"error": "bad json"})
@@ -169,8 +174,8 @@ func (a *API) FlightMissionsUpdate(c *gin.Context) {
 		return
 	}
 	_, err := a.db.Exec(
-		`UPDATE flight_missions SET name=?, route=?, target=?, estimated_duration=?, description=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
-		p.Name, p.Route, p.Target, p.EstimatedDuration, p.Description, id,
+		`UPDATE flight_missions SET name=?, route=?, target=?, estimated_duration=?, description=?, device_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+		p.Name, p.Route, p.Target, p.EstimatedDuration, p.Description, p.DeviceID, id,
 	)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})

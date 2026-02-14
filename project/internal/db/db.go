@@ -348,5 +348,51 @@ func Migrate(db *sql.DB) error {
 	for _, s := range updatesCols {
 		db.Exec(s)
 	}
+	// safely add device_id column to flight_missions for drone association
+	flightCols := []string{
+		`ALTER TABLE flight_missions ADD COLUMN device_id INTEGER DEFAULT 0`,
+	}
+	for _, s := range flightCols {
+		db.Exec(s)
+	}
+
+	// battery monitoring tables
+	batteryTables := []string{
+		`CREATE TABLE IF NOT EXISTS battery_records (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			device_id INTEGER NOT NULL,
+			device_name TEXT NOT NULL DEFAULT '',
+			voltage REAL DEFAULT 0,
+			current_val REAL DEFAULT 0,
+			level INTEGER DEFAULT 100,
+			temperature REAL DEFAULT 25,
+			health INTEGER DEFAULT 100,
+			status TEXT DEFAULT '正常',
+			charge_cycles INTEGER DEFAULT 0,
+			remaining_time TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_battery_records_device ON battery_records(device_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_battery_records_created ON battery_records(created_at)`,
+		`CREATE TABLE IF NOT EXISTS battery_alerts (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			device_id INTEGER NOT NULL,
+			device_name TEXT NOT NULL DEFAULT '',
+			level INTEGER DEFAULT 0,
+			voltage REAL DEFAULT 0,
+			temperature REAL DEFAULT 0,
+			alert_type TEXT DEFAULT '',
+			message TEXT DEFAULT '',
+			acknowledged INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_battery_alerts_device ON battery_alerts(device_id)`,
+	}
+	for _, s := range batteryTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("battery table: %w", err)
+		}
+	}
+
 	return nil
 }

@@ -15,7 +15,6 @@ import (
 func (a *API) GpsDevicesList(c *gin.Context) {
 	name := strings.TrimSpace(c.Query("name"))
 	status := strings.TrimSpace(c.Query("status"))
-	deviceType := strings.TrimSpace(c.Query("type"))
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
 	if page < 1 {
@@ -34,10 +33,6 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 	if status != "" {
 		where = append(where, "status = ?")
 		args = append(args, status)
-	}
-	if deviceType != "" {
-		where = append(where, "device_type = ?")
-		args = append(args, deviceType)
 	}
 
 	wc := strings.Join(where, " AND ")
@@ -79,7 +74,6 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 func (a *API) GpsDevicesCreate(c *gin.Context) {
 	var p struct {
 		Name         string  `json:"name"`
-		DeviceType   string  `json:"device_type"`
 		Latitude     float64 `json:"latitude"`
 		Longitude    float64 `json:"longitude"`
 		Altitude     float64 `json:"altitude"`
@@ -97,9 +91,6 @@ func (a *API) GpsDevicesCreate(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "设备名称不能为空"})
 		return
 	}
-	if p.DeviceType == "" {
-		p.DeviceType = "无人机"
-	}
 
 	fenceEn := 0
 	if p.FenceEnabled {
@@ -108,7 +99,7 @@ func (a *API) GpsDevicesCreate(c *gin.Context) {
 
 	res, err := a.db.Exec(
 		`INSERT INTO gps_devices(name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update) VALUES(?,?,?,?,?,0,0,0,'在线',?,?,?,?,CURRENT_TIMESTAMP)`,
-		p.Name, p.DeviceType, p.Latitude, p.Longitude, p.Altitude, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius,
+		p.Name, "无人机", p.Latitude, p.Longitude, p.Altitude, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius,
 	)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -124,10 +115,10 @@ func (a *API) GpsDevicesCreate(c *gin.Context) {
 func (a *API) GpsDevicesGet(c *gin.Context) {
 	id := c.Param("id")
 	var d struct {
-		ID, FenceEnabled                                               int
-		Name, DevType, Status                                          string
-		Lat, Lng, Alt, Speed, Heading, Accuracy, FLat, FLng, FRadius   float64
-		LastUpdate, Created                                            sql.NullString
+		ID, FenceEnabled                                             int
+		Name, DevType, Status                                        string
+		Lat, Lng, Alt, Speed, Heading, Accuracy, FLat, FLng, FRadius float64
+		LastUpdate, Created                                          sql.NullString
 	}
 	err := a.db.QueryRow(
 		`SELECT id, name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update, created_at FROM gps_devices WHERE id=?`, id,
@@ -151,7 +142,6 @@ func (a *API) GpsDevicesUpdate(c *gin.Context) {
 	id := c.Param("id")
 	var p struct {
 		Name         string  `json:"name"`
-		DeviceType   string  `json:"device_type"`
 		FenceEnabled bool    `json:"fence_enabled"`
 		FenceLat     float64 `json:"fence_lat"`
 		FenceLng     float64 `json:"fence_lng"`
@@ -171,8 +161,8 @@ func (a *API) GpsDevicesUpdate(c *gin.Context) {
 		fenceEn = 1
 	}
 	_, err := a.db.Exec(
-		`UPDATE gps_devices SET name=?, device_type=?, fence_enabled=?, fence_lat=?, fence_lng=?, fence_radius=? WHERE id=?`,
-		p.Name, p.DeviceType, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius, id,
+		`UPDATE gps_devices SET name=?, fence_enabled=?, fence_lat=?, fence_lng=?, fence_radius=? WHERE id=?`,
+		p.Name, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius, id,
 	)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -186,6 +176,8 @@ func (a *API) GpsDevicesDelete(c *gin.Context) {
 	id := c.Param("id")
 	a.db.Exec(`DELETE FROM gps_history WHERE device_id=?`, id)
 	a.db.Exec(`DELETE FROM gps_fence_alerts WHERE device_id=?`, id)
+	a.db.Exec(`DELETE FROM battery_records WHERE device_id=?`, id)
+	a.db.Exec(`DELETE FROM battery_alerts WHERE device_id=?`, id)
 	_, err := a.db.Exec(`DELETE FROM gps_devices WHERE id=?`, id)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
