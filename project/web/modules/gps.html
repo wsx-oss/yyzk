@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPS/位置信息</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before { content: "\1F4CD"; }
+    .gps-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .gps-header-row .module-title { margin-bottom: 0; }
+    .gps-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
+
+    /* Map */
+    .map-card { background: #fff; border-radius: 8px; padding: 0; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+    .map-card-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .map-card-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .map-legend { display: flex; gap: 16px; font-size: 12px; color: #64748b; }
+    .map-legend-item { display: flex; align-items: center; gap: 4px; }
+    .map-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    #mapContainer { height: 420px; width: 100%; }
+
+    /* Status badges */
+    .status-online { background: #d1fae5; color: #065f46; }
+    .status-offline { background: #fee2e2; color: #991b1b; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 560px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .modal-form .full-width { grid-column: 1 / -1; }
+    .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .modal-form input:focus, .modal-form select:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* Detail */
+    .detail-grid { display: grid; grid-template-columns: 110px 1fr; gap: 10px 16px; font-size: 14px; }
+    .detail-label { color: #64748b; font-weight: 500; text-align: right; }
+    .detail-value { color: #0f172a; }
+    #detailMap { height: 250px; width: 100%; border-radius: 8px; margin-top: 12px; }
+
+    /* Fence toggle */
+    .fence-toggle { display: flex; align-items: center; gap: 8px; }
+    .toggle-switch { position: relative; width: 44px; height: 24px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; border-radius: 24px; transition: 0.3s; }
+    .toggle-slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.3s; }
+    .toggle-switch input:checked + .toggle-slider { background: #0ea5e9; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+    .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #64748b; }
+    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
+
+    /* Tabs */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+    .tab-item { padding: 10px 24px; cursor: pointer; font-size: 14px; font-weight: 500; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+    .tab-item:hover { color: #0ea5e9; }
+    .tab-item.active { color: #0ea5e9; border-bottom-color: #0ea5e9; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .alert-row-unack { background: #fef2f2; }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="module-header">
+    <div class="gps-header-row">
+      <div class="module-title">GPS/位置信息</div>
+      <div class="gps-header-btns">
+        <button class="btn btn-primary" onclick="openNewDeviceModal()">添加设备</button>
+        <button class="btn btn-secondary" onclick="refreshAll()">刷新数据</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>设备名称</label>
+        <input id="filterName" type="text" placeholder="请输入设备名称" />
+      </div>
+      <div class="filter-group">
+        <label>设备类型</label>
+        <select id="filterType">
+          <option value="">全部</option>
+          <option value="无人机">无人机</option>
+          <option value="车辆">车辆</option>
+          <option value="人员">人员</option>
+          <option value="传感器">传感器</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>设备状态</label>
+        <select id="filterStatus">
+          <option value="">全部</option>
+          <option value="在线">在线</option>
+          <option value="离线">离线</option>
+        </select>
+      </div>
+      <div class="filter-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="search()" style="width:100%;">搜索</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-label">设备总数</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">在线</div>
+      <div class="stat-value" id="statOnline" style="color:#10b981;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">离线</div>
+      <div class="stat-value" id="statOffline" style="color:#ef4444;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">围栏启用</div>
+      <div class="stat-value" id="statFence" style="color:#6366f1;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">未处理报警</div>
+      <div class="stat-value" id="statAlerts" style="color:#f59e0b;">0</div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-card">
+    <div class="map-card-header">
+      <div class="map-card-title">实时位置地图</div>
+      <div class="map-legend">
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#10b981;"></div> 在线</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#ef4444;"></div> 离线</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#6366f1;border:2px dashed #6366f1;background:transparent;"></div> 电子围栏</div>
+      </div>
+    </div>
+    <div id="mapContainer"></div>
+  </div>
+
+  <!-- Tabs: Devices / Fence Alerts -->
+  <div class="tab-bar">
+    <div class="tab-item active" data-tab="devices" onclick="switchTab('devices')">设备列表</div>
+    <div class="tab-item" data-tab="alerts" onclick="switchTab('alerts')">围栏报警记录</div>
+  </div>
+
+  <!-- Devices Table -->
+  <div class="tab-content active" id="tabDevices">
+    <div class="card" style="margin-top:0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>设备名称</th>
+            <th>类型</th>
+            <th>经度</th>
+            <th>纬度</th>
+            <th>海拔(m)</th>
+            <th>速度(m/s)</th>
+            <th>状态</th>
+            <th>围栏</th>
+            <th>最后更新</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="devicesTbody"></tbody>
+      </table>
+      <div class="pagination-bar">
+        <span id="paginationInfo">共 0 条</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button id="btnPrev" onclick="changePage(-1)" disabled>&lt; 上一页</button>
+          <span id="pageIndicator">1/1</span>
+          <button id="btnNext" onclick="changePage(1)" disabled>下一页 &gt;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fence Alerts Table -->
+  <div class="tab-content" id="tabAlerts">
+    <div class="card" style="margin-top:0;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>设备名称</th>
+            <th>触发位置</th>
+            <th>围栏中心</th>
+            <th>围栏半径(m)</th>
+            <th>偏离距离(m)</th>
+            <th>状态</th>
+            <th>时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="alertsTbody"></tbody>
+      </table>
+      <div class="pagination-bar">
+        <span id="alertPaginationInfo">共 0 条</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button id="alertBtnPrev" onclick="changeAlertPage(-1)" disabled>&lt; 上一页</button>
+          <span id="alertPageIndicator">1/1</span>
+          <button id="alertBtnNext" onclick="changeAlertPage(1)" disabled>下一页 &gt;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hints -->
+  <div class="hint-box" style="margin-top:20px;">
+    <div><strong>使用提示</strong></div>
+    <div>1. 添加设备后，可通过"推送位置"模拟GPS数据上报，地图会实时更新设备位置。</div>
+    <div>2. 启用电子围栏后，当设备位置超出围栏范围时，系统会自动生成围栏报警记录。</div>
+    <div>3. 点击地图上的设备标记可查看设备详细信息，点击"轨迹"可查看历史移动轨迹。</div>
+  </div>
+
+  <!-- Stats Charts -->
+  <div class="card">
+    <div class="card-title">设备统计</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;">
+      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">设备状态分布</div>
+        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">设备类型分布</div>
+        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="typeChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New/Edit Device Modal -->
+  <div class="modal-overlay" id="deviceModal">
+    <div class="modal-box">
+      <div class="modal-title" id="deviceModalTitle">添加GPS设备</div>
+      <div class="modal-form">
+        <div class="full-width">
+          <label>设备名称 *</label>
+          <input id="devName" type="text" placeholder="请输入设备名称" />
+        </div>
+        <div>
+          <label>设备类型</label>
+          <select id="devType">
+            <option value="无人机">无人机</option>
+            <option value="车辆">车辆</option>
+            <option value="人员">人员</option>
+            <option value="传感器">传感器</option>
+          </select>
+        </div>
+        <div>
+          <label>初始经度</label>
+          <input id="devLng" type="number" step="any" placeholder="例如: 116.397" />
+        </div>
+        <div>
+          <label>初始纬度</label>
+          <input id="devLat" type="number" step="any" placeholder="例如: 39.908" />
+        </div>
+        <div>
+          <label>初始海拔(m)</label>
+          <input id="devAlt" type="number" step="any" value="0" />
+        </div>
+        <div class="full-width" style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:4px;">
+          <label style="margin-bottom:8px;">电子围栏设置</label>
+          <div class="fence-toggle">
+            <label class="toggle-switch">
+              <input type="checkbox" id="devFenceEnabled" onchange="toggleFenceFields()" />
+              <span class="toggle-slider"></span>
+            </label>
+            <span style="font-size:13px;color:#475569;">启用电子围栏</span>
+          </div>
+        </div>
+        <div id="fenceFields" style="display:none;grid-column:1/-1;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div>
+              <label>围栏中心经度</label>
+              <input id="devFenceLng" type="number" step="any" placeholder="116.397" />
+            </div>
+            <div>
+              <label>围栏中心纬度</label>
+              <input id="devFenceLat" type="number" step="any" placeholder="39.908" />
+            </div>
+            <div>
+              <label>围栏半径(m)</label>
+              <input id="devFenceRadius" type="number" step="any" value="500" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeDeviceModal()">取消</button>
+        <button class="btn btn-primary" id="btnSubmitDevice" onclick="submitDevice()">确认添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-box" style="width:640px;">
+      <div class="modal-title">设备详情</div>
+      <div class="detail-grid" id="detailContent"></div>
+      <div id="detailMap"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn btn-secondary" onclick="viewHistory(currentDetailId)">查看轨迹</button>
+        <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Push Location Modal -->
+  <div class="modal-overlay" id="pushModal">
+    <div class="modal-box" style="width:420px;">
+      <div class="modal-title">推送GPS位置</div>
+      <div class="modal-form">
+        <div>
+          <label>经度</label>
+          <input id="pushLng" type="number" step="any" />
+        </div>
+        <div>
+          <label>纬度</label>
+          <input id="pushLat" type="number" step="any" />
+        </div>
+        <div>
+          <label>海拔(m)</label>
+          <input id="pushAlt" type="number" step="any" value="100" />
+        </div>
+        <div>
+          <label>速度(m/s)</label>
+          <input id="pushSpeed" type="number" step="any" value="5" />
+        </div>
+        <div>
+          <label>航向角(°)</label>
+          <input id="pushHeading" type="number" step="any" value="0" />
+        </div>
+        <div>
+          <label>精度(m)</label>
+          <input id="pushAccuracy" type="number" step="any" value="3" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closePushModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitPush()">推送</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Modal -->
+  <div class="modal-overlay" id="historyModal">
+    <div class="modal-box" style="width:700px;">
+      <div class="modal-title">历史轨迹</div>
+      <div id="historyMap" style="height:350px;border-radius:8px;"></div>
+      <div id="historyList" style="max-height:150px;overflow-y:auto;margin-top:12px;font-size:13px;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeHistoryModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    let currentPage = 1, pageSize = 20, totalItems = 0;
+    let alertPage = 1, alertTotal = 0;
+    let editingId = null, pushDeviceId = null, currentDetailId = null;
+    let map = null, markers = {}, fenceCircles = {};
+    let detailMap = null, historyMap = null;
+    let statusChart = null, typeChart = null;
+    let allDevices = [];
+
+    // ========== Map Init ==========
+    function initMap() {
+      map = L.map('mapContainer').setView([39.908, 116.397], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 18
+      }).addTo(map);
+    }
+
+    function updateMapMarkers(devices) {
+      // clear old
+      Object.values(markers).forEach(m => map.removeLayer(m));
+      Object.values(fenceCircles).forEach(c => map.removeLayer(c));
+      markers = {};
+      fenceCircles = {};
+
+      const bounds = [];
+      devices.forEach(d => {
+        if (d.latitude === 0 && d.longitude === 0) return;
+        const color = d.status === '在线' ? '#10b981' : '#ef4444';
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
+          iconSize: [14, 14], iconAnchor: [7, 7]
+        });
+        const m = L.marker([d.latitude, d.longitude], { icon })
+          .addTo(map)
+          .bindPopup(`<b>${esc(d.name)}</b><br>类型: ${esc(d.device_type)}<br>经度: ${d.longitude.toFixed(6)}<br>纬度: ${d.latitude.toFixed(6)}<br>速度: ${d.speed} m/s<br>状态: ${d.status}`);
+        markers[d.id] = m;
+        bounds.push([d.latitude, d.longitude]);
+
+        if (d.fence_enabled && d.fence_radius > 0) {
+          const circle = L.circle([d.fence_lat, d.fence_lng], {
+            radius: d.fence_radius, color: '#6366f1', fillColor: '#6366f1',
+            fillOpacity: 0.08, weight: 2, dashArray: '6,4'
+          }).addTo(map);
+          fenceCircles[d.id] = circle;
+        }
+      });
+
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+      }
+    }
+
+    // ========== Charts ==========
+    function initCharts() {
+      statusChart = createChart($('#statusChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['在线', '离线'],
+          datasets: [{ data: [0, 0], backgroundColor: ['#10b981', '#ef4444'] }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
+        }
+      });
+      typeChart = createChart($('#typeChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['无人机', '车辆', '人员', '传感器'],
+          datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#0ea5e9', '#f59e0b', '#6366f1', '#10b981'] }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
+        }
+      });
+    }
+
+    // ========== Load Data ==========
+    async function loadDevices() {
+      try {
+        const params = new URLSearchParams();
+        const name = $('#filterName').value.trim();
+        const type = $('#filterType').value;
+        const status = $('#filterStatus').value;
+        if (name) params.append('name', name);
+        if (type) params.append('type', type);
+        if (status) params.append('status', status);
+        params.append('page', currentPage);
+        params.append('page_size', pageSize);
+
+        const res = await api('/gps/devices?' + params.toString());
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        totalItems = data.total || 0;
+        allDevices = items;
+        renderDeviceTable(items);
+        updatePagination();
+        updateMapMarkers(items);
+        updateTypeChart(items);
+      } catch (e) {
+        console.error('loadDevices error:', e);
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await api('/gps/devices/stats');
+        const s = await res.json();
+        $('#statTotal').textContent = s.total || 0;
+        $('#statOnline').textContent = s.online || 0;
+        $('#statOffline').textContent = s.offline || 0;
+        $('#statFence').textContent = s.fence_enabled || 0;
+        $('#statAlerts').textContent = s.alert_count || 0;
+        if (statusChart) {
+          statusChart.data.datasets[0].data = [s.online||0, s.offline||0];
+          statusChart.update();
+        }
+      } catch (e) {}
+    }
+
+    async function loadAlerts() {
+      try {
+        const res = await api('/gps/fence-alerts?page=' + alertPage + '&page_size=20');
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        alertTotal = data.total || 0;
+        renderAlertTable(items);
+        updateAlertPagination();
+      } catch (e) {}
+    }
+
+    function updateTypeChart(items) {
+      if (!typeChart) return;
+      const counts = { '无人机': 0, '车辆': 0, '人员': 0, '传感器': 0 };
+      items.forEach(d => { counts[d.device_type] = (counts[d.device_type] || 0) + 1; });
+      typeChart.data.datasets[0].data = [counts['无人机'], counts['车辆'], counts['人员'], counts['传感器']];
+      typeChart.update();
+    }
+
+    // ========== Render ==========
+    function renderDeviceTable(items) {
+      const tbody = $('#devicesTbody');
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:40px;">暂无GPS设备数据</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(d => `
+        <tr>
+          <td><strong>${esc(d.name)}</strong></td>
+          <td>${esc(d.device_type)}</td>
+          <td>${d.longitude.toFixed(6)}</td>
+          <td>${d.latitude.toFixed(6)}</td>
+          <td>${d.altitude.toFixed(1)}</td>
+          <td>${d.speed.toFixed(1)}</td>
+          <td><span class="status-badge ${d.status==='在线'?'status-online':'status-offline'}">${d.status}</span></td>
+          <td>${d.fence_enabled ? '<span style="color:#6366f1;font-weight:500;">已启用</span>' : '<span style="color:#94a3b8;">未启用</span>'}</td>
+          <td>${formatDate(d.last_update)}</td>
+          <td>
+            <button class="btn btn-primary btn-action" onclick="viewDetail(${d.id})">详情</button>
+            <button class="btn btn-success btn-action" onclick="openPushModal(${d.id},${d.longitude},${d.latitude})">推送</button>
+            <button class="btn btn-secondary btn-action" onclick="editDevice(${d.id})">编辑</button>
+            <button class="btn btn-danger btn-action" onclick="deleteDevice(${d.id})">删除</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAlertTable(items) {
+      const tbody = $('#alertsTbody');
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:40px;">暂无围栏报警记录</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(a => `
+        <tr class="${a.acknowledged?'':'alert-row-unack'}">
+          <td><strong>${esc(a.device_name)}</strong></td>
+          <td>${a.longitude.toFixed(6)}, ${a.latitude.toFixed(6)}</td>
+          <td>${a.fence_lng.toFixed(6)}, ${a.fence_lat.toFixed(6)}</td>
+          <td>${a.fence_radius.toFixed(0)}</td>
+          <td style="color:#ef4444;font-weight:500;">${a.distance.toFixed(1)}</td>
+          <td>${a.acknowledged ? '<span class="status-badge status-online">已确认</span>' : '<span class="status-badge status-offline">未确认</span>'}</td>
+          <td>${formatDate(a.created_at)}</td>
+          <td>${a.acknowledged ? '-' : '<button class="btn btn-primary btn-action" onclick="ackAlert('+a.id+')">确认</button>'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // ========== Tabs ==========
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      $('#tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+      if (tab === 'alerts') loadAlerts();
+    }
+
+    // ========== Pagination ==========
+    function updatePagination() {
+      const tp = Math.max(1, Math.ceil(totalItems / pageSize));
+      $('#paginationInfo').textContent = `共 ${totalItems} 条`;
+      $('#pageIndicator').textContent = `${currentPage}/${tp}`;
+      $('#btnPrev').disabled = currentPage <= 1;
+      $('#btnNext').disabled = currentPage >= tp;
+    }
+    function changePage(d) { currentPage += d; loadDevices(); }
+    function updateAlertPagination() {
+      const tp = Math.max(1, Math.ceil(alertTotal / 20));
+      $('#alertPaginationInfo').textContent = `共 ${alertTotal} 条`;
+      $('#alertPageIndicator').textContent = `${alertPage}/${tp}`;
+      $('#alertBtnPrev').disabled = alertPage <= 1;
+      $('#alertBtnNext').disabled = alertPage >= tp;
+    }
+    function changeAlertPage(d) { alertPage += d; loadAlerts(); }
+    function search() { currentPage = 1; loadDevices(); loadStats(); }
+    function refreshAll() { loadDevices(); loadStats(); loadAlerts(); showToast('数据已刷新', 'success'); }
+
+    // ========== Device Modal ==========
+    function openNewDeviceModal() {
+      editingId = null;
+      $('#deviceModalTitle').textContent = '添加GPS设备';
+      $('#btnSubmitDevice').textContent = '确认添加';
+      $('#devName').value = ''; $('#devType').value = '无人机';
+      $('#devLng').value = '116.397'; $('#devLat').value = '39.908'; $('#devAlt').value = '0';
+      $('#devFenceEnabled').checked = false; toggleFenceFields();
+      $('#devFenceLng').value = ''; $('#devFenceLat').value = ''; $('#devFenceRadius').value = '500';
+      $('#deviceModal').classList.add('active');
+    }
+
+    async function editDevice(id) {
+      try {
+        const res = await api('/gps/devices/' + id);
+        const d = await res.json();
+        editingId = id;
+        $('#deviceModalTitle').textContent = '编辑GPS设备';
+        $('#btnSubmitDevice').textContent = '确认保存';
+        $('#devName').value = d.name || '';
+        $('#devType').value = d.device_type || '无人机';
+        $('#devLng').value = d.longitude; $('#devLat').value = d.latitude; $('#devAlt').value = d.altitude;
+        $('#devFenceEnabled').checked = d.fence_enabled; toggleFenceFields();
+        $('#devFenceLng').value = d.fence_lng || ''; $('#devFenceLat').value = d.fence_lat || '';
+        $('#devFenceRadius').value = d.fence_radius || 500;
+        $('#deviceModal').classList.add('active');
+      } catch (e) { showToast('加载失败', 'error'); }
+    }
+
+    function closeDeviceModal() { $('#deviceModal').classList.remove('active'); editingId = null; }
+    function toggleFenceFields() { $('#fenceFields').style.display = $('#devFenceEnabled').checked ? 'block' : 'none'; }
+
+    async function submitDevice() {
+      const body = {
+        name: $('#devName').value.trim(),
+        device_type: $('#devType').value,
+        longitude: parseFloat($('#devLng').value) || 0,
+        latitude: parseFloat($('#devLat').value) || 0,
+        altitude: parseFloat($('#devAlt').value) || 0,
+        fence_enabled: $('#devFenceEnabled').checked,
+        fence_lng: parseFloat($('#devFenceLng').value) || 0,
+        fence_lat: parseFloat($('#devFenceLat').value) || 0,
+        fence_radius: parseFloat($('#devFenceRadius').value) || 0,
+      };
+      if (!body.name) { showToast('请输入设备名称', 'error'); return; }
+      try {
+        let res;
+        if (editingId) {
+          res = await api('/gps/devices/' + editingId, { method: 'PUT', body });
+        } else {
+          res = await api('/gps/devices', { method: 'POST', body });
+        }
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast(editingId ? '设备已更新' : '设备已添加', 'success');
+        closeDeviceModal(); loadDevices(); loadStats();
+      } catch (e) { showToast('操作失败', 'error'); }
+    }
+
+    // ========== Delete ==========
+    async function deleteDevice(id) {
+      if (!confirm('确定删除该GPS设备及其所有历史数据？')) return;
+      try {
+        const res = await api('/gps/devices/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('设备已删除', 'success'); loadDevices(); loadStats();
+      } catch (e) { showToast('删除失败', 'error'); }
+    }
+
+    // ========== Push Location ==========
+    function openPushModal(id, lng, lat) {
+      pushDeviceId = id;
+      $('#pushLng').value = (lng + (Math.random()-0.5)*0.01).toFixed(6);
+      $('#pushLat').value = (lat + (Math.random()-0.5)*0.01).toFixed(6);
+      $('#pushAlt').value = (50 + Math.random()*100).toFixed(0);
+      $('#pushSpeed').value = (Math.random()*15).toFixed(1);
+      $('#pushHeading').value = (Math.random()*360).toFixed(0);
+      $('#pushAccuracy').value = (1 + Math.random()*5).toFixed(1);
+      $('#pushModal').classList.add('active');
+    }
+    function closePushModal() { $('#pushModal').classList.remove('active'); pushDeviceId = null; }
+
+    async function submitPush() {
+      if (!pushDeviceId) return;
+      const body = {
+        longitude: parseFloat($('#pushLng').value) || 0,
+        latitude: parseFloat($('#pushLat').value) || 0,
+        altitude: parseFloat($('#pushAlt').value) || 0,
+        speed: parseFloat($('#pushSpeed').value) || 0,
+        heading: parseFloat($('#pushHeading').value) || 0,
+        accuracy: parseFloat($('#pushAccuracy').value) || 0,
+      };
+      try {
+        const res = await api('/gps/devices/' + pushDeviceId + '/push', { method: 'POST', body });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('位置已推送', 'success');
+        closePushModal(); loadDevices(); loadStats(); loadAlerts();
+      } catch (e) { showToast('推送失败', 'error'); }
+    }
+
+    // ========== Detail ==========
+    async function viewDetail(id) {
+      currentDetailId = id;
+      try {
+        const res = await api('/gps/devices/' + id);
+        const d = await res.json();
+        $('#detailContent').innerHTML = `
+          <div class="detail-label">设备名称</div><div class="detail-value"><strong>${esc(d.name)}</strong></div>
+          <div class="detail-label">设备类型</div><div class="detail-value">${esc(d.device_type)}</div>
+          <div class="detail-label">经度</div><div class="detail-value">${d.longitude.toFixed(6)}</div>
+          <div class="detail-label">纬度</div><div class="detail-value">${d.latitude.toFixed(6)}</div>
+          <div class="detail-label">海拔</div><div class="detail-value">${d.altitude.toFixed(1)} m</div>
+          <div class="detail-label">速度</div><div class="detail-value">${d.speed.toFixed(1)} m/s</div>
+          <div class="detail-label">航向</div><div class="detail-value">${d.heading.toFixed(0)}°</div>
+          <div class="detail-label">精度</div><div class="detail-value">${d.accuracy.toFixed(1)} m</div>
+          <div class="detail-label">状态</div><div class="detail-value"><span class="status-badge ${d.status==='在线'?'status-online':'status-offline'}">${d.status}</span></div>
+          <div class="detail-label">电子围栏</div><div class="detail-value">${d.fence_enabled ? '已启用 (半径: '+d.fence_radius+'m)' : '未启用'}</div>
+          <div class="detail-label">最后更新</div><div class="detail-value">${formatDate(d.last_update)}</div>
+        `;
+        $('#detailModal').classList.add('active');
+        setTimeout(() => {
+          if (detailMap) { detailMap.remove(); detailMap = null; }
+          detailMap = L.map('detailMap').setView([d.latitude || 39.908, d.longitude || 116.397], 14);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(detailMap);
+          if (d.latitude !== 0 || d.longitude !== 0) {
+            L.marker([d.latitude, d.longitude]).addTo(detailMap).bindPopup(d.name).openPopup();
+            if (d.fence_enabled && d.fence_radius > 0) {
+              L.circle([d.fence_lat, d.fence_lng], { radius: d.fence_radius, color: '#6366f1', fillOpacity: 0.1, dashArray: '6,4' }).addTo(detailMap);
+            }
+          }
+        }, 100);
+      } catch (e) { showToast('加载详情失败', 'error'); }
+    }
+    function closeDetailModal() { $('#detailModal').classList.remove('active'); if (detailMap) { detailMap.remove(); detailMap = null; } }
+
+    // ========== History ==========
+    async function viewHistory(id) {
+      if (!id) return;
+      closeDetailModal();
+      try {
+        const res = await api('/gps/devices/' + id + '/history?limit=500');
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        $('#historyModal').classList.add('active');
+        setTimeout(() => {
+          if (historyMap) { historyMap.remove(); historyMap = null; }
+          historyMap = L.map('historyMap').setView([39.908, 116.397], 5);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(historyMap);
+          if (items.length) {
+            const coords = items.map(h => [h.latitude, h.longitude]).reverse();
+            L.polyline(coords, { color: '#0ea5e9', weight: 3 }).addTo(historyMap);
+            L.circleMarker(coords[0], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 1 }).addTo(historyMap).bindPopup('起点');
+            L.circleMarker(coords[coords.length-1], { radius: 6, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).addTo(historyMap).bindPopup('最新位置');
+            historyMap.fitBounds(coords, { padding: [30, 30] });
+          }
+          $('#historyList').innerHTML = items.length ? items.map(h =>
+            `<div style="padding:4px 0;border-bottom:1px solid #f1f5f9;display:flex;gap:16px;">
+              <span style="color:#94a3b8;min-width:140px;">${formatDate(h.created_at)}</span>
+              <span>经度: ${h.longitude.toFixed(6)}</span>
+              <span>纬度: ${h.latitude.toFixed(6)}</span>
+              <span>速度: ${h.speed.toFixed(1)} m/s</span>
+            </div>`
+          ).join('') : '<div style="color:#94a3b8;text-align:center;padding:16px;">暂无轨迹数据</div>';
+        }, 100);
+      } catch (e) { showToast('加载轨迹失败', 'error'); }
+    }
+    function closeHistoryModal() { $('#historyModal').classList.remove('active'); if (historyMap) { historyMap.remove(); historyMap = null; } }
+
+    // ========== Ack Alert ==========
+    async function ackAlert(id) {
+      try {
+        const res = await api('/gps/fence-alerts/' + id + '/ack', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('已确认', 'success'); loadAlerts(); loadStats();
+      } catch (e) { showToast('操作失败', 'error'); }
+    }
+
+    // ========== Init ==========
+    initMap();
+    initCharts();
+    loadDevices();
+    loadStats();
+  </script>
+</body>
+</html>

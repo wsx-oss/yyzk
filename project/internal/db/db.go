@@ -226,6 +226,58 @@ func Migrate(db *sql.DB) error {
             FOREIGN KEY (mission_id) REFERENCES flight_missions(id) ON DELETE CASCADE
         );`,
 		`CREATE INDEX IF NOT EXISTS idx_mission_logs_mission ON mission_logs(mission_id);`,
+		// GPS devices for location tracking
+		`CREATE TABLE IF NOT EXISTS gps_devices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            device_type TEXT NOT NULL DEFAULT '无人机',
+            latitude REAL DEFAULT 0,
+            longitude REAL DEFAULT 0,
+            altitude REAL DEFAULT 0,
+            speed REAL DEFAULT 0,
+            heading REAL DEFAULT 0,
+            accuracy REAL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT '在线',
+            fence_enabled INTEGER DEFAULT 0,
+            fence_lat REAL DEFAULT 0,
+            fence_lng REAL DEFAULT 0,
+            fence_radius REAL DEFAULT 0,
+            last_update DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );`,
+		`CREATE INDEX IF NOT EXISTS idx_gps_devices_name ON gps_devices(name);`,
+		`CREATE INDEX IF NOT EXISTS idx_gps_devices_status ON gps_devices(status);`,
+		// GPS position history
+		`CREATE TABLE IF NOT EXISTS gps_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id INTEGER NOT NULL,
+            latitude REAL DEFAULT 0,
+            longitude REAL DEFAULT 0,
+            altitude REAL DEFAULT 0,
+            speed REAL DEFAULT 0,
+            heading REAL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (device_id) REFERENCES gps_devices(id) ON DELETE CASCADE
+        );`,
+		`CREATE INDEX IF NOT EXISTS idx_gps_history_device ON gps_history(device_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_gps_history_created ON gps_history(created_at);`,
+		// GPS geofence alerts
+		`CREATE TABLE IF NOT EXISTS gps_fence_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id INTEGER NOT NULL,
+            device_name TEXT DEFAULT '',
+            latitude REAL DEFAULT 0,
+            longitude REAL DEFAULT 0,
+            fence_lat REAL DEFAULT 0,
+            fence_lng REAL DEFAULT 0,
+            fence_radius REAL DEFAULT 0,
+            distance REAL DEFAULT 0,
+            message TEXT DEFAULT '',
+            acknowledged INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (device_id) REFERENCES gps_devices(id) ON DELETE CASCADE
+        );`,
+		`CREATE INDEX IF NOT EXISTS idx_gps_fence_alerts_device ON gps_fence_alerts(device_id);`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {

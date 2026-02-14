@@ -324,6 +324,18 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.DELETE("/flight/missions/:id", a.FlightMissionsDelete)
 		api.POST("/flight/missions/:id/phase", a.FlightMissionsUpdatePhase)
 		api.GET("/flight/missions/:id/logs", a.FlightMissionsLogs)
+
+		// GPS / location tracking
+		api.GET("/gps/devices", a.GpsDevicesList)
+		api.POST("/gps/devices", a.GpsDevicesCreate)
+		api.GET("/gps/devices/stats", a.GpsStats)
+		api.GET("/gps/devices/:id", a.GpsDevicesGet)
+		api.PUT("/gps/devices/:id", a.GpsDevicesUpdate)
+		api.DELETE("/gps/devices/:id", a.GpsDevicesDelete)
+		api.POST("/gps/devices/:id/push", a.GpsDevicesPush)
+		api.GET("/gps/devices/:id/history", a.GpsDevicesHistory)
+		api.GET("/gps/fence-alerts", a.GpsFenceAlerts)
+		api.POST("/gps/fence-alerts/:id/ack", a.GpsFenceAlertAck)
 	}
 }
 
