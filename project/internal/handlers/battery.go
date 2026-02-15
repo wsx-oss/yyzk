@@ -143,6 +143,7 @@ func (a *API) BatteryReport(c *gin.Context) {
 		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "中")
 	}
 
+	hub.Broadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": p.DeviceID, "status": status}})
 	c.JSON(200, gin.H{"ok": true, "id": id})
 }
 
@@ -377,6 +378,7 @@ func (a *API) BatteryPushByAgent(c *gin.Context) {
 		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "中")
 	}
 
+	hub.Broadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": deviceID, "status": status}})
 	c.JSON(200, gin.H{"ok": true, "id": id})
 }
 
@@ -388,5 +390,26 @@ func (a *API) BatteryAlertAck(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	hub.Broadcast("battery", WSEvent{Type: "battery_alert_ack"})
 	c.JSON(200, gin.H{"ok": true})
+}
+
+// BatteryStream is a WebSocket endpoint for real-time battery event push.
+// Clients connect and receive events whenever battery data changes.
+func (a *API) BatteryStream(c *gin.Context) {
+	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	hub.Subscribe("battery", ws)
+	defer func() {
+		hub.Unsubscribe("battery", ws)
+		ws.Close()
+	}()
+	// keep connection alive by reading (handles pings/close frames)
+	for {
+		if _, _, err := ws.ReadMessage(); err != nil {
+			break
+		}
+	}
 }

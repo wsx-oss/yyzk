@@ -252,12 +252,13 @@
   - 自动报警（低电量≤ 20%、严重低电≤ 10%、高温≥ 50°C、低健康度≤ 50%）
   - 手动上报和 Agent 自动推送
   - 历史趋势图表（最近 50 条记录）
-  - 每 5 秒自动刷新
+  - WebSocket 事件驱动实时推送（数据变化时即时通知前端，零延迟）
 - **后端接口**
   - `GET /api/battery/records`、`POST /api/battery/report`
   - `POST /api/battery/push`
   - `GET /api/battery/latest`、`GET /api/battery/history/:device_id`
   - `GET /api/battery/stats`、`GET /api/battery/alerts`
+  - `WS /api/battery/stream`（实时事件推送）
 - **数据落地**
   - SQLite 表：`battery_records`、`battery_alerts`
 - **页面**
@@ -271,12 +272,14 @@
   - 任务日志记录
   - 批量导入/导出（JSON）
   - 与 GPS 模块联动选择执行无人机
+  - WebSocket 事件驱动实时推送（任务创建/编辑/删除/阶段变更时即时通知前端）
 - **后端接口**
   - `GET /api/flight/missions`、`POST /api/flight/missions`
   - `PUT /api/flight/missions/:id`、`DELETE /api/flight/missions/:id`
   - `POST /api/flight/missions/:id/phase`
   - `POST /api/flight/missions/import`
   - `GET /api/flight/missions/stats`
+  - `WS /api/flight/stream`（实时事件推送）
 - **数据落地**
   - SQLite 表：`flight_missions`、`mission_logs`
 - **页面**
@@ -336,10 +339,13 @@
   - GPS/位置信息 API（设备管理、位置推送、历史轨迹、围栏报警）
 - **`project/internal/handlers/battery.go`**
 
-  - 电池监控 API（数据上报、最新状态、历史记录、报警、Agent Push）
+  - 电池监控 API（数据上报、最新状态、历史记录、报警、Agent Push、WebSocket 实时推送）
 - **`project/internal/handlers/flight.go`**
 
-  - 飞行任务管理 API（任务 CRUD、阶段更新、日志、导入、统计）
+  - 飞行任务管理 API（任务 CRUD、阶段更新、日志、导入、统计、WebSocket 实时推送）
+- **`project/internal/handlers/wshub.go`**
+
+  - WebSocket 事件广播中心（按 topic 分组管理客户端连接，支持 Subscribe/Unsubscribe/Broadcast，线程安全）
 
 ### 2.4 中间件
 

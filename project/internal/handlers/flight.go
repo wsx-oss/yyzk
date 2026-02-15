@@ -124,6 +124,7 @@ func (a *API) FlightMissionsCreate(c *gin.Context) {
 	// add mission log
 	a.db.Exec(`INSERT INTO mission_logs(mission_id, phase, message) VALUES(?,?,?)`, id, "创建", "任务已创建: "+p.Name)
 
+	hub.Broadcast("flight", WSEvent{Type: "flight_created", Data: gin.H{"id": id}})
 	c.JSON(200, gin.H{"ok": true, "id": id})
 }
 
@@ -181,6 +182,7 @@ func (a *API) FlightMissionsUpdate(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	hub.Broadcast("flight", WSEvent{Type: "flight_updated", Data: gin.H{"id": id}})
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -193,6 +195,7 @@ func (a *API) FlightMissionsDelete(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	hub.Broadcast("flight", WSEvent{Type: "flight_deleted", Data: gin.H{"id": id}})
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -251,6 +254,7 @@ func (a *API) FlightMissionsUpdatePhase(c *gin.Context) {
 	// add mission log
 	a.db.Exec(`INSERT INTO mission_logs(mission_id, phase, message) VALUES(?,?,?)`, id, p.Phase, "阶段变更: "+p.Phase)
 
+	hub.Broadcast("flight", WSEvent{Type: "flight_phase", Data: gin.H{"id": id, "status": status, "phase": p.Phase, "progress": progress}})
 	c.JSON(200, gin.H{"ok": true, "status": status, "phase": p.Phase, "progress": progress})
 }
 
@@ -364,6 +368,7 @@ func (a *API) FlightMissionPushByAgent(c *gin.Context) {
 	a.db.Exec(`INSERT INTO mission_logs(mission_id, phase, message) VALUES(?,?,?)`,
 		missionID, p.Phase, "[Agent自动] 阶段变更: "+p.Phase)
 
+	hub.Broadcast("flight", WSEvent{Type: "flight_phase", Data: gin.H{"id": missionID, "status": status, "phase": p.Phase, "progress": progress}})
 	c.JSON(200, gin.H{"ok": true, "id": missionID, "status": status, "phase": p.Phase, "progress": progress})
 }
 
@@ -451,5 +456,26 @@ func (a *API) FlightMissionsImport(c *gin.Context) {
 			count++
 		}
 	}
+	hub.Broadcast("flight", WSEvent{Type: "flight_imported", Data: gin.H{"count": count}})
 	c.JSON(200, gin.H{"ok": true, "imported": count})
+}
+
+// FlightStream is a WebSocket endpoint for real-time flight mission event push.
+// Clients connect and receive events whenever flight mission data changes.
+func (a *API) FlightStream(c *gin.Context) {
+	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	hub.Subscribe("flight", ws)
+	defer func() {
+		hub.Unsubscribe("flight", ws)
+		ws.Close()
+	}()
+	// keep connection alive by reading (handles pings/close frames)
+	for {
+		if _, _, err := ws.ReadMessage(); err != nil {
+			break
+		}
+	}
 }

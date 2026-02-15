@@ -659,25 +659,60 @@
       }
     }
 
-    // ========== Auto Refresh ==========
-    var autoRefreshTimer = null;
-    var autoRefreshInterval = 3000; // 3 seconds
+    // ========== Real-time WebSocket ==========
+    var flightWS = null;
+    var wsReconnectTimer = null;
+    var realtimeEnabled = false;
+
+    function connectFlightWS() {
+      if (flightWS && (flightWS.readyState === WebSocket.OPEN || flightWS.readyState === WebSocket.CONNECTING)) return;
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      flightWS = new WebSocket(proto + '//' + location.host + '/api/flight/stream');
+      flightWS.onopen = function() {
+        $('#btnAutoRefresh').textContent = '🟢 实时监控中（WebSocket）';
+        $('#btnAutoRefresh').className = 'btn btn-danger';
+      };
+      flightWS.onmessage = function(evt) {
+        try {
+          var event = JSON.parse(evt.data);
+          if (event.type === 'flight_phase' || event.type === 'flight_created' ||
+              event.type === 'flight_updated' || event.type === 'flight_deleted' ||
+              event.type === 'flight_imported') {
+            loadMissions();
+            loadStats();
+          }
+        } catch(e) {}
+      };
+      flightWS.onclose = function() {
+        if (realtimeEnabled) {
+          $('#btnAutoRefresh').textContent = '🔴 已断开，重连中...';
+          scheduleReconnect();
+        }
+      };
+      flightWS.onerror = function() { flightWS.close(); };
+    }
+
+    function disconnectFlightWS() {
+      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+      if (flightWS) { flightWS.onclose = null; flightWS.close(); flightWS = null; }
+      $('#btnAutoRefresh').textContent = '开启实时监控';
+      $('#btnAutoRefresh').className = 'btn btn-success';
+    }
+
+    function scheduleReconnect() {
+      if (!realtimeEnabled) return;
+      if (wsReconnectTimer) return;
+      wsReconnectTimer = setTimeout(function() { wsReconnectTimer = null; connectFlightWS(); }, 3000);
+    }
 
     function toggleAutoRefresh() {
-      if (autoRefreshTimer) {
-        clearInterval(autoRefreshTimer);
-        autoRefreshTimer = null;
-        $('#btnAutoRefresh').textContent = '开启实时监控';
-        $('#btnAutoRefresh').className = 'btn btn-success';
-        showToast('实时监控已关闭', 'info');
+      realtimeEnabled = !realtimeEnabled;
+      if (realtimeEnabled) {
+        connectFlightWS();
+        showToast('实时监控已开启（WebSocket 事件驱动）', 'success');
       } else {
-        autoRefreshTimer = setInterval(function() {
-          loadMissions();
-          loadStats();
-        }, autoRefreshInterval);
-        $('#btnAutoRefresh').textContent = '关闭实时监控';
-        $('#btnAutoRefresh').className = 'btn btn-danger';
-        showToast('实时监控已开启，每3秒自动刷新', 'success');
+        disconnectFlightWS();
+        showToast('实时监控已关闭', 'info');
       }
     }
 

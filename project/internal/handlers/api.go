@@ -346,6 +346,10 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/battery/alerts", a.BatteryAlertsList)
 		api.POST("/battery/alerts/:id/ack", a.BatteryAlertAck)
 		api.POST("/battery/push", a.BatteryPushByAgent)
+
+		// Real-time WebSocket streams (event-driven push)
+		r.GET("/api/battery/stream", a.BatteryStream)
+		r.GET("/api/flight/stream", a.FlightStream)
 	}
 }
 

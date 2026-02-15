@@ -114,8 +114,8 @@ listening on :8080
 |---|----------|----------|
 | 1 | 无人机管理 | 无人机注册、编辑、连接（SSH/VNC/RDP）、状态监控、视频流配置 |
 | 2 | GPS/位置信息 | 无人机实时位置、地图可视化、电子围栏、历史轨迹 |
-| 3 | 电池监控 | 电量/电压/温度/健康度监控、自动报警、历史趋势 |
-| 4 | 飞行任务管理 | 任务创建/编辑/删除、飞行阶段状态机、任务日志、导入导出 |
+| 3 | 电池监控 | 电量/电压/温度/健康度监控、自动报警、历史趋势、WebSocket 实时推送 |
+| 4 | 飞行任务管理 | 任务创建/编辑/删除、飞行阶段状态机、任务日志、导入导出、WebSocket 实时推送 |
 | 5 | 系统状态监控 | 主服务器 CPU、内存、磁盘、网络实时监控（WebSocket） |
 | 6 | 硬件状态检测 | 远程设备硬件指标采集（Agent 模式）、自动刷新、导出 CSV |
 | 7 | 远程桌面控制 | VNC/SSH/RDP 三种协议远程连接（浏览器内 VNC + SSH） |
@@ -203,7 +203,7 @@ go run .
 
 ### 3. 电池监控
 
-**功能**: 电量/电压/电流/温度/健康度监控，自动报警，历史趋势图表
+**功能**: 电量/电压/电流/温度/健康度监控，自动报警，历史趋势图表，WebSocket 事件驱动实时推送
 
 **API**:
 - `GET /api/battery/latest` - 最新电池状态
@@ -211,16 +211,18 @@ go run .
 - `POST /api/battery/push` - Agent 自动推送
 - `GET /api/battery/history/:device_id` - 历史记录
 - `GET /api/battery/alerts` - 电池报警列表
+- `WS /api/battery/stream` - 实时事件推送（数据变化时即时通知）
 
 ### 4. 飞行任务管理
 
-**功能**: 任务创建/编辑/删除、飞行阶段状态机（待命→起飞→巡航→执行任务→返航→降落）、任务日志
+**功能**: 任务创建/编辑/删除、飞行阶段状态机（待命→起飞→巡航→执行任务→返航→降落）、任务日志、WebSocket 事件驱动实时推送
 
 **API**:
 - `GET /api/flight/missions` - 任务列表
 - `POST /api/flight/missions` - 创建任务
 - `POST /api/flight/missions/:id/phase` - 更新飞行阶段
 - `POST /api/flight/missions/import` - 批量导入
+- `WS /api/flight/stream` - 实时事件推送（任务变更时即时通知）
 
 ### 5. 系统状态监控
 
@@ -501,7 +503,8 @@ project/
 │   │   ├── drones.go               # 无人机管理 API
 │   │   ├── gps.go                  # GPS/位置信息 API
 │   │   ├── battery.go              # 电池监控 API
-│   │   └── flight.go               # 飞行任务管理 API
+│   │   ├── flight.go               # 飞行任务管理 API
+│   │   └── wshub.go                # WebSocket 事件广播中心
 │   ├── middleware/                 # 中间件（认证等）
 │   ├── monitor/monitor.go          # 系统指标采集
 │   └── syncengine/engine.go        # 数据同步引擎
@@ -538,8 +541,8 @@ project/
 **新增**:
 - ✅ 无人机统一管理模块（注册/编辑/删除/连接）
 - ✅ GPS/位置信息模块（Leaflet 地图、电子围栏、历史轨迹）
-- ✅ 电池监控模块（自动报警、历史趋势）
-- ✅ 飞行任务管理模块（飞行阶段状态机、任务日志）
+- ✅ 电池监控模块（自动报警、历史趋势、WebSocket 实时推送）
+- ✅ 飞行任务管理模块（飞行阶段状态机、任务日志、WebSocket 实时推送）
 - ✅ hw-agent Push 模式（自动推送硬件+GPS+电池数据）
 - ✅ SSH 浏览器内终端（xterm.js）
 - ✅ RDP 连接支持（生成 .rdp 文件）

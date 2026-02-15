@@ -645,25 +645,60 @@
       } catch (e) { showToast('操作失败', 'error'); }
     }
 
-    // ========== Auto Refresh ==========
-    var autoRefreshTimer = null;
-    var autoRefreshInterval = 5000; // 5 seconds
+    // ========== Real-time WebSocket ==========
+    var batteryWS = null;
+    var wsReconnectTimer = null;
+    var realtimeEnabled = false;
+
+    function connectBatteryWS() {
+      if (batteryWS && (batteryWS.readyState === WebSocket.OPEN || batteryWS.readyState === WebSocket.CONNECTING)) return;
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      batteryWS = new WebSocket(proto + '//' + location.host + '/api/battery/stream');
+      batteryWS.onopen = function() {
+        $('#btnAutoRefresh').textContent = '🟢 实时监控中（WebSocket）';
+        $('#btnAutoRefresh').className = 'btn btn-danger';
+      };
+      batteryWS.onmessage = function(evt) {
+        try {
+          var event = JSON.parse(evt.data);
+          // Refresh data on any battery event
+          if (event.type === 'battery_update' || event.type === 'battery_alert_ack') {
+            loadLatest();
+            loadStats();
+            loadAlerts();
+          }
+        } catch(e) {}
+      };
+      batteryWS.onclose = function() {
+        if (realtimeEnabled) {
+          $('#btnAutoRefresh').textContent = '🔴 已断开，重连中...';
+          scheduleReconnect();
+        }
+      };
+      batteryWS.onerror = function() { batteryWS.close(); };
+    }
+
+    function disconnectBatteryWS() {
+      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+      if (batteryWS) { batteryWS.onclose = null; batteryWS.close(); batteryWS = null; }
+      $('#btnAutoRefresh').textContent = '开启实时监控';
+      $('#btnAutoRefresh').className = 'btn btn-success';
+    }
+
+    function scheduleReconnect() {
+      if (!realtimeEnabled) return;
+      if (wsReconnectTimer) return;
+      wsReconnectTimer = setTimeout(function() { wsReconnectTimer = null; connectBatteryWS(); }, 3000);
+    }
 
     function toggleAutoRefresh() {
-      if (autoRefreshTimer) {
-        clearInterval(autoRefreshTimer);
-        autoRefreshTimer = null;
-        $('#btnAutoRefresh').textContent = '开启实时监控';
-        $('#btnAutoRefresh').className = 'btn btn-success';
-        showToast('实时监控已关闭', 'info');
+      realtimeEnabled = !realtimeEnabled;
+      if (realtimeEnabled) {
+        connectBatteryWS();
+        showToast('实时监控已开启（WebSocket 事件驱动）', 'success');
       } else {
-        autoRefreshTimer = setInterval(function() {
-          loadLatest();
-          loadStats();
-        }, autoRefreshInterval);
-        $('#btnAutoRefresh').textContent = '关闭实时监控';
-        $('#btnAutoRefresh').className = 'btn btn-danger';
-        showToast('实时监控已开启，每5秒自动刷新', 'success');
+        disconnectBatteryWS();
+        showToast('实时监控已关闭', 'info');
       }
     }
 
