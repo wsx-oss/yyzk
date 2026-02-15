@@ -254,6 +254,119 @@ func (a *API) FlightMissionsUpdatePhase(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true, "status": status, "phase": p.Phase, "progress": progress})
 }
 
+// FlightMissionPushByAgent accepts flight mission phase updates from a remote agent.
+// The agent identifies itself by agent_id (hostname). The handler finds the GPS device
+// matching that name, then finds the latest non-completed mission bound to that device,
+// and updates its phase/status/progress automatically.
+func (a *API) FlightMissionPushByAgent(c *gin.Context) {
+	var p struct {
+		AgentID  string `json:"agent_id"`
+		Phase    string `json:"phase"`
+		Progress int    `json:"progress"`
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"error": "bad json"})
+		return
+	}
+	p.AgentID = strings.TrimSpace(p.AgentID)
+	p.Phase = strings.TrimSpace(p.Phase)
+	if p.AgentID == "" {
+		c.JSON(400, gin.H{"error": "agent_id required"})
+		return
+	}
+
+	// valid phases
+	validPhases := map[string]bool{
+		"待命": true, "起飞": true, "巡航": true, "执行任务": true, "返航": true, "降落": true,
+	}
+	if !validPhases[p.Phase] {
+		c.JSON(400, gin.H{"error": "无效的飞行阶段: " + p.Phase})
+		return
+	}
+
+	// Find GPS device: first by agent_id column, then fall back to name
+	var deviceID int
+	err := a.db.QueryRow(`SELECT id FROM gps_devices WHERE agent_id = ? AND agent_id != ''`, p.AgentID).Scan(&deviceID)
+	if err != nil {
+		err = a.db.QueryRow(`SELECT id FROM gps_devices WHERE name = ?`, p.AgentID).Scan(&deviceID)
+	}
+	if err != nil {
+		c.JSON(404, gin.H{"error": "未找到匹配的设备: " + p.AgentID})
+		return
+	}
+
+	// Find the latest non-completed mission bound to this device
+	var missionID int
+	var currentPhase string
+	err = a.db.QueryRow(
+		`SELECT id, current_phase FROM flight_missions WHERE device_id = ? AND status != '已完成' ORDER BY datetime(created_at) DESC LIMIT 1`,
+		deviceID,
+	).Scan(&missionID, &currentPhase)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "该设备没有进行中的飞行任务"})
+		return
+	}
+
+	// Only allow forward phase transitions
+	phaseOrder := []string{"待命", "起飞", "巡航", "执行任务", "返航", "降落"}
+	currentIdx := -1
+	newIdx := -1
+	for i, ph := range phaseOrder {
+		if ph == currentPhase {
+			currentIdx = i
+		}
+		if ph == p.Phase {
+			newIdx = i
+		}
+	}
+	if newIdx <= currentIdx {
+		// Phase not advancing, just acknowledge without updating
+		c.JSON(200, gin.H{"ok": true, "id": missionID, "phase": currentPhase, "skipped": true})
+		return
+	}
+
+	// Map phase to status and progress
+	statusMap := map[string]string{
+		"待命": "待起飞", "起飞": "飞行中", "巡航": "飞行中", "执行任务": "飞行中", "返航": "返航中", "降落": "已完成",
+	}
+	progressMap := map[string]int{
+		"待命": 0, "起飞": 10, "巡航": 30, "执行任务": 60, "返航": 80, "降落": 100,
+	}
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	status := statusMap[p.Phase]
+	progress := progressMap[p.Phase]
+	// Allow agent to override progress if provided and larger
+	if p.Progress > progress {
+		progress = p.Progress
+	}
+
+	updates := "SET status=?, current_phase=?, progress=?, updated_at=?"
+	args := []any{status, p.Phase, progress, now}
+
+	if p.Phase == "起飞" {
+		updates += ", start_time=?"
+		args = append(args, now)
+	}
+	if p.Phase == "降落" {
+		updates += ", end_time=?"
+		args = append(args, now)
+	}
+
+	args = append(args, missionID)
+	_, err = a.db.Exec("UPDATE flight_missions "+updates+" WHERE id=?", args...)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Add mission log
+	a.db.Exec(`INSERT INTO mission_logs(mission_id, phase, message) VALUES(?,?,?)`,
+		missionID, p.Phase, "[Agent自动] 阶段变更: "+p.Phase)
+
+	c.JSON(200, gin.H{"ok": true, "id": missionID, "status": status, "phase": p.Phase, "progress": progress})
+}
+
 // FlightMissionsStats returns statistics
 func (a *API) FlightMissionsStats(c *gin.Context) {
 	stats := gin.H{}

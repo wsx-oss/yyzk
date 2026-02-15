@@ -63,6 +63,7 @@
       <div class="bat-header-btns">
         <button class="btn btn-primary" onclick="openReportModal()">上报电池数据</button>
         <button class="btn btn-secondary" onclick="refreshAll()">刷新数据</button>
+        <button class="btn btn-success" id="btnAutoRefresh" onclick="toggleAutoRefresh()">开启实时监控</button>
       </div>
     </div>
     <div class="filter-row">
@@ -635,6 +636,28 @@
         showToast('报警已确认', 'success');
         loadAlerts(); loadStats();
       } catch (e) { showToast('操作失败', 'error'); }
+    }
+
+    // ========== Auto Refresh ==========
+    var autoRefreshTimer = null;
+    var autoRefreshInterval = 5000; // 5 seconds
+
+    function toggleAutoRefresh() {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+        $('#btnAutoRefresh').textContent = '开启实时监控';
+        $('#btnAutoRefresh').className = 'btn btn-success';
+        showToast('实时监控已关闭', 'info');
+      } else {
+        autoRefreshTimer = setInterval(function() {
+          loadLatest();
+          loadStats();
+        }, autoRefreshInterval);
+        $('#btnAutoRefresh').textContent = '关闭实时监控';
+        $('#btnAutoRefresh').className = 'btn btn-danger';
+        showToast('实时监控已开启，每5秒自动刷新', 'success');
+      }
     }
 
     // ========== Init ==========

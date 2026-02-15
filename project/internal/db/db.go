@@ -355,6 +355,13 @@ func Migrate(db *sql.DB) error {
 	for _, s := range flightCols {
 		db.Exec(s)
 	}
+	// safely add agent_id column to gps_devices for agent push matching
+	gpsCols := []string{
+		`ALTER TABLE gps_devices ADD COLUMN agent_id TEXT DEFAULT ''`,
+	}
+	for _, s := range gpsCols {
+		db.Exec(s)
+	}
 
 	// battery monitoring tables
 	batteryTables := []string{

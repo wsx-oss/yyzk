@@ -75,6 +75,7 @@
     <div class="flight-header-row">
       <div class="module-title">飞行任务管理</div>
       <div class="flight-header-btns">
+        <button class="btn btn-success" id="btnAutoRefresh" onclick="toggleAutoRefresh()">开启实时监控</button>
         <button class="btn btn-primary" onclick="openNewModal()">创建任务</button>
         <button class="btn btn-secondary" onclick="importMissions()">导入</button>
         <button class="btn btn-secondary" onclick="exportMissions()">导出</button>
@@ -652,6 +653,28 @@
         showToast('导出成功', 'success');
       } catch (e) {
         showToast('导出失败', 'error');
+      }
+    }
+
+    // ========== Auto Refresh ==========
+    var autoRefreshTimer = null;
+    var autoRefreshInterval = 3000; // 3 seconds
+
+    function toggleAutoRefresh() {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+        $('#btnAutoRefresh').textContent = '开启实时监控';
+        $('#btnAutoRefresh').className = 'btn btn-success';
+        showToast('实时监控已关闭', 'info');
+      } else {
+        autoRefreshTimer = setInterval(function() {
+          loadMissions();
+          loadStats();
+        }, autoRefreshInterval);
+        $('#btnAutoRefresh').textContent = '关闭实时监控';
+        $('#btnAutoRefresh').className = 'btn btn-danger';
+        showToast('实时监控已开启，每3秒自动刷新', 'success');
       }
     }
 

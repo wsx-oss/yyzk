@@ -41,7 +41,7 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 	_ = a.db.QueryRow("SELECT COUNT(*) FROM gps_devices WHERE "+wc, args...).Scan(&total)
 
 	offset := (page - 1) * pageSize
-	q := `SELECT id, name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update, created_at FROM gps_devices WHERE ` + wc + ` ORDER BY datetime(last_update) DESC LIMIT ? OFFSET ?`
+	q := `SELECT id, name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update, created_at, COALESCE(agent_id,'') FROM gps_devices WHERE ` + wc + ` ORDER BY datetime(last_update) DESC LIMIT ? OFFSET ?`
 	qArgs := append(args, pageSize, offset)
 	rows, err := a.db.Query(q, qArgs...)
 	if err != nil {
@@ -53,10 +53,10 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 	items := []gin.H{}
 	for rows.Next() {
 		var id, fenceEnabled int
-		var name, devType, status string
+		var name, devType, status, agentID string
 		var lat, lng, alt, speed, heading, accuracy, fLat, fLng, fRadius float64
 		var lastUpdate, created sql.NullString
-		if err := rows.Scan(&id, &name, &devType, &lat, &lng, &alt, &speed, &heading, &accuracy, &status, &fenceEnabled, &fLat, &fLng, &fRadius, &lastUpdate, &created); err == nil {
+		if err := rows.Scan(&id, &name, &devType, &lat, &lng, &alt, &speed, &heading, &accuracy, &status, &fenceEnabled, &fLat, &fLng, &fRadius, &lastUpdate, &created, &agentID); err == nil {
 			items = append(items, gin.H{
 				"id": id, "name": name, "device_type": devType,
 				"latitude": lat, "longitude": lng, "altitude": alt,
@@ -64,6 +64,7 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 				"status": status, "fence_enabled": fenceEnabled == 1,
 				"fence_lat": fLat, "fence_lng": fLng, "fence_radius": fRadius,
 				"last_update": lastUpdate.String, "created_at": created.String,
+				"agent_id": agentID,
 			})
 		}
 	}
@@ -74,6 +75,7 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 func (a *API) GpsDevicesCreate(c *gin.Context) {
 	var p struct {
 		Name         string  `json:"name"`
+		AgentID      string  `json:"agent_id"`
 		Latitude     float64 `json:"latitude"`
 		Longitude    float64 `json:"longitude"`
 		Altitude     float64 `json:"altitude"`
@@ -87,6 +89,7 @@ func (a *API) GpsDevicesCreate(c *gin.Context) {
 		return
 	}
 	p.Name = strings.TrimSpace(p.Name)
+	p.AgentID = strings.TrimSpace(p.AgentID)
 	if p.Name == "" {
 		c.JSON(400, gin.H{"error": "设备名称不能为空"})
 		return
@@ -98,8 +101,8 @@ func (a *API) GpsDevicesCreate(c *gin.Context) {
 	}
 
 	res, err := a.db.Exec(
-		`INSERT INTO gps_devices(name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update) VALUES(?,?,?,?,?,0,0,0,'在线',?,?,?,?,CURRENT_TIMESTAMP)`,
-		p.Name, "无人机", p.Latitude, p.Longitude, p.Altitude, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius,
+		`INSERT INTO gps_devices(name, agent_id, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update) VALUES(?,?,?,?,?,?,0,0,0,'在线',?,?,?,?,CURRENT_TIMESTAMP)`,
+		p.Name, p.AgentID, "无人机", p.Latitude, p.Longitude, p.Altitude, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius,
 	)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -116,13 +119,13 @@ func (a *API) GpsDevicesGet(c *gin.Context) {
 	id := c.Param("id")
 	var d struct {
 		ID, FenceEnabled                                             int
-		Name, DevType, Status                                        string
+		Name, DevType, Status, AgentID                               string
 		Lat, Lng, Alt, Speed, Heading, Accuracy, FLat, FLng, FRadius float64
 		LastUpdate, Created                                          sql.NullString
 	}
 	err := a.db.QueryRow(
-		`SELECT id, name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update, created_at FROM gps_devices WHERE id=?`, id,
-	).Scan(&d.ID, &d.Name, &d.DevType, &d.Lat, &d.Lng, &d.Alt, &d.Speed, &d.Heading, &d.Accuracy, &d.Status, &d.FenceEnabled, &d.FLat, &d.FLng, &d.FRadius, &d.LastUpdate, &d.Created)
+		`SELECT id, name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update, created_at, COALESCE(agent_id,'') FROM gps_devices WHERE id=?`, id,
+	).Scan(&d.ID, &d.Name, &d.DevType, &d.Lat, &d.Lng, &d.Alt, &d.Speed, &d.Heading, &d.Accuracy, &d.Status, &d.FenceEnabled, &d.FLat, &d.FLng, &d.FRadius, &d.LastUpdate, &d.Created, &d.AgentID)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "设备不存在"})
 		return
@@ -134,6 +137,7 @@ func (a *API) GpsDevicesGet(c *gin.Context) {
 		"status": d.Status, "fence_enabled": d.FenceEnabled == 1,
 		"fence_lat": d.FLat, "fence_lng": d.FLng, "fence_radius": d.FRadius,
 		"last_update": d.LastUpdate.String, "created_at": d.Created.String,
+		"agent_id": d.AgentID,
 	})
 }
 
@@ -142,6 +146,7 @@ func (a *API) GpsDevicesUpdate(c *gin.Context) {
 	id := c.Param("id")
 	var p struct {
 		Name         string  `json:"name"`
+		AgentID      string  `json:"agent_id"`
 		FenceEnabled bool    `json:"fence_enabled"`
 		FenceLat     float64 `json:"fence_lat"`
 		FenceLng     float64 `json:"fence_lng"`
@@ -152,6 +157,7 @@ func (a *API) GpsDevicesUpdate(c *gin.Context) {
 		return
 	}
 	p.Name = strings.TrimSpace(p.Name)
+	p.AgentID = strings.TrimSpace(p.AgentID)
 	if p.Name == "" {
 		c.JSON(400, gin.H{"error": "设备名称不能为空"})
 		return
@@ -161,8 +167,8 @@ func (a *API) GpsDevicesUpdate(c *gin.Context) {
 		fenceEn = 1
 	}
 	_, err := a.db.Exec(
-		`UPDATE gps_devices SET name=?, fence_enabled=?, fence_lat=?, fence_lng=?, fence_radius=? WHERE id=?`,
-		p.Name, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius, id,
+		`UPDATE gps_devices SET name=?, agent_id=?, fence_enabled=?, fence_lat=?, fence_lng=?, fence_radius=? WHERE id=?`,
+		p.Name, p.AgentID, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius, id,
 	)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -326,6 +332,88 @@ func (a *API) GpsStats(c *gin.Context) {
 		"total": total, "online": online, "offline": offline,
 		"fence_enabled": fenceEnabled, "alert_count": alertCount,
 	})
+}
+
+// GpsPushByAgent accepts GPS data from a remote agent identified by agent_id (hostname).
+// If no gps_device with that name exists, one is auto-created.
+// This enables hw-agent on drones to push GPS data without knowing the database ID.
+func (a *API) GpsPushByAgent(c *gin.Context) {
+	var p struct {
+		AgentID   string  `json:"agent_id"`
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+		Altitude  float64 `json:"altitude"`
+		Speed     float64 `json:"speed"`
+		Heading   float64 `json:"heading"`
+		Accuracy  float64 `json:"accuracy"`
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"error": "bad json"})
+		return
+	}
+	p.AgentID = strings.TrimSpace(p.AgentID)
+	if p.AgentID == "" {
+		c.JSON(400, gin.H{"error": "agent_id required"})
+		return
+	}
+
+	// Find existing gps_device: first by agent_id column, then fall back to name
+	var deviceID int
+	err := a.db.QueryRow(`SELECT id FROM gps_devices WHERE agent_id = ? AND agent_id != ''`, p.AgentID).Scan(&deviceID)
+	if err != nil {
+		// Fallback: match by name
+		err = a.db.QueryRow(`SELECT id FROM gps_devices WHERE name = ?`, p.AgentID).Scan(&deviceID)
+	}
+	if err != nil {
+		// Auto-create a new GPS device for this agent
+		res, err2 := a.db.Exec(
+			`INSERT INTO gps_devices(name, agent_id, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, last_update) VALUES(?,?,?,?,?,?,?,?,?,?,0,CURRENT_TIMESTAMP)`,
+			p.AgentID, p.AgentID, "无人机", p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading, p.Accuracy, "在线",
+		)
+		if err2 != nil {
+			c.JSON(500, gin.H{"error": err2.Error()})
+			return
+		}
+		newID, _ := res.LastInsertId()
+		deviceID = int(newID)
+		// record initial history
+		a.db.Exec(`INSERT INTO gps_history(device_id, latitude, longitude, altitude, speed, heading) VALUES(?,?,?,?,?,?)`,
+			deviceID, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
+		c.JSON(200, gin.H{"ok": true, "id": deviceID, "created": true})
+		return
+	}
+
+	// Update existing device position
+	_, err = a.db.Exec(
+		`UPDATE gps_devices SET latitude=?, longitude=?, altitude=?, speed=?, heading=?, accuracy=?, status='在线', last_update=CURRENT_TIMESTAMP WHERE id=?`,
+		p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading, p.Accuracy, deviceID,
+	)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Record history
+	a.db.Exec(`INSERT INTO gps_history(device_id, latitude, longitude, altitude, speed, heading) VALUES(?,?,?,?,?,?)`,
+		deviceID, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
+
+	// Check geofence
+	var fenceEnabled int
+	var fLat, fLng, fRadius float64
+	var devName string
+	err = a.db.QueryRow(`SELECT name, fence_enabled, fence_lat, fence_lng, fence_radius FROM gps_devices WHERE id=?`, deviceID).Scan(&devName, &fenceEnabled, &fLat, &fLng, &fRadius)
+	if err == nil && fenceEnabled == 1 && fRadius > 0 {
+		dist := haversine(p.Latitude, p.Longitude, fLat, fLng)
+		if dist > fRadius {
+			a.db.Exec(`INSERT INTO gps_fence_alerts(device_id, device_name, latitude, longitude, fence_lat, fence_lng, fence_radius, distance, message) VALUES(?,?,?,?,?,?,?,?,?)`,
+				deviceID, devName, p.Latitude, p.Longitude, fLat, fLng, fRadius, dist,
+				devName+" 已超出电子围栏范围，距离中心 "+strconv.FormatFloat(dist, 'f', 1, 64)+"m")
+			a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`,
+				"围栏报警", "warning", devName+" 超出电子围栏 (距离: "+strconv.FormatFloat(dist, 'f', 1, 64)+"m)")
+		}
+	}
+
+	c.JSON(200, gin.H{"ok": true, "id": deviceID})
 }
 
 // haversine calculates the distance in meters between two lat/lng points

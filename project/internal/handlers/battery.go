@@ -290,6 +290,92 @@ func (a *API) BatteryAlertsList(c *gin.Context) {
 	c.JSON(200, gin.H{"items": items, "total": total, "page": page, "page_size": pageSize})
 }
 
+// BatteryPushByAgent accepts battery data from a remote agent identified by agent_id (hostname).
+// It finds the gps_device by name matching agent_id, then inserts a battery record and auto-generates alerts.
+func (a *API) BatteryPushByAgent(c *gin.Context) {
+	var p struct {
+		AgentID       string  `json:"agent_id"`
+		Voltage       float64 `json:"voltage"`
+		CurrentVal    float64 `json:"current_val"`
+		Level         int     `json:"level"`
+		Temperature   float64 `json:"temperature"`
+		Health        int     `json:"health"`
+		ChargeCycles  int     `json:"charge_cycles"`
+		RemainingTime string  `json:"remaining_time"`
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"error": "bad json"})
+		return
+	}
+	agentID := strings.TrimSpace(p.AgentID)
+	if agentID == "" {
+		c.JSON(400, gin.H{"error": "agent_id required"})
+		return
+	}
+
+	// Find gps_device: first by agent_id column, then fall back to name
+	var deviceID int
+	var deviceName string
+	err := a.db.QueryRow(`SELECT id, name FROM gps_devices WHERE agent_id = ? AND agent_id != ''`, agentID).Scan(&deviceID, &deviceName)
+	if err != nil {
+		err = a.db.QueryRow(`SELECT id, name FROM gps_devices WHERE name = ?`, agentID).Scan(&deviceID, &deviceName)
+	}
+	if err != nil {
+		// No GPS device registered yet for this agent; skip silently
+		c.JSON(200, gin.H{"ok": false, "message": "GPS设备未注册，请先推送GPS数据"})
+		return
+	}
+
+	// Determine status
+	status := "正常"
+	if p.Level <= 10 {
+		status = "严重不足"
+	} else if p.Level <= 20 {
+		status = "电量低"
+	} else if p.Temperature >= 50 {
+		status = "温度过高"
+	} else if p.Health <= 50 {
+		status = "健康度低"
+	}
+
+	res, err := a.db.Exec(
+		`INSERT INTO battery_records(device_id, device_name, voltage, current_val, level, temperature, health, status, charge_cycles, remaining_time) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		deviceID, deviceName, p.Voltage, p.CurrentVal, p.Level, p.Temperature, p.Health, status, p.ChargeCycles, p.RemainingTime,
+	)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	id, _ := res.LastInsertId()
+
+	// Auto-generate alerts for abnormal conditions
+	if p.Level <= 20 {
+		msg := fmt.Sprintf("无人机[%s]电量低: %d%%", deviceName, p.Level)
+		alertType := "电量低"
+		if p.Level <= 10 {
+			msg = fmt.Sprintf("无人机[%s]电量严重不足: %d%%，请立即返航！", deviceName, p.Level)
+			alertType = "电量严重不足"
+		}
+		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
+			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, alertType, msg)
+		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "高")
+	}
+	if p.Temperature >= 50 {
+		msg := fmt.Sprintf("无人机[%s]电池温度过高: %.1f°C", deviceName, p.Temperature)
+		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
+			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, "温度过高", msg)
+		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "高")
+	}
+	if p.Health <= 50 {
+		msg := fmt.Sprintf("无人机[%s]电池健康度低: %d%%，建议更换电池", deviceName, p.Health)
+		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
+			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, "健康度低", msg)
+		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "中")
+	}
+
+	c.JSON(200, gin.H{"ok": true, "id": id})
+}
+
 // BatteryAlertAck acknowledges a battery alert
 func (a *API) BatteryAlertAck(c *gin.Context) {
 	id := c.Param("id")

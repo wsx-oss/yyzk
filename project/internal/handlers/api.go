@@ -324,6 +324,7 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.DELETE("/flight/missions/:id", a.FlightMissionsDelete)
 		api.POST("/flight/missions/:id/phase", a.FlightMissionsUpdatePhase)
 		api.GET("/flight/missions/:id/logs", a.FlightMissionsLogs)
+		api.POST("/flight/missions/push", a.FlightMissionPushByAgent)
 
 		// GPS / location tracking
 		api.GET("/gps/devices", a.GpsDevicesList)
@@ -336,6 +337,7 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/gps/devices/:id/history", a.GpsDevicesHistory)
 		api.GET("/gps/fence-alerts", a.GpsFenceAlerts)
 		api.POST("/gps/fence-alerts/:id/ack", a.GpsFenceAlertAck)
+		api.POST("/gps/push", a.GpsPushByAgent)
 
 		// Battery monitoring
 		api.GET("/battery/records", a.BatteryRecordsList)
@@ -345,6 +347,7 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/battery/stats", a.BatteryStats)
 		api.GET("/battery/alerts", a.BatteryAlertsList)
 		api.POST("/battery/alerts/:id/ack", a.BatteryAlertAck)
+		api.POST("/battery/push", a.BatteryPushByAgent)
 	}
 }
 

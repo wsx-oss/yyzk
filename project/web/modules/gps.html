@@ -79,6 +79,7 @@
       <div class="gps-header-btns">
         <button class="btn btn-primary" onclick="openNewDeviceModal()">添加设备</button>
         <button class="btn btn-secondary" onclick="refreshAll()">刷新数据</button>
+        <button class="btn btn-success" id="btnAutoRefresh" onclick="toggleAutoRefresh()">开启实时监控</button>
       </div>
     </div>
     <div class="filter-row">
@@ -205,9 +206,10 @@
   <!-- Hints -->
   <div class="hint-box" style="margin-top:20px;">
     <div><strong>使用提示</strong></div>
-    <div>1. 添加设备后，可通过"推送位置"模拟GPS数据上报，地图会实时更新设备位置。</div>
-    <div>2. 启用电子围栏后，当设备位置超出围栏范围时，系统会自动生成围栏报警记录。</div>
-    <div>3. 点击地图上的设备标记可查看设备详细信息，点击"轨迹"可查看历史移动轨迹。</div>
+    <div>1. 添加设备时填写 <strong>Agent ID</strong>（无人机主机名），系统会自动将 Agent 推送的数据关联到该设备。</div>
+    <div>2. 无人机上运行 <code>hw-agent -server http://主控端IP:8080</code> 后，设备状态会自动变为“在线”，30秒无数据则显示“离线”。</div>
+    <div>3. 启用电子围栏后，当设备位置超出围栏范围时，系统会自动生成围栏报警记录。</div>
+    <div>4. 点击地图上的设备标记可查看设备详细信息，点击“轨迹”可查看历史移动轨迹。</div>
   </div>
 
   <!-- Stats Charts -->
@@ -233,6 +235,11 @@
         <div class="full-width">
           <label>无人机名称 *</label>
           <input id="devName" type="text" placeholder="请输入无人机名称" />
+        </div>
+        <div class="full-width">
+          <label>Agent ID（无人机唯一标识）</label>
+          <input id="devAgentId" type="text" placeholder="例如: drone-SN-20240301-001" />
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">提示：在伴飞计算机上运行 <code>hw-agent -server http://主控端IP:8080 -id "drone-SN-xxx"</code> 时通过 -id 参数指定。此处填写相同的值即可关联推送数据。未指定 -id 时默认使用主机名。</div>
         </div>
         <div>
           <label>初始经度</label>
@@ -371,7 +378,7 @@
       const bounds = [];
       devices.forEach(d => {
         if (d.latitude === 0 && d.longitude === 0) return;
-        const color = d.status === '在线' ? '#10b981' : '#ef4444';
+        const color = isDeviceOnline(d) ? '#10b981' : '#ef4444';
         const icon = L.divIcon({
           className: '',
           html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
@@ -488,6 +495,19 @@
     }
 
     // ========== Render ==========
+    function isDeviceOnline(d) {
+      if (!d.last_update) return false;
+      var lastTime = new Date(d.last_update.replace(/-/g, '/')).getTime();
+      return (Date.now() - lastTime) < 30000;
+    }
+
+    function deviceStatusBadge(d) {
+      var online = isDeviceOnline(d);
+      var label = online ? '在线' : '离线';
+      var cls = online ? 'status-online' : 'status-offline';
+      return '<span class="status-badge ' + cls + '">' + label + '</span>';
+    }
+
     function renderDeviceTable(items) {
       const tbody = $('#devicesTbody');
       if (!items.length) {
@@ -501,7 +521,7 @@
           <td>${d.latitude.toFixed(6)}</td>
           <td>${d.altitude.toFixed(1)}</td>
           <td>${d.speed.toFixed(1)}</td>
-          <td><span class="status-badge ${d.status==='在线'?'status-online':'status-offline'}">${d.status}</span></td>
+          <td>${deviceStatusBadge(d)}</td>
           <td>${d.fence_enabled ? '<span style="color:#6366f1;font-weight:500;">已启用</span>' : '<span style="color:#94a3b8;">未启用</span>'}</td>
           <td>${formatDate(d.last_update)}</td>
           <td>
@@ -570,6 +590,7 @@
       $('#deviceModalTitle').textContent = '添加无人机';
       $('#btnSubmitDevice').textContent = '确认添加';
       $('#devName').value = '';
+      $('#devAgentId').value = '';
       $('#devLng').value = '116.397'; $('#devLat').value = '39.908'; $('#devAlt').value = '0';
       $('#devFenceEnabled').checked = false; toggleFenceFields();
       $('#devFenceLng').value = ''; $('#devFenceLat').value = ''; $('#devFenceRadius').value = '500';
@@ -584,6 +605,7 @@
         $('#deviceModalTitle').textContent = '编辑无人机';
         $('#btnSubmitDevice').textContent = '确认保存';
         $('#devName').value = d.name || '';
+        $('#devAgentId').value = d.agent_id || '';
         $('#devLng').value = d.longitude; $('#devLat').value = d.latitude; $('#devAlt').value = d.altitude;
         $('#devFenceEnabled').checked = d.fence_enabled; toggleFenceFields();
         $('#devFenceLng').value = d.fence_lng || ''; $('#devFenceLat').value = d.fence_lat || '';
@@ -598,6 +620,7 @@
     async function submitDevice() {
       const body = {
         name: $('#devName').value.trim(),
+        agent_id: $('#devAgentId').value.trim(),
         longitude: parseFloat($('#devLng').value) || 0,
         latitude: parseFloat($('#devLat').value) || 0,
         altitude: parseFloat($('#devAlt').value) || 0,
@@ -739,6 +762,28 @@
         if (data.error) { showToast(data.error, 'error'); return; }
         showToast('已确认', 'success'); loadAlerts(); loadStats();
       } catch (e) { showToast('操作失败', 'error'); }
+    }
+
+    // ========== Auto Refresh ==========
+    var autoRefreshTimer = null;
+    var autoRefreshInterval = 3000; // 3 seconds
+
+    function toggleAutoRefresh() {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+        $('#btnAutoRefresh').textContent = '开启实时监控';
+        $('#btnAutoRefresh').className = 'btn btn-success';
+        showToast('实时监控已关闭', 'info');
+      } else {
+        autoRefreshTimer = setInterval(function() {
+          loadDevices();
+          loadStats();
+        }, autoRefreshInterval);
+        $('#btnAutoRefresh').textContent = '关闭实时监控';
+        $('#btnAutoRefresh').className = 'btn btn-danger';
+        showToast('实时监控已开启，每3秒自动刷新', 'success');
+      }
     }
 
     // ========== Init ==========
