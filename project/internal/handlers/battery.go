@@ -24,7 +24,7 @@ func (a *API) BatteryRecordsList(c *gin.Context) {
 		pageSize = 50
 	}
 
-	where := []string{"1=1"}
+	where := []string{"device_id IN (SELECT id FROM gps_devices WHERE COALESCE(drone_id,0)>0)"}
 	args := []any{}
 	if deviceID != "" {
 		where = append(where, "device_id = ?")
@@ -152,6 +152,7 @@ func (a *API) BatteryLatest(c *gin.Context) {
 		SELECT b.id, b.device_id, b.device_name, b.voltage, b.current_val, b.level, b.temperature, b.health, b.status, b.charge_cycles, b.remaining_time, b.created_at
 		FROM battery_records b
 		INNER JOIN (SELECT device_id, MAX(id) as max_id FROM battery_records GROUP BY device_id) latest ON b.id = latest.max_id
+		INNER JOIN gps_devices g ON b.device_id = g.id AND COALESCE(g.drone_id,0) > 0
 		ORDER BY b.device_name
 	`)
 	if err != nil {
@@ -216,18 +217,21 @@ func (a *API) BatteryHistory(c *gin.Context) {
 func (a *API) BatteryStats(c *gin.Context) {
 	stats := gin.H{}
 
-	// count drones that have battery records
+	// count drones that have battery records (only drone-linked devices)
 	var totalDrones int
-	a.db.QueryRow(`SELECT COUNT(DISTINCT device_id) FROM battery_records`).Scan(&totalDrones)
+	a.db.QueryRow(`SELECT COUNT(DISTINCT b.device_id) FROM battery_records b INNER JOIN gps_devices g ON b.device_id=g.id WHERE COALESCE(g.drone_id,0)>0`).Scan(&totalDrones)
 	stats["total_drones"] = totalDrones
+
+	// latest record per drone-linked device
+	latestJoin := `battery_records b INNER JOIN (SELECT device_id, MAX(id) as max_id FROM battery_records GROUP BY device_id) l ON b.id=l.max_id INNER JOIN gps_devices g ON b.device_id=g.id AND COALESCE(g.drone_id,0)>0`
 
 	// count by status (latest record per device)
 	var normal, low, critical, tempHigh, healthLow int
-	a.db.QueryRow(`SELECT COUNT(*) FROM battery_records b INNER JOIN (SELECT device_id, MAX(id) as max_id FROM battery_records GROUP BY device_id) l ON b.id=l.max_id WHERE b.status='正常'`).Scan(&normal)
-	a.db.QueryRow(`SELECT COUNT(*) FROM battery_records b INNER JOIN (SELECT device_id, MAX(id) as max_id FROM battery_records GROUP BY device_id) l ON b.id=l.max_id WHERE b.status='电量低'`).Scan(&low)
-	a.db.QueryRow(`SELECT COUNT(*) FROM battery_records b INNER JOIN (SELECT device_id, MAX(id) as max_id FROM battery_records GROUP BY device_id) l ON b.id=l.max_id WHERE b.status='严重不足'`).Scan(&critical)
-	a.db.QueryRow(`SELECT COUNT(*) FROM battery_records b INNER JOIN (SELECT device_id, MAX(id) as max_id FROM battery_records GROUP BY device_id) l ON b.id=l.max_id WHERE b.status='温度过高'`).Scan(&tempHigh)
-	a.db.QueryRow(`SELECT COUNT(*) FROM battery_records b INNER JOIN (SELECT device_id, MAX(id) as max_id FROM battery_records GROUP BY device_id) l ON b.id=l.max_id WHERE b.status='健康度低'`).Scan(&healthLow)
+	a.db.QueryRow(`SELECT COUNT(*) FROM ` + latestJoin + ` WHERE b.status='正常'`).Scan(&normal)
+	a.db.QueryRow(`SELECT COUNT(*) FROM ` + latestJoin + ` WHERE b.status='电量低'`).Scan(&low)
+	a.db.QueryRow(`SELECT COUNT(*) FROM ` + latestJoin + ` WHERE b.status='严重不足'`).Scan(&critical)
+	a.db.QueryRow(`SELECT COUNT(*) FROM ` + latestJoin + ` WHERE b.status='温度过高'`).Scan(&tempHigh)
+	a.db.QueryRow(`SELECT COUNT(*) FROM ` + latestJoin + ` WHERE b.status='健康度低'`).Scan(&healthLow)
 	stats["normal"] = normal
 	stats["low"] = low
 	stats["critical"] = critical
@@ -236,7 +240,7 @@ func (a *API) BatteryStats(c *gin.Context) {
 
 	// average level and health across latest records
 	var avgLevel, avgHealth sql.NullFloat64
-	a.db.QueryRow(`SELECT AVG(b.level), AVG(b.health) FROM battery_records b INNER JOIN (SELECT device_id, MAX(id) as max_id FROM battery_records GROUP BY device_id) l ON b.id=l.max_id`).Scan(&avgLevel, &avgHealth)
+	a.db.QueryRow(`SELECT AVG(b.level), AVG(b.health) FROM ` + latestJoin).Scan(&avgLevel, &avgHealth)
 	stats["avg_level"] = int(avgLevel.Float64)
 	stats["avg_health"] = int(avgHealth.Float64)
 

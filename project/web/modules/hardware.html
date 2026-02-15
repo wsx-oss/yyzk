@@ -416,6 +416,7 @@
           <label>硬件类型</label>
           <select id="filterType">
             <option value="全部">全部</option>
+            <option value="无人机">无人机</option>
             <option value="服务器">服务器</option>
             <option value="路由器">路由器</option>
             <option value="交换机">交换机</option>
@@ -532,6 +533,7 @@
         <div class="form-group">
           <label>硬件类型 <span class="required">*</span></label>
           <select id="addType">
+            <option value="无人机">无人机</option>
             <option value="服务器">服务器</option>
             <option value="路由器">路由器</option>
             <option value="交换机">交换机</option>
@@ -707,8 +709,8 @@
 
       // Type distribution - Horizontal Bar
       const typeDist = stats.type_distribution || {};
-      const typeLabels = ['服务器', '路由器', '交换机', '存储设备'];
-      const typeColors = ['#0ea5e9', '#10b981', '#f59e0b', '#a855f7'];
+      const typeLabels = ['无人机', '服务器', '路由器', '交换机', '存储设备'];
+      const typeColors = ['#3b82f6', '#0ea5e9', '#10b981', '#f59e0b', '#a855f7'];
       const typeData = typeLabels.map(l => typeDist[l] || 0);
 
       if (typeChartInstance) typeChartInstance.destroy();

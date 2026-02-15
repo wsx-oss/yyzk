@@ -260,12 +260,15 @@
     let phaseChart = null;
     let droneList = [];
 
-    // ========== Load Drones from GPS module ==========
+    // ========== Load Drones from unified registry ==========
     async function loadDrones() {
       try {
-        const res = await api('/gps/devices?page_size=200');
+        const res = await api('/drones');
         const data = await res.json();
-        droneList = Array.isArray(data.items) ? data.items : [];
+        const drones = Array.isArray(data.items) ? data.items : [];
+        // linked_gps_device_id is the device_id used by flight_missions
+        droneList = drones.filter(d => d.linked_gps_device_id && d.linked_gps_device_id > 0)
+                         .map(d => ({ id: d.linked_gps_device_id, name: d.name }));
         const sel = $('#missionDevice');
         sel.innerHTML = '<option value="0">未指定</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
       } catch (e) { console.error('loadDrones error:', e); }
@@ -680,6 +683,7 @@
 
     // ========== Init ==========
     initCharts();
+    loadDrones();
     loadMissions();
     loadStats();
   </script>

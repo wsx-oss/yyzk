@@ -363,6 +363,59 @@ func Migrate(db *sql.DB) error {
 		db.Exec(s)
 	}
 
+	// unified drone registry – central place to register a drone once
+	droneTables := []string{
+		`CREATE TABLE IF NOT EXISTS drones (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			serial_number TEXT DEFAULT '',
+			model TEXT DEFAULT '',
+			description TEXT DEFAULT '',
+			ip TEXT DEFAULT '',
+			ssh_port INTEGER DEFAULT 22,
+			vnc_port INTEGER DEFAULT 5900,
+			rdp_port INTEGER DEFAULT 3389,
+			protocol TEXT DEFAULT 'SSH',
+			username TEXT DEFAULT '',
+			password TEXT DEFAULT '',
+			agent_id TEXT DEFAULT '',
+			initial_lat REAL DEFAULT 0,
+			initial_lng REAL DEFAULT 0,
+			initial_alt REAL DEFAULT 0,
+			fence_enabled INTEGER DEFAULT 0,
+			fence_lat REAL DEFAULT 0,
+			fence_lng REAL DEFAULT 0,
+			fence_radius REAL DEFAULT 500,
+			auto_connect INTEGER DEFAULT 0,
+			log_enabled INTEGER DEFAULT 0,
+			status TEXT NOT NULL DEFAULT 'offline',
+			linked_device_id INTEGER DEFAULT 0,
+			linked_gps_device_id INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_drones_name ON drones(name)`,
+		`CREATE INDEX IF NOT EXISTS idx_drones_agent_id ON drones(agent_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_drones_status ON drones(status)`,
+	}
+	for _, s := range droneTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("drones table: %w", err)
+		}
+	}
+
+	// add drone_id to devices and gps_devices for back-reference
+	droneLinks := []string{
+		`ALTER TABLE devices ADD COLUMN drone_id INTEGER DEFAULT 0`,
+		`ALTER TABLE gps_devices ADD COLUMN drone_id INTEGER DEFAULT 0`,
+	}
+	for _, s := range droneLinks {
+		db.Exec(s) // ignore if column already exists
+	}
+
+	// add video_url to drones for camera/video stream
+	db.Exec(`ALTER TABLE drones ADD COLUMN video_url TEXT DEFAULT ''`)
+
 	// battery monitoring tables
 	batteryTables := []string{
 		`CREATE TABLE IF NOT EXISTS battery_records (

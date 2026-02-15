@@ -7,450 +7,184 @@
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:1000;justify-content:center;align-items:center;}
-    .overlay.active{display:flex;}
-    .modal{background:#fff;border-radius:12px;padding:28px 32px;width:520px;max-width:92vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative;}
-    .modal h3{margin:0 0 20px;font-size:18px;color:#1e293b;}
-    .modal .close-btn{position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;}
-    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;}
-    .form-group{display:flex;flex-direction:column;gap:4px;}
-    .form-group label{font-size:13px;color:#1e3a5f;font-weight:600;}
-    .form-group label .req{color:#ef4444;}
-    .form-group input,.form-group select{padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;}
-    .form-group input:focus,.form-group select:focus{outline:none;border-color:#3b82f6;}
-    .modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
-    .switch-wrap{display:flex;align-items:center;gap:8px;margin-top:6px;}
-    .switch{position:relative;width:44px;height:22px;}
-    .switch input{opacity:0;width:0;height:0;}
-    .switch .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#cbd5e1;border-radius:22px;transition:.3s;}
-    .switch .slider:before{content:'';position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;}
-    .switch input:checked+.slider{background:#3b82f6;}
-    .switch input:checked+.slider:before{transform:translateX(22px);}
-    .tag-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;margin:1px 2px;}
-    .tag-normal{background:#dcfce7;color:#16a34a;}
-    .tag-fault{background:#fee2e2;color:#ef4444;}
-    .tag-maintain{background:#fef3c7;color:#d97706;}
     .video-player-section{background:#000;border-radius:8px;overflow:hidden;min-height:300px;position:relative;}
-    .video-player-section video{width:100%;max-height:450px;display:block;}
-    .player-controls{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1e293b;}
+    .video-player-section video{width:100%;max-height:500px;display:block;}
+    .player-controls{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1e293b;flex-wrap:wrap;}
     .player-controls .ctrl-btn{padding:6px 16px;border:none;border-radius:4px;cursor:pointer;font-size:13px;color:#fff;display:flex;align-items:center;gap:4px;}
     .ctrl-play{background:#3b82f6;}
     .ctrl-pause{background:#f59e0b;}
     .ctrl-full{background:#10b981;}
-    input[type="checkbox"].row-check{width:16px;height:16px;cursor:pointer;}
+    .drone-select-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:20px;}
+    .drone-video-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #e2e8f0;cursor:pointer;transition:all .2s;}
+    .drone-video-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);border-color:#0ea5e9;}
+    .drone-video-card.active{border-color:#3b82f6;background:#eff6ff;}
+    .drone-video-card.no-video{opacity:0.5;cursor:default;}
+    .dvc-name{font-size:15px;font-weight:600;color:#1e293b;margin-bottom:4px;}
+    .dvc-model{font-size:12px;color:#94a3b8;margin-bottom:8px;}
+    .dvc-url{font-size:12px;color:#475569;word-break:break-all;background:#f1f5f9;padding:6px 8px;border-radius:4px;}
+    .dvc-url.empty{color:#94a3b8;font-style:italic;background:transparent;}
+    .dvc-status{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;margin-left:8px;}
+    .dvc-status.online{background:#d1fae5;color:#065f46;}
+    .dvc-status.offline{background:#fee2e2;color:#991b1b;}
   </style>
 </head>
 <body>
-  <!-- 视频监控信息 -->
+  <!-- Header -->
   <div class="module-header">
-    <div class="module-title">视频监控信息</div>
+    <div class="module-title">视频监控</div>
     <div class="action-buttons">
-      <button class="btn btn-primary" onclick="openAddModal()">新增视频源</button>
-      <button class="btn btn-secondary" onclick="loadData()">刷新</button>
-      <button class="btn btn-danger" onclick="deleteSelected()">删除选中</button>
+      <button class="btn btn-primary" onclick="window.top.document.querySelector('[data-page=drones]').click()">前往配置视频流</button>
+      <button class="btn btn-secondary" onclick="loadDrones()">刷新</button>
     </div>
   </div>
 
-  <!-- 搜索表单 -->
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-label">注册无人机</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">已配置视频流</div>
+      <div class="stat-value" id="statVideo" style="color:#3b82f6;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">在线/GPS活跃</div>
+      <div class="stat-value" id="statOnline" style="color:#10b981;">0</div>
+    </div>
+  </div>
+
+  <!-- Drone selector -->
   <div class="card">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
-      <div class="form-group">
-        <label>视频名称</label>
-        <input type="text" id="sName" placeholder="请输入视频名称" />
-      </div>
-      <div class="form-group">
-        <label>视频地址</label>
-        <input type="text" id="sUrl" placeholder="请输入视频源地址" />
-      </div>
-      <div class="form-group">
-        <label>监控区域</label>
-        <select id="sRegion">
-          <option value="">全部区域</option>
-          <option value="A区">A区</option>
-          <option value="B区">B区</option>
-          <option value="C区">C区</option>
-          <option value="D区">D区</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>视频状态</label>
-        <select id="sStatus">
-          <option value="">全部</option>
-          <option value="正常">正常</option>
-          <option value="故障">故障</option>
-          <option value="维护">维护</option>
-        </select>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
-      <div class="form-group">
-        <label>清晰度</label>
-        <select id="sClarity">
-          <option value="">全部</option>
-          <option value="高清">高清</option>
-          <option value="标清">标清</option>
-          <option value="流畅">流畅</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>开始时间</label>
-        <input type="datetime-local" id="sStart" />
-      </div>
-      <div class="form-group">
-        <label>结束时间</label>
-        <input type="datetime-local" id="sEnd" />
-      </div>
-      <div class="form-group">
-        <label>是否录制</label>
-        <div class="switch-wrap" style="margin-top:2px;">
-          <label class="switch"><input type="checkbox" id="sRecording" /><span class="slider"></span></label>
-          <span>开启</span>
-        </div>
-      </div>
-    </div>
-    <div style="text-align:center;">
-      <button class="btn btn-primary" style="min-width:160px;" onclick="doSearch()">搜索</button>
+    <div class="card-title">选择无人机查看视频</div>
+    <div class="drone-select-grid" id="droneGrid">
+      <div style="text-align:center;color:#94a3b8;padding:40px;grid-column:1/-1;">加载中...</div>
     </div>
   </div>
 
-  <!-- 数据表格 -->
+  <!-- Player -->
   <div class="card">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th><input type="checkbox" id="checkAll" onclick="toggleCheckAll()" /></th>
-          <th>视频名称</th>
-          <th>视频地址</th>
-          <th>监控区域</th>
-          <th>视频状态</th>
-          <th>清晰度</th>
-          <th>开始时间</th>
-          <th>结束时间</th>
-          <th>是否录制</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="mainTbody">
-        <tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:32px;">暂无视频监控记录</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- 使用提示 -->
-  <div class="hint-box">
-    <div><strong>使用提示:</strong></div>
-    <div>1. 请确保输入的视频地址正确，否则可能无法正常播放。</div>
-    <div>2. 可通过搜索功能快速定位所需视频。</div>
-    <div>3. 删除视频源操作不可恢复，请谨慎操作。</div>
-  </div>
-
-  <!-- 视频监控统计 -->
-  <div class="card">
-    <div class="card-title">视频监控统计</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;">
-      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
-        <div style="font-weight:600;margin-bottom:8px;text-align:center;">视频状态分布</div>
-        <canvas id="statusChart" style="max-height:240px;"></canvas>
-      </div>
-      <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
-        <div style="font-weight:600;margin-bottom:8px;text-align:center;">监控区域分布</div>
-        <canvas id="regionChart" style="max-height:240px;"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- 视频播放窗口 -->
-  <div class="card">
-    <div class="card-title">视频播放窗口 <span id="playerLabel" style="font-size:13px;font-weight:normal;color:#94a3b8;"></span></div>
+    <div class="card-title">实时视频画面 <span id="playerLabel" style="font-size:13px;font-weight:normal;color:#94a3b8;"></span></div>
     <div class="video-player-section" id="playerContainer">
-      <video id="mainPlayer" style="width:100%;min-height:280px;background:#000;" controls></video>
+      <video id="mainPlayer" style="width:100%;min-height:320px;background:#000;" controls></video>
       <iframe id="iframePlayer" style="width:100%;min-height:400px;border:none;display:none;" allowfullscreen></iframe>
+      <div id="emptyPlayer" style="display:flex;align-items:center;justify-content:center;min-height:320px;color:#64748b;font-size:15px;">
+        请在上方选择一架已配置视频流的无人机
+      </div>
     </div>
-    <div class="player-controls" id="videoControls">
-      <button class="ctrl-btn ctrl-play" onclick="playerPlay()">▶ 播放</button>
-      <button class="ctrl-btn ctrl-pause" onclick="playerPause()">⏸ 暂停</button>
-      <button class="ctrl-btn ctrl-full" onclick="playerFullscreen()">⛶ 全屏</button>
-      <button class="ctrl-btn" style="background:#64748b;" onclick="openInNewTab()">↗ 新窗口打开</button>
+    <div class="player-controls" id="videoControls" style="display:none;">
+      <button class="ctrl-btn ctrl-play" onclick="playerPlay()">&#9654; 播放</button>
+      <button class="ctrl-btn ctrl-pause" onclick="playerPause()">&#9208; 暂停</button>
+      <button class="ctrl-btn ctrl-full" onclick="playerFullscreen()">&#9974; 全屏</button>
+      <button class="ctrl-btn" style="background:#64748b;" onclick="openInNewTab()">&#8599; 新窗口打开</button>
     </div>
     <div class="player-controls" id="iframeControls" style="display:none;">
-      <span style="color:#94a3b8;font-size:13px;flex:1;">ℹ️ 网页视频请直接在上方播放器内点击播放/暂停</span>
-      <button class="ctrl-btn ctrl-full" onclick="playerFullscreen()">⛶ 全屏</button>
-      <button class="ctrl-btn" style="background:#64748b;" onclick="openInNewTab()">↗ 新窗口打开</button>
+      <span style="color:#94a3b8;font-size:13px;flex:1;">网页视频请直接在上方播放器内点击播放/暂停</span>
+      <button class="ctrl-btn ctrl-full" onclick="playerFullscreen()">&#9974; 全屏</button>
+      <button class="ctrl-btn" style="background:#64748b;" onclick="openInNewTab()">&#8599; 新窗口打开</button>
     </div>
   </div>
 
-  <!-- 新增视频源弹窗 -->
-  <div class="overlay" id="addOverlay">
-    <div class="modal">
-      <button class="close-btn" onclick="closeAddModal()">&times;</button>
-      <h3>新增视频源</h3>
-      <div class="form-group" style="margin-bottom:14px;">
-        <label>视频名称 <span class="req">*</span></label>
-        <input type="text" id="fName" placeholder="请输入视频名称" />
-      </div>
-      <div class="form-group" style="margin-bottom:14px;">
-        <label>视频地址 <span class="req">*</span></label>
-        <input type="text" id="fUrl" placeholder="请输入视频源地址" />
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>监控区域 <span class="req">*</span></label>
-          <select id="fRegion">
-            <option value="A区">A区</option>
-            <option value="B区">B区</option>
-            <option value="C区">C区</option>
-            <option value="D区">D区</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>清晰度</label>
-          <select id="fClarity">
-            <option value="高清">高清</option>
-            <option value="标清">标清</option>
-            <option value="流畅">流畅</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>开始时间 <span class="req">*</span></label>
-          <input type="datetime-local" id="fStart" />
-        </div>
-        <div class="form-group">
-          <label>结束时间 <span class="req">*</span></label>
-          <input type="datetime-local" id="fEnd" />
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>视频状态 <span class="req">*</span></label>
-          <select id="fStatus">
-            <option value="正常">正常</option>
-            <option value="故障">故障</option>
-            <option value="维护">维护</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>是否录制 <span class="req">*</span></label>
-          <div class="switch-wrap">
-            <label class="switch"><input type="checkbox" id="fRecording" /><span class="slider"></span></label>
-            <span>开启</span>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn" style="background:#94a3b8;color:#fff;" onclick="closeAddModal()">取消</button>
-        <button class="btn btn-primary" onclick="submitAdd()">确认</button>
-      </div>
+  <!-- Chart -->
+  <div class="card">
+    <div class="card-title">视频配置统计</div>
+    <div style="height:260px;display:flex;flex-direction:column;align-items:center;width:100%;">
+      <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="videoChart"></canvas></div>
     </div>
   </div>
 
-  <!-- 删除确认弹窗 -->
-  <div class="overlay" id="confirmOverlay">
-    <div class="modal" style="width:400px;">
-      <h3>确认删除</h3>
-      <p id="confirmMsg" style="color:#64748b;margin:12px 0 20px;">确定要删除该视频源吗？此操作不可恢复。</p>
-      <div class="modal-footer">
-        <button class="btn" style="background:#94a3b8;color:#fff;" onclick="closeConfirm()">取消</button>
-        <button class="btn btn-danger" id="confirmDeleteBtn">确认删除</button>
-      </div>
-    </div>
+  <!-- Hints -->
+  <div class="hint-box">
+    <div><strong>使用提示</strong></div>
+    <div>1. 视频流地址在"无人机管理"页面注册无人机时填写，支持 RTSP/HTTP-FLV/HLS/MP4 等格式。</div>
+    <div>2. 选择一架已配置视频流的无人机即可在此实时查看其机载镜头画面。</div>
+    <div>3. 如需修改视频流地址，请到"无人机管理"页面编辑对应的无人机信息。</div>
+    <div>4. 对于 RTSP 等需要转码的流，需要在服务端部署流媒体网关（如 MediaMTX）将其转为 HLS/WebRTC 后才能在浏览器中播放。</div>
   </div>
 
   <script src="/app/modules/common.js"></script>
   <script>
-    var allRecords = [], visibleRecords = [];
+    var allDrones = [];
+    var currentDroneId = null;
+    var currentPlayerUrl = '';
+    var currentPlayerMode = '';
 
-    var statusChart = createChart($('#statusChart'), {
+    var videoChart = createChart($('#videoChart'), {
       type: 'doughnut',
       data: {
-        labels: ['正常', '故障', '维护'],
-        datasets: [{ data: [0, 0, 0], backgroundColor: ['#10b981', '#ef4444', '#f59e0b'] }]
+        labels: ['已配置视频流', '未配置视频流'],
+        datasets: [{ data: [0, 0], backgroundColor: ['#3b82f6', '#e2e8f0'] }]
       },
-      options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+      options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } } } }
     });
 
-    var regionChart = createChart($('#regionChart'), {
-      type: 'bar',
-      data: {
-        labels: ['A区', 'B区', 'C区', 'D区'],
-        datasets: [{ label: '视频数量', data: [0, 0, 0, 0], backgroundColor: ['#8b5cf6', '#ef4444', '#10b981', '#3b82f6'] }]
-      },
-      options: {
-        maintainAspectRatio: false,
-        indexAxis: 'y',
-        scales: { x: { beginAtZero: true } },
-        plugins: { legend: { display: false } }
-      }
-    });
+    window.addEventListener('DOMContentLoaded', function() { loadDrones(); });
 
-    window.addEventListener('DOMContentLoaded', function() { loadData(); });
-
-    async function loadData() {
+    async function loadDrones() {
       try {
-        var res = await api('/video/list');
+        var res = await api('/drones');
         var data = await res.json();
-        allRecords = Array.isArray(data.items) ? data.items : [];
-      } catch (e) { allRecords = []; }
-      visibleRecords = allRecords.slice();
-      renderTable(visibleRecords);
-      updateCharts(visibleRecords);
+        allDrones = Array.isArray(data.items) ? data.items : [];
+      } catch (e) { allDrones = []; }
+      renderDroneGrid();
+      updateStats();
     }
 
-    function renderTable(items) {
-      var tb = $('#mainTbody');
-      tb.innerHTML = '';
-      if (!items || !items.length) {
-        tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:32px;">暂无视频监控记录</td></tr>';
+    function renderDroneGrid() {
+      var grid = $('#droneGrid');
+      if (!allDrones.length) {
+        grid.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:40px;grid-column:1/-1;">暂无已注册的无人机，请先到<a href="javascript:void(0)" onclick="window.top.document.querySelector(\'[data-page=drones]\').click()" style="color:#0ea5e9;text-decoration:underline;">无人机管理</a>页面注册</div>';
         return;
       }
-      for (var i = 0; i < items.length; i++) {
-        var it = items[i];
-        var statusClass = it.status === '正常' ? 'tag-normal' : (it.status === '故障' ? 'tag-fault' : 'tag-maintain');
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td><input type="checkbox" class="row-check" data-id="' + it.id + '" /></td>' +
-          '<td>' + esc(it.name) + '</td>' +
-          '<td>' + esc(it.url) + '</td>' +
-          '<td>' + esc(it.region) + '</td>' +
-          '<td><span class="tag-badge ' + statusClass + '">' + esc(it.status) + '</span></td>' +
-          '<td>' + esc(it.clarity) + '</td>' +
-          '<td>' + esc(it.start_time) + '</td>' +
-          '<td>' + esc(it.end_time) + '</td>' +
-          '<td>' + (it.recording ? '是' : '否') + '</td>' +
-          '<td>' +
-            '<button class="btn btn-primary" style="padding:4px 12px;font-size:12px;margin-right:4px;" onclick="playVideo(' + i + ')">播放</button>' +
-            '<button class="btn btn-danger" style="padding:4px 12px;font-size:12px;" onclick="confirmDelete(' + i + ')">删除</button>' +
-          '</td>';
-        tb.appendChild(tr);
+      grid.innerHTML = allDrones.map(function(d) {
+        var hasVideo = d.video_url && d.video_url.trim() !== '';
+        var isActive = currentDroneId === d.id;
+        var statusCls = d.gps_online ? 'online' : (d.status === 'online' ? 'online' : 'offline');
+        var statusText = d.gps_online ? 'GPS推送中' : (d.status === 'online' ? '在线' : '离线');
+        return '<div class="drone-video-card' + (isActive ? ' active' : '') + (hasVideo ? '' : ' no-video') + '"'
+          + (hasVideo ? ' onclick="selectDrone(' + d.id + ')"' : '')
+          + '>'
+          + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+          + '  <div><div class="dvc-name">' + esc(d.name) + '</div>'
+          + '  <div class="dvc-model">' + esc(d.model || d.serial_number || '') + '</div></div>'
+          + '  <span class="dvc-status ' + statusCls + '">' + statusText + '</span>'
+          + '</div>'
+          + '<div class="dvc-url' + (hasVideo ? '' : ' empty') + '">'
+          + (hasVideo ? esc(d.video_url) : '未配置视频流 - 请到无人机管理页面编辑')
+          + '</div></div>';
+      }).join('');
+    }
+
+    function updateStats() {
+      var total = allDrones.length;
+      var withVideo = 0, online = 0;
+      for (var i = 0; i < allDrones.length; i++) {
+        if (allDrones[i].video_url && allDrones[i].video_url.trim()) withVideo++;
+        if (allDrones[i].gps_online || allDrones[i].status === 'online') online++;
+      }
+      $('#statTotal').textContent = total;
+      $('#statVideo').textContent = withVideo;
+      $('#statOnline').textContent = online;
+      if (videoChart) {
+        videoChart.data.datasets[0].data = [withVideo, total - withVideo];
+        videoChart.update();
       }
     }
 
-    function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-    function updateCharts(items) {
-      var sc = { '正常': 0, '故障': 0, '维护': 0 };
-      var rc = { 'A区': 0, 'B区': 0, 'C区': 0, 'D区': 0 };
-      for (var i = 0; i < items.length; i++) {
-        var it = items[i];
-        if (sc[it.status] !== undefined) sc[it.status]++;
-        if (rc[it.region] !== undefined) rc[it.region]++;
+    function selectDrone(id) {
+      var drone = null;
+      for (var i = 0; i < allDrones.length; i++) {
+        if (allDrones[i].id === id) { drone = allDrones[i]; break; }
       }
-      if (statusChart) {
-        statusChart.data.datasets[0].data = [sc['正常'], sc['故障'], sc['维护']];
-        statusChart.update();
-      }
-      if (regionChart) {
-        regionChart.data.datasets[0].data = [rc['A区'], rc['B区'], rc['C区'], rc['D区']];
-        regionChart.update();
-      }
+      if (!drone || !drone.video_url) return;
+      currentDroneId = id;
+      renderDroneGrid();
+      playVideo(drone.name, drone.video_url);
     }
 
-    function doSearch() {
-      var name = ($('#sName').value || '').trim().toLowerCase();
-      var url = ($('#sUrl').value || '').trim().toLowerCase();
-      var region = $('#sRegion').value;
-      var status = $('#sStatus').value;
-      var clarity = $('#sClarity').value;
-      var start = ($('#sStart').value || '').replace('T', ' ');
-      var end = ($('#sEnd').value || '').replace('T', ' ');
-      visibleRecords = allRecords.filter(function(it) {
-        if (name && (it.name || '').toLowerCase().indexOf(name) < 0) return false;
-        if (url && (it.url || '').toLowerCase().indexOf(url) < 0) return false;
-        if (region && it.region !== region) return false;
-        if (status && it.status !== status) return false;
-        if (clarity && it.clarity !== clarity) return false;
-        if (start && (it.start_time || '') < start) return false;
-        if (end && (it.end_time || '') > end) return false;
-        return true;
-      });
-      renderTable(visibleRecords);
-      updateCharts(visibleRecords);
-      showToast('搜索完成，共 ' + visibleRecords.length + ' 条记录', 'success');
-    }
+    function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 
-    function toggleCheckAll() {
-      var checked = $('#checkAll').checked;
-      var boxes = document.querySelectorAll('.row-check');
-      for (var i = 0; i < boxes.length; i++) boxes[i].checked = checked;
-    }
-
-    function openAddModal() {
-      var now = new Date();
-      $('#fName').value = '';
-      $('#fUrl').value = '';
-      $('#fStart').value = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-      $('#fEnd').value = '';
-      $('#fRecording').checked = false;
-      $('#addOverlay').classList.add('active');
-    }
-    function closeAddModal() { $('#addOverlay').classList.remove('active'); }
-
-    async function submitAdd() {
-      var name = ($('#fName').value || '').trim();
-      var url = ($('#fUrl').value || '').trim();
-      var region = $('#fRegion').value;
-      var clarity = $('#fClarity').value;
-      var startTime = ($('#fStart').value || '').replace('T', ' ');
-      var endTime = ($('#fEnd').value || '').replace('T', ' ');
-      var status = $('#fStatus').value;
-      var recording = $('#fRecording').checked;
-      if (!name || !url) { showToast('请填写视频名称和地址', 'error'); return; }
-      if (!startTime || !endTime) { showToast('请填写开始时间和结束时间', 'error'); return; }
-      try {
-        var res = await api('/video/add', {
-          method: 'POST',
-          body: { name: name, url: url, region: region, clarity: clarity, status: status, recording: recording, start_time: startTime, end_time: endTime }
-        });
-        var d = await res.json();
-        if (!d.ok) { showToast(d.error || '新增失败', 'error'); return; }
-        closeAddModal();
-        showToast('新增视频源成功', 'success');
-        await loadData();
-      } catch (e) { showToast(e.message || '操作失败', 'error'); }
-    }
-
-    var pendingDeleteIds = [];
-    function confirmDelete(idx) {
-      var it = visibleRecords[idx];
-      if (!it) return;
-      pendingDeleteIds = [it.id];
-      $('#confirmMsg').textContent = '确定要删除视频源"' + it.name + '"吗？此操作不可恢复。';
-      $('#confirmOverlay').classList.add('active');
-      $('#confirmDeleteBtn').onclick = function() { doDeleteBatch(); };
-    }
-
-    function deleteSelected() {
-      var boxes = document.querySelectorAll('.row-check:checked');
-      if (!boxes.length) { showToast('请先选择要删除的记录', 'error'); return; }
-      pendingDeleteIds = [];
-      for (var i = 0; i < boxes.length; i++) pendingDeleteIds.push(parseInt(boxes[i].dataset.id));
-      $('#confirmMsg').textContent = '确定要删除选中的 ' + pendingDeleteIds.length + ' 条视频源吗？此操作不可恢复。';
-      $('#confirmOverlay').classList.add('active');
-      $('#confirmDeleteBtn').onclick = function() { doDeleteBatch(); };
-    }
-
-    function closeConfirm() { $('#confirmOverlay').classList.remove('active'); pendingDeleteIds = []; }
-
-    async function doDeleteBatch() {
-      var failed = 0;
-      for (var i = 0; i < pendingDeleteIds.length; i++) {
-        try {
-          var res = await api('/video/' + pendingDeleteIds[i], { method: 'DELETE' });
-          var d = await res.json();
-          if (!d.ok) failed++;
-        } catch (e) { failed++; }
-      }
-      closeConfirm();
-      if (failed > 0) showToast(failed + ' 条删除失败', 'error');
-      else showToast('删除成功', 'success');
-      $('#checkAll').checked = false;
-      await loadData();
-    }
-
-    var currentPlayerUrl = '';
-    var currentPlayerMode = ''; // 'video' or 'iframe'
-
+    /* ---- Player ---- */
     function isDirectMedia(url) {
       if (!url) return false;
       var ext = url.split('?')[0].split('#')[0].toLowerCase();
@@ -469,14 +203,13 @@
       return null;
     }
 
-    function playVideo(idx) {
-      var it = visibleRecords[idx];
-      if (!it) return;
-      var url = it.url || '';
+    function playVideo(name, url) {
       currentPlayerUrl = url;
       var video = $('#mainPlayer');
       var iframe = $('#iframePlayer');
-      $('#playerLabel').textContent = '— ' + it.name;
+      var empty = $('#emptyPlayer');
+      empty.style.display = 'none';
+      $('#playerLabel').textContent = '— ' + name;
 
       if (isDirectMedia(url)) {
         currentPlayerMode = 'video';
@@ -497,23 +230,23 @@
         $('#iframeControls').style.display = 'flex';
       }
       $('#playerContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      showToast('正在播放: ' + it.name, 'info');
+      showToast('正在播放: ' + name, 'info');
     }
 
     function playerPlay() {
       if (currentPlayerMode === 'video') {
         var p = $('#mainPlayer');
         if (p.src) p.play().catch(function() { showToast('无法播放该视频', 'error'); });
-        else showToast('请先选择要播放的视频', 'info');
+        else showToast('请先选择无人机', 'info');
       } else if (currentPlayerMode === 'iframe') {
-        showToast('网页视频请在播放器内操作控制', 'info');
+        showToast('网页视频请在播放器内操作', 'info');
       } else {
-        showToast('请先选择要播放的视频', 'info');
+        showToast('请先选择无人机', 'info');
       }
     }
     function playerPause() {
       if (currentPlayerMode === 'video') $('#mainPlayer').pause();
-      else showToast('网页视频请在播放器内操作控制', 'info');
+      else showToast('网页视频请在播放器内操作', 'info');
     }
     function playerFullscreen() {
       var el = currentPlayerMode === 'iframe' ? $('#iframePlayer') : $('#mainPlayer');
@@ -522,7 +255,7 @@
     }
     function openInNewTab() {
       if (currentPlayerUrl) window.open(currentPlayerUrl, '_blank');
-      else showToast('请先选择要播放的视频', 'info');
+      else showToast('请先选择无人机', 'info');
     }
   </script>
 </body>

@@ -207,7 +207,7 @@
   <!-- Usage tips -->
   <div class="hint-box">
     <div><strong>使用提示</strong></div>
-    <div>1. 先在"GPS/位置信息"模块中添加无人机设备，然后在此处上报电池数据进行监控。</div>
+    <div>1. 先在"无人机管理"页面统一注册无人机，注册后即可在此处选择该无人机并上报电池数据进行监控。</div>
     <div>2. 当电量低于20%、温度超过50°C或健康度低于50%时，系统会自动生成电池报警。</div>
     <div>3. 点击"详情"可查看该无人机的电池历史趋势图表，点击"上报"可快速为该无人机上报新数据。</div>
   </div>
@@ -235,6 +235,7 @@
         <div class="full-width">
           <label>无人机设备 *</label>
           <select id="reportDevice"><option value="0">请选择无人机</option></select>
+          <div id="reportDeviceHint" style="font-size:12px;color:#f59e0b;margin-top:4px;display:none;">暂无可选设备，请先到 <a href="javascript:void(0)" onclick="window.top.document.querySelector('[data-page=drones]').click()" style="color:#0ea5e9;text-decoration:underline;">无人机管理</a> 页面注册无人机</div>
         </div>
         <div>
           <label>电量(%)</label>
@@ -291,18 +292,24 @@
     let statusChart = null, gaugeChart = null, historyChart = null;
     let droneList = [];
 
-    // ========== Load Drones ==========
+    // ========== Load Drones from unified registry ==========
     async function loadDrones() {
       try {
-        const res = await api('/gps/devices?page_size=200');
+        const res = await api('/drones');
         const data = await res.json();
-        droneList = Array.isArray(data.items) ? data.items : [];
+        const drones = Array.isArray(data.items) ? data.items : [];
+        // linked_gps_device_id is the device_id used by battery_records
+        droneList = drones.filter(d => d.linked_gps_device_id && d.linked_gps_device_id > 0)
+                         .map(d => ({ id: d.linked_gps_device_id, name: d.name }));
         // update filter dropdown
         const filterSel = $('#filterDevice');
         filterSel.innerHTML = '<option value="">全部</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
         // update report dropdown
         const reportSel = $('#reportDevice');
         reportSel.innerHTML = '<option value="0">请选择无人机</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+        // show hint if no drones registered
+        const hint = $('#reportDeviceHint');
+        if (hint) hint.style.display = droneList.length === 0 ? 'block' : 'none';
       } catch (e) { console.error('loadDrones error:', e); }
     }
 

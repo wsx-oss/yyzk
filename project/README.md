@@ -19,7 +19,7 @@
 - [快速开始](#快速开始)
 - [系统访问地址](#系统访问地址)
 - [环境变量配置](#环境变量配置)
-- [10大功能模块](#10大功能模块)
+- [15大功能模块](#15大功能模块)
 - [API接口文档](#api接口文档)
 - [部署指南](#部署指南)
 - [故障排查](#故障排查)
@@ -88,7 +88,7 @@ listening on :8080
 
 1. 访问注册页面创建账号
 2. 登录后进入仪表盘
-3. 左侧导航切换10大功能模块
+3. 左侧导航切换15大功能模块
 
 ---
 
@@ -104,6 +104,7 @@ listening on :8080
 | `http://127.0.0.1:8080/app/login.html` | 用户登录 | ❌ |
 | `http://127.0.0.1:8080/app/dashboard.html` | 控制仪表盘（主界面）| ✅ |
 | `http://127.0.0.1:8080/app/vnc.html` | VNC 远程桌面（独立页面）| ✅ |
+| `http://127.0.0.1:8080/app/ssh.html` | SSH 终端（独立页面）| ✅ |
 
 ### 功能模块（在仪表盘内）
 
@@ -111,16 +112,21 @@ listening on :8080
 
 | # | 模块名称 | 功能说明 |
 |---|----------|----------|
-| 1 | 系统状态监控 | CPU、内存、磁盘、网络实时监控 |
-| 2 | 语音交互记录 | 音频文件上传/下载/播放/删除 |
-| 3 | 远程桌面控制 | 基于 noVNC 的远程桌面（需目标机VNC服务）|
-| 4 | 视频监控 | RTSP/HTTP 视频流接入和预览 |
-| 5 | 硬件状态检测 | 硬件温度、状态监控 |
-| 6 | 软件更新管理 | 更新包管理和部署 |
-| 7 | 数据同步状态 | 同步任务监控 |
-| 8 | 异常报警 | 告警记录和响应管理 |
-| 9 | 性能分析报告 | 多维度性能分析 |
-| 10 | 维护操作日志 | 操作审计日志 |
+| 1 | 无人机管理 | 无人机注册、编辑、连接（SSH/VNC/RDP）、状态监控、视频流配置 |
+| 2 | GPS/位置信息 | 无人机实时位置、地图可视化、电子围栏、历史轨迹 |
+| 3 | 电池监控 | 电量/电压/温度/健康度监控、自动报警、历史趋势 |
+| 4 | 飞行任务管理 | 任务创建/编辑/删除、飞行阶段状态机、任务日志、导入导出 |
+| 5 | 系统状态监控 | 主服务器 CPU、内存、磁盘、网络实时监控（WebSocket） |
+| 6 | 硬件状态检测 | 远程设备硬件指标采集（Agent 模式）、自动刷新、导出 CSV |
+| 7 | 远程桌面控制 | VNC/SSH/RDP 三种协议远程连接（浏览器内 VNC + SSH） |
+| 8 | 视频监控 | 无人机视频流统一查看和播放（数据来源于无人机注册表） |
+| 9 | 语音交互记录 | 音频文件上传/下载/播放/删除、交互统计 |
+| 10 | 异常报警 | 报警记录管理、导入导出、类型/优先级统计 |
+| 11 | 维护操作日志 | 操作审计日志、导入导出、类型/结果统计 |
+| 12 | 软件更新管理 | 更新发布/编辑/删除、自动/强制更新、导入导出 |
+| 13 | 数据同步状态 | 多设备间数据库同步（全量/增量）、独立任务管理 |
+| 14 | 性能分析报告 | 响应时间/吞吐量/错误率多维度分析、四种图表 |
+| 15 | 无人机连接与部署 | hw-agent 部署、Push/Pull 模式、跨网络方案 |
 
 ### API 端点
 
@@ -129,6 +135,7 @@ listening on :8080
 | `http://127.0.0.1:8080/api/healthz` | 健康检查 |
 | `ws://127.0.0.1:8080/api/metrics/stream` | WebSocket 实时监控流 |
 | `ws://127.0.0.1:8080/api/vnc/ws?target=IP:Port` | VNC WebSocket 代理 |
+| `ws://127.0.0.1:8080/api/ssh/ws` | SSH WebSocket 代理 |
 
 ---
 
@@ -170,43 +177,114 @@ go run .
 
 ---
 
-## 📦 10大功能模块
+## 📦 15大功能模块
 
-### 1. 系统状态监控
+### 1. 无人机管理
 
-**功能**: CPU、内存、磁盘、网络实时监控
+**功能**: 无人机注册、编辑、删除、连接（SSH/VNC/RDP）、状态监控、视频流配置。注册无人机时自动创建关联的远程设备和 GPS 设备。
+
+**API**:
+- `GET /api/drones` - 无人机列表
+- `POST /api/drones` - 注册无人机
+- `PUT /api/drones/:id` - 编辑无人机
+- `DELETE /api/drones/:id` - 删除无人机（级联删除关联数据）
+- `GET /api/drones/stats` - 无人机统计
+
+### 2. GPS/位置信息
+
+**功能**: 无人机实时位置、Leaflet 地图可视化、电子围栏、历史轨迹、Agent 自动推送
+
+**API**:
+- `GET /api/gps/devices` - GPS 设备列表
+- `POST /api/gps/devices/:id/push` - 手动推送位置
+- `POST /api/gps/push` - Agent 自动推送
+- `GET /api/gps/devices/:id/history` - 历史轨迹
+- `GET /api/gps/fence-alerts` - 围栏报警列表
+
+### 3. 电池监控
+
+**功能**: 电量/电压/电流/温度/健康度监控，自动报警，历史趋势图表
+
+**API**:
+- `GET /api/battery/latest` - 最新电池状态
+- `POST /api/battery/report` - 上报电池数据
+- `POST /api/battery/push` - Agent 自动推送
+- `GET /api/battery/history/:device_id` - 历史记录
+- `GET /api/battery/alerts` - 电池报警列表
+
+### 4. 飞行任务管理
+
+**功能**: 任务创建/编辑/删除、飞行阶段状态机（待命→起飞→巡航→执行任务→返航→降落）、任务日志
+
+**API**:
+- `GET /api/flight/missions` - 任务列表
+- `POST /api/flight/missions` - 创建任务
+- `POST /api/flight/missions/:id/phase` - 更新飞行阶段
+- `POST /api/flight/missions/import` - 批量导入
+
+### 5. 系统状态监控
+
+**功能**: 主服务器 CPU、内存、磁盘、网络实时监控（WebSocket 每秒推送）
 
 **API**:
 - `GET /api/metrics/snapshot` - 获取快照
 - `WS /api/metrics/stream` - 实时数据流
 
-**示例**:
-```bash
-curl http://127.0.0.1:8080/api/metrics/snapshot
-```
+### 6. 硬件状态检测
 
-### 2. 语音交互记录
+**功能**: 远程设备硬件指标采集（hw-agent Pull/Push 模式）、自动刷新、导出 CSV
 
-**功能**: 音频文件管理
+**API**:
+- `GET /api/hardware/items` - 硬件列表
+- `POST /api/hardware/items` - 添加硬件（自动检测 Agent）
+- `POST /api/hardware/items/refresh` - 批量刷新
+- `POST /api/hardware/push` - Agent 推送硬件数据
+
+### 7. 远程桌面控制
+
+**功能**: VNC/SSH/RDP 三种协议远程连接，VNC 和 SSH 在浏览器内完成，RDP 生成 .rdp 文件
+
+**API**:
+- `GET /api/devices` - 设备列表
+- `POST /api/devices` - 新增设备
+- `POST /api/devices/:id/status` - 设置状态
+- `WS /api/vnc/ws` - VNC 代理
+- `WS /api/ssh/ws` - SSH 代理
+
+### 8. 视频监控
+
+**功能**: 无人机视频流统一查看和播放，数据来源于无人机注册表的 `video_url` 字段
+
+**API**: 复用 `GET /api/drones` 接口
+
+### 9. 语音交互记录
+
+**功能**: 音频文件上传/下载/播放/删除、交互统计
 
 **API**:
 - `POST /api/audio/upload` - 上传
-- `GET /api/audio/list?page=1&page_size=20` - 列表（分页）
-- `GET /api/audio/download/:id` - 下载
+- `GET /api/audio/list` - 列表（分页）
+- `GET /api/audio/download/:id` - 下载/播放
 - `DELETE /api/audio/:id` - 删除
 
-### 3. 远程桌面控制
+### 10. 异常报警
 
-**功能**: VNC 远程桌面
-
-**前置条件**: 目标机器需安装 VNC 服务器（默认端口5900）
+**功能**: 报警记录管理、导入导出、类型/优先级统计
 
 **API**:
-- `WS /api/vnc/ws?target=192.168.1.100:5900` - VNC代理
+- `GET /api/alerts/list` - 报警列表（分页）
+- `POST /api/alerts/new` - 新增报警
+- `POST /api/alerts/resolve/:id` - 标记已解决
+- `GET /api/alerts/stats` - 报警统计
 
-### 4-10. 其他模块
+### 11-15. 其他模块
 
-其他功能模块详细说明请查看在线文档。
+- **维护操作日志**: `GET /api/logs/list`、`POST /api/logs/append`、`GET /api/logs/stats`
+- **软件更新管理**: `GET /api/updates/list`、`POST /api/updates/add`、`GET /api/updates/stats`
+- **数据同步状态**: `GET /api/sync/tasks`、`POST /api/sync/tasks/:id/start`、`POST /api/sync/tasks/:id/stop`
+- **性能分析报告**: `GET /api/report/perf-list`、`GET /api/report/perf`
+
+各模块详细功能说明请参考 `功能介绍/` 目录下的对应文档。
 
 ---
 
@@ -247,11 +325,21 @@ curl -X POST http://127.0.0.1:8080/api/auth/login \
 
 | 分类 | 端点 | 说明 |
 |------|------|------|
+| 无人机 | `GET /api/drones` | 无人机列表（含 video_url） |
+| 无人机 | `POST /api/drones` | 注册无人机 |
+| 无人机 | `GET /api/drones/stats` | 无人机统计 |
+| GPS | `GET /api/gps/devices` | GPS 设备列表 |
+| GPS | `POST /api/gps/push` | Agent GPS 推送 |
+| 电池 | `GET /api/battery/latest` | 最新电池状态 |
+| 电池 | `POST /api/battery/push` | Agent 电池推送 |
+| 飞行 | `GET /api/flight/missions` | 任务列表 |
+| 硬件 | `GET /api/hardware/items` | 硬件列表 |
+| 硬件 | `POST /api/hardware/push` | Agent 硬件推送 |
+| 设备 | `GET /api/devices` | 远程设备列表 |
 | 音频 | `GET /api/audio/list` | 列表（支持分页）|
-| 音频 | `DELETE /api/audio/:id` | 删除 |
 | 告警 | `GET /api/alerts/list` | 列表（支持分页）|
-| 告警 | `POST /api/alerts/ack/:id` | 确认 |
 | 日志 | `GET /api/logs/list` | 列表（支持分页）|
+| 同步 | `GET /api/sync/tasks` | 同步任务列表 |
 
 ### 分页参数
 
@@ -398,42 +486,78 @@ go run .
 
 ## 📁 项目结构
 
-```
+```text
 project/
-├── main.go                    # 程序入口
-├── go.mod                     # 依赖管理
+├── main.go                        # 主程序入口
+├── go.mod / go.sum                 # Go 依赖管理
+├── app.db                          # SQLite 数据库文件
+├── cmd/
+│   └── agent/main.go               # hw-agent 独立程序（部署在无人机/目标设备上）
 ├── internal/
-│   ├── db/db.go              # 数据库
-│   ├── handlers/             # API处理
-│   ├── monitor/              # 监控
-│   ├── middleware/           # 中间件
-│   └── utils/                # 工具
-├── web/                      # 前端页面
-│   ├── index.html
-│   ├── login.html
-│   ├── dashboard.html
-│   └── modules/              # 功能模块
-└── data/                     # 数据目录
-    └── recordings/           # 录音文件
+│   ├── agent/agent.go              # 内嵌 Agent（主服务启动时自动运行本机 Agent）
+│   ├── db/db.go                    # 数据库初始化与表结构定义
+│   ├── handlers/                   # API 处理函数
+│   │   ├── api.go                  # 通用 API（设备、硬件、报警、日志、更新、同步、性能等）
+│   │   ├── drones.go               # 无人机管理 API
+│   │   ├── gps.go                  # GPS/位置信息 API
+│   │   ├── battery.go              # 电池监控 API
+│   │   └── flight.go               # 飞行任务管理 API
+│   ├── middleware/                 # 中间件（认证等）
+│   ├── monitor/monitor.go          # 系统指标采集
+│   └── syncengine/engine.go        # 数据同步引擎
+├── web/
+│   ├── index.html                  # 登录页
+│   ├── dashboard.html              # 仪表盘导航
+│   ├── vnc.html / ssh.html         # VNC/SSH 客户端页面
+│   └── modules/                    # 15 个功能模块页面
+│       ├── drones.html             # 无人机管理
+│       ├── gps.html                # GPS/位置信息
+│       ├── battery.html            # 电池监控
+│       ├── flight.html             # 飞行任务管理
+│       ├── hardware.html           # 硬件状态检测
+│       ├── remote.html             # 远程桌面控制
+│       ├── video.html              # 视频监控
+│       ├── monitor.html            # 系统状态监控
+│       ├── alerts.html             # 异常报警
+│       ├── logs.html               # 维护操作日志
+│       ├── audio.html              # 语音交互记录
+│       ├── updates.html            # 软件更新管理
+│       ├── sync.html               # 数据同步状态
+│       ├── performance.html        # 性能分析报告
+│       └── common.js / common.css  # 公共工具函数和样式
+└── data/
+    └── recordings/                 # 语音文件存储目录
 ```
 
 ---
 
 ## 🔄 版本更新
 
-### v1.1.0 (最新)
+### v2.0.0 (最新)
+
+**新增**:
+- ✅ 无人机统一管理模块（注册/编辑/删除/连接）
+- ✅ GPS/位置信息模块（Leaflet 地图、电子围栏、历史轨迹）
+- ✅ 电池监控模块（自动报警、历史趋势）
+- ✅ 飞行任务管理模块（飞行阶段状态机、任务日志）
+- ✅ hw-agent Push 模式（自动推送硬件+GPS+电池数据）
+- ✅ SSH 浏览器内终端（xterm.js）
+- ✅ RDP 连接支持（生成 .rdp 文件）
+- ✅ 数据同步引擎（全量/增量同步）
+- ✅ 视频监控与无人机注册表联动
+
+### v1.1.0
 
 **新增**:
 - ✅ 完整会话管理系统
-- ✅ 3个新认证接口
-- ✅ 音频删除功能
+- ✅ 认证接口
 - ✅ 列表分页支持
 - ✅ API限流保护
 - ✅ CORS跨域支持
 
 **优化**:
-- ✅ 6个数据库索引
-- ✅ 性能提升50-80%
+- ✅ 数据库索引优化
+- ✅ 性能提升
 - ✅ 安全性增强
 
 ---

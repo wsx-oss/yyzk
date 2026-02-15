@@ -38,7 +38,7 @@ func (a *API) DevicesList(c *gin.Context) {
 
 	var args []any
 	// 不做 WHERE 过滤，仅按匹配程度置顶
-	q := "SELECT id, name, ip, protocol, port, username, auto_connect, log_enabled, description, status, created_at, updated_at, last_connected_at FROM devices"
+	q := "SELECT id, name, ip, protocol, port, username, auto_connect, log_enabled, description, status, created_at, updated_at, last_connected_at FROM devices WHERE COALESCE(drone_id,0) > 0"
 	// 按名称匹配、协议匹配进行权重排序，其次按创建时间倒序
 	q += " ORDER BY (CASE WHEN ? != '' AND LOWER(name) LIKE LOWER(?) THEN 0 ELSE 1 END)"
 	q += ", (CASE WHEN ? != '' AND UPPER(protocol) = ? THEN 0 ELSE 1 END)"
@@ -285,17 +285,10 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		r.GET("/api/vnc/ws", a.VNCProxyWS)
 		r.GET("/api/ssh/ws", a.SSHProxyWS)
 
-		// devices management
+		// devices (read-only + status; create/delete managed by /drones)
 		api.GET("/devices", a.DevicesList)
-		api.POST("/devices", a.DevicesCreate)
 		api.POST("/devices/disconnect-all", a.DevicesDisconnectAll)
-		api.DELETE("/devices/:id", a.DevicesDelete)
 		api.POST("/devices/:id/status", a.DeviceSetStatus)
-
-		// video sources
-		api.GET("/video/list", a.VideoList)
-		api.POST("/video/add", a.VideoAdd)
-		api.DELETE("/video/:id", a.VideoDelete)
 
 		// hardware items management
 		api.GET("/hardware/items", a.HardwareItemsList)
@@ -326,18 +319,23 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/flight/missions/:id/logs", a.FlightMissionsLogs)
 		api.POST("/flight/missions/push", a.FlightMissionPushByAgent)
 
-		// GPS / location tracking
+		// GPS / location tracking (read-only + push; create/update/delete managed by /drones)
 		api.GET("/gps/devices", a.GpsDevicesList)
-		api.POST("/gps/devices", a.GpsDevicesCreate)
 		api.GET("/gps/devices/stats", a.GpsStats)
 		api.GET("/gps/devices/:id", a.GpsDevicesGet)
-		api.PUT("/gps/devices/:id", a.GpsDevicesUpdate)
-		api.DELETE("/gps/devices/:id", a.GpsDevicesDelete)
 		api.POST("/gps/devices/:id/push", a.GpsDevicesPush)
 		api.GET("/gps/devices/:id/history", a.GpsDevicesHistory)
 		api.GET("/gps/fence-alerts", a.GpsFenceAlerts)
 		api.POST("/gps/fence-alerts/:id/ack", a.GpsFenceAlertAck)
 		api.POST("/gps/push", a.GpsPushByAgent)
+
+		// Unified drone registry
+		api.GET("/drones", a.DronesList)
+		api.POST("/drones", a.DronesCreate)
+		api.GET("/drones/stats", a.DronesStats)
+		api.GET("/drones/:id", a.DronesGet)
+		api.PUT("/drones/:id", a.DronesUpdate)
+		api.DELETE("/drones/:id", a.DronesDelete)
 
 		// Battery monitoring
 		api.GET("/battery/records", a.BatteryRecordsList)
@@ -2762,73 +2760,6 @@ func (a *API) PerfCollect(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"ok": true, "collected": inserted, "results": results})
-}
-
-func (a *API) VideoList(c *gin.Context) {
-	rows, err := a.db.Query(`SELECT id, name, url, region, clarity, status, recording, start_time, end_time, created_at FROM video_sources ORDER BY id DESC`)
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-	defer rows.Close()
-	var items []gin.H
-	for rows.Next() {
-		var id int
-		var name, url, region, clarity, status, startTime, endTime, created string
-		var recording int
-		if err := rows.Scan(&id, &name, &url, &region, &clarity, &status, &recording, &startTime, &endTime, &created); err == nil {
-			items = append(items, gin.H{"id": id, "name": name, "url": url, "region": region, "clarity": clarity, "status": status, "recording": recording == 1, "start_time": startTime, "end_time": endTime, "created_at": created})
-		}
-	}
-	c.JSON(200, gin.H{"items": items})
-}
-
-func (a *API) VideoAdd(c *gin.Context) {
-	var p struct {
-		Name      string `json:"name"`
-		Url       string `json:"url"`
-		Region    string `json:"region"`
-		Clarity   string `json:"clarity"`
-		Status    string `json:"status"`
-		Recording bool   `json:"recording"`
-		StartTime string `json:"start_time"`
-		EndTime   string `json:"end_time"`
-	}
-	if err := c.BindJSON(&p); err != nil {
-		c.JSON(400, gin.H{"error": "bad json"})
-		return
-	}
-	if p.Name == "" || p.Url == "" {
-		c.JSON(400, gin.H{"error": "name and url required"})
-		return
-	}
-	rec := 0
-	if p.Recording {
-		rec = 1
-	}
-	res, err := a.db.Exec(`INSERT INTO video_sources(name, url, region, clarity, status, recording, start_time, end_time) VALUES(?,?,?,?,?,?,?,?)`,
-		p.Name, p.Url, p.Region, p.Clarity, p.Status, rec, p.StartTime, p.EndTime)
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-	newId, _ := res.LastInsertId()
-	c.JSON(200, gin.H{"ok": true, "id": newId})
-}
-
-func (a *API) VideoDelete(c *gin.Context) {
-	id := c.Param("id")
-	result, err := a.db.Exec(`DELETE FROM video_sources WHERE id = ?`, id)
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-	affected, _ := result.RowsAffected()
-	if affected == 0 {
-		c.JSON(404, gin.H{"error": "not found"})
-		return
-	}
-	c.JSON(200, gin.H{"ok": true})
 }
 
 func (a *API) VNCProxyWS(c *gin.Context) {

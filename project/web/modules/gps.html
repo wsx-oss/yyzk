@@ -77,7 +77,7 @@
     <div class="gps-header-row">
       <div class="module-title">GPS/位置信息</div>
       <div class="gps-header-btns">
-        <button class="btn btn-primary" onclick="openNewDeviceModal()">添加设备</button>
+        <button class="btn btn-primary" onclick="window.top.document.querySelector('[data-page=drones]').click()">前往注册无人机</button>
         <button class="btn btn-secondary" onclick="refreshAll()">刷新数据</button>
         <button class="btn btn-success" id="btnAutoRefresh" onclick="toggleAutoRefresh()">开启实时监控</button>
       </div>
@@ -203,15 +203,6 @@
     </div>
   </div>
 
-  <!-- Hints -->
-  <div class="hint-box" style="margin-top:20px;">
-    <div><strong>使用提示</strong></div>
-    <div>1. 添加设备时填写 <strong>Agent ID</strong>（无人机主机名），系统会自动将 Agent 推送的数据关联到该设备。</div>
-    <div>2. 无人机上运行 <code>hw-agent -server http://主控端IP:8080</code> 后，设备状态会自动变为“在线”，30秒无数据则显示“离线”。</div>
-    <div>3. 启用电子围栏后，当设备位置超出围栏范围时，系统会自动生成围栏报警记录。</div>
-    <div>4. 点击地图上的设备标记可查看设备详细信息，点击“轨迹”可查看历史移动轨迹。</div>
-  </div>
-
   <!-- Stats Charts -->
   <div class="card">
     <div class="card-title">设备统计</div>
@@ -227,64 +218,14 @@
     </div>
   </div>
 
-  <!-- New/Edit Device Modal -->
-  <div class="modal-overlay" id="deviceModal">
-    <div class="modal-box">
-      <div class="modal-title" id="deviceModalTitle">添加无人机</div>
-      <div class="modal-form">
-        <div class="full-width">
-          <label>无人机名称 *</label>
-          <input id="devName" type="text" placeholder="请输入无人机名称" />
-        </div>
-        <div class="full-width">
-          <label>Agent ID（无人机唯一标识）</label>
-          <input id="devAgentId" type="text" placeholder="例如: drone-SN-20240301-001" />
-          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">提示：在伴飞计算机上运行 <code>hw-agent -server http://主控端IP:8080 -id "drone-SN-xxx"</code> 时通过 -id 参数指定。此处填写相同的值即可关联推送数据。未指定 -id 时默认使用主机名。</div>
-        </div>
-        <div>
-          <label>初始经度</label>
-          <input id="devLng" type="number" step="any" placeholder="例如: 116.397" />
-        </div>
-        <div>
-          <label>初始纬度</label>
-          <input id="devLat" type="number" step="any" placeholder="例如: 39.908" />
-        </div>
-        <div>
-          <label>初始海拔(m)</label>
-          <input id="devAlt" type="number" step="any" value="0" />
-        </div>
-        <div class="full-width" style="border-top:1px solid #e2e8f0;padding-top:14px;margin-top:4px;">
-          <label style="margin-bottom:8px;">电子围栏设置</label>
-          <div class="fence-toggle">
-            <label class="toggle-switch">
-              <input type="checkbox" id="devFenceEnabled" onchange="toggleFenceFields()" />
-              <span class="toggle-slider"></span>
-            </label>
-            <span style="font-size:13px;color:#475569;">启用电子围栏</span>
-          </div>
-        </div>
-        <div id="fenceFields" style="display:none;grid-column:1/-1;">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-            <div>
-              <label>围栏中心经度</label>
-              <input id="devFenceLng" type="number" step="any" placeholder="116.397" />
-            </div>
-            <div>
-              <label>围栏中心纬度</label>
-              <input id="devFenceLat" type="number" step="any" placeholder="39.908" />
-            </div>
-            <div>
-              <label>围栏半径(m)</label>
-              <input id="devFenceRadius" type="number" step="any" value="500" />
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeDeviceModal()">取消</button>
-        <button class="btn btn-primary" id="btnSubmitDevice" onclick="submitDevice()">确认添加</button>
-      </div>
-    </div>
+  <!-- Hints -->
+  <div class="hint-box" style="margin-top:20px;">
+    <div><strong>使用提示</strong></div>
+    <div>1. 设备统一在"无人机管理"页面注册，注册后系统会自动在此页面创建对应的GPS设备，无需手动添加。</div>
+    <div>2. 无人机上运行 <code>hw-agent -server http://主控端IP:8080</code> 后，设备状态会自动变为"在线"，30秒无数据则显示"离线"。</div>
+    <div>3. 启用电子围栏后，当设备位置超出围栏范围时，系统会自动生成围栏报警记录。</div>
+    <div>4. 点击地图上的设备标记可查看设备详细信息，点击"轨迹"可查看历史移动轨迹。</div>
+    <div>5. 如需编辑或删除设备，请到"无人机管理"页面操作，关联数据会自动同步。</div>
   </div>
 
   <!-- Detail Modal -->
@@ -527,11 +468,8 @@
           <td>
             <button class="btn btn-primary btn-action" onclick="viewDetail(${d.id})">详情</button>
             <button class="btn btn-success btn-action" onclick="openPushModal(${d.id},${d.longitude},${d.latitude})">推送</button>
-            <button class="btn btn-secondary btn-action" onclick="editDevice(${d.id})">编辑</button>
-            <button class="btn btn-danger btn-action" onclick="deleteDevice(${d.id})">删除</button>
           </td>
-        </tr>
-      `).join('');
+        </tr>`).join('');
     }
 
     function renderAlertTable(items) {
@@ -583,77 +521,6 @@
     function changeAlertPage(d) { alertPage += d; loadAlerts(); }
     function search() { currentPage = 1; loadDevices(); loadStats(); }
     function refreshAll() { loadDevices(); loadStats(); loadAlerts(); showToast('数据已刷新', 'success'); }
-
-    // ========== Device Modal ==========
-    function openNewDeviceModal() {
-      editingId = null;
-      $('#deviceModalTitle').textContent = '添加无人机';
-      $('#btnSubmitDevice').textContent = '确认添加';
-      $('#devName').value = '';
-      $('#devAgentId').value = '';
-      $('#devLng').value = '116.397'; $('#devLat').value = '39.908'; $('#devAlt').value = '0';
-      $('#devFenceEnabled').checked = false; toggleFenceFields();
-      $('#devFenceLng').value = ''; $('#devFenceLat').value = ''; $('#devFenceRadius').value = '500';
-      $('#deviceModal').classList.add('active');
-    }
-
-    async function editDevice(id) {
-      try {
-        const res = await api('/gps/devices/' + id);
-        const d = await res.json();
-        editingId = id;
-        $('#deviceModalTitle').textContent = '编辑无人机';
-        $('#btnSubmitDevice').textContent = '确认保存';
-        $('#devName').value = d.name || '';
-        $('#devAgentId').value = d.agent_id || '';
-        $('#devLng').value = d.longitude; $('#devLat').value = d.latitude; $('#devAlt').value = d.altitude;
-        $('#devFenceEnabled').checked = d.fence_enabled; toggleFenceFields();
-        $('#devFenceLng').value = d.fence_lng || ''; $('#devFenceLat').value = d.fence_lat || '';
-        $('#devFenceRadius').value = d.fence_radius || 500;
-        $('#deviceModal').classList.add('active');
-      } catch (e) { showToast('加载失败', 'error'); }
-    }
-
-    function closeDeviceModal() { $('#deviceModal').classList.remove('active'); editingId = null; }
-    function toggleFenceFields() { $('#fenceFields').style.display = $('#devFenceEnabled').checked ? 'block' : 'none'; }
-
-    async function submitDevice() {
-      const body = {
-        name: $('#devName').value.trim(),
-        agent_id: $('#devAgentId').value.trim(),
-        longitude: parseFloat($('#devLng').value) || 0,
-        latitude: parseFloat($('#devLat').value) || 0,
-        altitude: parseFloat($('#devAlt').value) || 0,
-        fence_enabled: $('#devFenceEnabled').checked,
-        fence_lng: parseFloat($('#devFenceLng').value) || 0,
-        fence_lat: parseFloat($('#devFenceLat').value) || 0,
-        fence_radius: parseFloat($('#devFenceRadius').value) || 0,
-      };
-      if (!body.name) { showToast('请输入无人机名称', 'error'); return; }
-      try {
-        let res;
-        if (editingId) {
-          res = await api('/gps/devices/' + editingId, { method: 'PUT', body });
-        } else {
-          res = await api('/gps/devices', { method: 'POST', body });
-        }
-        const data = await res.json();
-        if (data.error) { showToast(data.error, 'error'); return; }
-        showToast(editingId ? '设备已更新' : '设备已添加', 'success');
-        closeDeviceModal(); loadDevices(); loadStats();
-      } catch (e) { showToast('操作失败', 'error'); }
-    }
-
-    // ========== Delete ==========
-    async function deleteDevice(id) {
-      if (!confirm('确定删除该无人机及其所有历史数据？')) return;
-      try {
-        const res = await api('/gps/devices/' + id, { method: 'DELETE' });
-        const data = await res.json();
-        if (data.error) { showToast(data.error, 'error'); return; }
-        showToast('设备已删除', 'success'); loadDevices(); loadStats();
-      } catch (e) { showToast('删除失败', 'error'); }
-    }
 
     // ========== Push Location ==========
     function openPushModal(id, lng, lat) {

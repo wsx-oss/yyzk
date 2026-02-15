@@ -45,7 +45,7 @@
   <div class="module-header">
     <div class="module-title">远程桌面控制</div>
     <div class="action-buttons">
-      <button class="btn btn-primary" onclick="openAddModal()">新增连接</button>
+      <button class="btn btn-primary" onclick="window.top.document.querySelector('[data-page=drones]').click()">前往注册无人机</button>
       <button class="btn btn-secondary" onclick="loadDevices()">刷新</button>
       <button class="btn btn-danger" onclick="disconnectAll()">断开所有连接</button>
     </div>
@@ -156,9 +156,9 @@
   <!-- 使用提示 -->
   <div class="hint-box">
     <div><strong>使用提示:</strong></div>
-    <div>1. 请确保设备的IP地址和端口号正确，以保证连接成功。</div>
-    <div>2. 不同的连接类型可能需要不同的配置，请根据实际情况设置。</div>
-    <div>3. 断开连接后，设备将无法进行远程控制。</div>
+    <div>1. 设备统一在“无人机管理”页面注册，注册后此页面会自动显示对应的远程连接设备。</div>
+    <div>2. 点击“连接”即可通过 VNC/SSH/RDP 远程控制无人机伴飞计算机。</div>
+    <div>3. 断开连接后，设备将无法进行远程控制。如需修改设备信息，请到“无人机管理”页面操作。</div>
   </div>
 
   <!-- 连接统计 -->
@@ -172,70 +172,6 @@
       <div style="height:280px;display:flex;flex-direction:column;align-items:center;">
         <div style="font-weight:600;margin-bottom:8px;text-align:center;">连接类型分布</div>
         <canvas id="protocolChart" style="max-height:240px;"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- 新增远程连接弹窗 -->
-  <div class="overlay" id="addOverlay">
-    <div class="modal">
-      <button class="close-btn" onclick="closeAddModal()">&times;</button>
-      <h3>新增远程连接</h3>
-      <div class="form-group" style="margin-bottom:14px;">
-        <label>设备名称 <span class="req">*</span></label>
-        <input type="text" id="fName" placeholder="请输入设备名称" />
-      </div>
-      <div class="form-group" style="margin-bottom:14px;">
-        <label>IP地址 <span class="req">*</span></label>
-        <input type="text" id="fIP" placeholder="请输入IP地址" />
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>连接类型 <span class="req">*</span></label>
-          <select id="fProtocol">
-            <option value="RDP">RDP</option>
-            <option value="VNC">VNC</option>
-            <option value="SSH">SSH</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>端口号 <span class="req">*</span></label>
-          <input type="text" id="fPort" placeholder="请输入端口号" />
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>用户名 <span class="req">*</span></label>
-          <input type="text" id="fUsername" placeholder="请输入用户名" />
-        </div>
-        <div class="form-group">
-          <label>密码</label>
-          <input type="password" id="fPassword" placeholder="请输入密码" />
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>自动连接</label>
-          <div class="switch-wrap">
-            <label class="switch"><input type="checkbox" id="fAutoConnect" /><span class="slider"></span></label>
-            <span>启用</span>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>记录日志</label>
-          <div class="switch-wrap">
-            <label class="switch"><input type="checkbox" id="fLogEnabled" /><span class="slider"></span></label>
-            <span>启用</span>
-          </div>
-        </div>
-      </div>
-      <div class="form-group" style="margin-bottom:14px;">
-        <label>描述信息</label>
-        <textarea id="fDesc" placeholder="请输入描述信息"></textarea>
-      </div>
-      <div class="modal-footer">
-        <button class="btn" style="background:#94a3b8;color:#fff;" onclick="closeAddModal()">取消</button>
-        <button class="btn btn-primary" onclick="submitAdd()">确认</button>
       </div>
     </div>
   </div>
@@ -316,7 +252,6 @@
             (isOnline
               ? '<button class="btn btn-secondary" style="padding:4px 12px;font-size:12px;margin-right:4px;" onclick="doDisconnect(' + it.id + ')">断开</button>'
               : '<button class="btn btn-primary" style="padding:4px 12px;font-size:12px;margin-right:4px;" onclick="doConnect(' + i + ')">连接</button>') +
-            '<button class="btn btn-danger" style="padding:4px 12px;font-size:12px;" onclick="doDelete(' + it.id + ',\'' + esc(it.name) + '\')">删除</button>' +
           '</td>';
         tb.appendChild(tr);
       }
@@ -378,47 +313,6 @@
       updateStats(visibleDevices);
       updateCharts(visibleDevices);
       showToast('搜索完成，共 ' + visibleDevices.length + ' 条记录', 'success');
-    }
-
-    /* ---- Add Modal ---- */
-    function openAddModal() {
-      $('#fName').value = '';
-      $('#fIP').value = '';
-      $('#fPort').value = '';
-      $('#fUsername').value = '';
-      $('#fPassword').value = '';
-      $('#fAutoConnect').checked = false;
-      $('#fLogEnabled').checked = false;
-      $('#fDesc').value = '';
-      $('#addOverlay').classList.add('active');
-    }
-    function closeAddModal() { $('#addOverlay').classList.remove('active'); }
-
-    async function submitAdd() {
-      var name = ($('#fName').value || '').trim();
-      var ip = ($('#fIP').value || '').trim();
-      var protocol = $('#fProtocol').value;
-      var port = parseInt($('#fPort').value) || 0;
-      var username = ($('#fUsername').value || '').trim();
-      var password = ($('#fPassword').value || '');
-      var autoConnect = $('#fAutoConnect').checked;
-      var logEnabled = $('#fLogEnabled').checked;
-      var description = ($('#fDesc').value || '').trim();
-      if (!name || !ip || !protocol) { showToast('请填写设备名称、IP地址和连接类型', 'error'); return; }
-      if (!port) { showToast('请填写端口号', 'error'); return; }
-      if (!username) { showToast('请填写用户名', 'error'); return; }
-      try {
-        var res = await api('/devices', {
-          method: 'POST',
-          body: { name: name, ip: ip, protocol: protocol, port: port, username: username, password: password, auto_connect: autoConnect, log_enabled: logEnabled, description: description }
-        });
-        if (res.status === 409) { showToast('已存在相同设备', 'error'); return; }
-        var d = await res.json();
-        if (!d.ok) { showToast(d.error || '新增失败', 'error'); return; }
-        closeAddModal();
-        showToast('新增连接成功', 'success');
-        await loadDevices();
-      } catch (e) { showToast(e.message || '操作失败', 'error'); }
     }
 
     /* ---- Connect / Disconnect ---- */
@@ -520,20 +414,6 @@
           remoteWindows = {};
           showToast('已断开所有连接', 'success');
         } catch (e) { showToast('操作失败', 'error'); }
-        closeConfirm();
-        await loadDevices();
-      });
-    }
-
-    /* ---- Delete ---- */
-    function doDelete(id, name) {
-      showConfirm('确认删除', '确定要删除设备"' + name + '"吗？此操作不可恢复。', async function() {
-        try {
-          var res = await api('/devices/' + id, { method: 'DELETE' });
-          var d = await res.json();
-          if (!d.ok) { showToast(d.error || '删除失败', 'error'); closeConfirm(); return; }
-          showToast('已删除', 'success');
-        } catch (e) { showToast('删除失败', 'error'); }
         closeConfirm();
         await loadDevices();
       });

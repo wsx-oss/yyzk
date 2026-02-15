@@ -10,7 +10,7 @@
 
 - 后端位于 `project/`，使用 Go + Gin 提供 API 服务，SQLite 持久化。
 - 前端静态页面位于 `project/web/`，由后端内嵌静态资源并通过 `/app` 提供访问。
-- 主要能力包含：用户认证、状态监控、音频管理、远程桌面（VNC WebSocket 代理）等。
+- 主要能力包含：用户认证、无人机管理、GPS/位置信息、电池监控、飞行任务管理、硬件状态检测、远程桌面控制（VNC/SSH/RDP）、视频监控、系统状态监控、异常报警、维护操作日志、语音交互记录、软件更新管理、数据同步、性能分析报告等。
 
 **目标**：在多人协作下持续迭代功能，确保代码质量、提交可追溯、分支清晰、可稳定交付。
 
@@ -79,15 +79,45 @@
 
 ```text
 project/
-  main.go
-  go.mod
+  main.go                    # 主程序入口
+  go.mod / go.sum             # Go 依赖管理
+  app.db                      # SQLite 数据库文件
+  cmd/
+    agent/main.go             # hw-agent 独立程序（部署在无人机/目标设备上）
   internal/
-    db/
-    handlers/
-    middleware/
-    monitor/
+    agent/agent.go            # 内嵌 Agent（主服务启动时自动运行本机 Agent）
+    db/db.go                  # 数据库初始化与表结构定义
+    handlers/                 # API 处理函数
+      api.go                  # 通用 API（设备、硬件、报警、日志、更新、同步、性能等）
+      drones.go               # 无人机管理 API
+      gps.go                  # GPS/位置信息 API
+      battery.go              # 电池监控 API
+      flight.go               # 飞行任务管理 API
+    middleware/                # 中间件（认证等）
+    monitor/monitor.go        # 系统指标采集
+    syncengine/engine.go      # 数据同步引擎
   web/
+    index.html                # 登录页
+    dashboard.html            # 仪表盘导航
+    vnc.html / ssh.html       # VNC/SSH 客户端页面
+    modules/                  # 功能模块页面
+      drones.html             # 无人机管理
+      gps.html                # GPS/位置信息
+      battery.html            # 电池监控
+      flight.html             # 飞行任务管理
+      hardware.html           # 硬件状态检测
+      remote.html             # 远程桌面控制
+      video.html              # 视频监控
+      monitor.html            # 系统状态监控
+      alerts.html             # 异常报警
+      logs.html               # 维护操作日志
+      audio.html              # 语音交互记录
+      updates.html            # 软件更新管理
+      sync.html               # 数据同步状态
+      performance.html        # 性能分析报告
+      common.js / common.css  # 公共工具函数和样式
   data/
+    recordings/               # 语音文件存储目录
 ```
 
 ### 5.3 新增文件/目录规则
@@ -108,5 +138,3 @@ project/
 - **禁止**在公共分支执行 `git push --force`。
 - **禁止**把个人临时文件、无关生成物提交进仓库（如 `node_modules/`、本地数据库、临时日志等）。
 - **禁止**未通知他人就改动公共接口（API/字段/URL），导致他人分支不可用。
-=======
-- 开始我们的创作旅程吧！！！

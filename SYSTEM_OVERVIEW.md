@@ -43,12 +43,23 @@
 - **页面**
   - 仪表盘模块：`/app/modules/monitor.html`
 
-### 1.4 硬件信息采集
+### 1.4 硬件状态检测
 
 - **功能**
   - 获取主机硬件与系统信息（主机名/OS/CPU/内存等）
+  - 远程设备硬件指标采集（通过 hw-agent Pull/Push 模式）
+  - 硬件设备管理（添加/搜索/刷新/删除/导出 CSV）
+  - 自动状态判定（在线/离线）
+  - 硬件类型支持：服务器、路由器、交换机、存储设备、无人机
 - **后端接口**
   - `GET /api/hardware/snapshot`
+  - `GET /api/hardware/items`
+  - `POST /api/hardware/items`
+  - `POST /api/hardware/items/refresh`
+  - `POST /api/hardware/push`（Agent Push 模式）
+  - `GET /api/hardware/items/stats`
+- **数据落地**
+  - SQLite 表：`hardware_items`
 - **页面**
   - 仪表盘模块：`/app/modules/hardware.html`
 
@@ -70,20 +81,22 @@
 - **页面**
   - 仪表盘模块：`/app/modules/audio.html`
 
-### 1.6 远程桌面控制（VNC WebSocket 代理 + noVNC）
+### 1.6 远程桌面控制（VNC/SSH/RDP）
 
 - **功能**
-  - 浏览器端 noVNC 渲染远程桌面
-  - 后端提供 VNC TCP 到 WebSocket 的代理（浏览器与 VNC 服务之间的桥接）
+  - VNC：浏览器端 noVNC 渲染远程桌面（后端 VNC TCP 到 WebSocket 代理）
+  - SSH：浏览器端 xterm.js 终端（后端 SSH TCP 到 WebSocket 代理）
+  - RDP：生成 .rdp 文件下载，用户通过本地 RDP 客户端连接
   - 设备在线/离线状态更新
-  - 记录用户远程连接次数
+  - 设备可通过无人机注册自动创建，也可手动添加
 - **后端接口**
-  - `WS /api/vnc/ws?target=IP:PORT`（默认 `127.0.0.1:5900`）
+  - `WS /api/vnc/ws?target=IP:PORT`
+  - `WS /api/ssh/ws`
   - `POST /api/devices/:id/status`（在线/离线）
   - `POST /api/user/stats/incr_connection`
 - **页面**
   - 仪表盘模块：`/app/modules/remote.html`
-  - 独立页面：`/app/vnc.html`（noVNC + 连接/断开/冷却）
+  - 独立页面：`/app/vnc.html`（noVNC）、`/app/ssh.html`（xterm.js）
 
 ### 1.7 设备管理（远程控制资产）
 
@@ -149,33 +162,125 @@
 ### 1.11 数据同步状态
 
 - **功能**
-  - 获取同步状态
-  - 设置同步状态（并更新时间）
+  - 多设备间数据库同步（全量/增量模式）
+  - 同步任务管理（创建/启停/编辑/删除）
+  - IP 有效性预检、实时进度追踪
+  - 同步 7 张表：`hardware_items`、`updates`、`recordings`、`logs`、`alerts`、`devices`、`drones`
 - **后端接口**
-  - `GET /api/sync/status`
-  - `POST /api/sync/status`
+  - `GET /api/sync/tasks`、`POST /api/sync/tasks`
+  - `POST /api/sync/tasks/:id/start`、`POST /api/sync/tasks/:id/stop`
+  - `POST /api/sync/tasks/stop-all`
+  - `POST /api/sync/tasks/check-ip`
+  - `GET /api/sync/export-data`、`POST /api/sync/import-data`
+  - `GET /api/sync/tasks/stats`、`GET /api/sync/tasks/progress`、`GET /api/sync/tasks/info`
 - **数据落地**
-  - SQLite 表：`sync_status`（固定 `id=1` 一条记录）
+  - SQLite 表：`sync_tasks`
 - **页面**
   - 仪表盘模块：`/app/modules/sync.html`
 
-### 1.12 性能报告（汇总）
+### 1.12 性能分析报告
 
 - **功能**
-  - 输出一份“当前实时指标 + 历史事件计数”的快速报告
+  - 实时系统性能报告（CPU、内存、磁盘、网络）
+  - 性能分析记录管理（查询/新增/导入/删除）
+  - 四种图表：响应时间折线图、吞吐量柱状图、错误率饼图、模块性能雷达图
 - **后端接口**
   - `GET /api/report/perf`
+  - `GET /api/report/perf-list`
+  - `POST /api/report/perf-add`
+  - `POST /api/report/perf-import`
+  - `DELETE /api/report/perf-delete/:id`
+- **数据落地**
+  - SQLite 表：`perf_reports`
 - **页面**
   - 仪表盘模块：`/app/modules/performance.html`
 
-### 1.13 视频监控（浏览器摄像头预览/页面模块）
+### 1.13 视频监控
 
 - **功能**
-  - 当前实现主要是前端页面能力（调用浏览器 `getUserMedia` 进行视频预览）
+  - 无人机视频流统一查看和播放
+  - 数据来源于无人机注册表的 `video_url` 字段（不再使用独立的 `video_sources` 表）
+  - 支持 HTTP/HTTPS 视频流直接播放
 - **后端接口**
-  - 无强制依赖（以页面脚本为主）
+  - 复用 `GET /api/drones`（含 `video_url` 字段）
 - **页面**
   - 仪表盘模块：`/app/modules/video.html`
+
+### 1.14 无人机管理
+
+- **功能**
+  - 无人机注册/编辑/删除
+  - 注册时自动创建关联的远程设备（`devices`）和 GPS 设备（`gps_devices`）
+  - 删除时级联清理所有关联数据（设备、GPS、电池、飞行任务等）
+  - 支持 SSH/VNC/RDP 三种连接协议
+  - 视频流地址配置（`video_url`）
+  - 无人机统计（在线/离线/协议分布）
+- **后端接口**
+  - `GET /api/drones`
+  - `POST /api/drones`
+  - `PUT /api/drones/:id`
+  - `DELETE /api/drones/:id`
+  - `GET /api/drones/stats`
+- **数据落地**
+  - SQLite 表：`drones`
+- **页面**
+  - 仪表盘模块：`/app/modules/drones.html`
+
+### 1.15 GPS/位置信息
+
+- **功能**
+  - 无人机实时位置监控（Leaflet + OpenStreetMap 地图）
+  - GPS 设备管理（添加/编辑/删除）
+  - 手动和 Agent 自动推送 GPS 数据
+  - 电子围栏（超出范围触发报警）
+  - 历史轨迹查看
+  - 每 3 秒自动刷新
+- **后端接口**
+  - `GET /api/gps/devices`、`POST /api/gps/devices`
+  - `POST /api/gps/devices/:id/push`、`POST /api/gps/push`
+  - `GET /api/gps/devices/:id/history`
+  - `GET /api/gps/fence-alerts`
+- **数据落地**
+  - SQLite 表：`gps_devices`、`gps_history`、`gps_fence_alerts`
+- **页面**
+  - 仪表盘模块：`/app/modules/gps.html`
+
+### 1.16 电池监控
+
+- **功能**
+  - 实时电池指标监控（电量/电压/电流/温度/健康度）
+  - 自动报警（低电量≤ 20%、严重低电≤ 10%、高温≥ 50°C、低健康度≤ 50%）
+  - 手动上报和 Agent 自动推送
+  - 历史趋势图表（最近 50 条记录）
+  - 每 5 秒自动刷新
+- **后端接口**
+  - `GET /api/battery/records`、`POST /api/battery/report`
+  - `POST /api/battery/push`
+  - `GET /api/battery/latest`、`GET /api/battery/history/:device_id`
+  - `GET /api/battery/stats`、`GET /api/battery/alerts`
+- **数据落地**
+  - SQLite 表：`battery_records`、`battery_alerts`
+- **页面**
+  - 仪表盘模块：`/app/modules/battery.html`
+
+### 1.17 飞行任务管理
+
+- **功能**
+  - 飞行任务创建/编辑/删除
+  - 飞行阶段状态机（待命→起飞→巡航→执行任务→返航→降落）
+  - 任务日志记录
+  - 批量导入/导出（JSON）
+  - 与 GPS 模块联动选择执行无人机
+- **后端接口**
+  - `GET /api/flight/missions`、`POST /api/flight/missions`
+  - `PUT /api/flight/missions/:id`、`DELETE /api/flight/missions/:id`
+  - `POST /api/flight/missions/:id/phase`
+  - `POST /api/flight/missions/import`
+  - `GET /api/flight/missions/stats`
+- **数据落地**
+  - SQLite 表：`flight_missions`、`mission_logs`
+- **页面**
+  - 仪表盘模块：`/app/modules/flight.html`
 
 ---
 
@@ -198,7 +303,7 @@
 - **`project/internal/db/db.go`**
   - `Open(path)`：打开 SQLite（WAL 模式、外键开启）
   - `Migrate(db)`：创建并初始化表结构、索引、以及 `sync_status` 初始行
-  - 涉及表：`recordings`、`logs`、`alerts`、`updates`、`sync_status`、`users`、`sessions`、`devices`、`user_stats`
+  - 涉及表：`recordings`、`logs`、`alerts`、`updates`、`sync_tasks`、`users`、`sessions`、`devices`、`user_stats`、`drones`、`gps_devices`、`gps_history`、`gps_fence_alerts`、`battery_records`、`battery_alerts`、`flight_missions`、`mission_logs`、`hardware_items`、`perf_reports`、`video_sources`(已废弃)
 
 ### 2.3 业务接口层（Handlers）
 
@@ -212,14 +317,29 @@
 
   - 注册主要业务接口 `RegisterRoutes()`
   - 监控指标快照/流、硬件信息、音频上传/列表/下载/删除
-  - 告警列表/确认/新建
-  - 日志追加/列表
-  - 更新列表/新增/检查（示例返回）
-  - 同步状态获取/设置
-  - 性能报告汇总
-  - VNC TCP 到 WebSocket 代理（`/api/vnc/ws`）
+  - 告警列表/确认/新建/解决/导入/统计
+  - 日志追加/列表/编辑/删除/导入/统计
+  - 更新列表/新增/编辑/删除/导入/统计/检查
+  - 同步任务管理（CRUD + 启停 + 进度 + 统计）
+  - 性能报告（实时 + 列表 + 新增 + 导入 + 删除）
+  - VNC/SSH TCP 到 WebSocket 代理
   - 设备管理（CRUD + 状态）
+  - 硬件设备管理（CRUD + 刷新 + Agent Push）
   - 用户统计（连接次数）
+- **`project/internal/handlers/drones.go`**
+
+  - 无人机管理 API（注册/编辑/删除/列表/统计）
+  - 注册时自动创建关联设备和 GPS 设备
+  - 删除时级联清理
+- **`project/internal/handlers/gps.go`**
+
+  - GPS/位置信息 API（设备管理、位置推送、历史轨迹、围栏报警）
+- **`project/internal/handlers/battery.go`**
+
+  - 电池监控 API（数据上报、最新状态、历史记录、报警、Agent Push）
+- **`project/internal/handlers/flight.go`**
+
+  - 飞行任务管理 API（任务 CRUD、阶段更新、日志、导入、统计）
 
 ### 2.4 中间件
 
@@ -238,6 +358,23 @@
   - 使用 `gopsutil` 采集 CPU/内存/负载/磁盘/网络/开机时间等
   - `CollectMetrics()`：输出监控指标快照
   - `HardwareInfo()`：输出硬件/系统信息
+
+### 2.6 同步引擎
+
+- **`project/internal/syncengine/engine.go`**
+  - 独立 goroutine 管理每个同步任务
+  - 全量同步（清空目标表 + 写入）和增量同步（基于时间戳）
+  - 数据导出/导入、事务保护、安全白名单
+
+### 2.7 Agent 程序
+
+- **`project/cmd/agent/main.go`**
+  - 独立的 hw-agent 程序，部署在无人机/目标设备上
+  - 采集 CPU、内存、温度、网络、GPS、电池数据
+  - Pull 模式：暴露 `/metrics` 和 `/health` HTTP 端点
+  - Push 模式：主动推送数据到主控端
+- **`project/internal/agent/agent.go`**
+  - 内嵌 Agent，主服务启动时自动运行本机 Agent（端口 9100）
 
 ### 2.6 工具函数
 
@@ -268,11 +405,15 @@
 
 ### 3.2 功能模块页面（iframe 内加载：`project/web/modules/`）
 
+- **`modules/drones.html`**：无人机管理模块页面
+- **`modules/gps.html`**：GPS/位置信息模块页面
+- **`modules/battery.html`**：电池监控模块页面
+- **`modules/flight.html`**：飞行任务管理模块页面
 - **`modules/monitor.html`**：系统状态监控模块页面
 - **`modules/audio.html`**：音频/语音交互记录模块页面
-- **`modules/remote.html`**：远程桌面控制模块页面（通常与设备管理、连接入口相关）
-- **`modules/video.html`**：视频监控模块页面（偏前端预览能力）
-- **`modules/hardware.html`**：硬件信息模块页面
+- **`modules/remote.html`**：远程桌面控制模块页面（VNC/SSH/RDP）
+- **`modules/video.html`**：视频监控模块页面（数据来源于无人机注册表）
+- **`modules/hardware.html`**：硬件状态检测模块页面
 - **`modules/updates.html`**：软件更新管理模块页面
 - **`modules/sync.html`**：数据同步状态模块页面
 - **`modules/alerts.html`**：异常告警模块页面
@@ -281,22 +422,22 @@
 - **`modules/common.js`**：模块页共用的请求/渲染辅助逻辑（供各模块复用）
 - **`modules/common.css`**：模块页共用样式
 
-### 3.3 远程桌面（noVNC）相关
+### 3.3 远程桌面相关
 
 - **`project/web/vnc.html`**
 
-  - 独立的 VNC 远程桌面页面
-  - 浏览器端加载 noVNC（CDN）
-  - 连接时访问后端 WebSocket：`/api/vnc/ws?target=...`
+  - 独立的 VNC 远程桌面页面（noVNC + WebSocket 代理）
   - 连接/断开做了前端冷却（避免频繁操作）
-  - 连接成功后会触发：设备状态在线 + 用户连接次数自增
+  - 连接成功后触发设备状态在线 + 用户连接次数自增
+- **`project/web/ssh.html`**
+
+  - 独立的 SSH 终端页面（xterm.js + WebSocket 代理）
 - **`project/web/vnc_simple.html`**
 
   - VNC 的简化版本页面（用于快速连接验证/演示）
 - **`project/web/novnc-rfb.js`**
 
-  - noVNC 相关脚本（本地版本文件）。
-  - 说明：当前 `vnc.html` 主要通过 CDN 加载 noVNC；该文件可用于离线替代或历史遗留。
+  - noVNC 相关脚本（本地版本文件，可用于离线替代）
 
 ### 3.4 通用静态资源
 
@@ -370,11 +511,20 @@
   - 后端：`project/internal/handlers/api.go`（`MetricsStream`）
   - 采集：`project/internal/monitor/monitor.go`
   - 前端：`project/web/modules/monitor.html` 或 `project/web/script.js`
-- **VNC 连接失败**
+- **VNC/SSH 连接失败**
 
-  - 后端：`project/internal/handlers/api.go`（`VNCProxyWS`）
-  - 前端：`project/web/vnc.html`、`project/web/modules/remote.html`
-  - 外部依赖：目标机 VNC 服务、端口 5900、防火墙/网络连通
+  - 后端：`project/internal/handlers/api.go`（`VNCProxyWS`、`SSHProxyWS`）
+  - 前端：`project/web/vnc.html`、`project/web/ssh.html`、`project/web/modules/remote.html`
+  - 外部依赖：目标机 VNC/SSH 服务、端口、防火墙/网络连通
+- **无人机管理问题**
+
+  - 后端：`project/internal/handlers/drones.go`
+  - 前端：`project/web/modules/drones.html`
+  - 数据：`drones`、`devices`、`gps_devices`
+- **GPS/电池/飞行任务问题**
+
+  - 后端：`project/internal/handlers/gps.go`、`battery.go`、`flight.go`
+  - 前端：`project/web/modules/gps.html`、`battery.html`、`flight.html`
 - **音频上传/列表异常**
 
   - 后端：`project/internal/handlers/api.go`（`AudioUpload/AudioList/...`）

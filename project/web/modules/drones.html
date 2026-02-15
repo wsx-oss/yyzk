@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>无人机管理</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before { content: "\1F681"; }
+    .drone-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .drone-header-row .module-title { margin-bottom: 0; }
+    .drone-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 28px; width: 680px; max-width: 95vw; max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .modal-form .full-width { grid-column: 1 / -1; }
+    .modal-form .col-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; grid-column: 1 / -1; }
+    .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .modal-form label .req { color: #ef4444; }
+    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-form textarea { resize: vertical; min-height: 50px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* Section dividers in modal */
+    .form-section { grid-column: 1 / -1; border-top: 1px solid #e2e8f0; padding-top: 14px; margin-top: 4px; }
+    .form-section-title { font-size: 14px; font-weight: 600; color: #1e3a5f; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+
+    /* Fence toggle */
+    .fence-toggle { display: flex; align-items: center; gap: 8px; }
+    .toggle-switch { position: relative; width: 44px; height: 24px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; border-radius: 24px; transition: 0.3s; }
+    .toggle-slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.3s; }
+    .toggle-switch input:checked + .toggle-slider { background: #0ea5e9; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+    /* Detail grid */
+    .detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 10px 16px; font-size: 14px; }
+    .detail-label { color: #64748b; font-weight: 500; text-align: right; }
+    .detail-value { color: #0f172a; }
+
+    /* Drone cards view */
+    .drone-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .drone-card { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; transition: all 0.2s; position: relative; }
+    .drone-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #0ea5e9; }
+    .drone-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .drone-card-name { font-size: 16px; font-weight: 600; color: #1e293b; }
+    .drone-card-model { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+    .drone-card-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .drone-card-status.online { background: #d1fae5; color: #065f46; }
+    .drone-card-status.offline { background: #fee2e2; color: #991b1b; }
+    .drone-card-status.gps-active { background: #dbeafe; color: #1e40af; }
+    .drone-card-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 13px; color: #475569; margin-bottom: 14px; }
+    .drone-card-info-item { display: flex; align-items: center; gap: 4px; }
+    .drone-card-info-item .info-label { color: #94a3b8; min-width: 48px; }
+    .drone-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .drone-card-actions .btn { padding: 5px 12px; font-size: 12px; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+    .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state .empty-text { font-size: 16px; margin-bottom: 8px; }
+    .empty-state .empty-hint { font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="module-header">
+    <div class="drone-header-row">
+      <div class="module-title">无人机管理</div>
+      <div class="drone-header-btns">
+        <button class="btn btn-primary" onclick="openNewModal()">注册无人机</button>
+        <button class="btn btn-secondary" onclick="refreshAll()">刷新</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div class="filter-group">
+        <label>名称搜索</label>
+        <input id="filterName" type="text" placeholder="输入无人机名称" />
+      </div>
+      <div class="filter-group">
+        <label>状态筛选</label>
+        <select id="filterStatus">
+          <option value="">全部</option>
+          <option value="online">在线</option>
+          <option value="offline">离线</option>
+        </select>
+      </div>
+      <div class="filter-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="search()" style="width:100%;">搜索</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-label">注册总数</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">远程连接在线</div>
+      <div class="stat-value" id="statOnline" style="color:#10b981;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">离线</div>
+      <div class="stat-value" id="statOffline" style="color:#ef4444;">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">GPS数据推送中</div>
+      <div class="stat-value" id="statGpsActive" style="color:#0ea5e9;">0</div>
+    </div>
+  </div>
+
+  <!-- Drone Cards -->
+  <div class="drone-cards" id="droneCards">
+    <div class="empty-state">
+      <div class="empty-icon">&#x1F681;</div>
+      <div class="empty-text">暂无已注册的无人机</div>
+      <div class="empty-hint">点击"注册无人机"按钮，添加第一架无人机</div>
+    </div>
+  </div>
+
+  <!-- Hints -->
+  <div class="hint-box">
+    <div><strong>无人机统一注册说明</strong></div>
+    <div>1. 在此页面注册无人机后，系统会自动创建对应的<strong>远程控制设备</strong>和<strong>GPS追踪设备</strong>，无需在各功能模块重复添加。</div>
+    <div>2. <strong>远程控制</strong>（SSH/VNC/RDP）：在"远程桌面控制"页面可直接选择已注册的无人机进行连接。</div>
+    <div>3. <strong>GPS/电池/飞行任务</strong>：只要无人机上运行了 <code>hw-agent</code>，数据会自动推送到平台，实时显示在各功能模块中。</div>
+    <div>4. <strong>Agent ID</strong> 是无人机上报数据的唯一标识。在伴飞计算机上运行 <code>hw-agent -server http://主控端IP:8080 -id "你的AgentID"</code> 即可关联。</div>
+    <div>5. 编辑或删除无人机时，关联的远程设备和GPS设备会自动同步更新或级联删除。</div>
+  </div>
+
+  <!-- Charts -->
+  <div class="card">
+    <div class="card-title">统计概览</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;">
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;">状态分布</div>
+        <div style="flex:1;width:100%;max-width:280px;position:relative;"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div style="height:280px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;">协议分布</div>
+        <div style="flex:1;width:100%;max-width:280px;position:relative;"><canvas id="protocolChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register / Edit Drone Modal -->
+  <div class="modal-overlay" id="droneModal">
+    <div class="modal-box">
+      <div class="modal-title" id="droneModalTitle">注册无人机</div>
+      <div class="modal-form">
+        <!-- Basic Info -->
+        <div class="form-section">
+          <div class="form-section-title">&#x1F4CB; 基本信息</div>
+        </div>
+        <div>
+          <label>无人机名称 <span class="req">*</span></label>
+          <input id="fName" type="text" placeholder="例如: 巡检一号" />
+        </div>
+        <div>
+          <label>Agent ID</label>
+          <input id="fAgentId" type="text" placeholder="例如: drone-SN-001" />
+          <div style="font-size:11px;color:#94a3b8;margin-top:3px;">hw-agent 的 -id 参数值，留空则默认使用名称</div>
+        </div>
+        <div>
+          <label>序列号</label>
+          <input id="fSN" type="text" placeholder="例如: SN-20240301-001" />
+        </div>
+        <div>
+          <label>机型</label>
+          <input id="fModel" type="text" placeholder="例如: DJI Mavic 3" />
+        </div>
+        <div class="full-width">
+          <label>描述</label>
+          <textarea id="fDesc" placeholder="简要描述该无人机的用途"></textarea>
+        </div>
+
+        <!-- Connection Info -->
+        <div class="form-section">
+          <div class="form-section-title">&#x1F517; 远程连接信息</div>
+        </div>
+        <div>
+          <label>IP地址 <span class="req">*</span></label>
+          <input id="fIP" type="text" placeholder="例如: 192.168.1.100" />
+        </div>
+        <div>
+          <label>默认协议 <span class="req">*</span></label>
+          <select id="fProtocol">
+            <option value="SSH">SSH</option>
+            <option value="VNC">VNC</option>
+            <option value="RDP">RDP</option>
+          </select>
+        </div>
+        <div class="col-3">
+          <div>
+            <label>SSH端口</label>
+            <input id="fSSHPort" type="number" value="22" />
+          </div>
+          <div>
+            <label>VNC端口</label>
+            <input id="fVNCPort" type="number" value="5900" />
+          </div>
+          <div>
+            <label>RDP端口</label>
+            <input id="fRDPPort" type="number" value="3389" />
+          </div>
+        </div>
+        <div>
+          <label>用户名</label>
+          <input id="fUsername" type="text" placeholder="远程连接用户名" />
+        </div>
+        <div>
+          <label>密码</label>
+          <input id="fPassword" type="password" placeholder="远程连接密码" />
+        </div>
+        <div>
+          <label>自动连接</label>
+          <div class="fence-toggle" style="margin-top:4px;">
+            <label class="toggle-switch"><input type="checkbox" id="fAutoConnect" /><span class="toggle-slider"></span></label>
+            <span style="font-size:13px;color:#475569;">启用</span>
+          </div>
+        </div>
+        <div>
+          <label>记录日志</label>
+          <div class="fence-toggle" style="margin-top:4px;">
+            <label class="toggle-switch"><input type="checkbox" id="fLogEnabled" /><span class="toggle-slider"></span></label>
+            <span style="font-size:13px;color:#475569;">启用</span>
+          </div>
+        </div>
+
+        <!-- GPS Info -->
+        <div class="form-section">
+          <div class="form-section-title">&#x1F4CD; GPS / 位置信息</div>
+        </div>
+        <div class="col-3">
+          <div>
+            <label>初始经度</label>
+            <input id="fLng" type="number" step="any" placeholder="116.397" />
+          </div>
+          <div>
+            <label>初始纬度</label>
+            <input id="fLat" type="number" step="any" placeholder="39.908" />
+          </div>
+          <div>
+            <label>初始海拔(m)</label>
+            <input id="fAlt" type="number" step="any" value="0" />
+          </div>
+        </div>
+
+        <!-- Fence -->
+        <div class="full-width">
+          <label style="margin-bottom:8px;">电子围栏</label>
+          <div class="fence-toggle">
+            <label class="toggle-switch"><input type="checkbox" id="fFenceEnabled" onchange="toggleFence()" /><span class="toggle-slider"></span></label>
+            <span style="font-size:13px;color:#475569;">启用电子围栏</span>
+          </div>
+        </div>
+        <div class="col-3" id="fenceFields" style="display:none;">
+          <div>
+            <label>围栏中心经度</label>
+            <input id="fFenceLng" type="number" step="any" placeholder="116.397" />
+          </div>
+          <div>
+            <label>围栏中心纬度</label>
+            <input id="fFenceLat" type="number" step="any" placeholder="39.908" />
+          </div>
+          <div>
+            <label>围栏半径(m)</label>
+            <input id="fFenceRadius" type="number" step="any" value="500" />
+          </div>
+        </div>
+
+        <!-- Video Stream -->
+        <div class="form-section">
+          <div class="form-section-title">&#x1F4F9; 视频监控</div>
+        </div>
+        <div class="full-width">
+          <label>视频流地址</label>
+          <input id="fVideoUrl" type="text" placeholder="例如: rtsp://192.168.1.100:8554/live 或 http://ip:port/stream.m3u8" />
+          <div style="font-size:11px;color:#94a3b8;margin-top:3px;">填写无人机机载相机的视频流地址，支持 RTSP/HTTP-FLV/HLS/MP4 等格式。留空则不启用视频监控。</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" id="btnSubmit" onclick="submitDrone()">确认注册</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-box" style="width:640px;">
+      <div class="modal-title">无人机详情</div>
+      <div class="detail-grid" id="detailContent"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    let allDrones = [];
+    let editingId = null;
+    let statusChart = null, protocolChart = null;
+
+    // ========== Charts ==========
+    function initCharts() {
+      statusChart = createChart($('#statusChart'), {
+        type: 'doughnut',
+        data: { labels: ['在线', '离线', 'GPS活跃'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#10b981', '#ef4444', '#0ea5e9'] }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } } } }
+      });
+      protocolChart = createChart($('#protocolChart'), {
+        type: 'doughnut',
+        data: { labels: ['SSH', 'VNC', 'RDP'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#8b5cf6', '#3b82f6', '#f59e0b'] }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } } } }
+      });
+    }
+
+    // ========== Load Data ==========
+    async function loadDrones() {
+      try {
+        const params = new URLSearchParams();
+        const name = $('#filterName').value.trim();
+        const status = $('#filterStatus').value;
+        if (name) params.append('name', name);
+        if (status) params.append('status', status);
+        const res = await api('/drones?' + params.toString());
+        const data = await res.json();
+        allDrones = Array.isArray(data.items) ? data.items : [];
+        renderCards(allDrones);
+        updateCharts(allDrones);
+      } catch (e) {
+        console.error('loadDrones error:', e);
+        allDrones = [];
+        renderCards(allDrones);
+        updateCharts(allDrones);
+        showToast('加载无人机列表失败，请检查是否已登录或刷新页面重试', 'error');
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await api('/drones/stats');
+        const s = await res.json();
+        $('#statTotal').textContent = s.total || 0;
+        $('#statOnline').textContent = s.online || 0;
+        $('#statOffline').textContent = s.offline || 0;
+        $('#statGpsActive').textContent = s.gps_active || 0;
+        if (statusChart) {
+          statusChart.data.datasets[0].data = [s.online||0, s.offline||0, s.gps_active||0];
+          statusChart.update();
+        }
+      } catch (e) {
+        console.error('loadStats error:', e);
+        showToast('加载无人机统计失败，请刷新页面重试', 'error');
+      }
+    }
+
+    function updateCharts(items) {
+      if (protocolChart) {
+        let pc = { SSH: 0, VNC: 0, RDP: 0 };
+        items.forEach(d => { let p = (d.protocol||'').toUpperCase(); if (pc[p] !== undefined) pc[p]++; });
+        protocolChart.data.datasets[0].data = [pc.SSH, pc.VNC, pc.RDP];
+        protocolChart.update();
+      }
+    }
+
+    // ========== Render Cards ==========
+    function renderCards(items) {
+      const container = $('#droneCards');
+      if (!items.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F681;</div><div class="empty-text">暂无已注册的无人机</div><div class="empty-hint">点击"注册无人机"按钮，添加第一架无人机</div></div>';
+        return;
+      }
+      container.innerHTML = items.map(d => {
+        const isGpsActive = d.gps_online;
+        const statusCls = isGpsActive ? 'gps-active' : (d.status === 'online' ? 'online' : 'offline');
+        const statusText = isGpsActive ? 'GPS推送中' : (d.status === 'online' ? '在线' : '离线');
+        return `
+        <div class="drone-card">
+          <div class="drone-card-header">
+            <div>
+              <div class="drone-card-name">${esc(d.name)}</div>
+              <div class="drone-card-model">${esc(d.model || d.serial_number || 'Agent: ' + (d.agent_id || '-'))}</div>
+            </div>
+            <span class="drone-card-status ${statusCls}">${statusText}</span>
+          </div>
+          <div class="drone-card-info">
+            <div class="drone-card-info-item"><span class="info-label">IP:</span> ${esc(d.ip || '-')}</div>
+            <div class="drone-card-info-item"><span class="info-label">协议:</span> ${esc(d.protocol)}</div>
+            <div class="drone-card-info-item"><span class="info-label">Agent:</span> ${esc(d.agent_id || '-')}</div>
+            <div class="drone-card-info-item"><span class="info-label">围栏:</span> ${d.fence_enabled ? '已启用' : '未启用'}</div>
+            <div class="drone-card-info-item" style="grid-column:1/-1;"><span class="info-label">视频:</span> ${d.video_url ? '<span style="color:#10b981;">已配置</span>' : '<span style="color:#94a3b8;">未配置</span>'}</div>
+          </div>
+          <div class="drone-card-actions">
+            <button class="btn btn-primary" onclick="viewDetail(${d.id})">详情</button>
+            <button class="btn btn-secondary" onclick="editDrone(${d.id})">编辑</button>
+            <button class="btn btn-success" onclick="doConnect(${d.id})">连接</button>
+            <button class="btn btn-danger" onclick="deleteDrone(${d.id},'${esc(d.name)}')">删除</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // ========== Search & Refresh ==========
+    function search() { loadDrones(); loadStats(); }
+    function refreshAll() { loadDrones(); loadStats(); showToast('数据已刷新', 'success'); }
+
+    // ========== Modal: Register / Edit ==========
+    function toggleFence() { $('#fenceFields').style.display = $('#fFenceEnabled').checked ? 'grid' : 'none'; }
+
+    function openNewModal() {
+      editingId = null;
+      $('#droneModalTitle').textContent = '注册无人机';
+      $('#btnSubmit').textContent = '确认注册';
+      $('#fName').value = ''; $('#fAgentId').value = ''; $('#fSN').value = ''; $('#fModel').value = ''; $('#fDesc').value = '';
+      $('#fIP').value = ''; $('#fProtocol').value = 'SSH';
+      $('#fSSHPort').value = '22'; $('#fVNCPort').value = '5900'; $('#fRDPPort').value = '3389';
+      $('#fUsername').value = ''; $('#fPassword').value = '';
+      $('#fAutoConnect').checked = false; $('#fLogEnabled').checked = false;
+      $('#fLng').value = '116.397'; $('#fLat').value = '39.908'; $('#fAlt').value = '0';
+      $('#fFenceEnabled').checked = false; toggleFence();
+      $('#fFenceLng').value = ''; $('#fFenceLat').value = ''; $('#fFenceRadius').value = '500';
+      $('#fVideoUrl').value = '';
+      $('#droneModal').classList.add('active');
+    }
+
+    async function editDrone(id) {
+      try {
+        const res = await api('/drones/' + id);
+        const d = await res.json();
+        if (d.error) { showToast(d.error, 'error'); return; }
+        editingId = id;
+        $('#droneModalTitle').textContent = '编辑无人机';
+        $('#btnSubmit').textContent = '确认保存';
+        $('#fName').value = d.name || '';
+        $('#fAgentId').value = d.agent_id || '';
+        $('#fSN').value = d.serial_number || '';
+        $('#fModel').value = d.model || '';
+        $('#fDesc').value = d.description || '';
+        $('#fIP').value = d.ip || '';
+        $('#fProtocol').value = d.protocol || 'SSH';
+        $('#fSSHPort').value = d.ssh_port || 22;
+        $('#fVNCPort').value = d.vnc_port || 5900;
+        $('#fRDPPort').value = d.rdp_port || 3389;
+        $('#fUsername').value = d.username || '';
+        $('#fPassword').value = d.password || '';
+        $('#fAutoConnect').checked = d.auto_connect;
+        $('#fLogEnabled').checked = d.log_enabled;
+        $('#fLng').value = d.initial_lng || 0;
+        $('#fLat').value = d.initial_lat || 0;
+        $('#fAlt').value = d.initial_alt || 0;
+        $('#fFenceEnabled').checked = d.fence_enabled; toggleFence();
+        $('#fFenceLng').value = d.fence_lng || '';
+        $('#fFenceLat').value = d.fence_lat || '';
+        $('#fFenceRadius').value = d.fence_radius || 500;
+        $('#fVideoUrl').value = d.video_url || '';
+        $('#droneModal').classList.add('active');
+      } catch (e) { showToast('加载失败', 'error'); }
+    }
+
+    function closeModal() { $('#droneModal').classList.remove('active'); editingId = null; }
+
+    async function submitDrone() {
+      const body = {
+        name: $('#fName').value.trim(),
+        agent_id: $('#fAgentId').value.trim(),
+        serial_number: $('#fSN').value.trim(),
+        model: $('#fModel').value.trim(),
+        description: $('#fDesc').value.trim(),
+        ip: $('#fIP').value.trim(),
+        protocol: $('#fProtocol').value,
+        ssh_port: parseInt($('#fSSHPort').value) || 22,
+        vnc_port: parseInt($('#fVNCPort').value) || 5900,
+        rdp_port: parseInt($('#fRDPPort').value) || 3389,
+        username: $('#fUsername').value.trim(),
+        password: $('#fPassword').value,
+        auto_connect: $('#fAutoConnect').checked,
+        log_enabled: $('#fLogEnabled').checked,
+        initial_lng: parseFloat($('#fLng').value) || 0,
+        initial_lat: parseFloat($('#fLat').value) || 0,
+        initial_alt: parseFloat($('#fAlt').value) || 0,
+        fence_enabled: $('#fFenceEnabled').checked,
+        fence_lng: parseFloat($('#fFenceLng').value) || 0,
+        fence_lat: parseFloat($('#fFenceLat').value) || 0,
+        fence_radius: parseFloat($('#fFenceRadius').value) || 500,
+        video_url: $('#fVideoUrl').value.trim(),
+      };
+      if (!body.name) { showToast('请输入无人机名称', 'error'); return; }
+      if (!body.ip) { showToast('请输入IP地址', 'error'); return; }
+      try {
+        let res;
+        if (editingId) {
+          res = await api('/drones/' + editingId, { method: 'PUT', body });
+        } else {
+          res = await api('/drones', { method: 'POST', body });
+        }
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast(editingId ? '无人机信息已更新' : '无人机注册成功！已自动创建远程设备和GPS设备', 'success');
+        closeModal(); loadDrones(); loadStats();
+      } catch (e) { showToast('操作失败: ' + e.message, 'error'); }
+    }
+
+    // ========== Delete ==========
+    function deleteDrone(id, name) {
+      if (!confirm('确定要删除无人机"' + name + '"吗？\n关联的远程设备、GPS设备及其历史数据将一同被删除，此操作不可恢复。')) return;
+      api('/drones/' + id, { method: 'DELETE' }).then(r => r.json()).then(data => {
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('无人机已删除', 'success');
+        loadDrones(); loadStats();
+      }).catch(e => showToast('删除失败', 'error'));
+    }
+
+    // ========== Connect ==========
+    function doConnect(id) {
+      const drone = allDrones.find(d => d.id === id);
+      if (!drone) return;
+      const protocol = (drone.protocol || 'SSH').toUpperCase();
+      const ip = drone.ip || '';
+      let port = drone.ssh_port || 22;
+      if (protocol === 'VNC') port = drone.vnc_port || 5900;
+      if (protocol === 'RDP') port = drone.rdp_port || 3389;
+      const username = drone.username || '';
+
+      if (protocol === 'VNC') {
+        const target = ip + ':' + port;
+        window.open('/app/vnc.html?target=' + encodeURIComponent(target) + '&deviceId=' + encodeURIComponent(drone.linked_device_id), '_blank');
+      } else if (protocol === 'SSH') {
+        const pass = prompt('请输入 ' + username + '@' + ip + ' 的 SSH 密码：');
+        if (pass === null) return;
+        window.open('/app/ssh.html?host=' + encodeURIComponent(ip) + '&port=' + encodeURIComponent(port) + '&user=' + encodeURIComponent(username) + '&pass=' + encodeURIComponent(pass) + '&name=' + encodeURIComponent(drone.name), '_blank');
+      } else if (protocol === 'RDP') {
+        const rdpContent = 'full address:s:' + ip + ':' + port + '\r\nusername:s:' + username + '\r\nprompt for credentials:i:1\r\nscreen mode id:i:2\r\n';
+        const blob = new Blob([rdpContent], { type: 'application/x-rdp' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (drone.name || 'remote') + '.rdp';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast('已下载 RDP 文件', 'success');
+      }
+
+      // Set device online
+      if (drone.linked_device_id) {
+        api('/devices/' + drone.linked_device_id + '/status', { method: 'POST', body: { Status: 'online' } }).catch(() => {});
+      }
+    }
+
+    // ========== Detail ==========
+    async function viewDetail(id) {
+      try {
+        const res = await api('/drones/' + id);
+        const d = await res.json();
+        if (d.error) { showToast(d.error, 'error'); return; }
+        const dc = $('#detailContent');
+        dc.innerHTML = `
+          <div class="detail-label">名称</div><div class="detail-value"><strong>${esc(d.name)}</strong></div>
+          <div class="detail-label">序列号</div><div class="detail-value">${esc(d.serial_number) || '-'}</div>
+          <div class="detail-label">机型</div><div class="detail-value">${esc(d.model) || '-'}</div>
+          <div class="detail-label">Agent ID</div><div class="detail-value"><code>${esc(d.agent_id)}</code></div>
+          <div class="detail-label">描述</div><div class="detail-value">${esc(d.description) || '-'}</div>
+          <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">远程连接</div><div></div>
+          <div class="detail-label">IP地址</div><div class="detail-value">${esc(d.ip)}</div>
+          <div class="detail-label">默认协议</div><div class="detail-value">${esc(d.protocol)}</div>
+          <div class="detail-label">端口</div><div class="detail-value">SSH: ${d.ssh_port} / VNC: ${d.vnc_port} / RDP: ${d.rdp_port}</div>
+          <div class="detail-label">用户名</div><div class="detail-value">${esc(d.username) || '-'}</div>
+          <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">GPS / 位置</div><div></div>
+          <div class="detail-label">初始坐标</div><div class="detail-value">经度: ${d.initial_lng}, 纬度: ${d.initial_lat}, 海拔: ${d.initial_alt}m</div>
+          <div class="detail-label">电子围栏</div><div class="detail-value">${d.fence_enabled ? '已启用 (半径: '+d.fence_radius+'m)' : '未启用'}</div>
+          <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">视频监控</div><div></div>
+          <div class="detail-label">视频流</div><div class="detail-value">${d.video_url ? '<code style="word-break:break-all;">' + esc(d.video_url) + '</code>' : '<span style="color:#94a3b8;">未配置</span>'}</div>
+          <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">关联信息</div><div></div>
+          <div class="detail-label">远程设备ID</div><div class="detail-value">${d.linked_device_id || '-'}</div>
+          <div class="detail-label">GPS设备ID</div><div class="detail-value">${d.linked_gps_device_id || '-'}</div>
+          <div class="detail-label">创建时间</div><div class="detail-value">${formatDate(d.created_at)}</div>
+          <div class="detail-label">更新时间</div><div class="detail-value">${formatDate(d.updated_at)}</div>
+        `;
+        $('#detailModal').classList.add('active');
+      } catch (e) { showToast('加载详情失败', 'error'); }
+    }
+
+    function closeDetailModal() { $('#detailModal').classList.remove('active'); }
+
+    // ========== Init ==========
+    initCharts();
+    loadDrones();
+    loadStats();
+
+    // Auto refresh every 8s
+    setInterval(() => { loadDrones(); loadStats(); }, 8000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { loadDrones(); loadStats(); } });
+  </script>
+</body>
+</html>
