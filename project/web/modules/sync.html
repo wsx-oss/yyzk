@@ -527,9 +527,10 @@
   <!-- Usage Tips -->
   <div class="hint-box" style="margin-bottom: 20px;">
     <div><strong>使用提示:</strong></div>
-    <div>1. 请确保数据源和目标地址的正确性，避免同步失败。</div>
-    <div>2. 不同的同步模式和频率适用于不同场景，请根据实际情况选择。</div>
-    <div>3. 启用日志记录可以方便后续问题排查。</div>
+    <div>1. 数据源为远程设备IP，目标地址为本机。同步会从远程设备拉取数据到本地数据库。</div>
+    <div>2. 请确保远程设备已运行本系统（go run .），且两台设备在同一局域网内。</div>
+    <div>3. 全量同步会覆盖本地数据，增量同步只同步新增/更新的数据。</div>
+    <div>4. 同步内容包括：设备信息、无人机、电池监控、GPS定位、飞行任务、硬件状态、告警日志等。</div>
   </div>
 
   <!-- Statistics -->
@@ -592,12 +593,13 @@
         <input type="hidden" id="editId" value="" />
         <div class="form-row-2">
           <div class="form-group">
-            <label>数据源 <span class="req">*</span></label>
-            <input type="text" id="mSource" placeholder="请输入数据源地址" />
+            <label>数据源（远程设备IP） <span class="req">*</span></label>
+            <input type="text" id="mSource" placeholder="请输入远程设备IP地址" />
           </div>
           <div class="form-group">
-            <label>目标地址 <span class="req">*</span></label>
-            <input type="text" id="mTarget" placeholder="请输入目标地址" />
+            <label>目标地址（本机） <span class="req">*</span></label>
+            <input type="text" id="mTarget" placeholder="自动填充本机地址" />
+            <div style="font-size:11px;color:#94a3b8;margin-top:3px;">数据将同步到本机数据库</div>
           </div>
         </div>
         <div class="form-row-2">
@@ -912,7 +914,8 @@
       document.getElementById('formTitle').textContent = '新增同步任务';
       document.getElementById('editId').value = '';
       document.getElementById('mSource').value = '';
-      document.getElementById('mTarget').value = '';
+      // Auto-fill target with current page host (local machine)
+      document.getElementById('mTarget').value = window.location.hostname || '127.0.0.1';
       document.getElementById('mFrequency').value = '5分钟';
       document.getElementById('mMode').value = '全量同步';
       document.getElementById('mStartTime').value = '';
@@ -963,7 +966,8 @@
         return;
       }
 
-      // IP validation for new tasks
+      // IP validation for new tasks — only validate source (remote device)
+      // Target is the local machine, no need to validate connectivity to self
       if (!editId) {
         showToast('正在检测数据源设备...', 'info');
         const srcCheck = await checkSyncIP(source);
@@ -971,12 +975,7 @@
           showToast('数据源无效: ' + srcCheck.message, 'error');
           return;
         }
-        showToast('正在检测目标设备...', 'info');
-        const tgtCheck = await checkSyncIP(target);
-        if (!tgtCheck.ok) {
-          showToast('目标地址无效: ' + tgtCheck.message, 'error');
-          return;
-        }
+        showToast('数据源设备连接成功', 'success');
       }
 
       const body = {

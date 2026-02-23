@@ -21,6 +21,14 @@ var SyncableTables = []string{
 	"alerts",
 	"video_sources",
 	"devices",
+	"drones",
+	"battery_records",
+	"battery_alerts",
+	"gps_devices",
+	"gps_history",
+	"gps_fence_alerts",
+	"flight_missions",
+	"mission_logs",
 }
 
 // TableData holds exported rows for one table
@@ -129,19 +137,51 @@ func (e *Engine) StopAll() int {
 	return stopped
 }
 
-// CheckIP verifies that a device is reachable and running smartcontrol
+// CheckIP verifies that a device is reachable and running smartcontrol.
+// It tries /api/sync/ping first (whitelisted in auth middleware), then
+// falls back to /api/healthz for compatibility with older versions.
 func CheckIP(ip string) error {
-	url := fmt.Sprintf("http://%s:8080/api/healthz", ip)
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		return fmt.Errorf("无法连接到 %s:8080，请确保目标设备已运行smartcontrol程序且8080端口已放行", ip)
+
+	// Try multiple endpoints for robustness
+	endpoints := []string{
+		fmt.Sprintf("http://%s:8080/api/sync/ping", ip),
+		fmt.Sprintf("http://%s:8080/api/healthz", ip),
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("目标设备 %s 响应异常 (HTTP %d)", ip, resp.StatusCode)
+
+	var lastErr error
+	for _, url := range endpoints {
+		resp, err := client.Get(url)
+		if err != nil {
+			lastErr = fmt.Errorf("无法连接到 %s:8080，请确保目标设备已运行smartcontrol程序且8080端口已放行", ip)
+			continue
+		}
+		body, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			lastErr = fmt.Errorf("目标设备 %s 响应异常 (HTTP %d)", ip, resp.StatusCode)
+			continue
+		}
+		if readErr != nil {
+			lastErr = fmt.Errorf("读取目标设备 %s 响应失败", ip)
+			continue
+		}
+		// Try to parse as JSON with "ok" field (sync/ping response)
+		var result struct {
+			OK     bool   `json:"ok"`
+			Status string `json:"status"`
+		}
+		if err := json.Unmarshal(body, &result); err == nil {
+			if result.OK || result.Status == "ok" {
+				return nil // Device is reachable and running smartcontrol
+			}
+		}
+		lastErr = fmt.Errorf("目标设备 %s 不是有效的smartcontrol实例", ip)
 	}
-	return nil
+	if lastErr != nil {
+		return lastErr
+	}
+	return fmt.Errorf("无法验证设备 %s 的连通性", ip)
 }
 
 // runSync is the main sync loop for a task
@@ -183,11 +223,9 @@ func (e *Engine) doSyncCycle(taskID int, source, target, mode string, state *Tas
 	state.Progress = 0
 	state.Message = "正在从数据源获取数据..."
 
-	// Step 1: Export data from source
+	// Step 1: Export data from source (remote device)
 	exportURL := fmt.Sprintf("http://%s:8080/api/sync/export-data", source)
-	// Note: these endpoints are under /api/ group
 	if mode == "增量同步" {
-		// For incremental, get data since last sync
 		var lastSynced sql.NullString
 		_ = e.db.QueryRow("SELECT last_synced_at FROM sync_tasks WHERE id = ?", taskID).Scan(&lastSynced)
 		if lastSynced.Valid && lastSynced.String != "" {
@@ -205,6 +243,13 @@ func (e *Engine) doSyncCycle(taskID int, source, target, mode string, state *Tas
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != 200 {
+		state.LastError = fmt.Sprintf("数据源返回错误 (HTTP %d)", resp.StatusCode)
+		state.Message = "同步失败: 数据源响应异常"
+		log.Printf("[SyncEngine] Task %d: export from %s returned HTTP %d", taskID, source, resp.StatusCode)
+		return
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		state.LastError = "读取数据源响应失败: " + err.Error()
@@ -216,6 +261,7 @@ func (e *Engine) doSyncCycle(taskID int, source, target, mode string, state *Tas
 	if err := json.Unmarshal(body, &payload); err != nil {
 		state.LastError = "解析数据源响应失败: " + err.Error()
 		state.Message = "同步失败: 数据格式错误"
+		log.Printf("[SyncEngine] Task %d: unmarshal failed: %v, body: %s", taskID, err, string(body[:min(len(body), 200)]))
 		return
 	}
 
@@ -227,56 +273,29 @@ func (e *Engine) doSyncCycle(taskID int, source, target, mode string, state *Tas
 		return
 	}
 
-	state.Message = "正在向目标设备写入数据..."
+	// Step 2: Import data locally (into this device's database)
+	// This is the practical approach: pull data from source, save to local DB
+	state.Message = "正在写入本地数据库..."
+	payload.DeviceIP = source
 
-	// Step 2: Import data to target
-	importURL := fmt.Sprintf("http://%s:8080/api/sync/import-data", target)
-	importPayload := payload
-	importPayload.DeviceIP = source
-
-	// For full sync, add mode flag
-	if mode == "全量同步" {
-		importURL += "?mode=full"
-	} else {
-		importURL += "?mode=incremental"
+	importMode := "full"
+	if mode == "增量同步" {
+		importMode = "incremental"
 	}
 
-	jsonData, err := json.Marshal(importPayload)
-	if err != nil {
-		state.LastError = "序列化数据失败"
-		state.Message = "同步失败: 内部错误"
+	synced, total, importErr := ImportData(e.db, &payload, importMode)
+	if importErr != nil {
+		state.LastError = "本地导入失败: " + importErr.Error()
+		state.Message = "同步失败: " + importErr.Error()
+		log.Printf("[SyncEngine] Task %d: local import failed: %v", taskID, importErr)
 		return
 	}
 
-	importResp, err := client.Post(importURL, "application/json", strings.NewReader(string(jsonData)))
-	if err != nil {
-		state.LastError = "连接目标设备失败: " + err.Error()
-		state.Message = "同步失败: 无法连接目标设备"
-		return
-	}
-	defer importResp.Body.Close()
-
-	importBody, _ := io.ReadAll(importResp.Body)
-	var importResult struct {
-		OK      bool   `json:"ok"`
-		Message string `json:"message"`
-		Synced  int    `json:"synced"`
-		Total   int    `json:"total"`
-	}
-	if err := json.Unmarshal(importBody, &importResult); err != nil || !importResult.OK {
-		errMsg := "目标设备导入失败"
-		if importResult.Message != "" {
-			errMsg = importResult.Message
-		}
-		state.LastError = errMsg
-		state.Message = "同步失败: " + errMsg
-		return
-	}
-
-	state.SyncedTables = importResult.Synced
+	state.SyncedTables = synced
 	state.Progress = 100
-	state.Message = fmt.Sprintf("同步完成，已同步 %d/%d 张表", importResult.Synced, importResult.Total)
+	state.Message = fmt.Sprintf("同步完成，已同步 %d/%d 张表", synced, total)
 	state.LastError = ""
+	log.Printf("[SyncEngine] Task %d: sync from %s completed, %d/%d tables synced", taskID, source, synced, total)
 }
 
 func (e *Engine) updateTaskDB(taskID int, state *TaskState) {
@@ -473,6 +492,22 @@ func getTimeColumn(table string) string {
 		return "updated_at"
 	case "sync_tasks":
 		return "updated_at"
+	case "drones":
+		return "updated_at"
+	case "battery_records":
+		return "created_at"
+	case "battery_alerts":
+		return "created_at"
+	case "gps_devices":
+		return "updated_at"
+	case "gps_history":
+		return "created_at"
+	case "gps_fence_alerts":
+		return "created_at"
+	case "flight_missions":
+		return "updated_at"
+	case "mission_logs":
+		return "created_at"
 	default:
 		return "created_at"
 	}
