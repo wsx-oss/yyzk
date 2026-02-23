@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>飞行任务管理</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://webapi.amap.com/maps?v=2.0&key=dd1c139ca98be9925c57001ab97a7bbe"></script>
+  <!-- Chart.js and AMap SDK loaded asynchronously at bottom to avoid blocking first paint -->
   <style>
     .module-title::before { content: "\2708\FE0F"; }
     .flight-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
@@ -113,6 +112,38 @@
     .plan-map-context strong { color: #15803d; }
     .plan-poi-list { margin-top: 6px; }
     .plan-poi-item { display: inline-block; padding: 2px 8px; margin: 2px; background: #fef3c7; color: #92400e; border-radius: 10px; font-size: 11px; }
+
+    /* Location column in table */
+    .loc-cell { font-size: 12px; line-height: 1.5; min-width: 140px; }
+    .loc-addr { color: #0f172a; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; display: block; }
+    .loc-coords { color: #94a3b8; font-size: 11px; }
+    .loc-meta { display: flex; gap: 8px; margin-top: 2px; font-size: 11px; color: #64748b; }
+    .loc-meta .loc-speed { color: #0ea5e9; }
+    .loc-meta .loc-bat { font-weight: 600; }
+    .loc-bat-ok { color: #10b981; }
+    .loc-bat-low { color: #f59e0b; }
+    .loc-bat-crit { color: #ef4444; }
+    .loc-offline { color: #94a3b8; font-style: italic; font-size: 12px; }
+    .loc-none { color: #cbd5e1; font-size: 12px; }
+    .loc-time { color: #cbd5e1; font-size: 10px; display: block; }
+
+    /* Combined status column */
+    .flight-status-cell { text-align: center; }
+    .flight-status-cell .phase-badge { display: block; margin-bottom: 3px; }
+
+    /* Real-time position card in detail modal */
+    .realtime-card { margin-top: 18px; padding: 16px; background: linear-gradient(135deg, #f0f9ff, #f0fdf4); border-radius: 10px; border: 1px solid #e0f2fe; }
+    .realtime-card-title { font-size: 14px; font-weight: 600; color: #0c4a6e; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    .realtime-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .realtime-item { text-align: center; }
+    .realtime-item .rt-label { font-size: 11px; color: #64748b; }
+    .realtime-item .rt-value { font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 2px; }
+    .realtime-item .rt-value.rt-speed { color: #0ea5e9; }
+    .realtime-item .rt-value.rt-alt { color: #6366f1; }
+    .realtime-item .rt-value.rt-bat { color: #10b981; }
+    .realtime-addr { margin-top: 12px; padding: 10px; background: #fff; border-radius: 8px; font-size: 13px; color: #334155; text-align: center; }
+    .realtime-addr strong { color: #0ea5e9; }
+    .realtime-update { text-align: center; margin-top: 8px; font-size: 11px; color: #94a3b8; }
   </style>
 </head>
 <body>
@@ -183,11 +214,9 @@
         <tr>
           <th>任务名称</th>
           <th>执行无人机</th>
-          <th>飞行路线</th>
           <th>任务目标</th>
-          <th>预计时长</th>
-          <th>当前阶段</th>
-          <th>任务状态</th>
+          <th>飞行状态</th>
+          <th>当前位置</th>
           <th>进度</th>
           <th>创建时间</th>
           <th>操作</th>
@@ -479,21 +508,28 @@
     }
 
     // ========== Render ==========
+    // Cache: device_id -> { address, ts } for reverse geocoding results
+    var _addrCache = {};
+    // Cache: device_id -> latest mission item data (for GPS WS updates)
+    var _lastMissionItems = [];
+
     function renderTable(items) {
+      _lastMissionItems = items;
       const tbody = $('#missionsTbody');
       if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:40px;">暂无飞行任务数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:40px;">暂无飞行任务数据</td></tr>';
         return;
       }
       tbody.innerHTML = items.map(m => `
         <tr>
           <td><strong>${esc(m.name)}</strong></td>
           <td>${m.drone_name ? esc(m.drone_name) : '<span style="color:#94a3b8;">未指定</span>'}</td>
-          <td>${esc(m.route)}</td>
-          <td>${esc(m.target)}</td>
-          <td>${esc(m.estimated_duration) || '-'}</td>
-          <td>${phaseTag(m.current_phase)}</td>
-          <td>${statusTag(m.status)}</td>
+          <td>${esc(m.target) || '-'}</td>
+          <td class="flight-status-cell">
+            ${phaseTag(m.current_phase)}
+            ${statusTag(m.status)}
+          </td>
+          <td class="loc-cell" id="loc-${m.id}">${renderLocationCell(m)}</td>
           <td>
             <div class="mission-progress">
               <div class="progress-bar"><div class="progress-fill" style="width:${m.progress}%;background:${progressColor(m.progress)};"></div></div>
@@ -508,6 +544,60 @@
           </td>
         </tr>
       `).join('');
+      // Trigger reverse geocoding for items with GPS data
+      items.forEach(m => { if (m.gps && m.gps.latitude && m.gps.longitude) tryRegeocode(m); });
+    }
+
+    function renderLocationCell(m) {
+      if (!m.device_id || m.device_id === 0) return '<span class="loc-none">未绑定无人机</span>';
+      if (!m.gps || (!m.gps.latitude && !m.gps.longitude)) return '<span class="loc-offline">等待GPS数据...</span>';
+      var g = m.gps;
+      var cached = _addrCache[m.device_id];
+      var addrHtml = cached ? '<span class="loc-addr" title="' + esc(cached.address) + '">' + esc(cached.short) + '</span>'
+                            : '<span class="loc-addr" id="addr-' + m.device_id + '">' + g.latitude.toFixed(4) + ', ' + g.longitude.toFixed(4) + '</span>';
+      var speedHtml = '<span class="loc-speed">' + g.speed.toFixed(1) + 'm/s</span>';
+      var altHtml = '<span>' + g.altitude.toFixed(0) + 'm</span>';
+      var batHtml = '';
+      if (m.battery_level !== undefined && m.battery_level >= 0) {
+        var batCls = m.battery_level > 30 ? 'loc-bat-ok' : (m.battery_level > 15 ? 'loc-bat-low' : 'loc-bat-crit');
+        batHtml = '<span class="loc-bat ' + batCls + '">' + m.battery_level + '%</span>';
+      }
+      var timeHtml = g.last_update ? '<span class="loc-time">' + timeAgo(g.last_update) + '</span>' : '';
+      return addrHtml + '<div class="loc-meta">' + speedHtml + altHtml + batHtml + '</div>' + timeHtml;
+    }
+
+    function timeAgo(dateStr) {
+      if (!dateStr) return '';
+      try {
+        var d = new Date(dateStr.replace(' ', 'T'));
+        var diff = Math.floor((Date.now() - d.getTime()) / 1000);
+        if (diff < 0) diff = 0;
+        if (diff < 5) return '刚刚更新';
+        if (diff < 60) return diff + '秒前';
+        if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+        if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+        return Math.floor(diff / 86400) + '天前';
+      } catch(e) { return ''; }
+    }
+
+    async function tryRegeocode(m) {
+      var g = m.gps;
+      if (!g || !g.latitude || !g.longitude) return;
+      var key = m.device_id;
+      // Use cache if fresh (< 60s)
+      if (_addrCache[key] && (Date.now() - _addrCache[key].ts) < 60000) return;
+      try {
+        var res = await api('/amap/regeocode', { method: 'POST', body: { latitude: g.latitude, longitude: g.longitude } });
+        var data = await res.json();
+        if (data.formatted) {
+          var short = data.district ? (data.district + ' ' + (data.township || '')) : data.formatted;
+          if (short.length > 16) short = short.substring(0, 16) + '...';
+          _addrCache[key] = { address: data.formatted, short: short.trim(), ts: Date.now() };
+          // Update the cell in-place
+          var cell = $('#loc-' + m.id);
+          if (cell) cell.innerHTML = renderLocationCell(m);
+        }
+      } catch(e) { /* fallback to coords */ }
     }
 
     function statusTag(s) {
@@ -556,7 +646,7 @@
     let mResultMap = null;
     let mLastMapCtx = null;
     let mLastPlan = null;
-    const amapOK = (typeof AMap !== 'undefined');
+    let amapOK = (typeof AMap !== 'undefined');
 
     function initMissionPickerMap() {
       if (!amapOK) return;
@@ -812,8 +902,7 @@
           <div class="detail-label">飞行路线</div><div class="detail-value">${esc(m.route)}</div>
           <div class="detail-label">任务目标</div><div class="detail-value">${esc(m.target) || '-'}</div>
           <div class="detail-label">预计时长</div><div class="detail-value">${esc(m.estimated_duration) || '-'}</div>
-          <div class="detail-label">当前阶段</div><div class="detail-value">${phaseTag(m.current_phase)}</div>
-          <div class="detail-label">任务状态</div><div class="detail-value">${statusTag(m.status)}</div>
+          <div class="detail-label">飞行阶段</div><div class="detail-value">${phaseTag(m.current_phase)} ${statusTag(m.status)}</div>
           <div class="detail-label">任务进度</div><div class="detail-value">
             <div class="mission-progress" style="max-width:300px;">
               <div class="progress-bar"><div class="progress-fill" style="width:${m.progress}%;background:${progressColor(m.progress)};"></div></div>
@@ -826,14 +915,73 @@
           <div class="detail-label">创建时间</div><div class="detail-value">${formatDate(m.created_at)}</div>
         `;
 
+        // Real-time position card
+        const rtCard = document.createElement('div');
+        rtCard.id = 'realtimeCard';
+        if (m.gps && (m.gps.latitude || m.gps.longitude)) {
+          var g = m.gps;
+          var bat = m.battery || {};
+          var headingDir = headingToDir(g.heading);
+          var batLevel = bat.level !== undefined ? bat.level : -1;
+          var batCls = batLevel > 30 ? 'loc-bat-ok' : (batLevel > 15 ? 'loc-bat-low' : 'loc-bat-crit');
+          rtCard.className = 'realtime-card';
+          rtCard.innerHTML = `
+            <div class="realtime-card-title">📡 无人机实时位置</div>
+            <div class="realtime-grid">
+              <div class="realtime-item"><div class="rt-label">速度</div><div class="rt-value rt-speed">${g.speed.toFixed(1)} <small>m/s</small></div></div>
+              <div class="realtime-item"><div class="rt-label">高度</div><div class="rt-value rt-alt">${g.altitude.toFixed(0)} <small>m</small></div></div>
+              <div class="realtime-item"><div class="rt-label">航向</div><div class="rt-value">${g.heading.toFixed(0)}° <small>${headingDir}</small></div></div>
+              <div class="realtime-item"><div class="rt-label">纬度</div><div class="rt-value">${g.latitude.toFixed(6)}</div></div>
+              <div class="realtime-item"><div class="rt-label">经度</div><div class="rt-value">${g.longitude.toFixed(6)}</div></div>
+              <div class="realtime-item"><div class="rt-label">电量</div><div class="rt-value ${batCls}">${batLevel >= 0 ? batLevel + '%' : '-'}</div></div>
+            </div>
+            <div class="realtime-addr" id="detailAddr">
+              <strong>📍</strong> <span id="detailAddrText">${g.latitude.toFixed(4)}, ${g.longitude.toFixed(4)}</span>
+            </div>
+            <div class="realtime-update">${g.last_update ? '最后更新: ' + timeAgo(g.last_update) + ' (' + g.last_update + ')' : ''}</div>
+          `;
+          dc.parentNode.insertBefore(rtCard, dc.nextSibling);
+          // Try reverse geocoding for detail
+          tryDetailRegeocode(g.latitude, g.longitude);
+        } else if (m.device_id && m.device_id > 0) {
+          rtCard.className = 'realtime-card';
+          rtCard.innerHTML = '<div class="realtime-card-title">📡 无人机实时位置</div><div style="text-align:center;color:#94a3b8;padding:12px;">等待GPS数据推送...</div>';
+          dc.parentNode.insertBefore(rtCard, dc.nextSibling);
+        }
+
         // Phase control buttons
         const pc = $('#phaseControl');
+        // Rule A: check if device is online (GPS updated within 60s)
+        var deviceOnline = false;
+        if (m.gps && m.gps.last_update) {
+          try {
+            var gpsT = new Date(m.gps.last_update.replace(' ', 'T'));
+            deviceOnline = (Date.now() - gpsT.getTime()) < 60000;
+          } catch(e) {}
+        }
+
         if (m.status === '已完成') {
           pc.innerHTML = '<span style="color:#10b981;font-weight:500;">任务已完成</span>';
-        } else {
+        } else if (deviceOnline) {
+          // Device online: show read-only phase indicators + auto-control notice
           const phases = ['待命', '起飞', '巡航', '执行任务', '返航', '降落'];
           const currentIdx = phases.indexOf(m.current_phase);
-          pc.innerHTML = '<strong style="font-size:13px;color:#475569;">状态跟踪：</strong>' +
+          pc.innerHTML = '<div style="margin-bottom:6px;"><strong style="font-size:13px;color:#475569;">飞行阶段（自动）：</strong>' +
+            '<span style="font-size:11px;color:#0ea5e9;margin-left:6px;">📡 设备在线，阶段由无人机自动上报</span></div>' +
+            phases.map((p, i) => {
+              const isCurrent = p === m.current_phase;
+              const isPast = i < currentIdx;
+              let cls = 'btn btn-secondary';
+              if (isCurrent) cls = 'btn btn-primary';
+              if (isPast) cls = 'btn btn-success';
+              return `<button class="${cls} btn-action" disabled>${p}</button>`;
+            }).join('');
+        } else {
+          // Device offline or not bound: allow manual phase control
+          const phases = ['待命', '起飞', '巡航', '执行任务', '返航', '降落'];
+          const currentIdx = phases.indexOf(m.current_phase);
+          var manualHint = m.device_id > 0 ? '<span style="font-size:11px;color:#f59e0b;margin-left:6px;">⚠ 设备离线，允许手动控制</span>' : '';
+          pc.innerHTML = '<div style="margin-bottom:6px;"><strong style="font-size:13px;color:#475569;">状态跟踪：</strong>' + manualHint + '</div>' +
             phases.map((p, i) => {
               const isCurrent = p === m.current_phase;
               const isNext = i === currentIdx + 1;
@@ -868,6 +1016,8 @@
     }
 
     function closeDetailModal() {
+      var rc = document.getElementById('realtimeCard');
+      if (rc) rc.remove();
       $('#detailModal').classList.remove('active');
     }
 
@@ -878,7 +1028,14 @@
           body: { phase }
         });
         const data = await res.json();
-        if (data.error) { showToast(data.error, 'error'); return; }
+        if (data.error) {
+          if (data.rule === 'A') {
+            showToast('设备在线，飞行阶段由无人机自动上报，无法手动修改', 'error');
+          } else {
+            showToast(data.error, 'error');
+          }
+          return;
+        }
         showToast('阶段已更新: ' + phase, 'success');
         closeDetailModal();
         loadMissions();
@@ -953,9 +1110,30 @@
       }
     }
 
-    // ========== Real-time WebSocket ==========
+    // ========== Heading direction helper ==========
+    function headingToDir(deg) {
+      if (deg == null) return '';
+      var dirs = ['北','东北','东','东南','南','西南','西','西北'];
+      return dirs[Math.round(((deg % 360 + 360) % 360) / 45) % 8];
+    }
+
+    // ========== Reverse geocoding for detail modal ==========
+    async function tryDetailRegeocode(lat, lon) {
+      try {
+        var res = await api('/amap/regeocode', { method: 'POST', body: { latitude: lat, longitude: lon } });
+        var data = await res.json();
+        if (data.formatted) {
+          var el = document.getElementById('detailAddrText');
+          if (el) el.textContent = data.formatted;
+        }
+      } catch(e) {}
+    }
+
+    // ========== Real-time WebSocket (Flight + GPS) ==========
     var flightWS = null;
+    var gpsWS = null;
     var wsReconnectTimer = null;
+    var gpsReconnectTimer = null;
     var realtimeEnabled = true;
 
     function connectFlightWS() {
@@ -972,8 +1150,7 @@
           if (event.type === 'flight_phase' || event.type === 'flight_created' ||
               event.type === 'flight_updated' || event.type === 'flight_deleted' ||
               event.type === 'flight_imported') {
-            loadMissions();
-            loadStats();
+            throttledWSRefresh();
           }
         } catch(e) {}
       };
@@ -988,6 +1165,45 @@
     function scheduleReconnect() {
       if (wsReconnectTimer) return;
       wsReconnectTimer = setTimeout(function() { wsReconnectTimer = null; connectFlightWS(); }, 3000);
+    }
+
+    // GPS WebSocket: real-time position updates for the mission list
+    function connectGpsWS() {
+      if (gpsWS && (gpsWS.readyState === WebSocket.OPEN || gpsWS.readyState === WebSocket.CONNECTING)) return;
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      gpsWS = new WebSocket(proto + '//' + location.host + '/api/gps/stream');
+      gpsWS.onmessage = function(evt) {
+        try {
+          var event = JSON.parse(evt.data);
+          if (event.type === 'gps_update' && event.data) {
+            var d = event.data;
+            // Update matching missions in the cached list
+            _lastMissionItems.forEach(function(m) {
+              if (m.device_id === d.device_id) {
+                if (!m.gps) m.gps = {};
+                m.gps.latitude = d.latitude;
+                m.gps.longitude = d.longitude;
+                m.gps.altitude = d.altitude;
+                m.gps.speed = d.speed;
+                m.gps.heading = d.heading;
+                m.gps.last_update = new Date().toISOString().replace('T',' ').substring(0,19);
+                m.gps.status = '在线';
+                // Re-render just this cell
+                var cell = document.getElementById('loc-' + m.id);
+                if (cell) cell.innerHTML = renderLocationCell(m);
+                // Invalidate address cache for this device so it re-fetches
+                delete _addrCache[m.device_id];
+                tryRegeocode(m);
+              }
+            });
+          }
+        } catch(e) {}
+      };
+      gpsWS.onclose = function() {
+        if (gpsReconnectTimer) return;
+        gpsReconnectTimer = setTimeout(function() { gpsReconnectTimer = null; connectGpsWS(); }, 3000);
+      };
+      gpsWS.onerror = function() { gpsWS.close(); };
     }
 
     // ========== Smart Plan & Fill (integrated into create mission) ==========
@@ -1210,12 +1426,48 @@
       } catch(e) { console.warn('Result map render failed:', e); }
     }
 
-    // ========== Init ==========
-    initCharts();
+    // ========== WebSocket event throttle ==========
+    let _wsRefreshTimer = null;
+    function throttledWSRefresh() {
+      if (_wsRefreshTimer) return;
+      _wsRefreshTimer = setTimeout(function() {
+        _wsRefreshTimer = null;
+        loadMissions();
+        loadStats();
+      }, 500);
+    }
+
+    // ========== Async script loader ==========
+    function loadScript(src) {
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.async = true;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    // ========== Init (optimized load order) ==========
+    // Phase 1: Load data immediately (no external deps needed)
     loadDrones();
     loadMissions();
-    loadStats();
     connectFlightWS();
+    connectGpsWS();
+
+    // Phase 2: Load Chart.js async, then init charts + stats
+    loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js')
+      .then(function() {
+        initCharts();
+        loadStats();
+      })
+      .catch(function(e) { console.warn('Chart.js load failed:', e); });
+
+    // Phase 3: Load AMap SDK async (only needed when opening create modal)
+    loadScript('https://webapi.amap.com/maps?v=2.0&key=dd1c139ca98be9925c57001ab97a7bbe')
+      .then(function() { amapOK = true; })
+      .catch(function(e) { console.warn('AMap SDK load failed (map features disabled):', e); });
   </script>
 </body>
 </html>

@@ -56,9 +56,15 @@ func (a *API) FlightMissionsList(c *gin.Context) {
 	var total int
 	_ = a.db.QueryRow("SELECT COUNT(*) FROM flight_missions WHERE "+wc, args...).Scan(&total)
 
-	// query
+	// query — also fetch latest GPS position and battery level for each mission's device
 	offset := (page - 1) * pageSize
-	q := "SELECT f.id, f.name, f.route, f.target, f.estimated_duration, f.status, f.current_phase, f.progress, f.start_time, f.end_time, f.description, f.created_at, f.updated_at, f.device_id, COALESCE(g.name,'') FROM flight_missions f LEFT JOIN gps_devices g ON f.device_id=g.id WHERE " + wc + " ORDER BY datetime(f.created_at) DESC LIMIT ? OFFSET ?"
+	q := `SELECT f.id, f.name, f.route, f.target, f.estimated_duration, f.status, f.current_phase, f.progress,
+		f.start_time, f.end_time, f.description, f.created_at, f.updated_at, f.device_id, COALESCE(g.name,''),
+		COALESCE(g.latitude,0), COALESCE(g.longitude,0), COALESCE(g.altitude,0),
+		COALESCE(g.speed,0), COALESCE(g.heading,0), COALESCE(g.status,''),
+		COALESCE(g.last_update,''),
+		COALESCE((SELECT level FROM battery_records WHERE device_id=f.device_id ORDER BY id DESC LIMIT 1),-1)
+		FROM flight_missions f LEFT JOIN gps_devices g ON f.device_id=g.id WHERE ` + wc + ` ORDER BY datetime(f.created_at) DESC LIMIT ? OFFSET ?`
 	qArgs := append(args, pageSize, offset)
 	rows, err := a.db.Query(q, qArgs...)
 	if err != nil {
@@ -69,17 +75,32 @@ func (a *API) FlightMissionsList(c *gin.Context) {
 
 	items := []gin.H{}
 	for rows.Next() {
-		var id, progress, deviceID int
-		var name, route, target, estDur, status, phase, desc, droneName string
-		var startTime, endTime, created, updated sql.NullString
-		if err := rows.Scan(&id, &name, &route, &target, &estDur, &status, &phase, &progress, &startTime, &endTime, &desc, &created, &updated, &deviceID, &droneName); err == nil {
-			items = append(items, gin.H{
+		var id, progress, deviceID, batteryLevel int
+		var name, route, target, estDur, status, phase, desc, droneName, gpsStatus string
+		var gpsLat, gpsLng, gpsAlt, gpsSpeed, gpsHeading float64
+		var startTime, endTime, created, updated, gpsLastUpdate sql.NullString
+		if err := rows.Scan(&id, &name, &route, &target, &estDur, &status, &phase, &progress,
+			&startTime, &endTime, &desc, &created, &updated, &deviceID, &droneName,
+			&gpsLat, &gpsLng, &gpsAlt, &gpsSpeed, &gpsHeading, &gpsStatus, &gpsLastUpdate,
+			&batteryLevel); err == nil {
+			item := gin.H{
 				"id": id, "name": name, "route": route, "target": target,
 				"estimated_duration": estDur, "status": status, "current_phase": phase,
 				"progress": progress, "start_time": startTime.String, "end_time": endTime.String,
 				"description": desc, "created_at": created.String, "updated_at": updated.String,
 				"device_id": deviceID, "drone_name": droneName,
-			})
+			}
+			if deviceID > 0 {
+				item["gps"] = gin.H{
+					"latitude": gpsLat, "longitude": gpsLng, "altitude": gpsAlt,
+					"speed": gpsSpeed, "heading": gpsHeading, "status": gpsStatus,
+					"last_update": gpsLastUpdate.String,
+				}
+				if batteryLevel >= 0 {
+					item["battery_level"] = batteryLevel
+				}
+			}
+			items = append(items, item)
 		}
 	}
 	c.JSON(200, gin.H{"items": items, "total": total, "page": page, "page_size": pageSize})
@@ -128,7 +149,7 @@ func (a *API) FlightMissionsCreate(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true, "id": id})
 }
 
-// FlightMissionsGet returns a single mission by ID
+// FlightMissionsGet returns a single mission by ID, including GPS position and battery info
 func (a *API) FlightMissionsGet(c *gin.Context) {
 	id := c.Param("id")
 	var m struct {
@@ -145,13 +166,41 @@ func (a *API) FlightMissionsGet(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "任务不存在"})
 		return
 	}
-	c.JSON(200, gin.H{
+	result := gin.H{
 		"id": m.ID, "name": m.Name, "route": m.Route, "target": m.Target,
 		"estimated_duration": m.EstDur, "status": m.Status, "current_phase": m.Phase,
 		"progress": m.Progress, "start_time": m.StartTime.String, "end_time": m.EndTime.String,
 		"description": m.Desc, "created_at": m.Created.String, "updated_at": m.Updated.String,
 		"device_id": m.DeviceID, "drone_name": m.DroneName,
-	})
+	}
+
+	// Attach GPS position if device is linked
+	if m.DeviceID > 0 {
+		var gpsLat, gpsLng, gpsAlt, gpsSpeed, gpsHeading float64
+		var gpsStatus string
+		var gpsLastUpdate sql.NullString
+		if a.db.QueryRow(`SELECT latitude, longitude, altitude, speed, heading, status, last_update FROM gps_devices WHERE id=?`, m.DeviceID).Scan(
+			&gpsLat, &gpsLng, &gpsAlt, &gpsSpeed, &gpsHeading, &gpsStatus, &gpsLastUpdate) == nil {
+			result["gps"] = gin.H{
+				"latitude": gpsLat, "longitude": gpsLng, "altitude": gpsAlt,
+				"speed": gpsSpeed, "heading": gpsHeading, "status": gpsStatus,
+				"last_update": gpsLastUpdate.String,
+			}
+		}
+		// Attach latest battery info
+		var batLevel, batHealth int
+		var batVoltage, batTemp float64
+		var batStatus, batRemaining string
+		if a.db.QueryRow(`SELECT level, health, voltage, temperature, status, remaining_time FROM battery_records WHERE device_id=? ORDER BY id DESC LIMIT 1`, m.DeviceID).Scan(
+			&batLevel, &batHealth, &batVoltage, &batTemp, &batStatus, &batRemaining) == nil {
+			result["battery"] = gin.H{
+				"level": batLevel, "health": batHealth, "voltage": batVoltage,
+				"temperature": batTemp, "status": batStatus, "remaining_time": batRemaining,
+			}
+		}
+	}
+
+	c.JSON(200, result)
 }
 
 // FlightMissionsUpdate edits a flight mission
@@ -199,7 +248,10 @@ func (a *API) FlightMissionsDelete(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 
-// FlightMissionsUpdatePhase updates the status/phase of a mission (state machine)
+// FlightMissionsUpdatePhase updates the status/phase of a mission (state machine).
+// Rule A: If the mission is bound to a device and that device is online (GPS updated
+// within the last 60 seconds), manual phase changes are rejected — only agent push
+// (/api/flight/missions/push) is allowed to update the phase.
 func (a *API) FlightMissionsUpdatePhase(c *gin.Context) {
 	id := c.Param("id")
 	var p struct {
@@ -218,6 +270,26 @@ func (a *API) FlightMissionsUpdatePhase(c *gin.Context) {
 	if !validPhases[p.Phase] {
 		c.JSON(400, gin.H{"error": "无效的飞行阶段"})
 		return
+	}
+
+	// Rule A: Check if device is online — if so, reject manual phase change
+	var deviceID int
+	a.db.QueryRow(`SELECT device_id FROM flight_missions WHERE id=?`, id).Scan(&deviceID)
+	if deviceID > 0 {
+		var lastUpdate sql.NullString
+		a.db.QueryRow(`SELECT last_update FROM gps_devices WHERE id=?`, deviceID).Scan(&lastUpdate)
+		if lastUpdate.Valid && lastUpdate.String != "" {
+			if t, err := time.Parse("2006-01-02 15:04:05", lastUpdate.String); err == nil {
+				if time.Since(t) < 60*time.Second {
+					c.JSON(403, gin.H{
+						"error":     "该任务已绑定在线设备，飞行阶段由无人机自动上报，无法手动修改",
+						"device_id": deviceID,
+						"rule":      "A",
+					})
+					return
+				}
+			}
+		}
 	}
 
 	// map phase to status and progress

@@ -327,8 +327,9 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.POST("/flight/missions/plan/:id/adopt", a.FlightPlanAdopt)
 		api.POST("/flight/missions/plan/:id/discard", a.FlightPlanDiscard)
 
-		// AMap geocoding (address → coordinates)
+		// AMap geocoding (address ↔ coordinates)
 		api.POST("/amap/geocode", a.AmapGeocode)
+		api.POST("/amap/regeocode", a.AmapRegeocode)
 
 		// GPS / location tracking (read-only + push; create/update/delete managed by /drones)
 		api.GET("/gps/devices", a.GpsDevicesList)
@@ -359,6 +360,7 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.POST("/battery/push", a.BatteryPushByAgent)
 
 		// Real-time WebSocket streams (event-driven push)
+		r.GET("/api/gps/stream", a.GpsStream)
 		r.GET("/api/battery/stream", a.BatteryStream)
 		r.GET("/api/flight/stream", a.FlightStream)
 	}
@@ -943,10 +945,11 @@ func (a *API) HardwarePush(c *gin.Context) {
 	}
 
 	// Update existing record
+	desc := fmt.Sprintf("OS:%s CPU:%s Cores:%d Mem:%dMB", p.OS, p.CPUModel, p.CPUCores, p.MemTotalMB)
 	_, err = a.db.Exec(`UPDATE hardware_items SET
 		status = '在线', temperature = ?, cpu_usage = ?, mem_usage = ?, network_bandwidth = ?,
-		detected_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-		p.Temperature, p.CPUUsage, p.MemUsage, p.NetworkBandwidth, id)
+		description = ?, detected_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+		p.Temperature, p.CPUUsage, p.MemUsage, p.NetworkBandwidth, desc, id)
 	if err != nil {
 		c.JSON(500, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -971,16 +974,34 @@ func (a *API) MetricsStream(c *gin.Context) {
 		return
 	}
 	defer ws.Close()
+
+	// Read goroutine to detect client disconnect / close frames promptly
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			if _, _, err := ws.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 	for {
-		m, err := monitor.CollectMetrics()
-		if err != nil {
+		select {
+		case <-done:
 			return
+		case <-ticker.C:
+			m, err := monitor.CollectMetrics()
+			if err != nil {
+				return
+			}
+			b, _ := json.Marshal(m)
+			if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
+				return
+			}
 		}
-		b, _ := json.Marshal(m)
-		if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
-			return
-		}
-		time.Sleep(1 * time.Second)
 	}
 }
 

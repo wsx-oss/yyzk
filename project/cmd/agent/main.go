@@ -238,148 +238,14 @@ type pushPayload struct {
 	Timestamp        int64   `json:"timestamp"`
 }
 
-// gpsBatteryState holds simulated GPS + battery + flight mission state for the push loop
-type gpsBatteryState struct {
-	// GPS: simulate circular flight around a center point
-	centerLat  float64
-	centerLng  float64
-	radius     float64 // degrees offset (~0.005 ≈ 500m)
-	altitude   float64
-	angle      float64 // current angle in radians
-	angleStep  float64 // radians per push cycle
-	// Battery: simulate gradual drain
-	level      int
-	health     int
-	cycles     int
-	voltage    float64
-	drainRate  float64 // fractional level decrease per push cycle
-	drainAccum float64 // accumulator for fractional drain
-	// Flight mission: simulate phase progression
-	flightPhases    []string
-	flightPhaseDur  []int // how many push cycles each phase lasts
-	flightPhaseIdx  int   // current phase index
-	flightPhaseTick int   // ticks spent in current phase
-	flightCooldown  int   // ticks to wait before starting a new cycle
-	flightCoolTick  int   // current cooldown tick counter
-}
+// NOTE: GPS/battery/flight simulation logic has been extracted to provider_simulated.go
+// Real data providers are in provider_mavlink.go and provider_nmea.go
+// All implement the DroneDataProvider interface defined in provider.go
 
-func newGpsBatteryState() *gpsBatteryState {
-	return &gpsBatteryState{
-		centerLat: 39.908,   // Beijing area default
-		centerLng: 116.397,
-		radius:    0.005,    // ~500m radius
-		altitude:  80,
-		angle:     0,
-		angleStep: 0.1,     // ~6 degrees per cycle
-		level:     100,
-		health:    95,
-		cycles:    42,
-		voltage:   12.6,
-		drainRate: 0.15,    // ~1% every 7 cycles
-		// Flight mission phases and durations (in push cycles)
-		// 待命(5) → 起飞(8) → 巡航(15) → 执行任务(20) → 返航(12) → 降落(5)
-		flightPhases:   []string{"待命", "起飞", "巡航", "执行任务", "返航", "降落"},
-		flightPhaseDur: []int{5, 8, 15, 20, 12, 5},
-		flightPhaseIdx: 0,
-		flightPhaseTick: 0,
-		flightCooldown: 15, // wait 15 cycles before restarting
-		flightCoolTick: 0,
-	}
-}
-
-func (s *gpsBatteryState) tick() {
-	s.angle += s.angleStep
-	if s.angle >= 2*math.Pi {
-		s.angle -= 2 * math.Pi
-	}
-	// Battery drains slowly using accumulator for fractional values
-	s.drainAccum += s.drainRate
-	if s.drainAccum >= 1.0 {
-		drop := int(s.drainAccum)
-		s.level -= drop
-		s.drainAccum -= float64(drop)
-	}
-	if s.level < 0 {
-		s.level = 0
-	}
-	if s.level <= 5 {
-		// Simulate battery swap
-		s.level = 100
-		s.voltage = 12.6
-		s.cycles++
-		s.drainAccum = 0
-	}
-	// Voltage correlates with level
-	s.voltage = 10.0 + float64(s.level)*0.026
-
-	// Flight mission phase progression
-	if s.flightPhaseIdx >= len(s.flightPhases) {
-		// In cooldown after completing a full cycle
-		s.flightCoolTick++
-		if s.flightCoolTick >= s.flightCooldown {
-			// Restart the mission cycle
-			s.flightPhaseIdx = 0
-			s.flightPhaseTick = 0
-			s.flightCoolTick = 0
-		}
-	} else {
-		s.flightPhaseTick++
-		if s.flightPhaseTick >= s.flightPhaseDur[s.flightPhaseIdx] {
-			s.flightPhaseIdx++
-			s.flightPhaseTick = 0
-		}
-	}
-}
-
-func (s *gpsBatteryState) currentFlightPhase() string {
-	if s.flightPhaseIdx >= len(s.flightPhases) {
-		return "" // in cooldown, no active phase to push
-	}
-	return s.flightPhases[s.flightPhaseIdx]
-}
-
-func (s *gpsBatteryState) flightPayload(agentID string) map[string]interface{} {
-	phase := s.currentFlightPhase()
-	return map[string]interface{}{
-		"agent_id": agentID,
-		"phase":    phase,
-	}
-}
-
-func (s *gpsBatteryState) gpsPayload(agentID string) map[string]interface{} {
-	lat := s.centerLat + s.radius*math.Sin(s.angle)
-	lng := s.centerLng + s.radius*math.Cos(s.angle)
-	speed := s.radius * s.angleStep * 111000 // approximate m/s
-	heading := math.Mod(s.angle*180/math.Pi+90, 360)
-	return map[string]interface{}{
-		"agent_id":  agentID,
-		"latitude":  math.Round(lat*1e6) / 1e6,
-		"longitude": math.Round(lng*1e6) / 1e6,
-		"altitude":  s.altitude + (math.Sin(s.angle*2) * 5), // slight altitude variation
-		"speed":     math.Round(speed*10) / 10,
-		"heading":   math.Round(heading*10) / 10,
-		"accuracy":  2.5,
-	}
-}
-
-func (s *gpsBatteryState) batteryPayload(agentID string) map[string]interface{} {
-	temp := 32.0 + float64(100-s.level)*0.12 // hotter when lower
-	remaining := fmt.Sprintf("%d分钟", s.level*30/100)
-	return map[string]interface{}{
-		"agent_id":       agentID,
-		"voltage":        math.Round(s.voltage*10) / 10,
-		"current_val":    math.Round((3.0+float64(100-s.level)*0.05)*10) / 10,
-		"level":          s.level,
-		"temperature":    math.Round(temp*10) / 10,
-		"health":         s.health,
-		"charge_cycles":  s.cycles,
-		"remaining_time": remaining,
-	}
-}
-
-// backgroundPusher periodically pushes hardware metrics, GPS position, and battery data to the remote server.
+// backgroundPusher periodically pushes hardware metrics, GPS position, battery data, and flight phase
+// to the remote server using the given DroneDataProvider for GPS/battery/flight data.
 // If the server is unreachable, it retries with exponential backoff.
-func backgroundPusher(serverURL, agentID string, interval time.Duration) {
+func backgroundPusher(serverURL, agentID string, interval time.Duration, provider DroneDataProvider) {
 	baseURL := strings.TrimRight(serverURL, "/")
 	hwPushURL := baseURL + "/api/hardware/push"
 	gpsPushURL := baseURL + "/api/gps/push"
@@ -399,11 +265,9 @@ func backgroundPusher(serverURL, agentID string, interval time.Duration) {
 	backoff := interval
 	maxBackoff := 30 * time.Second
 	consecutiveFails := 0
-
-	gbs := newGpsBatteryState()
 	pushCount := 0
 
-	log.Printf("[Push] Pushing metrics to %s every %v (agent_id=%s)", baseURL, interval, agentID)
+	log.Printf("[Push] Pushing metrics to %s every %v (agent_id=%s, provider=%s)", baseURL, interval, agentID, provider.Name())
 	log.Printf("[Push] GPS + Battery + Flight mission push enabled")
 
 	for {
@@ -449,25 +313,29 @@ func backgroundPusher(serverURL, agentID string, interval time.Duration) {
 			log.Printf("[Push] Server returned HTTP %d", resp.StatusCode)
 		}
 
-		// Push GPS data every cycle
-		gbs.tick()
-		gpsBody, _ := json.Marshal(gbs.gpsPayload(agentID))
-		if gpsResp, err := client.Post(gpsPushURL, "application/json", bytes.NewReader(gpsBody)); err == nil {
-			gpsResp.Body.Close()
+		// Advance provider state (e.g. simulation tick, or battery estimate update)
+		provider.Tick()
+
+		// Push GPS data every cycle (only if provider has data)
+		if provider.IsReady() {
+			gpsBody, _ := json.Marshal(provider.GPSPayload(agentID))
+			if gpsResp, err := client.Post(gpsPushURL, "application/json", bytes.NewReader(gpsBody)); err == nil {
+				gpsResp.Body.Close()
+			}
 		}
 
 		// Push battery data every 5 cycles (less frequent than GPS)
 		pushCount++
 		if pushCount%5 == 0 {
-			batBody, _ := json.Marshal(gbs.batteryPayload(agentID))
+			batBody, _ := json.Marshal(provider.BatteryPayload(agentID))
 			if batResp, err := client.Post(batPushURL, "application/json", bytes.NewReader(batBody)); err == nil {
 				batResp.Body.Close()
 			}
 		}
 
 		// Push flight mission phase every cycle (only when there's an active phase)
-		if phase := gbs.currentFlightPhase(); phase != "" {
-			flightBody, _ := json.Marshal(gbs.flightPayload(agentID))
+		if phase := provider.FlightPhase(); phase != "" {
+			flightBody, _ := json.Marshal(provider.FlightPayload(agentID))
 			if flightResp, err := client.Post(flightPushURL, "application/json", bytes.NewReader(flightBody)); err == nil {
 				flightResp.Body.Close()
 			}
@@ -625,6 +493,12 @@ func main() {
 	serverURL := flag.String("server", "", "Ground station server URL for Push mode (e.g. http://192.168.1.100:8080)")
 	agentID := flag.String("id", "", "Unique agent ID (defaults to hostname)")
 	pushInterval := flag.Int("push-interval", 2, "Push interval in seconds")
+
+	// Data source selection flags
+	simulate := flag.Bool("simulate", false, "Use simulated GPS/battery/flight data (for demo/testing)")
+	mavlinkAddr := flag.String("mavlink", "", "MAVLink UDP listen address for real flight controller (e.g. :14550)")
+	gpsSerial := flag.String("gps-serial", "", "NMEA GPS serial port or gpsd address (e.g. COM3, /dev/ttyUSB0, tcp:localhost:2947)")
+
 	flag.Parse()
 
 	go backgroundCPUCollector()
@@ -633,8 +507,51 @@ func main() {
 
 	// Start Push mode if -server is specified
 	if *serverURL != "" {
-		log.Printf("[Agent] Push mode enabled → %s", *serverURL)
-		go backgroundPusher(*serverURL, *agentID, time.Duration(*pushInterval)*time.Second)
+		// Select drone data provider based on flags
+		var provider DroneDataProvider
+		switch {
+		case *simulate:
+			log.Printf("[Agent] Data source: SIMULATED (demo mode)")
+			provider = NewSimulatedProvider()
+		case *mavlinkAddr != "":
+			log.Printf("[Agent] Data source: MAVLink (real flight controller on %s)", *mavlinkAddr)
+			provider = NewMAVLinkProvider(*mavlinkAddr)
+		case *gpsSerial != "":
+			log.Printf("[Agent] Data source: NMEA GPS (serial/gpsd: %s)", *gpsSerial)
+			provider = NewNMEAProvider(*gpsSerial)
+		default:
+			// Default: try MAVLink on standard port, fall back to simulated
+			log.Printf("[Agent] No data source specified. Trying MAVLink on :14550...")
+			mavProv := NewMAVLinkProvider(":14550")
+			if err := mavProv.Start(); err != nil {
+				log.Printf("[Agent] MAVLink not available (%v), falling back to SIMULATED mode", err)
+				provider = NewSimulatedProvider()
+			} else {
+				// Wait briefly to see if we get real data
+				time.Sleep(3 * time.Second)
+				if mavProv.IsReady() {
+					log.Printf("[Agent] MAVLink connected! Using real flight controller data.")
+					provider = mavProv
+				} else {
+					log.Printf("[Agent] No MAVLink data received, falling back to SIMULATED mode")
+					log.Printf("[Agent] To use real data, connect a flight controller or specify -mavlink / -gps-serial")
+					mavProv.Stop()
+					provider = NewSimulatedProvider()
+				}
+			}
+		}
+
+		// Start the provider if not already started (MAVLink auto-detect path starts it above)
+		if _, isMav := provider.(*MAVLinkProvider); !isMav || *mavlinkAddr != "" {
+			if err := provider.Start(); err != nil {
+				log.Printf("[Agent] WARNING: Provider start failed: %v, falling back to simulated", err)
+				provider = NewSimulatedProvider()
+				provider.Start()
+			}
+		}
+
+		log.Printf("[Agent] Push mode enabled → %s (provider: %s)", *serverURL, provider.Name())
+		go backgroundPusher(*serverURL, *agentID, time.Duration(*pushInterval)*time.Second, provider)
 	}
 
 	addr := fmt.Sprintf(":%d", *port)
@@ -660,5 +577,12 @@ func main() {
 	} else {
 		log.Printf("  Push mode disabled. Use -server to enable.")
 	}
+	log.Printf("")
+	log.Printf("  Data source flags:")
+	log.Printf("    -simulate          Use simulated data (demo/testing)")
+	log.Printf("    -mavlink :14550    Read from MAVLink flight controller (PX4/ArduPilot)")
+	log.Printf("    -gps-serial COM3   Read GPS from serial NMEA device")
+	log.Printf("    -gps-serial tcp:localhost:2947  Read GPS from gpsd")
+	log.Printf("    (none)             Auto-detect: try MAVLink, fallback to simulated")
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

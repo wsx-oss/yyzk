@@ -142,6 +142,7 @@ func authMiddleware(token string) gin.HandlerFunc {
 		if p == "/api/healthz" || p == "/api/metrics/stream" || p == "/api/vnc/ws" || p == "/api/ssh/ws" ||
 			p == "/api/sync/ping" || p == "/api/sync/export-data" || p == "/api/sync/import-data" ||
 			p == "/api/hardware/push" || p == "/api/gps/push" || p == "/api/battery/push" || p == "/api/flight/missions/push" ||
+			p == "/api/gps/stream" || p == "/api/battery/stream" || p == "/api/flight/stream" ||
 			p == "/" || strings.HasPrefix(p, "/app/") {
 			c.Next()
 			return

@@ -128,19 +128,19 @@ func (a *API) BatteryReport(c *gin.Context) {
 		}
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, alertType, msg)
-		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "高")
+		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "critical", msg)
 	}
 	if p.Temperature >= 50 {
 		msg := fmt.Sprintf("无人机[%s]电池温度过高: %.1f°C", deviceName, p.Temperature)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, "温度过高", msg)
-		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "高")
+		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
 	}
 	if p.Health <= 50 {
 		msg := fmt.Sprintf("无人机[%s]电池健康度低: %d%%，建议更换电池", deviceName, p.Health)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, "健康度低", msg)
-		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "中")
+		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
 	}
 
 	hub.Broadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": p.DeviceID, "status": status}})
@@ -318,6 +318,23 @@ func (a *API) BatteryPushByAgent(c *gin.Context) {
 		return
 	}
 
+	// Validate battery data ranges
+	if p.Level < -1 {
+		p.Level = 0
+	}
+	if p.Level > 100 {
+		p.Level = 100
+	}
+	if p.Voltage < 0 {
+		p.Voltage = 0
+	}
+	if p.Health < 0 {
+		p.Health = 0
+	}
+	if p.Health > 100 {
+		p.Health = 100
+	}
+
 	// Find gps_device: first by agent_id column, then fall back to name
 	var deviceID int
 	var deviceName string
@@ -363,19 +380,19 @@ func (a *API) BatteryPushByAgent(c *gin.Context) {
 		}
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, alertType, msg)
-		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "高")
+		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "critical", msg)
 	}
 	if p.Temperature >= 50 {
 		msg := fmt.Sprintf("无人机[%s]电池温度过高: %.1f°C", deviceName, p.Temperature)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, "温度过高", msg)
-		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "高")
+		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
 	}
 	if p.Health <= 50 {
 		msg := fmt.Sprintf("无人机[%s]电池健康度低: %d%%，建议更换电池", deviceName, p.Health)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, "健康度低", msg)
-		a.db.Exec(`INSERT INTO alerts(type, message, level) VALUES(?,?,?)`, "电池报警", msg, "中")
+		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
 	}
 
 	hub.Broadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": deviceID, "status": status}})

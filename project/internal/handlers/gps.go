@@ -238,6 +238,7 @@ func (a *API) GpsDevicesPush(c *gin.Context) {
 		}
 	}
 
+	hub.Broadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": id, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading}})
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -357,6 +358,16 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 		return
 	}
 
+	// Validate GPS coordinates
+	if p.Latitude < -90 || p.Latitude > 90 || p.Longitude < -180 || p.Longitude > 180 {
+		c.JSON(400, gin.H{"error": "invalid coordinates: latitude must be -90~90, longitude must be -180~180"})
+		return
+	}
+	if p.Latitude == 0 && p.Longitude == 0 {
+		c.JSON(400, gin.H{"error": "invalid coordinates: 0,0 is not a valid position"})
+		return
+	}
+
 	// Find existing gps_device: first by agent_id column, then fall back to name
 	var deviceID int
 	err := a.db.QueryRow(`SELECT id FROM gps_devices WHERE agent_id = ? AND agent_id != ''`, p.AgentID).Scan(&deviceID)
@@ -385,6 +396,7 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 			a.db.Exec(`UPDATE gps_devices SET drone_id=? WHERE id=?`, droneID, deviceID)
 			a.db.Exec(`UPDATE drones SET linked_gps_device_id=?, status='online', updated_at=datetime('now') WHERE id=?`, deviceID, droneID)
 		}
+		hub.Broadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": deviceID, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading, "created": true}})
 		c.JSON(200, gin.H{"ok": true, "id": deviceID, "created": true})
 		return
 	}
@@ -422,7 +434,26 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 	// Also update linked drone status to online
 	a.db.Exec(`UPDATE drones SET status='online', updated_at=datetime('now') WHERE linked_gps_device_id=?`, deviceID)
 
+	hub.Broadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": deviceID, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading}})
 	c.JSON(200, gin.H{"ok": true, "id": deviceID})
+}
+
+// GpsStream is a WebSocket endpoint for real-time GPS position event push.
+func (a *API) GpsStream(c *gin.Context) {
+	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	hub.Subscribe("gps", ws)
+	defer func() {
+		hub.Unsubscribe("gps", ws)
+		ws.Close()
+	}()
+	for {
+		if _, _, err := ws.ReadMessage(); err != nil {
+			break
+		}
+	}
 }
 
 // haversine calculates the distance in meters between two lat/lng points

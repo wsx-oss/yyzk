@@ -330,3 +330,40 @@ func (a *API) AmapGeocode(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"items": candidates})
 }
+
+// AmapRegeocode converts coordinates to a human-readable address (reverse geocoding).
+// POST /api/amap/regeocode
+func (a *API) AmapRegeocode(c *gin.Context) {
+	var req struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "请求格式错误"})
+		return
+	}
+	if req.Latitude == 0 && req.Longitude == 0 {
+		c.JSON(400, gin.H{"error": "坐标不能为空"})
+		return
+	}
+
+	amapClient := amap.NewClient()
+	if !amapClient.Available() {
+		c.JSON(500, gin.H{"error": "高德地图 API 未配置（AMAP_KEY）"})
+		return
+	}
+
+	result, err := amapClient.ReverseGeocode(req.Latitude, req.Longitude)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "逆地理编码失败: " + err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{
+		"address":   result.Address,
+		"province":  result.Province,
+		"city":      result.City,
+		"district":  result.District,
+		"township":  result.Township,
+		"formatted": result.Formatted,
+	})
+}
