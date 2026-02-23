@@ -288,9 +288,45 @@ func (a *API) FlightPlanList(c *gin.Context) {
 // GET /api/flight/missions/plan/status
 func (a *API) FlightPlanStatus(c *gin.Context) {
 	client := llm.NewClient()
+	amapClient := amap.NewClient()
 	c.JSON(200, gin.H{
-		"llm_available": client.Available(),
-		"model":         client.Model,
-		"base_url":      client.BaseURL,
+		"llm_available":  client.Available(),
+		"amap_available": amapClient.Available(),
+		"model":          client.Model,
+		"base_url":       client.BaseURL,
 	})
+}
+
+// AmapGeocode converts an address string to coordinate candidates.
+// POST /api/amap/geocode
+func (a *API) AmapGeocode(c *gin.Context) {
+	var req struct {
+		Address string `json:"address"`
+		City    string `json:"city"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "请求格式错误"})
+		return
+	}
+	if strings.TrimSpace(req.Address) == "" {
+		c.JSON(400, gin.H{"error": "地址不能为空"})
+		return
+	}
+
+	amapClient := amap.NewClient()
+	if !amapClient.Available() {
+		c.JSON(500, gin.H{"error": "高德地图 API 未配置（AMAP_KEY）"})
+		return
+	}
+
+	candidates, err := amapClient.Geocode(strings.TrimSpace(req.Address), strings.TrimSpace(req.City))
+	if err != nil {
+		c.JSON(500, gin.H{"error": "地理编码失败: " + err.Error()})
+		return
+	}
+	if len(candidates) == 0 {
+		c.JSON(200, gin.H{"items": []interface{}{}, "message": "未找到匹配的地点"})
+		return
+	}
+	c.JSON(200, gin.H{"items": candidates})
 }

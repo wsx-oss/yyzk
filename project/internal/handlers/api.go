@@ -327,6 +327,9 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.POST("/flight/missions/plan/:id/adopt", a.FlightPlanAdopt)
 		api.POST("/flight/missions/plan/:id/discard", a.FlightPlanDiscard)
 
+		// AMap geocoding (address → coordinates)
+		api.POST("/amap/geocode", a.AmapGeocode)
+
 		// GPS / location tracking (read-only + push; create/update/delete managed by /drones)
 		api.GET("/gps/devices", a.GpsDevicesList)
 		api.GET("/gps/devices/stats", a.GpsStats)

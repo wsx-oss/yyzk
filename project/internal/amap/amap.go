@@ -265,6 +265,99 @@ func (c *Client) SearchNearbyPOI(lat, lon float64, radiusM int) ([]POIItem, erro
 	return items, nil
 }
 
+// ======================== Forward Geocoding ========================
+
+// GeoCandidate represents one geocoding result candidate
+type GeoCandidate struct {
+	Name      string  `json:"name"`
+	Formatted string  `json:"formatted_address"`
+	Province  string  `json:"province"`
+	City      string  `json:"city"`
+	District  string  `json:"district"`
+	Lat       float64 `json:"lat"`
+	Lon       float64 `json:"lon"`
+	Level     string  `json:"level"`
+}
+
+type geoResponse struct {
+	Status   string `json:"status"`
+	Info     string `json:"info"`
+	Geocodes []struct {
+		FormattedAddress string `json:"formatted_address"`
+		Province         string `json:"province"`
+		City             interface{} `json:"city"`
+		District         string `json:"district"`
+		Location         string `json:"location"`
+		Level            string `json:"level"`
+	} `json:"geocodes"`
+}
+
+// Geocode converts an address string to a list of coordinate candidates
+func (c *Client) Geocode(address string, city string) ([]GeoCandidate, error) {
+	if !c.Available() {
+		return nil, fmt.Errorf("AMAP_KEY not configured")
+	}
+	if address == "" {
+		return nil, fmt.Errorf("address is empty")
+	}
+
+	u := fmt.Sprintf("https://restapi.amap.com/v3/geocode/geo?key=%s&address=%s",
+		url.QueryEscape(c.APIKey), url.QueryEscape(address))
+	if city != "" {
+		u += "&city=" + url.QueryEscape(city)
+	}
+
+	client := &http.Client{Timeout: c.Timeout}
+	resp, err := client.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("amap geocode request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	var result geoResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+	if result.Status != "1" {
+		return nil, fmt.Errorf("amap geocode error: %s", result.Info)
+	}
+
+	var candidates []GeoCandidate
+	for _, g := range result.Geocodes {
+		var lon, lat float64
+		coords := strings.Split(g.Location, ",")
+		if len(coords) == 2 {
+			fmt.Sscanf(coords[0], "%f", &lon)
+			fmt.Sscanf(coords[1], "%f", &lat)
+		}
+		cityStr := ""
+		switch v := g.City.(type) {
+		case string:
+			cityStr = v
+		case []interface{}:
+			if len(v) > 0 {
+				cityStr = fmt.Sprintf("%v", v[0])
+			}
+		}
+		candidates = append(candidates, GeoCandidate{
+			Name:      address,
+			Formatted: g.FormattedAddress,
+			Province:  g.Province,
+			City:      cityStr,
+			District:  g.District,
+			Lat:       lat,
+			Lon:       lon,
+			Level:     g.Level,
+		})
+	}
+	return candidates, nil
+}
+
 // ======================== Build Map Context for LLM ========================
 
 // MapContext holds all map-derived info to feed into LLM prompt
