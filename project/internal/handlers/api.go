@@ -319,6 +319,14 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/flight/missions/:id/logs", a.FlightMissionsLogs)
 		api.POST("/flight/missions/push", a.FlightMissionPushByAgent)
 
+		// LLM flight plan (smart route planning)
+		api.POST("/flight/missions/plan", a.FlightPlanCreate)
+		api.GET("/flight/missions/plans", a.FlightPlanList)
+		api.GET("/flight/missions/plan/status", a.FlightPlanStatus)
+		api.GET("/flight/missions/plan/:id", a.FlightPlanGet)
+		api.POST("/flight/missions/plan/:id/adopt", a.FlightPlanAdopt)
+		api.POST("/flight/missions/plan/:id/discard", a.FlightPlanDiscard)
+
 		// GPS / location tracking (read-only + push; create/update/delete managed by /drones)
 		api.GET("/gps/devices", a.GpsDevicesList)
 		api.GET("/gps/devices/stats", a.GpsStats)

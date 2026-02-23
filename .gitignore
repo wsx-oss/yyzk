@@ -1,0 +1,11 @@
+# Environment config (contains API keys)
+.env
+project/.env
+
+# Build output
+*.exe
+*.db
+
+# IDE
+.idea/
+.vscode/

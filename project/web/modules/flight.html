@@ -6,6 +6,7 @@
   <title>飞行任务管理</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://webapi.amap.com/maps?v=2.0&key=dd1c139ca98be9925c57001ab97a7bbe"></script>
   <style>
     .module-title::before { content: "\2708\FE0F"; }
     .flight-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
@@ -67,6 +68,51 @@
     .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
     .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
     .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
+
+    /* LLM Plan Modal */
+    .plan-modal-box { width: 720px; }
+    .plan-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .plan-form .full-width { grid-column: 1 / -1; }
+    .plan-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .plan-form input, .plan-form select { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .plan-form input:focus, .plan-form select:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .plan-actions-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .plan-action-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #e0e7ff; color: #3730a3; border-radius: 12px; font-size: 12px; }
+    .plan-action-tag .remove-action { cursor: pointer; font-size: 14px; color: #6366f1; margin-left: 2px; }
+    .plan-action-tag .remove-action:hover { color: #ef4444; }
+
+    /* Plan Result */
+    .plan-result { margin-top: 20px; padding-top: 20px; border-top: 2px solid #e2e8f0; }
+    .plan-result-title { font-size: 15px; font-weight: 600; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .plan-waypoints { max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; }
+    .plan-waypoints table { width: 100%; border-collapse: collapse; }
+    .plan-waypoints th { background: #f8fafc; padding: 6px 10px; text-align: left; font-weight: 600; color: #475569; position: sticky; top: 0; }
+    .plan-waypoints td { padding: 5px 10px; border-top: 1px solid #f1f5f9; }
+    .plan-explanation { margin-top: 12px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 13px; color: #0c4a6e; line-height: 1.6; }
+    .plan-warnings { margin-top: 10px; }
+    .plan-warning-item { padding: 6px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 4px; }
+    .plan-warning-info { background: #f0f9ff; color: #0369a1; }
+    .plan-warning-warning { background: #fffbeb; color: #92400e; }
+    .plan-warning-critical { background: #fef2f2; color: #991b1b; }
+    .plan-estimates { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .plan-est-box { background: #f8fafc; border-radius: 8px; padding: 10px; text-align: center; }
+    .plan-est-label { font-size: 11px; color: #94a3b8; }
+    .plan-est-value { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 2px; }
+    .plan-adopt-bar { display: flex; gap: 10px; margin-top: 16px; justify-content: center; }
+    .plan-loading { text-align: center; padding: 40px; color: #64748b; }
+    .plan-loading .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: #0ea5e9; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-llm { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; }
+    .btn-llm:hover { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
+
+    /* Map containers */
+    .plan-picker-map { width: 100%; height: 220px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 6px; }
+    .plan-picker-hint { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+    .plan-result-map { width: 100%; height: 320px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 12px; }
+    .plan-map-context { margin-top: 10px; padding: 10px; background: #f0fdf4; border-radius: 8px; font-size: 12px; color: #166534; line-height: 1.6; }
+    .plan-map-context strong { color: #15803d; }
+    .plan-poi-list { margin-top: 6px; }
+    .plan-poi-item { display: inline-block; padding: 2px 8px; margin: 2px; background: #fef3c7; color: #92400e; border-radius: 10px; font-size: 11px; }
   </style>
 </head>
 <body>
@@ -77,6 +123,7 @@
       <div class="flight-header-btns">
         <button class="btn btn-success" id="btnAutoRefresh" onclick="toggleAutoRefresh()">开启实时监控</button>
         <button class="btn btn-primary" onclick="openNewModal()">创建任务</button>
+        <button class="btn btn-llm" onclick="openPlanModal()">&#x1F9E0; 智能规划路线</button>
         <button class="btn btn-secondary" onclick="importMissions()">导入</button>
         <button class="btn btn-secondary" onclick="exportMissions()">导出</button>
       </div>
@@ -247,6 +294,72 @@
         <button class="btn btn-secondary" onclick="closeImportModal()">取消</button>
         <button class="btn btn-primary" onclick="submitImport()">确认导入</button>
       </div>
+    </div>
+  </div>
+
+  <!-- LLM Smart Plan Modal -->
+  <div class="modal-overlay" id="planModal">
+    <div class="modal-box plan-modal-box">
+      <div class="modal-title">&#x1F9E0; 智能路径规划（LLM）</div>
+      <div id="planFormArea">
+        <div class="plan-form">
+          <div class="full-width">
+            <label>执行无人机</label>
+            <select id="planDrone"><option value="0">未指定</option></select>
+          </div>
+          <div>
+            <label>起点纬度 *</label>
+            <input id="planStartLat" type="number" step="0.000001" placeholder="例如：30.572961" />
+          </div>
+          <div>
+            <label>起点经度 *</label>
+            <input id="planStartLon" type="number" step="0.000001" placeholder="例如：104.066301" />
+          </div>
+          <div>
+            <label>终点纬度 *</label>
+            <input id="planGoalLat" type="number" step="0.000001" placeholder="例如：30.580000" />
+          </div>
+          <div>
+            <label>终点经度 *</label>
+            <input id="planGoalLon" type="number" step="0.000001" placeholder="例如：104.075000" />
+          </div>
+          <div>
+            <label>飞行高度 (m)</label>
+            <input id="planAlt" type="number" value="80" min="10" max="500" />
+          </div>
+          <div>
+            <label>最大速度 (m/s)</label>
+            <input id="planSpeed" type="number" value="8" min="1" max="30" />
+          </div>
+          <div class="full-width">
+            <label>在地图上点击选取坐标（左键设起点，右键设终点）</label>
+            <div id="pickerMapContainer" class="plan-picker-map"></div>
+            <div class="plan-picker-hint">提示：也可以手动输入上方坐标。地图点击会自动填充坐标值。</div>
+          </div>
+          <div class="full-width">
+            <label>飞行动作</label>
+            <div style="display:flex;gap:6px;">
+              <select id="planActionSelect">
+                <option value="">选择动作...</option>
+                <option value="CAPTURE_PHOTO">拍照 (CAPTURE_PHOTO)</option>
+                <option value="RECORD_VIDEO">录像 (RECORD_VIDEO)</option>
+                <option value="LOITER">悬停 (LOITER)</option>
+                <option value="SCAN_AREA">区域扫描 (SCAN_AREA)</option>
+                <option value="INSPECT">巡检 (INSPECT)</option>
+                <option value="SPRAY">喷洒 (SPRAY)</option>
+                <option value="DROP_PAYLOAD">投放 (DROP_PAYLOAD)</option>
+              </select>
+              <button class="btn btn-secondary" onclick="addPlanAction()" type="button">添加</button>
+            </div>
+            <div class="plan-actions-list" id="planActionsList"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closePlanModal()">取消</button>
+          <button class="btn btn-llm" id="btnStartPlan" onclick="startPlan()">&#x1F680; 开始智能规划</button>
+        </div>
+      </div>
+      <div id="planResultArea" style="display:none;"></div>
     </div>
   </div>
 
@@ -714,6 +827,372 @@
         disconnectFlightWS();
         showToast('实时监控已关闭', 'info');
       }
+    }
+
+    // ========== LLM Smart Plan ==========
+    let planActions = [];
+    let currentPlanId = null;
+    let pickerMap = null;
+    let pickerStartMarker = null;
+    let pickerGoalMarker = null;
+    let resultMap = null;
+    let lastMapContext = null;
+    const amapAvailable = (typeof AMap !== 'undefined');
+
+    function initPickerMap() {
+      if (!amapAvailable) return;
+      if (pickerMap) { pickerMap.destroy(); pickerMap = null; }
+      pickerStartMarker = null;
+      pickerGoalMarker = null;
+      try {
+        pickerMap = new AMap.Map('pickerMapContainer', {
+          zoom: 13, center: [104.066, 30.573], mapStyle: 'amap://styles/light'
+        });
+        // Left click = set start
+        pickerMap.on('click', function(e) {
+          const lat = e.lnglat.getLat().toFixed(6);
+          const lon = e.lnglat.getLng().toFixed(6);
+          $('#planStartLat').value = lat;
+          $('#planStartLon').value = lon;
+          if (pickerStartMarker) { pickerStartMarker.setPosition(e.lnglat); }
+          else {
+            pickerStartMarker = new AMap.Marker({
+              position: e.lnglat, map: pickerMap,
+              label: { content: '<span style="background:#10b981;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;">起点</span>', direction: 'top' }
+            });
+          }
+        });
+        // Right click = set goal
+        pickerMap.on('rightclick', function(e) {
+          const lat = e.lnglat.getLat().toFixed(6);
+          const lon = e.lnglat.getLng().toFixed(6);
+          $('#planGoalLat').value = lat;
+          $('#planGoalLon').value = lon;
+          if (pickerGoalMarker) { pickerGoalMarker.setPosition(e.lnglat); }
+          else {
+            pickerGoalMarker = new AMap.Marker({
+              position: e.lnglat, map: pickerMap,
+              label: { content: '<span style="background:#ef4444;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;">终点</span>', direction: 'top' }
+            });
+          }
+        });
+      } catch(e) { console.warn('AMap init failed:', e); }
+    }
+
+    async function openPlanModal() {
+      planActions = [];
+      currentPlanId = null;
+      lastMapContext = null;
+      renderPlanActions();
+      $('#planStartLat').value = '';
+      $('#planStartLon').value = '';
+      $('#planGoalLat').value = '';
+      $('#planGoalLon').value = '';
+      $('#planAlt').value = '80';
+      $('#planSpeed').value = '8';
+      $('#planActionSelect').value = '';
+      $('#planFormArea').style.display = '';
+      $('#planResultArea').style.display = 'none';
+      $('#planResultArea').innerHTML = '';
+      $('#btnStartPlan').disabled = false;
+      $('#btnStartPlan').innerHTML = '&#x1F680; 开始智能规划';
+
+      // Load drones into plan modal
+      try {
+        const res = await api('/drones');
+        const data = await res.json();
+        const drones = Array.isArray(data.items) ? data.items : [];
+        const list = drones.filter(d => d.linked_gps_device_id && d.linked_gps_device_id > 0);
+        const sel = $('#planDrone');
+        sel.innerHTML = '<option value="0">未指定</option>' + list.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+      } catch(e) {}
+
+      // Check LLM status
+      try {
+        const res = await api('/flight/missions/plan/status');
+        const s = await res.json();
+        if (!s.llm_available) {
+          $('#btnStartPlan').innerHTML = '&#x1F680; 开始规划（降级模式）';
+        }
+      } catch(e) {}
+
+      $('#planModal').classList.add('active');
+      // Init picker map after modal is visible (AMap needs visible container)
+      setTimeout(function() { initPickerMap(); }, 200);
+    }
+
+    function closePlanModal() {
+      $('#planModal').classList.remove('active');
+      if (resultMap) { resultMap.destroy(); resultMap = null; }
+    }
+
+    function addPlanAction() {
+      const sel = $('#planActionSelect');
+      const val = sel.value;
+      if (!val) return;
+      planActions.push({ type: val, params: {} });
+      sel.value = '';
+      renderPlanActions();
+    }
+
+    function removePlanAction(idx) {
+      planActions.splice(idx, 1);
+      renderPlanActions();
+    }
+
+    function renderPlanActions() {
+      const container = $('#planActionsList');
+      if (!planActions.length) {
+        container.innerHTML = '<span style="color:#94a3b8;font-size:12px;">未添加动作（可选）</span>';
+        return;
+      }
+      const labels = {
+        'CAPTURE_PHOTO': '拍照', 'RECORD_VIDEO': '录像', 'LOITER': '悬停',
+        'SCAN_AREA': '区域扫描', 'INSPECT': '巡检', 'SPRAY': '喷洒', 'DROP_PAYLOAD': '投放'
+      };
+      container.innerHTML = planActions.map((a, i) =>
+        `<span class="plan-action-tag">${labels[a.type] || a.type} <span class="remove-action" onclick="removePlanAction(${i})">&times;</span></span>`
+      ).join('');
+    }
+
+    async function startPlan() {
+      const startLat = parseFloat($('#planStartLat').value);
+      const startLon = parseFloat($('#planStartLon').value);
+      const goalLat = parseFloat($('#planGoalLat').value);
+      const goalLon = parseFloat($('#planGoalLon').value);
+      const alt = parseFloat($('#planAlt').value) || 80;
+      const speed = parseFloat($('#planSpeed').value) || 8;
+
+      if (isNaN(startLat) || isNaN(startLon)) { showToast('请输入起点坐标（或在地图上左键点击）', 'error'); return; }
+      if (isNaN(goalLat) || isNaN(goalLon)) { showToast('请输入终点坐标（或在地图上右键点击）', 'error'); return; }
+
+      const droneSel = $('#planDrone');
+      const droneId = parseInt(droneSel.value) || 0;
+      const droneName = droneSel.selectedOptions[0]?.text || '';
+
+      const reqBody = {
+        start: { lat: startLat, lon: startLon, alt_m: alt },
+        goal: { lat: goalLat, lon: goalLon, alt_m: alt },
+        actions: planActions,
+        constraints: { max_speed_mps: speed, max_alt_m: alt + 50, battery_return_threshold_percent: 20 },
+        drone_id: droneId,
+        drone_name: droneName !== '未指定' ? droneName : ''
+      };
+
+      // Show loading
+      $('#btnStartPlan').disabled = true;
+      $('#btnStartPlan').innerHTML = '<span class="spinner"></span> 规划中...';
+      $('#planResultArea').style.display = 'block';
+      $('#planResultArea').innerHTML = '<div class="plan-loading"><span class="spinner"></span> 正在调用大模型进行路径规划，请稍候...</div>';
+
+      try {
+        const res = await api('/flight/missions/plan', { method: 'POST', body: reqBody });
+        const data = await res.json();
+        if (data.error) {
+          $('#planResultArea').innerHTML = `<div style="color:#ef4444;padding:20px;text-align:center;">${esc(data.error)}</div>`;
+          $('#btnStartPlan').disabled = false;
+          $('#btnStartPlan').innerHTML = '&#x1F680; 重新规划';
+          return;
+        }
+        currentPlanId = data.plan_id;
+        lastMapContext = data.map_context || null;
+        renderPlanResult(data.plan, data.source, data.plan_id);
+      } catch(e) {
+        $('#planResultArea').innerHTML = `<div style="color:#ef4444;padding:20px;text-align:center;">请求失败: ${esc(e.message)}</div>`;
+        $('#btnStartPlan').disabled = false;
+        $('#btnStartPlan').innerHTML = '&#x1F680; 重新规划';
+      }
+    }
+
+    function renderPlanResult(plan, source, planId) {
+      const sourceLabel = source === 'llm' ? 'LLM智能规划' : '降级直线规划';
+      const sourceColor = source === 'llm' ? '#6366f1' : '#f59e0b';
+
+      let html = '<div class="plan-result">';
+      html += `<div class="plan-result-title"><span style="color:${sourceColor};">&#x2714;</span> 规划完成 <span style="font-size:12px;color:${sourceColor};background:${source==='llm'?'#e0e7ff':'#fef3c7'};padding:2px 8px;border-radius:8px;">${sourceLabel}</span></div>`;
+
+      // Estimates
+      if (plan.estimates) {
+        const distKm = (plan.estimates.distance_m / 1000).toFixed(2);
+        const timeMins = Math.ceil(plan.estimates.time_s / 60);
+        const battery = plan.estimates.expected_battery_drop_percent?.toFixed(1) || '0';
+        html += '<div class="plan-estimates">';
+        html += `<div class="plan-est-box"><div class="plan-est-label">总距离</div><div class="plan-est-value">${distKm} km</div></div>`;
+        html += `<div class="plan-est-box"><div class="plan-est-label">预计耗时</div><div class="plan-est-value">${timeMins} min</div></div>`;
+        html += `<div class="plan-est-box"><div class="plan-est-label">预计电量消耗</div><div class="plan-est-value">${battery}%</div></div>`;
+        html += '</div>';
+      }
+
+      // Map visualization placeholder
+      html += '<div id="resultMapContainer" class="plan-result-map"></div>';
+
+      // Map context info (from AMap)
+      if (lastMapContext) {
+        html += '<div class="plan-map-context">';
+        html += '<strong>&#x1F30D; 地图信息（高德地图）</strong><br>';
+        if (lastMapContext.start_address) html += '起点: ' + esc(lastMapContext.start_address) + '<br>';
+        if (lastMapContext.goal_address) html += '终点: ' + esc(lastMapContext.goal_address) + '<br>';
+        if (lastMapContext.ref_distance) html += '地面参考距离: ' + lastMapContext.ref_distance + 'm<br>';
+        if (lastMapContext.nearby_pois && lastMapContext.nearby_pois.length) {
+          html += '<div class="plan-poi-list"><strong>附近敏感区域: </strong>';
+          lastMapContext.nearby_pois.forEach(p => {
+            html += `<span class="plan-poi-item">${esc(p.name)} (${p.distance}m)</span>`;
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+
+      // Waypoints table
+      if (plan.waypoints && plan.waypoints.length) {
+        html += '<div class="plan-waypoints" style="margin-top:12px;"><table>';
+        html += '<thead><tr><th>#</th><th>纬度</th><th>经度</th><th>高度(m)</th><th>速度(m/s)</th><th>动作</th></tr></thead><tbody>';
+        plan.waypoints.forEach((wp, i) => {
+          const actionLabel = wp.action || '-';
+          html += `<tr><td>${i+1}</td><td>${wp.lat?.toFixed(6)}</td><td>${wp.lon?.toFixed(6)}</td><td>${wp.alt_m || '-'}</td><td>${wp.speed_mps || '-'}</td><td><strong>${esc(actionLabel)}</strong></td></tr>`;
+        });
+        html += '</tbody></table></div>';
+      }
+
+      // Warnings
+      if (plan.warnings && plan.warnings.length) {
+        html += '<div class="plan-warnings">';
+        plan.warnings.forEach(w => {
+          const cls = 'plan-warning-' + (w.level || 'info');
+          const icon = w.level === 'critical' ? '&#x26A0;' : w.level === 'warning' ? '&#x26A0;' : '&#x2139;';
+          html += `<div class="plan-warning-item ${cls}">${icon} ${esc(w.message)}</div>`;
+        });
+        html += '</div>';
+      }
+
+      // Explanation
+      if (plan.explanation) {
+        html += `<div class="plan-explanation"><strong>规划说明：</strong>${esc(plan.explanation)}</div>`;
+      }
+
+      // Adopt / Discard / Replan buttons
+      html += '<div class="plan-adopt-bar">';
+      html += `<button class="btn btn-success" onclick="adoptPlan(${planId})">&#x2705; 采纳并创建任务</button>`;
+      html += `<button class="btn btn-danger" onclick="discardPlan(${planId})">&#x274C; 放弃</button>`;
+      html += `<button class="btn btn-secondary" onclick="replan()">&#x1F504; 重新规划</button>`;
+      html += '</div>';
+
+      html += '</div>';
+
+      $('#planResultArea').innerHTML = html;
+      $('#btnStartPlan').disabled = false;
+      $('#btnStartPlan').innerHTML = '&#x1F680; 重新规划';
+
+      // Render result map with waypoints and polyline
+      setTimeout(function() { renderResultMap(plan); }, 200);
+    }
+
+    function renderResultMap(plan) {
+      if (!amapAvailable || !plan.waypoints || !plan.waypoints.length) return;
+      if (resultMap) { resultMap.destroy(); resultMap = null; }
+
+      try {
+        // Calculate center from waypoints
+        let sumLat = 0, sumLon = 0;
+        plan.waypoints.forEach(wp => { sumLat += wp.lat; sumLon += wp.lon; });
+        const centerLat = sumLat / plan.waypoints.length;
+        const centerLon = sumLon / plan.waypoints.length;
+
+        resultMap = new AMap.Map('resultMapContainer', {
+          zoom: 14, center: [centerLon, centerLat], mapStyle: 'amap://styles/light'
+        });
+
+        // Draw polyline (flight path)
+        const path = plan.waypoints.map(wp => new AMap.LngLat(wp.lon, wp.lat));
+        new AMap.Polyline({
+          path: path, map: resultMap,
+          strokeColor: '#6366f1', strokeWeight: 4, strokeOpacity: 0.8,
+          strokeStyle: 'solid', lineJoin: 'round', showDir: true
+        });
+
+        // Draw reference polyline from AMap if available
+        if (lastMapContext && lastMapContext.ref_polyline && lastMapContext.ref_polyline.length > 1) {
+          const refPath = lastMapContext.ref_polyline.map(p => new AMap.LngLat(p[0], p[1]));
+          new AMap.Polyline({
+            path: refPath, map: resultMap,
+            strokeColor: '#94a3b8', strokeWeight: 2, strokeOpacity: 0.5,
+            strokeStyle: 'dashed'
+          });
+        }
+
+        // Draw waypoint markers
+        const actionColors = {
+          'TAKEOFF': '#10b981', 'LAND': '#ef4444',
+          'CAPTURE_PHOTO': '#0ea5e9', 'RECORD_VIDEO': '#8b5cf6',
+          'LOITER': '#f59e0b', 'SCAN_AREA': '#06b6d4',
+          'INSPECT': '#3b82f6', 'SPRAY': '#22c55e', 'DROP_PAYLOAD': '#f97316'
+        };
+        plan.waypoints.forEach((wp, i) => {
+          const color = actionColors[wp.action] || '#6366f1';
+          const isFirst = i === 0;
+          const isLast = i === plan.waypoints.length - 1;
+          const label = wp.action || ('' + (i + 1));
+          const size = (isFirst || isLast) ? 14 : 10;
+
+          const marker = new AMap.Marker({
+            position: new AMap.LngLat(wp.lon, wp.lat), map: resultMap,
+            label: {
+              content: `<span style="background:${color};color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;white-space:nowrap;">${i+1}. ${label}</span>`,
+              direction: 'top'
+            }
+          });
+        });
+
+        // Draw nearby POIs if available
+        if (lastMapContext && lastMapContext.nearby_pois) {
+          lastMapContext.nearby_pois.forEach(p => {
+            if (p.lat && p.lon) {
+              new AMap.Marker({
+                position: new AMap.LngLat(p.lon, p.lat), map: resultMap,
+                label: {
+                  content: `<span style="background:#fbbf24;color:#78350f;padding:1px 5px;border-radius:4px;font-size:9px;">&#x26A0; ${p.name}</span>`,
+                  direction: 'bottom'
+                }
+              });
+            }
+          });
+        }
+
+        // Auto fit view
+        resultMap.setFitView();
+      } catch(e) { console.warn('Result map render failed:', e); }
+    }
+
+    async function adoptPlan(planId) {
+      try {
+        const res = await api('/flight/missions/plan/' + planId + '/adopt', { method: 'POST', body: {} });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('已采纳规划方案，任务已创建！(ID: ' + data.mission_id + ')', 'success');
+        closePlanModal();
+        loadMissions();
+        loadStats();
+      } catch(e) {
+        showToast('采纳失败: ' + e.message, 'error');
+      }
+    }
+
+    async function discardPlan(planId) {
+      try {
+        await api('/flight/missions/plan/' + planId + '/discard', { method: 'POST', body: {} });
+        showToast('已放弃该规划方案', 'info');
+        closePlanModal();
+      } catch(e) {}
+    }
+
+    function replan() {
+      currentPlanId = null;
+      lastMapContext = null;
+      if (resultMap) { resultMap.destroy(); resultMap = null; }
+      $('#planResultArea').style.display = 'none';
+      $('#planResultArea').innerHTML = '';
+      $('#btnStartPlan').disabled = false;
+      $('#btnStartPlan').innerHTML = '&#x1F680; 开始智能规划';
     }
 
     // ========== Init ==========

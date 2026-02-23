@@ -454,5 +454,28 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 
+	// LLM flight plan drafts
+	flightPlanTables := []string{
+		`CREATE TABLE IF NOT EXISTS flight_plans (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			drone_id INTEGER DEFAULT 0,
+			request_json TEXT DEFAULT '{}',
+			result_json TEXT DEFAULT '{}',
+			source TEXT DEFAULT 'llm',
+			status TEXT DEFAULT 'draft',
+			mission_id INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_flight_plans_status ON flight_plans(status)`,
+		`CREATE INDEX IF NOT EXISTS idx_flight_plans_drone ON flight_plans(drone_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_flight_plans_created ON flight_plans(created_at)`,
+	}
+	for _, s := range flightPlanTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("flight_plans table: %w", err)
+		}
+	}
+
 	return nil
 }
