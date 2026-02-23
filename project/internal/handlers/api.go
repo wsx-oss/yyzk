@@ -1947,7 +1947,8 @@ func (a *API) SyncStatusSet(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "bad json"})
 		return
 	}
-	_, err := a.db.Exec(`UPDATE sync_status SET status=?, message=?, last_synced_at=datetime('now'), updated_at=datetime('now') WHERE id = 1`, p.Status, p.Message)
+	syncNow := time.Now().Format("2006-01-02 15:04:05")
+	_, err := a.db.Exec(`UPDATE sync_status SET status=?, message=?, last_synced_at=?, updated_at=? WHERE id = 1`, p.Status, p.Message, syncNow, syncNow)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -2089,6 +2090,16 @@ func (a *API) SyncTasksCreate(c *gin.Context) {
 			c.JSON(400, gin.H{"error": "开始时间必须小于结束时间"})
 			return
 		}
+		// Validate that the time interval is at least one sync frequency
+		freqDur := syncengine.ParseFrequencyDuration(p.Frequency)
+		startT, errS := time.Parse("2006-01-02 15:04", p.StartTime)
+		endT, errE := time.Parse("2006-01-02 15:04", p.EndTime)
+		if errS == nil && errE == nil {
+			if endT.Sub(startT) < freqDur {
+				c.JSON(400, gin.H{"error": fmt.Sprintf("开始时间和结束时间的间隔必须大于同步频率（%s）", p.Frequency)})
+				return
+			}
+		}
 	}
 	if p.Frequency == "" {
 		p.Frequency = "5分钟"
@@ -2108,8 +2119,9 @@ func (a *API) SyncTasksCreate(c *gin.Context) {
 	if p.LogEnabled {
 		le = 1
 	}
-	res, err := a.db.Exec(`INSERT INTO sync_tasks(source, target, frequency, mode, start_time, end_time, status, sync_status_enabled, log_enabled, total_data, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`,
-		p.Source, p.Target, p.Frequency, p.Mode, p.StartTime, p.EndTime, p.Status, sse, le, totalTables)
+	nowLocal := time.Now().Format("2006-01-02 15:04:05")
+	res, err := a.db.Exec(`INSERT INTO sync_tasks(source, target, frequency, mode, start_time, end_time, status, sync_status_enabled, log_enabled, total_data, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+		p.Source, p.Target, p.Frequency, p.Mode, p.StartTime, p.EndTime, p.Status, sse, le, totalTables, nowLocal, nowLocal)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -2140,8 +2152,9 @@ func (a *API) SyncTasksEdit(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "参数格式错误"})
 		return
 	}
-	sets := []string{"updated_at = datetime('now')"}
-	args := []any{}
+	nowLocal := time.Now().Format("2006-01-02 15:04:05")
+	sets := []string{"updated_at = ?"}
+	args := []any{nowLocal}
 	if p.Source != nil {
 		sets = append(sets, "source = ?")
 		args = append(args, strings.TrimSpace(*p.Source))
@@ -2177,7 +2190,8 @@ func (a *API) SyncTasksEdit(c *gin.Context) {
 		sets = append(sets, "status = ?")
 		args = append(args, *p.Status)
 		if *p.Status == "运行中" {
-			sets = append(sets, "last_synced_at = datetime('now')")
+			sets = append(sets, "last_synced_at = ?")
+			args = append(args, nowLocal)
 		}
 	}
 	if p.SyncStatusEnabled != nil {
@@ -2289,8 +2303,9 @@ func (a *API) SyncTasksImport(c *gin.Context) {
 		if p.LogEnabled {
 			le = 1
 		}
-		_, err := a.db.Exec(`INSERT INTO sync_tasks(source, target, frequency, mode, start_time, end_time, status, sync_status_enabled, log_enabled, total_data, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`,
-			p.Source, p.Target, p.Frequency, p.Mode, p.StartTime, p.EndTime, p.Status, sse, le, p.TotalData)
+		importNow := time.Now().Format("2006-01-02 15:04:05")
+		_, err := a.db.Exec(`INSERT INTO sync_tasks(source, target, frequency, mode, start_time, end_time, status, sync_status_enabled, log_enabled, total_data, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+			p.Source, p.Target, p.Frequency, p.Mode, p.StartTime, p.EndTime, p.Status, sse, le, p.TotalData, importNow, importNow)
 		if err == nil {
 			imported++
 		}
@@ -2408,7 +2423,8 @@ func (a *API) SyncTasksInfo(c *gin.Context) {
 func (a *API) SyncTaskStart(c *gin.Context) {
 	id := c.Param("id")
 	var source, target, mode, frequency, status string
-	err := a.db.QueryRow("SELECT source, target, mode, frequency, status FROM sync_tasks WHERE id = ?", id).Scan(&source, &target, &mode, &frequency, &status)
+	var endTime sql.NullString
+	err := a.db.QueryRow("SELECT source, target, mode, frequency, status, end_time FROM sync_tasks WHERE id = ?", id).Scan(&source, &target, &mode, &frequency, &status, &endTime)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "同步任务不存在"})
 		return
@@ -2418,11 +2434,12 @@ func (a *API) SyncTaskStart(c *gin.Context) {
 		return
 	}
 	idInt, _ := strconv.Atoi(id)
-	if err := a.syncEng.StartTask(idInt, source, target, mode, frequency); err != nil {
+	if err := a.syncEng.StartTask(idInt, source, target, mode, frequency, endTime.String); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '运行中', last_synced_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", id)
+	nowLocal := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '运行中', last_synced_at = ?, updated_at = ? WHERE id = ?", nowLocal, nowLocal, id)
 	c.JSON(200, gin.H{"ok": true, "message": "同步任务已启动"})
 }
 
@@ -2431,14 +2448,16 @@ func (a *API) SyncTaskStop(c *gin.Context) {
 	id := c.Param("id")
 	idInt, _ := strconv.Atoi(id)
 	a.syncEng.StopTask(idInt)
-	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '已停止', updated_at = datetime('now') WHERE id = ?", id)
+	nowLocal := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '已停止', updated_at = ? WHERE id = ?", nowLocal, id)
 	c.JSON(200, gin.H{"ok": true, "message": "同步任务已停止"})
 }
 
 // SyncTaskStopAll stops all running sync tasks
 func (a *API) SyncTaskStopAll(c *gin.Context) {
 	stopped := a.syncEng.StopAll()
-	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '已停止', updated_at = datetime('now') WHERE status = '运行中'")
+	nowLocal := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = a.db.Exec("UPDATE sync_tasks SET status = '已停止', updated_at = ? WHERE status = '运行中'", nowLocal)
 	c.JSON(200, gin.H{"ok": true, "stopped": stopped, "message": fmt.Sprintf("已停止 %d 个同步任务", stopped)})
 }
 

@@ -29,6 +29,9 @@ var SyncableTables = []string{
 	"gps_fence_alerts",
 	"flight_missions",
 	"mission_logs",
+	"perf_reports",
+	"flight_plans",
+	"user_stats",
 }
 
 // TableData holds exported rows for one table
@@ -56,6 +59,7 @@ type TaskState struct {
 	TotalTables  int
 	LastError    string
 	StartedAt    time.Time
+	EndTime      string // task end time (local time string "2006-01-02 15:04")
 }
 
 // Engine manages all sync tasks
@@ -89,7 +93,7 @@ func (e *Engine) GetState(taskID int) *TaskState {
 }
 
 // StartTask begins a sync task in a goroutine
-func (e *Engine) StartTask(taskID int, source, target, mode, frequency string) error {
+func (e *Engine) StartTask(taskID int, source, target, mode, frequency, endTime string) error {
 	e.mu.Lock()
 	if s, ok := e.tasks[taskID]; ok && s.Running {
 		e.mu.Unlock()
@@ -102,6 +106,7 @@ func (e *Engine) StartTask(taskID int, source, target, mode, frequency string) e
 		Message:     "准备同步...",
 		TotalTables: len(SyncableTables),
 		StartedAt:   time.Now(),
+		EndTime:     endTime,
 	}
 	e.tasks[taskID] = state
 	e.mu.Unlock()
@@ -201,6 +206,18 @@ func (e *Engine) runSync(taskID int, source, target, mode, frequency string, sta
 		// Update DB with progress
 		e.updateTaskDB(taskID, state)
 
+		// Check if end_time has been reached after completing this cycle
+		if state.EndTime != "" {
+			if endT, err := parseLocalTime(state.EndTime); err == nil {
+				if time.Now().After(endT) {
+					state.Message = "已到达结束时间，自动停止"
+					e.setTaskStatus(taskID, "已停止")
+					log.Printf("[SyncEngine] Task %d: auto-stopped, end_time %s reached", taskID, state.EndTime)
+					return
+				}
+			}
+		}
+
 		// Wait for next cycle or cancellation
 		select {
 		case <-state.Cancel:
@@ -216,6 +233,22 @@ func (e *Engine) runSync(taskID int, source, target, mode, frequency string, sta
 			}
 		}
 	}
+}
+
+// parseLocalTime parses a time string in common local formats
+func parseLocalTime(s string) (time.Time, error) {
+	formats := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04",
+	}
+	for _, f := range formats {
+		if t, err := time.ParseInLocation(f, s, time.Local); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("无法解析时间: %s", s)
 }
 
 func (e *Engine) doSyncCycle(taskID int, source, target, mode string, state *TaskState) {
@@ -304,16 +337,23 @@ func (e *Engine) updateTaskDB(taskID int, state *TaskState) {
 	if state.TotalTables > 0 {
 		successRate = float64(state.SyncedTables) / float64(state.TotalTables) * 100
 	}
-	_, _ = e.db.Exec(`UPDATE sync_tasks SET progress = ?, synced_data = ?, total_data = ?, success_rate = ?, avg_duration = ?, last_synced_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-		state.Progress, state.SyncedTables, state.TotalTables, successRate, duration, taskID)
+	nowLocal := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = e.db.Exec(`UPDATE sync_tasks SET progress = ?, synced_data = ?, total_data = ?, success_rate = ?, avg_duration = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`,
+		state.Progress, state.SyncedTables, state.TotalTables, successRate, duration, nowLocal, nowLocal, taskID)
 }
 
 func (e *Engine) setTaskStatus(taskID int, status string) {
-	_, _ = e.db.Exec(`UPDATE sync_tasks SET status = ?, updated_at = datetime('now') WHERE id = ?`, status, taskID)
+	nowLocal := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = e.db.Exec(`UPDATE sync_tasks SET status = ?, updated_at = ? WHERE id = ?`, status, nowLocal, taskID)
 }
 
-func parseFrequency(freq string) time.Duration {
+// ParseFrequencyDuration returns the duration for a frequency string (exported for validation)
+func ParseFrequencyDuration(freq string) time.Duration {
 	switch freq {
+	case "10秒":
+		return 10 * time.Second
+	case "30秒":
+		return 30 * time.Second
 	case "1分钟":
 		return 1 * time.Minute
 	case "5分钟":
@@ -327,6 +367,10 @@ func parseFrequency(freq string) time.Duration {
 	default:
 		return 5 * time.Minute
 	}
+}
+
+func parseFrequency(freq string) time.Duration {
+	return ParseFrequencyDuration(freq)
 }
 
 // ExportLocalData exports all syncable tables from the local database
@@ -508,6 +552,12 @@ func getTimeColumn(table string) string {
 		return "updated_at"
 	case "mission_logs":
 		return "created_at"
+	case "perf_reports":
+		return "created_at"
+	case "flight_plans":
+		return "created_at"
+	case "user_stats":
+		return "updated_at"
 	default:
 		return "created_at"
 	}

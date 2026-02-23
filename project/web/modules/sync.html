@@ -448,6 +448,8 @@
           <label>同步频率</label>
           <select id="fFrequency">
             <option value="">全部</option>
+            <option value="10秒">10秒</option>
+            <option value="30秒">30秒</option>
             <option value="1分钟">1分钟</option>
             <option value="5分钟">5分钟</option>
             <option value="10分钟">10分钟</option>
@@ -606,6 +608,8 @@
           <div class="form-group">
             <label>同步频率 <span class="req">*</span></label>
             <select id="mFrequency">
+              <option value="10秒">10秒</option>
+              <option value="30秒">30秒</option>
               <option value="1分钟">1分钟</option>
               <option value="5分钟" selected>5分钟</option>
               <option value="10分钟">10分钟</option>
@@ -964,6 +968,17 @@
       if (startTime && endTime && startTime >= endTime) {
         showToast('开始时间必须小于结束时间', 'error');
         return;
+      }
+
+      // Validate time interval >= sync frequency
+      if (startTime && endTime) {
+        const freqMs = { '10秒': 10000, '30秒': 30000, '1分钟': 60000, '5分钟': 300000, '10分钟': 600000, '30分钟': 1800000, '1小时': 3600000 };
+        const interval = new Date(endTime.replace(' ', 'T')) - new Date(startTime.replace(' ', 'T'));
+        const freqDur = freqMs[frequency] || 300000;
+        if (interval < freqDur) {
+          showToast('开始时间和结束时间的间隔必须大于同步频率（' + frequency + '）', 'error');
+          return;
+        }
       }
 
       // IP validation for new tasks — only validate source (remote device)
