@@ -121,7 +121,7 @@
     <div class="flight-header-row">
       <div class="module-title">飞行任务管理</div>
       <div class="flight-header-btns">
-        <button class="btn btn-success" id="btnAutoRefresh" onclick="toggleAutoRefresh()">开启实时监控</button>
+        <span class="btn btn-success" id="btnAutoRefresh" style="cursor:default;">🟢 实时监控中</span>
         <button class="btn btn-primary" onclick="openNewModal()">创建任务</button>
         <button class="btn btn-secondary" onclick="importMissions()">导入</button>
         <button class="btn btn-secondary" onclick="exportMissions()">导出</button>
@@ -956,15 +956,15 @@
     // ========== Real-time WebSocket ==========
     var flightWS = null;
     var wsReconnectTimer = null;
-    var realtimeEnabled = false;
+    var realtimeEnabled = true;
 
     function connectFlightWS() {
       if (flightWS && (flightWS.readyState === WebSocket.OPEN || flightWS.readyState === WebSocket.CONNECTING)) return;
       var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       flightWS = new WebSocket(proto + '//' + location.host + '/api/flight/stream');
       flightWS.onopen = function() {
-        $('#btnAutoRefresh').textContent = '🟢 实时监控中（WebSocket）';
-        $('#btnAutoRefresh').className = 'btn btn-danger';
+        $('#btnAutoRefresh').textContent = '🟢 实时监控中';
+        $('#btnAutoRefresh').className = 'btn btn-success';
       };
       flightWS.onmessage = function(evt) {
         try {
@@ -978,36 +978,16 @@
         } catch(e) {}
       };
       flightWS.onclose = function() {
-        if (realtimeEnabled) {
-          $('#btnAutoRefresh').textContent = '🔴 已断开，重连中...';
-          scheduleReconnect();
-        }
+        $('#btnAutoRefresh').textContent = '🔴 已断开，重连中...';
+        $('#btnAutoRefresh').className = 'btn btn-danger';
+        scheduleReconnect();
       };
       flightWS.onerror = function() { flightWS.close(); };
     }
 
-    function disconnectFlightWS() {
-      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
-      if (flightWS) { flightWS.onclose = null; flightWS.close(); flightWS = null; }
-      $('#btnAutoRefresh').textContent = '开启实时监控';
-      $('#btnAutoRefresh').className = 'btn btn-success';
-    }
-
     function scheduleReconnect() {
-      if (!realtimeEnabled) return;
       if (wsReconnectTimer) return;
       wsReconnectTimer = setTimeout(function() { wsReconnectTimer = null; connectFlightWS(); }, 3000);
-    }
-
-    function toggleAutoRefresh() {
-      realtimeEnabled = !realtimeEnabled;
-      if (realtimeEnabled) {
-        connectFlightWS();
-        showToast('实时监控已开启（WebSocket 事件驱动）', 'success');
-      } else {
-        disconnectFlightWS();
-        showToast('实时监控已关闭', 'info');
-      }
     }
 
     // ========== Smart Plan & Fill (integrated into create mission) ==========
@@ -1235,6 +1215,7 @@
     loadDrones();
     loadMissions();
     loadStats();
+    connectFlightWS();
   </script>
 </body>
 </html>
