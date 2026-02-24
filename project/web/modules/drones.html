@@ -510,6 +510,11 @@
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
         showToast(editingId ? '无人机信息已更新' : '无人机注册成功！已自动创建远程设备和GPS设备', 'success');
+        if (!editingId) {
+          // Clear filters to ensure the newly created drone is visible immediately
+          $('#filterName').value = '';
+          $('#filterStatus').value = '';
+        }
         closeModal(); loadDrones(); loadStats();
       } catch (e) { showToast('操作失败: ' + e.message, 'error'); }
     }
