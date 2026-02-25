@@ -17,6 +17,12 @@
   - 否则重定向到 `/app/login.html`
 - **前端静态资源**：`/app/*`（后端通过 Go `embed` 内嵌 `project/web/` 并静态托管）
 
+### 1.1.1 在线/离线判定（重要）
+
+- **GPS 设备在线**：`gps_devices.last_update` 在 60 秒内更新视为在线。
+- **无人机在线**：当关联的 GPS 设备持续上报时，`drones.status` 会被更新为 `online`。
+- **无人机离线**：主程序后台会定时检测，若 GPS 设备超过 60 秒未上报，会把 `gps_devices.status` 置为 `离线`，并将关联的 `drones.status` 置为 `offline`。
+
 ### 1.2 认证与会话（用户体系）
 
 - **功能**
@@ -88,7 +94,7 @@
   - SSH：浏览器端 xterm.js 终端（后端 SSH TCP 到 WebSocket 代理）
   - RDP：生成 .rdp 文件下载，用户通过本地 RDP 客户端连接
   - 设备在线/离线状态更新
-  - 设备可通过无人机注册自动创建，也可手动添加
+  - 设备统一通过无人机注册自动创建（设备列表仅显示 `drone_id > 0` 的记录）
 - **后端接口**
   - `WS /api/vnc/ws?target=IP:PORT`
   - `WS /api/ssh/ws`
@@ -165,7 +171,7 @@
   - 多设备间数据库同步（全量/增量模式）
   - 同步任务管理（创建/启停/编辑/删除）
   - IP 有效性预检、实时进度追踪
-  - 同步 7 张表：`hardware_items`、`updates`、`recordings`、`logs`、`alerts`、`devices`、`drones`
+  - 同步 18 张表（白名单定义于 `syncengine.SyncableTables`）：`hardware_items`、`updates`、`recordings`、`logs`、`alerts`、`video_sources`、`devices`、`drones`、`battery_records`、`battery_alerts`、`gps_devices`、`gps_history`、`gps_fence_alerts`、`flight_missions`、`mission_logs`、`perf_reports`、`flight_plans`、`user_stats`
 - **后端接口**
   - `GET /api/sync/tasks`、`POST /api/sync/tasks`
   - `POST /api/sync/tasks/:id/start`、`POST /api/sync/tasks/:id/stop`
@@ -190,6 +196,7 @@
   - `POST /api/report/perf-add`
   - `POST /api/report/perf-import`
   - `DELETE /api/report/perf-delete/:id`
+  - `POST /api/report/perf-collect`（自动采集当前性能数据并存储）
 - **数据落地**
   - SQLite 表：`perf_reports`
 - **页面**
@@ -234,12 +241,13 @@
   - 手动和 Agent 自动推送 GPS 数据
   - 电子围栏（超出范围触发报警）
   - 历史轨迹查看
-  - 每 3 秒自动刷新
+  - WebSocket 事件驱动的实时监控（`gps_update`）
 - **后端接口**
   - `GET /api/gps/devices`、`POST /api/gps/devices`
   - `POST /api/gps/devices/:id/push`、`POST /api/gps/push`
   - `GET /api/gps/devices/:id/history`
   - `GET /api/gps/fence-alerts`
+  - `WS /api/gps/stream`（实时事件推送）
 - **数据落地**
   - SQLite 表：`gps_devices`、`gps_history`、`gps_fence_alerts`
 - **页面**
@@ -285,6 +293,29 @@
 - **页面**
   - 仪表盘模块：`/app/modules/flight.html`
 
+### 1.18 智能航线规划（LLM + 降级规划）
+
+- **功能**
+  - 基于大模型（LLM）的智能航线规划（支持多航点、动作序列、高度/速度配置）
+  - LLM 不可用时自动降级为直线规划器
+  - 规划结果以草稿形式保存，可采纳转为正式飞行任务
+  - AMap（高德地图）地理编码/逆地理编码集成
+  - 规划状态检查（LLM 和 AMap 可用性）
+- **后端接口**
+  - `POST /api/flight/missions/plan`（创建规划请求）
+  - `GET /api/flight/missions/plans`（规划列表）
+  - `GET /api/flight/missions/plan/:id`（获取规划详情）
+  - `POST /api/flight/missions/plan/:id/adopt`（采纳规划→创建飞行任务）
+  - `POST /api/flight/missions/plan/:id/discard`（丢弃规划）
+  - `GET /api/flight/missions/plan/status`（LLM/AMap 状态检查）
+  - `POST /api/amap/geocode`（地址→坐标）
+  - `POST /api/amap/regeocode`（坐标→地址）
+- **数据落地**
+  - SQLite 表：`flight_plans`
+- **环境变量**
+  - `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`（大模型配置）
+  - `AMAP_KEY`（高德地图 Key）
+
 ---
 
 ## 2. 后端（Go + Gin + SQLite）文件说明（`project/`）
@@ -306,7 +337,7 @@
 - **`project/internal/db/db.go`**
   - `Open(path)`：打开 SQLite（WAL 模式、外键开启）
   - `Migrate(db)`：创建并初始化表结构、索引、以及 `sync_status` 初始行
-  - 涉及表：`recordings`、`logs`、`alerts`、`updates`、`sync_tasks`、`users`、`sessions`、`devices`、`user_stats`、`drones`、`gps_devices`、`gps_history`、`gps_fence_alerts`、`battery_records`、`battery_alerts`、`flight_missions`、`mission_logs`、`hardware_items`、`perf_reports`、`video_sources`(已废弃)
+  - 涉及表：`recordings`、`logs`、`alerts`、`updates`、`sync_tasks`、`users`、`sessions`、`devices`、`user_stats`、`drones`、`gps_devices`、`gps_history`、`gps_fence_alerts`、`battery_records`、`battery_alerts`、`flight_missions`、`mission_logs`、`hardware_items`、`perf_reports`、`flight_plans`、`video_sources`(已废弃)
 
 ### 2.3 业务接口层（Handlers）
 
@@ -343,6 +374,9 @@
 - **`project/internal/handlers/flight.go`**
 
   - 飞行任务管理 API（任务 CRUD、阶段更新、日志、导入、统计、WebSocket 实时推送）
+- **`project/internal/handlers/flight_plan.go`**
+
+  - 智能航线规划 API（LLM 规划创建/采纳/丢弃/列表/状态检查、AMap 地理编码/逆编码）
 - **`project/internal/handlers/wshub.go`**
 
   - WebSocket 事件广播中心（按 topic 分组管理客户端连接，支持 Subscribe/Unsubscribe/Broadcast，线程安全）
@@ -370,7 +404,17 @@
 - **`project/internal/syncengine/engine.go`**
   - 独立 goroutine 管理每个同步任务
   - 全量同步（清空目标表 + 写入）和增量同步（基于时间戳）
-  - 数据导出/导入、事务保护、安全白名单
+  - 数据导出/导入、事务保护、安全白名单（18 张表）
+
+### 2.6.1 LLM 与地图集成
+
+- **`project/internal/llm/llm.go`**
+  - 大模型（LLM）调用封装：自动加载 `.env`、构建 Prompt、解析返回的航线 JSON
+  - 降级规划器（`simplePlanner`）：LLM 不可用时生成起点→终点直线航线
+  - 数据结构：`PlanRequest`、`PlanResult`、`Coordinate`、`Waypoint`、`Action`
+- **`project/internal/amap/amap.go`**
+  - 高德地图 Web Service API 封装（地理编码 + 逆地理编码）
+  - 环境变量 `AMAP_KEY` 控制可用性
 
 ### 2.7 Agent 程序
 
@@ -500,8 +544,17 @@
 - `SC_DB_PATH`：数据库路径（默认 `app.db`）
 - `SC_API_TOKEN`：API 认证 Token（空字符串=关闭后端 API Token 校验；注意：与用户登录 Token 是两套机制）
 - `SC_MAX_UPLOAD_MB`：上传大小限制（默认 64MB）
+- `SC_TRUSTED_PROXIES`：受信任的代理 IP（默认 `127.0.0.1`，多个用英文逗号分隔）
+- `SC_AGENT_PORT`：内嵌硬件监控 Agent 端口（默认 `9100`）
 - `SC_THRESH_CPU` / `SC_THRESH_MEM` / `SC_THRESH_DISK`：阈值告警
 - `SC_ALERT_INTERVAL_SEC`：阈值检测间隔（秒）
+
+智能规划/地图相关：
+
+- `LLM_API_KEY`：大模型 API Key
+- `LLM_BASE_URL`：大模型 API Base URL
+- `LLM_MODEL`：大模型名称
+- `AMAP_KEY`：高德地图 Web 服务 Key（用于地理编码/逆地理编码）
 
 ---
 

@@ -40,7 +40,7 @@
 **🚀 性能优化**
 - 数据库索引优化（查询速度提升 50-80%）
 - 分页支持（所有列表接口）
-- 请求限流（100 req/min）
+- 请求限流（每 IP 每分钟 500 次）
 
 **🛡️ 安全防护**
 - CORS 跨域支持
@@ -63,6 +63,20 @@
 cd project
 go mod tidy
 ```
+
+### 1.1 环境变量文件（团队协作推荐）
+
+- 仓库提供：`project/.env.example`（可提交）
+- 你本地运行时使用：`project/.env`（已被 `.gitignore` 忽略，不会提交到 GitHub）
+
+首次运行建议：
+
+```bash
+# 在 project/ 目录下
+cp .env.example .env
+```
+
+然后按需填写：`SC_API_TOKEN`、`LLM_API_KEY`、`AMAP_KEY` 等。
 
 ### 2. 启动服务
 
@@ -149,6 +163,8 @@ listening on :8080
 | `SC_DB_PATH` | `app.db` | 数据库文件路径 |
 | `SC_API_TOKEN` | `""` | API认证Token（空=关闭）|
 | `SC_MAX_UPLOAD_MB` | `64` | 文件上传限制(MB) |
+| `SC_TRUSTED_PROXIES` | `127.0.0.1` | 受信任的代理 IP（多个用英文逗号分隔） |
+| `SC_AGENT_PORT` | `9100` | 内嵌硬件监控 Agent 端口 |
 
 ### 告警配置
 
@@ -158,6 +174,15 @@ listening on :8080
 | `SC_THRESH_MEM` | `85` | 内存告警阈值(%) |
 | `SC_THRESH_DISK` | `90` | 磁盘告警阈值(%) |
 | `SC_ALERT_INTERVAL_SEC` | `10` | 检测间隔(秒) |
+
+### 智能规划 / 地图（可选）
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `LLM_API_KEY` | `""` | 大模型 API Key（留空将自动降级为直线规划） |
+| `LLM_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 大模型 API Base URL |
+| `LLM_MODEL` | `qwen-plus` | 大模型名称 |
+| `AMAP_KEY` | `""` | 高德地图 Key（用于地址解析/逆地理编码） |
 
 ### 配置示例
 
@@ -192,7 +217,7 @@ go run .
 
 ### 2. GPS/位置信息
 
-**功能**: 无人机实时位置、Leaflet 地图可视化、电子围栏、历史轨迹、Agent 自动推送
+**功能**: 无人机实时位置、Leaflet 地图可视化、电子围栏、历史轨迹、Agent 自动推送、WebSocket 实时事件
 
 **API**:
 - `GET /api/gps/devices` - GPS 设备列表
@@ -200,6 +225,9 @@ go run .
 - `POST /api/gps/push` - Agent 自动推送
 - `GET /api/gps/devices/:id/history` - 历史轨迹
 - `GET /api/gps/fence-alerts` - 围栏报警列表
+- `WS /api/gps/stream` - 实时事件推送（gps_update）
+
+**在线/离线**：GPS 设备超过 60 秒未上报会被后台标记为离线，同时关联无人机状态会被置为 `offline`。
 
 ### 3. 电池监控
 
@@ -215,7 +243,7 @@ go run .
 
 ### 4. 飞行任务管理
 
-**功能**: 任务创建/编辑/删除、飞行阶段状态机（待命→起飞→巡航→执行任务→返航→降落）、任务日志、WebSocket 事件驱动实时推送
+**功能**: 任务创建/编辑/删除、飞行阶段状态机（待命→起飞→巡航→执行任务→返航→降落）、任务日志、WebSocket 事件驱动实时推送、智能航线规划（LLM + 降级规划）
 
 **API**:
 - `GET /api/flight/missions` - 任务列表
@@ -223,6 +251,13 @@ go run .
 - `POST /api/flight/missions/:id/phase` - 更新飞行阶段
 - `POST /api/flight/missions/import` - 批量导入
 - `WS /api/flight/stream` - 实时事件推送（任务变更时即时通知）
+- `POST /api/flight/missions/plan` - 创建智能航线规划（LLM/降级）
+- `GET /api/flight/missions/plans` - 规划列表
+- `POST /api/flight/missions/plan/:id/adopt` - 采纳规划→创建任务
+- `POST /api/flight/missions/plan/:id/discard` - 丢弃规划
+- `GET /api/flight/missions/plan/status` - LLM/AMap 状态检查
+- `POST /api/amap/geocode` - 地址→坐标（高德地图）
+- `POST /api/amap/regeocode` - 坐标→地址（高德地图）
 
 ### 5. 系统状态监控
 
@@ -283,7 +318,7 @@ go run .
 
 - **维护操作日志**: `GET /api/logs/list`、`POST /api/logs/append`、`GET /api/logs/stats`
 - **软件更新管理**: `GET /api/updates/list`、`POST /api/updates/add`、`GET /api/updates/stats`
-- **数据同步状态**: `GET /api/sync/tasks`、`POST /api/sync/tasks/:id/start`、`POST /api/sync/tasks/:id/stop`
+- **数据同步状态**（18 张表同步）: `GET /api/sync/tasks`、`POST /api/sync/tasks/:id/start`、`POST /api/sync/tasks/:id/stop`
 - **性能分析报告**: `GET /api/report/perf-list`、`GET /api/report/perf`
 
 各模块详细功能说明请参考 `功能介绍/` 目录下的对应文档。
@@ -335,6 +370,7 @@ curl -X POST http://127.0.0.1:8080/api/auth/login \
 | 电池 | `GET /api/battery/latest` | 最新电池状态 |
 | 电池 | `POST /api/battery/push` | Agent 电池推送 |
 | 飞行 | `GET /api/flight/missions` | 任务列表 |
+| 飞行规划 | `POST /api/flight/missions/plan` | 智能航线规划（LLM） |
 | 硬件 | `GET /api/hardware/items` | 硬件列表 |
 | 硬件 | `POST /api/hardware/push` | Agent 硬件推送 |
 | 设备 | `GET /api/devices` | 远程设备列表 |
@@ -504,10 +540,13 @@ project/
 │   │   ├── gps.go                  # GPS/位置信息 API
 │   │   ├── battery.go              # 电池监控 API
 │   │   ├── flight.go               # 飞行任务管理 API
+│   │   ├── flight_plan.go          # 智能航线规划 API（LLM + AMap）
 │   │   └── wshub.go                # WebSocket 事件广播中心
+│   ├── llm/llm.go                 # LLM 大模型调用封装（航线规划 + 降级规划器）
+│   ├── amap/amap.go               # 高德地图 API 封装（地理编码/逆编码）
 │   ├── middleware/                 # 中间件（认证等）
 │   ├── monitor/monitor.go          # 系统指标采集
-│   └── syncengine/engine.go        # 数据同步引擎
+│   └── syncengine/engine.go        # 数据同步引擎（18 张表白名单）
 ├── web/
 │   ├── index.html                  # 登录页
 │   ├── dashboard.html              # 仪表盘导航
@@ -546,8 +585,10 @@ project/
 - ✅ hw-agent Push 模式（自动推送硬件+GPS+电池数据）
 - ✅ SSH 浏览器内终端（xterm.js）
 - ✅ RDP 连接支持（生成 .rdp 文件）
-- ✅ 数据同步引擎（全量/增量同步）
+- ✅ 数据同步引擎（全量/增量同步）18 张表）
 - ✅ 视频监控与无人机注册表联动
+- ✅ 智能航线规划（LLM 大模型 + 降级直线规划）
+- ✅ 高德地图地理编码/逆编码集成
 
 ### v1.1.0
 

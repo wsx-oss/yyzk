@@ -299,6 +299,9 @@
     let detailMap = null, historyMap = null;
     let statusChart = null, fenceChart = null;
     let allDevices = [];
+    // Track last applied search params so auto-refresh reuses them
+    let activeFilterName = '';
+    let activeFilterStatus = '';
 
     // ========== Map Init ==========
     function initMap() {
@@ -372,13 +375,15 @@
     }
 
     // ========== Load Data ==========
-    async function loadDevices() {
+    async function loadDevices(useInputFilters) {
       try {
+        if (useInputFilters) {
+          activeFilterName = $('#filterName').value.trim();
+          activeFilterStatus = $('#filterStatus').value;
+        }
         const params = new URLSearchParams();
-        const name = $('#filterName').value.trim();
-        const status = $('#filterStatus').value;
-        if (name) params.append('name', name);
-        if (status) params.append('status', status);
+        if (activeFilterName) params.append('name', activeFilterName);
+        if (activeFilterStatus) params.append('status', activeFilterStatus);
         params.append('page', currentPage);
         params.append('page_size', pageSize);
 
@@ -519,8 +524,15 @@
       $('#alertBtnNext').disabled = alertPage >= tp;
     }
     function changeAlertPage(d) { alertPage += d; loadAlerts(); }
-    function search() { currentPage = 1; loadDevices(); loadStats(); }
-    function refreshAll() { loadDevices(); loadStats(); loadAlerts(); showToast('数据已刷新', 'success'); }
+    function search() { currentPage = 1; loadDevices(true); loadStats(); }
+    function refreshAll() {
+      $('#filterName').value = '';
+      $('#filterStatus').value = '';
+      activeFilterName = '';
+      activeFilterStatus = '';
+      loadDevices(); loadStats(); loadAlerts();
+      showToast('数据已刷新', 'success');
+    }
 
     // ========== Push Location ==========
     function openPushModal(id, lng, lat) {
@@ -631,25 +643,59 @@
       } catch (e) { showToast('操作失败', 'error'); }
     }
 
-    // ========== Auto Refresh ==========
-    var autoRefreshTimer = null;
-    var autoRefreshInterval = 3000; // 3 seconds
+    // ========== Real-time WebSocket ==========
+    var gpsWS = null;
+    var wsReconnectTimer = null;
+    var realtimeEnabled = false;
+
+    function connectGpsWS() {
+      if (gpsWS && (gpsWS.readyState === WebSocket.OPEN || gpsWS.readyState === WebSocket.CONNECTING)) return;
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      gpsWS = new WebSocket(proto + '//' + location.host + '/api/gps/stream');
+      gpsWS.onopen = function() {
+        $('#btnAutoRefresh').textContent = '🟢 实时监控中（WebSocket）';
+        $('#btnAutoRefresh').className = 'btn btn-danger';
+      };
+      gpsWS.onmessage = function(evt) {
+        try {
+          var event = JSON.parse(evt.data);
+          if (event.type === 'gps_update') {
+            loadDevices();
+            loadStats();
+            loadAlerts();
+          }
+        } catch(e) {}
+      };
+      gpsWS.onclose = function() {
+        if (realtimeEnabled) {
+          $('#btnAutoRefresh').textContent = '🔴 已断开，重连中...';
+          scheduleWSReconnect();
+        }
+      };
+      gpsWS.onerror = function() { gpsWS.close(); };
+    }
+
+    function disconnectGpsWS() {
+      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+      if (gpsWS) { gpsWS.onclose = null; gpsWS.close(); gpsWS = null; }
+      $('#btnAutoRefresh').textContent = '开启实时监控';
+      $('#btnAutoRefresh').className = 'btn btn-success';
+    }
+
+    function scheduleWSReconnect() {
+      if (!realtimeEnabled) return;
+      if (wsReconnectTimer) return;
+      wsReconnectTimer = setTimeout(function() { wsReconnectTimer = null; connectGpsWS(); }, 3000);
+    }
 
     function toggleAutoRefresh() {
-      if (autoRefreshTimer) {
-        clearInterval(autoRefreshTimer);
-        autoRefreshTimer = null;
-        $('#btnAutoRefresh').textContent = '开启实时监控';
-        $('#btnAutoRefresh').className = 'btn btn-success';
-        showToast('实时监控已关闭', 'info');
+      realtimeEnabled = !realtimeEnabled;
+      if (realtimeEnabled) {
+        connectGpsWS();
+        showToast('实时监控已开启（WebSocket 事件驱动）', 'success');
       } else {
-        autoRefreshTimer = setInterval(function() {
-          loadDevices();
-          loadStats();
-        }, autoRefreshInterval);
-        $('#btnAutoRefresh').textContent = '关闭实时监控';
-        $('#btnAutoRefresh').className = 'btn btn-danger';
-        showToast('实时监控已开启，每3秒自动刷新', 'success');
+        disconnectGpsWS();
+        showToast('实时监控已关闭', 'info');
       }
     }
 

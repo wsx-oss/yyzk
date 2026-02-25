@@ -2833,13 +2833,16 @@ func (a *API) VNCProxyWS(c *gin.Context) {
 		return
 	}
 	defer ws.Close()
+	var wsMu sync.Mutex
 	done := make(chan struct{})
 	go func() {
 		buf := make([]byte, 8192)
 		for {
 			n, err := conn.Read(buf)
 			if n > 0 {
+				wsMu.Lock()
 				_ = ws.WriteMessage(websocket.BinaryMessage, buf[:n])
+				wsMu.Unlock()
 			}
 			if err != nil {
 				close(done)
@@ -2906,6 +2909,7 @@ func (a *API) SSHProxyWS(c *gin.Context) {
 		return
 	}
 	defer ws.Close()
+	var wsMu sync.Mutex
 
 	stdinPipe, _ := session.StdinPipe()
 	stdoutPipe, _ := session.StdoutPipe()
@@ -2930,7 +2934,9 @@ func (a *API) SSHProxyWS(c *gin.Context) {
 		for {
 			n, err := stdoutPipe.Read(buf)
 			if n > 0 {
+				wsMu.Lock()
 				ws.WriteMessage(websocket.TextMessage, buf[:n])
+				wsMu.Unlock()
 			}
 			if err != nil {
 				close(done)
@@ -2944,7 +2950,9 @@ func (a *API) SSHProxyWS(c *gin.Context) {
 		for {
 			n, err := stderrPipe.Read(buf)
 			if n > 0 {
+				wsMu.Lock()
 				ws.WriteMessage(websocket.TextMessage, buf[:n])
+				wsMu.Unlock()
 			}
 			if err != nil {
 				return

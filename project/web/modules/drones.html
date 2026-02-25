@@ -311,6 +311,9 @@
     let allDrones = [];
     let editingId = null;
     let statusChart = null, protocolChart = null;
+    // Track the last applied search params so auto-refresh reuses them
+    let activeFilterName = '';
+    let activeFilterStatus = '';
 
     // ========== Charts ==========
     function initCharts() {
@@ -327,13 +330,15 @@
     }
 
     // ========== Load Data ==========
-    async function loadDrones() {
+    async function loadDrones(useInputFilters) {
       try {
+        if (useInputFilters) {
+          activeFilterName = $('#filterName').value.trim();
+          activeFilterStatus = $('#filterStatus').value;
+        }
         const params = new URLSearchParams();
-        const name = $('#filterName').value.trim();
-        const status = $('#filterStatus').value;
-        if (name) params.append('name', name);
-        if (status) params.append('status', status);
+        if (activeFilterName) params.append('name', activeFilterName);
+        if (activeFilterStatus) params.append('status', activeFilterStatus);
         const res = await api('/drones?' + params.toString());
         const data = await res.json();
         allDrones = Array.isArray(data.items) ? data.items : [];
@@ -415,8 +420,16 @@
     function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     // ========== Search & Refresh ==========
-    function search() { loadDrones(); loadStats(); }
-    function refreshAll() { loadDrones(); loadStats(); showToast('数据已刷新', 'success'); }
+    function search() { loadDrones(true); loadStats(); }
+    function refreshAll() {
+      // Clear filters and reload all
+      $('#filterName').value = '';
+      $('#filterStatus').value = '';
+      activeFilterName = '';
+      activeFilterStatus = '';
+      loadDrones(); loadStats();
+      showToast('数据已刷新', 'success');
+    }
 
     // ========== Modal: Register / Edit ==========
     function toggleFence() { $('#fenceFields').style.display = $('#fFenceEnabled').checked ? 'grid' : 'none'; }
@@ -510,11 +523,11 @@
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
         showToast(editingId ? '无人机信息已更新' : '无人机注册成功！已自动创建远程设备和GPS设备', 'success');
-        if (!editingId) {
-          // Clear filters to ensure the newly created drone is visible immediately
-          $('#filterName').value = '';
-          $('#filterStatus').value = '';
-        }
+        // Clear filters to ensure newly created/updated drone is visible immediately
+        $('#filterName').value = '';
+        $('#filterStatus').value = '';
+        activeFilterName = '';
+        activeFilterStatus = '';
         closeModal(); loadDrones(); loadStats();
       } catch (e) { showToast('操作失败: ' + e.message, 'error'); }
     }
@@ -525,6 +538,11 @@
       api('/drones/' + id, { method: 'DELETE' }).then(r => r.json()).then(data => {
         if (data.error) { showToast(data.error, 'error'); return; }
         showToast('无人机已删除', 'success');
+        // Clear filters after delete to show remaining drones
+        $('#filterName').value = '';
+        $('#filterStatus').value = '';
+        activeFilterName = '';
+        activeFilterStatus = '';
         loadDrones(); loadStats();
       }).catch(e => showToast('删除失败', 'error'));
     }
