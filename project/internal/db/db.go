@@ -416,6 +416,9 @@ func Migrate(db *sql.DB) error {
 	// add video_url to drones for camera/video stream
 	db.Exec(`ALTER TABLE drones ADD COLUMN video_url TEXT DEFAULT ''`)
 
+	// add map_visible to gps_devices: 0=hidden from map (default), 1=shown on map
+	db.Exec(`ALTER TABLE gps_devices ADD COLUMN map_visible INTEGER DEFAULT 0`)
+
 	// battery monitoring tables
 	batteryTables := []string{
 		`CREATE TABLE IF NOT EXISTS battery_records (

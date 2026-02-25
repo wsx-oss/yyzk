@@ -6,7 +6,10 @@
   <title>GPS/位置信息</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     .module-title::before { content: "\1F4CD"; }
@@ -93,6 +96,7 @@
           <option value="">全部</option>
           <option value="在线">在线</option>
           <option value="离线">离线</option>
+          <option value="等待连接">等待连接</option>
         </select>
       </div>
       <div class="filter-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
@@ -222,10 +226,11 @@
   <div class="hint-box" style="margin-top:20px;">
     <div><strong>使用提示</strong></div>
     <div>1. 设备统一在"无人机管理"页面注册，注册后系统会自动在此页面创建对应的GPS设备，无需手动添加。</div>
-    <div>2. 无人机上运行 <code>hw-agent -server http://主控端IP:8080</code> 后，设备状态会自动变为"在线"，30秒无数据则显示"离线"。</div>
-    <div>3. 启用电子围栏后，当设备位置超出围栏范围时，系统会自动生成围栏报警记录。</div>
-    <div>4. 点击地图上的设备标记可查看设备详细信息，点击"轨迹"可查看历史移动轨迹。</div>
-    <div>5. 如需编辑或删除设备，请到"无人机管理"页面操作，关联数据会自动同步。</div>
+    <div>2. 无人机上运行 <code>hw-agent -server http://主控端IP:8080</code> 后，设备状态会自动变为"在线"，位置数据自动更新，15秒无数据则标记为"离线"。</div>
+    <div>3. 无人机上传的位置数据<strong>不会自动显示在地图上</strong>，需在设备列表中点击"显示地图"按钮后才会在地图上展示；点击"地图中"可将其从地图隐藏。</div>
+    <div>4. 启用电子围栏后，当设备位置超出围栏范围时，系统会自动生成围栏报警记录。</div>
+    <div>5. 点击地图上的设备标记可查看设备详细信息，在设备列表中点击"定位"可快速跳转到该设备在地图上的位置。</div>
+    <div>6. 如需编辑或删除设备，请到"无人机管理"页面操作，关联数据会自动同步。</div>
   </div>
 
   <!-- Detail Modal -->
@@ -295,7 +300,8 @@
     let currentPage = 1, pageSize = 20, totalItems = 0;
     let alertPage = 1, alertTotal = 0;
     let editingId = null, pushDeviceId = null, currentDetailId = null;
-    let map = null, markers = {}, fenceCircles = {};
+    let map = null, markers = {}, fenceCircles = {}, accuracyCircles = {};
+    let markerClusterGroup = null;
     let detailMap = null, historyMap = null;
     let statusChart = null, fenceChart = null;
     let allDevices = [];
@@ -310,29 +316,94 @@
         attribution: '&copy; OpenStreetMap',
         maxZoom: 18
       }).addTo(map);
+      // MarkerCluster: handles overlapping markers — click cluster to spiderfy (fan out)
+      markerClusterGroup = L.markerClusterGroup({
+        maxClusterRadius: 45,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        spiderfyDistanceMultiplier: 2,
+        iconCreateFunction: function(cluster) {
+          const count = cluster.getChildCount();
+          return L.divIcon({
+            className: '',
+            html: `<div style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;background:#0ea5e9;color:#fff;border-radius:50%;font-size:14px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);">${count}</div>`,
+            iconSize: [36, 36], iconAnchor: [18, 18]
+          });
+        }
+      });
+      map.addLayer(markerClusterGroup);
+    }
+
+    // Fly the map to a specific device
+    function locateDevice(id) {
+      const m = markers[id];
+      if (m) {
+        map.setView(m.getLatLng(), 16, { animate: true });
+        // If it's inside a cluster, spiderfy it
+        if (markerClusterGroup) markerClusterGroup.zoomToShowLayer(m, function() { m.openPopup(); });
+      }
     }
 
     function updateMapMarkers(devices) {
       // clear old
-      Object.values(markers).forEach(m => map.removeLayer(m));
+      if (markerClusterGroup) markerClusterGroup.clearLayers();
       Object.values(fenceCircles).forEach(c => map.removeLayer(c));
+      Object.values(accuracyCircles).forEach(c => map.removeLayer(c));
       markers = {};
       fenceCircles = {};
+      accuracyCircles = {};
 
       const bounds = [];
       devices.forEach(d => {
         if (d.latitude === 0 && d.longitude === 0) return;
-        const color = isDeviceOnline(d) ? '#10b981' : '#ef4444';
+        if (!d.map_visible) return;
+        const online = isDeviceOnline(d);
+        const color = online ? '#10b981' : (d.status === '等待连接' ? '#f59e0b' : '#ef4444');
+        const statusLabel = online ? '在线' : d.status;
         const icon = L.divIcon({
           className: '',
-          html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
-          iconSize: [14, 14], iconAnchor: [7, 7]
+          html: `<div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;">
+            <div style="width:16px;height:16px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>
+            <div style="background:rgba(255,255,255,0.92);padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;color:#1e293b;white-space:nowrap;margin-top:2px;box-shadow:0 1px 3px rgba(0,0,0,0.15);border:1px solid ${color};">${esc(d.name)}</div>
+          </div>`,
+          iconSize: [80, 36], iconAnchor: [40, 8]
         });
+        // GPS quality indicator based on accuracy
+        const acc = d.accuracy || 0;
+        let gpsQuality, gpsQColor;
+        if (acc > 0 && acc <= 5)       { gpsQuality = '优秀'; gpsQColor = '#10b981'; }
+        else if (acc > 0 && acc <= 15) { gpsQuality = '良好'; gpsQColor = '#0ea5e9'; }
+        else if (acc > 0 && acc <= 50) { gpsQuality = '一般'; gpsQColor = '#f59e0b'; }
+        else if (acc > 50)             { gpsQuality = '较差'; gpsQColor = '#ef4444'; }
+        else                           { gpsQuality = '未知'; gpsQColor = '#94a3b8'; }
+
         const m = L.marker([d.latitude, d.longitude], { icon })
-          .addTo(map)
-          .bindPopup(`<b>${esc(d.name)}</b><br>经度: ${d.longitude.toFixed(6)}<br>纬度: ${d.latitude.toFixed(6)}<br>速度: ${d.speed} m/s<br>状态: ${d.status}`);
+          .bindPopup(`<div style="min-width:180px;">
+            <b style="font-size:14px;">${esc(d.name)}</b><br>
+            <span style="color:${color};font-weight:500;">${statusLabel}</span>
+            <hr style="margin:6px 0;border:none;border-top:1px solid #e2e8f0;">
+            经度: ${d.longitude.toFixed(6)}<br>纬度: ${d.latitude.toFixed(6)}<br>
+            海拔: ${d.altitude.toFixed(1)}m<br>速度: ${d.speed.toFixed(1)} m/s<br>航向: ${d.heading.toFixed(0)}°<br>
+            定位精度: ${acc > 0 ? acc.toFixed(1) + 'm' : '-'} <span style="color:${gpsQColor};font-weight:600;">${gpsQuality}</span>
+            <hr style="margin:6px 0;border:none;border-top:1px solid #e2e8f0;">
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <button onclick="viewDetail(${d.id})" style="flex:1;padding:4px 8px;background:#0ea5e9;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">详情</button>
+              <button onclick="toggleMapVisible(${d.id})" style="flex:1;padding:4px 8px;background:#ef4444;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">从地图隐藏</button>
+            </div>
+          </div>`);
         markers[d.id] = m;
+        markerClusterGroup.addLayer(m);
         bounds.push([d.latitude, d.longitude]);
+
+        // Accuracy circle: visualize positioning error range when accuracy > 30m
+        if (acc > 30) {
+          const accCircle = L.circle([d.latitude, d.longitude], {
+            radius: acc, color: gpsQColor, fillColor: gpsQColor,
+            fillOpacity: 0.06, weight: 1, dashArray: '4,4'
+          }).addTo(map);
+          accuracyCircles[d.id] = accCircle;
+        }
 
         if (d.fence_enabled && d.fence_radius > 0) {
           const circle = L.circle([d.fence_lat, d.fence_lng], {
@@ -353,8 +424,8 @@
       statusChart = createChart($('#statusChart'), {
         type: 'doughnut',
         data: {
-          labels: ['在线', '离线'],
-          datasets: [{ data: [0, 0], backgroundColor: ['#10b981', '#ef4444'] }]
+          labels: ['在线', '离线', '等待连接'],
+          datasets: [{ data: [0, 0, 0], backgroundColor: ['#10b981', '#ef4444', '#f59e0b'] }]
         },
         options: {
           maintainAspectRatio: false,
@@ -407,11 +478,11 @@
         const s = await res.json();
         $('#statTotal').textContent = s.total || 0;
         $('#statOnline').textContent = s.online || 0;
-        $('#statOffline').textContent = s.offline || 0;
+        $('#statOffline').textContent = (s.offline||0) + (s.waiting||0);
         $('#statFence').textContent = s.fence_enabled || 0;
         $('#statAlerts').textContent = s.alert_count || 0;
         if (statusChart) {
-          statusChart.data.datasets[0].data = [s.online||0, s.offline||0];
+          statusChart.data.datasets[0].data = [s.online||0, s.offline||0, s.waiting||0];
           statusChart.update();
         }
         if (fenceChart) {
@@ -442,16 +513,16 @@
 
     // ========== Render ==========
     function isDeviceOnline(d) {
-      if (!d.last_update) return false;
-      var lastTime = new Date(d.last_update.replace(/-/g, '/')).getTime();
-      return (Date.now() - lastTime) < 30000;
+      return d.status === '在线';
     }
 
     function deviceStatusBadge(d) {
-      var online = isDeviceOnline(d);
-      var label = online ? '在线' : '离线';
-      var cls = online ? 'status-online' : 'status-offline';
-      return '<span class="status-badge ' + cls + '">' + label + '</span>';
+      if (d.status === '在线') {
+        return '<span class="status-badge status-online">在线</span>';
+      } else if (d.status === '等待连接') {
+        return '<span class="status-badge" style="background:#fef3c7;color:#92400e;">等待连接</span>';
+      }
+      return '<span class="status-badge status-offline">离线</span>';
     }
 
     function renderDeviceTable(items) {
@@ -470,9 +541,12 @@
           <td>${deviceStatusBadge(d)}</td>
           <td>${d.fence_enabled ? '<span style="color:#6366f1;font-weight:500;">已启用</span>' : '<span style="color:#94a3b8;">未启用</span>'}</td>
           <td>${formatDate(d.last_update)}</td>
-          <td>
+          <td style="white-space:nowrap;">
             <button class="btn btn-primary btn-action" onclick="viewDetail(${d.id})">详情</button>
-            <button class="btn btn-success btn-action" onclick="openPushModal(${d.id},${d.longitude},${d.latitude})">推送</button>
+            ${(d.latitude !== 0 || d.longitude !== 0) ? (d.map_visible
+              ? '<button class="btn btn-action" style="background:#10b981;color:#fff;" onclick="toggleMapVisible('+d.id+')">地图中</button><button class="btn btn-action" style="background:#6366f1;color:#fff;" onclick="locateDevice('+d.id+')">定位</button>'
+              : '<button class="btn btn-action" style="background:#94a3b8;color:#fff;" onclick="toggleMapVisible('+d.id+')">显示地图</button>'
+            ) : '<span style="color:#94a3b8;font-size:12px;">无坐标</span>'}
           </td>
         </tr>`).join('');
     }
@@ -564,6 +638,29 @@
         showToast('位置已推送', 'success');
         closePushModal(); loadDevices(); loadStats(); loadAlerts();
       } catch (e) { showToast('推送失败', 'error'); }
+    }
+
+    // ========== Toggle Map Visibility ==========
+    async function toggleMapVisible(id) {
+      try {
+        const res = await api('/gps/devices/' + id + '/toggle-map', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast(data.map_visible ? '已显示到地图' : '已从地图隐藏', 'success');
+        loadDevices(); loadStats();
+      } catch (e) { showToast('操作失败', 'error'); }
+    }
+
+    // ========== Reset Location ==========
+    async function resetDeviceLocation(id) {
+      if (!confirm('确定要清除该设备的位置数据吗？\n设备将从地图上移除，历史轨迹也将被清空。\n当Agent重新推送GPS数据后会自动恢复。')) return;
+      try {
+        const res = await api('/gps/devices/' + id + '/reset-location', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('位置已清除', 'success');
+        loadDevices(); loadStats();
+      } catch (e) { showToast('清除失败', 'error'); }
     }
 
     // ========== Detail ==========

@@ -41,7 +41,7 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 	_ = a.db.QueryRow("SELECT COUNT(*) FROM gps_devices WHERE "+wc, args...).Scan(&total)
 
 	offset := (page - 1) * pageSize
-	q := `SELECT id, name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update, created_at, COALESCE(agent_id,''), COALESCE(drone_id,0) FROM gps_devices WHERE ` + wc + ` ORDER BY datetime(last_update) DESC LIMIT ? OFFSET ?`
+	q := `SELECT id, name, device_type, latitude, longitude, altitude, speed, heading, accuracy, status, fence_enabled, fence_lat, fence_lng, fence_radius, last_update, created_at, COALESCE(agent_id,''), COALESCE(drone_id,0), COALESCE(map_visible,0) FROM gps_devices WHERE ` + wc + ` ORDER BY CASE status WHEN '在线' THEN 0 WHEN '等待连接' THEN 1 ELSE 2 END, datetime(COALESCE(last_update,'2000-01-01')) DESC LIMIT ? OFFSET ?`
 	qArgs := append(args, pageSize, offset)
 	rows, err := a.db.Query(q, qArgs...)
 	if err != nil {
@@ -52,11 +52,11 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 
 	items := []gin.H{}
 	for rows.Next() {
-		var id, fenceEnabled, droneID int
+		var id, fenceEnabled, droneID, mapVisible int
 		var name, devType, status, agentID string
 		var lat, lng, alt, speed, heading, accuracy, fLat, fLng, fRadius float64
 		var lastUpdate, created sql.NullString
-		if err := rows.Scan(&id, &name, &devType, &lat, &lng, &alt, &speed, &heading, &accuracy, &status, &fenceEnabled, &fLat, &fLng, &fRadius, &lastUpdate, &created, &agentID, &droneID); err == nil {
+		if err := rows.Scan(&id, &name, &devType, &lat, &lng, &alt, &speed, &heading, &accuracy, &status, &fenceEnabled, &fLat, &fLng, &fRadius, &lastUpdate, &created, &agentID, &droneID, &mapVisible); err == nil {
 			items = append(items, gin.H{
 				"id": id, "name": name, "device_type": devType,
 				"latitude": lat, "longitude": lng, "altitude": alt,
@@ -65,6 +65,7 @@ func (a *API) GpsDevicesList(c *gin.Context) {
 				"fence_lat": fLat, "fence_lng": fLng, "fence_radius": fRadius,
 				"last_update": lastUpdate.String, "created_at": created.String,
 				"agent_id": agentID, "drone_id": droneID,
+				"map_visible": mapVisible == 1,
 			})
 		}
 	}
@@ -192,6 +193,39 @@ func (a *API) GpsDevicesDelete(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 
+// GpsDevicesResetLocation resets a GPS device's position to 0,0 and clears its history.
+// The device remains in the system but disappears from the map until new GPS data arrives.
+func (a *API) GpsDevicesResetLocation(c *gin.Context) {
+	id := c.Param("id")
+	_, err := a.db.Exec(
+		`UPDATE gps_devices SET latitude=0, longitude=0, altitude=0, speed=0, heading=0, accuracy=0, status='等待连接', last_update=NULL WHERE id=?`, id,
+	)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	// Clear history so old points don't linger
+	a.db.Exec(`DELETE FROM gps_history WHERE device_id=?`, id)
+	// Also reset linked drone's initial coordinates and status
+	a.db.Exec(`UPDATE drones SET initial_lat=0, initial_lng=0, initial_alt=0, status='offline', updated_at=datetime('now') WHERE linked_gps_device_id=?`, id)
+	c.JSON(200, gin.H{"ok": true})
+}
+
+// GpsDevicesToggleMapVisible toggles whether a GPS device is shown on the map.
+// Agent pushes update the DB but the device only appears on the map when map_visible=1.
+func (a *API) GpsDevicesToggleMapVisible(c *gin.Context) {
+	id := c.Param("id")
+	// Toggle: if currently 1 set to 0, if 0 set to 1
+	_, err := a.db.Exec(`UPDATE gps_devices SET map_visible = CASE WHEN COALESCE(map_visible,0)=0 THEN 1 ELSE 0 END WHERE id=?`, id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	var newVal int
+	a.db.QueryRow(`SELECT COALESCE(map_visible,0) FROM gps_devices WHERE id=?`, id).Scan(&newVal)
+	c.JSON(200, gin.H{"ok": true, "map_visible": newVal == 1})
+}
+
 // GpsDevicesPush updates a device's GPS position (simulates agent push)
 func (a *API) GpsDevicesPush(c *gin.Context) {
 	id := c.Param("id")
@@ -205,6 +239,15 @@ func (a *API) GpsDevicesPush(c *gin.Context) {
 	}
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(400, gin.H{"error": "bad json"})
+		return
+	}
+	// Validate GPS coordinates
+	if p.Latitude < -90 || p.Latitude > 90 || p.Longitude < -180 || p.Longitude > 180 {
+		c.JSON(400, gin.H{"error": "坐标无效: 纬度范围 -90~90，经度范围 -180~180"})
+		return
+	}
+	if p.Latitude == 0 && p.Longitude == 0 {
+		c.JSON(400, gin.H{"error": "坐标无效: (0,0) 不是有效位置"})
 		return
 	}
 
@@ -323,14 +366,15 @@ func (a *API) GpsFenceAlertAck(c *gin.Context) {
 
 // GpsStats returns GPS statistics
 func (a *API) GpsStats(c *gin.Context) {
-	var total, online, offline, fenceEnabled, alertCount int
+	var total, online, offline, waiting, fenceEnabled, alertCount int
 	a.db.QueryRow(`SELECT COUNT(*) FROM gps_devices WHERE COALESCE(drone_id,0)>0`).Scan(&total)
 	a.db.QueryRow(`SELECT COUNT(*) FROM gps_devices WHERE COALESCE(drone_id,0)>0 AND status='在线'`).Scan(&online)
 	a.db.QueryRow(`SELECT COUNT(*) FROM gps_devices WHERE COALESCE(drone_id,0)>0 AND status='离线'`).Scan(&offline)
+	a.db.QueryRow(`SELECT COUNT(*) FROM gps_devices WHERE COALESCE(drone_id,0)>0 AND status='等待连接'`).Scan(&waiting)
 	a.db.QueryRow(`SELECT COUNT(*) FROM gps_devices WHERE COALESCE(drone_id,0)>0 AND fence_enabled=1`).Scan(&fenceEnabled)
 	a.db.QueryRow(`SELECT COUNT(*) FROM gps_fence_alerts WHERE acknowledged=0`).Scan(&alertCount)
 	c.JSON(200, gin.H{
-		"total": total, "online": online, "offline": offline,
+		"total": total, "online": online, "offline": offline, "waiting": waiting,
 		"fence_enabled": fenceEnabled, "alert_count": alertCount,
 	})
 }
@@ -431,8 +475,12 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 		}
 	}
 
-	// Also update linked drone status to online
+	// Also update linked drone status to online, and auto-populate initial_lat/lng if still 0,0
 	a.db.Exec(`UPDATE drones SET status='online', updated_at=datetime('now') WHERE linked_gps_device_id=?`, deviceID)
+	// If drone's initial coordinates were not provided at registration (0,0), fill them from the first real GPS push
+	a.db.Exec(`UPDATE drones SET initial_lat=?, initial_lng=?, initial_alt=?, updated_at=datetime('now')
+		WHERE linked_gps_device_id=? AND initial_lat=0 AND initial_lng=0`,
+		p.Latitude, p.Longitude, p.Altitude, deviceID)
 
 	hub.Broadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": deviceID, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading}})
 	c.JSON(200, gin.H{"ok": true, "id": deviceID})

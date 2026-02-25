@@ -30,7 +30,7 @@ func (a *API) DronesList(c *gin.Context) {
 	var total int
 	_ = a.db.QueryRow("SELECT COUNT(*) FROM drones WHERE "+wc, args...).Scan(&total)
 
-	q := `SELECT id, name, serial_number, model, description, ip, ssh_port, vnc_port, rdp_port, protocol, username,
+	q := `SELECT id, name, model, description, ip, ssh_port, vnc_port, rdp_port, protocol, username,
 		agent_id, initial_lat, initial_lng, initial_alt, fence_enabled, fence_lat, fence_lng, fence_radius,
 		auto_connect, log_enabled, status, linked_device_id, linked_gps_device_id, created_at, updated_at, COALESCE(video_url,'')
 		FROM drones WHERE ` + wc + ` ORDER BY datetime(created_at) DESC`
@@ -44,29 +44,29 @@ func (a *API) DronesList(c *gin.Context) {
 	items := []gin.H{}
 	for rows.Next() {
 		var id, sshPort, vncPort, rdpPort, fenceEnabled, autoConn, logEn, linkedDevID, linkedGpsID int
-		var name, sn, model, desc, ip, protocol, username, agentID, status, videoURL string
+		var name, model, desc, ip, protocol, username, agentID, status, videoURL string
 		var lat, lng, alt, fLat, fLng, fRadius float64
 		var created, updated sql.NullString
-		if err := rows.Scan(&id, &name, &sn, &model, &desc, &ip, &sshPort, &vncPort, &rdpPort, &protocol, &username,
+		if err := rows.Scan(&id, &name, &model, &desc, &ip, &sshPort, &vncPort, &rdpPort, &protocol, &username,
 			&agentID, &lat, &lng, &alt, &fenceEnabled, &fLat, &fLng, &fRadius,
 			&autoConn, &logEn, &status, &linkedDevID, &linkedGpsID, &created, &updated, &videoURL); err == nil {
 
-			// check if linked gps_device is currently online (last_update within 30s)
+			// check linked gps_device status (maintained by GpsPushByAgent + runOfflineDetection)
 			gpsOnline := false
+			gpsStatus := ""
 			if linkedGpsID > 0 {
-				var cnt int
-				_ = a.db.QueryRow(`SELECT COUNT(*) FROM gps_devices WHERE id=? AND datetime(last_update) >= datetime('now','-30 seconds')`, linkedGpsID).Scan(&cnt)
-				gpsOnline = cnt > 0
+				_ = a.db.QueryRow(`SELECT status FROM gps_devices WHERE id=?`, linkedGpsID).Scan(&gpsStatus)
+				gpsOnline = gpsStatus == "在线"
 			}
 
 			items = append(items, gin.H{
-				"id": id, "name": name, "serial_number": sn, "model": model, "description": desc,
+				"id": id, "name": name, "model": model, "description": desc,
 				"ip": ip, "ssh_port": sshPort, "vnc_port": vncPort, "rdp_port": rdpPort,
 				"protocol": protocol, "username": username, "agent_id": agentID,
 				"initial_lat": lat, "initial_lng": lng, "initial_alt": alt,
 				"fence_enabled": fenceEnabled == 1, "fence_lat": fLat, "fence_lng": fLng, "fence_radius": fRadius,
 				"auto_connect": autoConn == 1, "log_enabled": logEn == 1,
-				"status": status, "gps_online": gpsOnline, "video_url": videoURL,
+				"status": status, "gps_online": gpsOnline, "gps_status": gpsStatus, "video_url": videoURL,
 				"linked_device_id": linkedDevID, "linked_gps_device_id": linkedGpsID,
 				"created_at": created.String, "updated_at": updated.String,
 			})
@@ -80,16 +80,16 @@ func (a *API) DronesGet(c *gin.Context) {
 	id := c.Param("id")
 	var d struct {
 		ID, SSHPort, VNCPort, RDPPort, FenceEnabled, AutoConn, LogEn, LinkedDevID, LinkedGpsID int
-		Name, SN, Model, Desc, IP, Protocol, Username, Password, AgentID, Status, VideoURL     string
+		Name, Model, Desc, IP, Protocol, Username, Password, AgentID, Status, VideoURL         string
 		Lat, Lng, Alt, FLat, FLng, FRadius                                                     float64
 		Created, Updated                                                                        sql.NullString
 	}
 	err := a.db.QueryRow(
-		`SELECT id, name, serial_number, model, description, ip, ssh_port, vnc_port, rdp_port, protocol, username, password,
+		`SELECT id, name, model, description, ip, ssh_port, vnc_port, rdp_port, protocol, username, password,
 		agent_id, initial_lat, initial_lng, initial_alt, fence_enabled, fence_lat, fence_lng, fence_radius,
 		auto_connect, log_enabled, status, linked_device_id, linked_gps_device_id, created_at, updated_at, COALESCE(video_url,'')
 		FROM drones WHERE id=?`, id,
-	).Scan(&d.ID, &d.Name, &d.SN, &d.Model, &d.Desc, &d.IP, &d.SSHPort, &d.VNCPort, &d.RDPPort, &d.Protocol, &d.Username, &d.Password,
+	).Scan(&d.ID, &d.Name, &d.Model, &d.Desc, &d.IP, &d.SSHPort, &d.VNCPort, &d.RDPPort, &d.Protocol, &d.Username, &d.Password,
 		&d.AgentID, &d.Lat, &d.Lng, &d.Alt, &d.FenceEnabled, &d.FLat, &d.FLng, &d.FRadius,
 		&d.AutoConn, &d.LogEn, &d.Status, &d.LinkedDevID, &d.LinkedGpsID, &d.Created, &d.Updated, &d.VideoURL)
 	if err != nil {
@@ -97,7 +97,7 @@ func (a *API) DronesGet(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{
-		"id": d.ID, "name": d.Name, "serial_number": d.SN, "model": d.Model, "description": d.Desc,
+		"id": d.ID, "name": d.Name, "model": d.Model, "description": d.Desc,
 		"ip": d.IP, "ssh_port": d.SSHPort, "vnc_port": d.VNCPort, "rdp_port": d.RDPPort,
 		"protocol": d.Protocol, "username": d.Username, "password": d.Password, "agent_id": d.AgentID,
 		"initial_lat": d.Lat, "initial_lng": d.Lng, "initial_alt": d.Alt,
@@ -113,7 +113,6 @@ func (a *API) DronesGet(c *gin.Context) {
 func (a *API) DronesCreate(c *gin.Context) {
 	var p struct {
 		Name         string  `json:"name"`
-		SerialNumber string  `json:"serial_number"`
 		Model        string  `json:"model"`
 		Description  string  `json:"description"`
 		IP           string  `json:"ip"`
@@ -190,11 +189,11 @@ func (a *API) DronesCreate(c *gin.Context) {
 
 	// ---- Insert drone ----
 	res, err := a.db.Exec(
-		`INSERT INTO drones(name, serial_number, model, description, ip, ssh_port, vnc_port, rdp_port, protocol, username, password,
+		`INSERT INTO drones(name, model, description, ip, ssh_port, vnc_port, rdp_port, protocol, username, password,
 		agent_id, initial_lat, initial_lng, initial_alt, fence_enabled, fence_lat, fence_lng, fence_radius,
 		auto_connect, log_enabled, status, video_url)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		p.Name, p.SerialNumber, p.Model, p.Description, p.IP, p.SSHPort, p.VNCPort, p.RDPPort, p.Protocol, p.Username, p.Password,
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		p.Name, p.Model, p.Description, p.IP, p.SSHPort, p.VNCPort, p.RDPPort, p.Protocol, p.Username, p.Password,
 		p.AgentID, p.InitialLat, p.InitialLng, p.InitialAlt, fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius,
 		ac, le, "offline", p.VideoURL,
 	)
@@ -223,19 +222,23 @@ func (a *API) DronesCreate(c *gin.Context) {
 	}
 
 	// ---- Auto-create linked GPS device (gps_devices table) ----
+	// Use status '等待连接' and last_update=NULL so that offline detection
+	// ignores this device until the Agent pushes real GPS data.
 	gpsRes, err := a.db.Exec(
 		`INSERT INTO gps_devices(name, agent_id, device_type, latitude, longitude, altitude, speed, heading, accuracy, status,
 		fence_enabled, fence_lat, fence_lng, fence_radius, drone_id, last_update)
-		VALUES(?,?,?,?,?,?,0,0,0,'在线',?,?,?,?,?,CURRENT_TIMESTAMP)`,
+		VALUES(?,?,?,?,?,?,0,0,0,'等待连接',?,?,?,?,?,NULL)`,
 		p.Name, p.AgentID, "无人机", p.InitialLat, p.InitialLng, p.InitialAlt,
 		fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius, droneID,
 	)
 	var linkedGpsID int64
 	if err == nil {
 		linkedGpsID, _ = gpsRes.LastInsertId()
-		// record initial GPS history
-		a.db.Exec(`INSERT INTO gps_history(device_id, latitude, longitude, altitude, speed, heading) VALUES(?,?,?,?,0,0)`,
-			linkedGpsID, p.InitialLat, p.InitialLng, p.InitialAlt)
+		// Only record initial GPS history if coordinates were provided (non-zero)
+		if p.InitialLat != 0 || p.InitialLng != 0 {
+			a.db.Exec(`INSERT INTO gps_history(device_id, latitude, longitude, altitude, speed, heading) VALUES(?,?,?,?,0,0)`,
+				linkedGpsID, p.InitialLat, p.InitialLng, p.InitialAlt)
+		}
 	}
 
 	// ---- Update drone with linked IDs ----
@@ -249,7 +252,6 @@ func (a *API) DronesUpdate(c *gin.Context) {
 	id := c.Param("id")
 	var p struct {
 		Name         string  `json:"name"`
-		SerialNumber string  `json:"serial_number"`
 		Model        string  `json:"model"`
 		Description  string  `json:"description"`
 		IP           string  `json:"ip"`
@@ -319,11 +321,11 @@ func (a *API) DronesUpdate(c *gin.Context) {
 
 	// Update drone
 	_, err := a.db.Exec(
-		`UPDATE drones SET name=?, serial_number=?, model=?, description=?, ip=?, ssh_port=?, vnc_port=?, rdp_port=?, protocol=?,
+		`UPDATE drones SET name=?, model=?, description=?, ip=?, ssh_port=?, vnc_port=?, rdp_port=?, protocol=?,
 		username=?, password=?, agent_id=?, initial_lat=?, initial_lng=?, initial_alt=?,
 		fence_enabled=?, fence_lat=?, fence_lng=?, fence_radius=?, auto_connect=?, log_enabled=?, video_url=?, updated_at=datetime('now')
 		WHERE id=?`,
-		p.Name, p.SerialNumber, p.Model, p.Description, p.IP, p.SSHPort, p.VNCPort, p.RDPPort, p.Protocol,
+		p.Name, p.Model, p.Description, p.IP, p.SSHPort, p.VNCPort, p.RDPPort, p.Protocol,
 		p.Username, p.Password, p.AgentID, p.InitialLat, p.InitialLng, p.InitialAlt,
 		fenceEn, p.FenceLat, p.FenceLng, p.FenceRadius, ac, le, p.VideoURL, id,
 	)

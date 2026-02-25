@@ -96,7 +96,7 @@ func main() {
 	go runThresholdAlerts(database, thCPU, thMEM, thDISK, time.Duration(thInterval)*time.Second)
 
 	// background drone offline detection: mark drones/gps_devices as offline when GPS stops pushing
-	go runOfflineDetection(database, 30*time.Second)
+	go runOfflineDetection(database, 10*time.Second)
 
 	srv := &http.Server{Addr: addr, Handler: r}
 	go func() {
@@ -224,7 +224,7 @@ func runThresholdAlerts(database *sql.DB, thCPU, thMEM, thDISK int, interval tim
 }
 
 // runOfflineDetection periodically marks GPS devices and their linked drones as offline
-// when the GPS device hasn't pushed data for more than 60 seconds.
+// when the GPS device hasn't pushed data for more than 15 seconds.
 func runOfflineDetection(database *sql.DB, interval time.Duration) {
 	if interval <= 0 {
 		interval = 30 * time.Second
@@ -233,8 +233,9 @@ func runOfflineDetection(database *sql.DB, interval time.Duration) {
 	defer ticker.Stop()
 	for {
 		<-ticker.C
-		// Mark GPS devices as offline if last_update is older than 60 seconds
-		database.Exec(`UPDATE gps_devices SET status='离线' WHERE status='在线' AND datetime(last_update) < datetime('now','-60 seconds')`)
+		// Mark GPS devices as offline if last_update is older than 15 seconds
+		// Skip devices with last_update=NULL (status='等待连接', never received real GPS data)
+		database.Exec(`UPDATE gps_devices SET status='离线' WHERE status='在线' AND last_update IS NOT NULL AND datetime(last_update) < datetime('now','-15 seconds')`)
 		// Mark linked drones as offline if their GPS device is offline
 		database.Exec(`UPDATE drones SET status='offline', updated_at=datetime('now') WHERE status='online' AND linked_gps_device_id > 0 AND linked_gps_device_id IN (SELECT id FROM gps_devices WHERE status='离线')`)
 	}

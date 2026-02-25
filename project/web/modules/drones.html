@@ -56,6 +56,7 @@
     .drone-card-status.online { background: #d1fae5; color: #065f46; }
     .drone-card-status.offline { background: #fee2e2; color: #991b1b; }
     .drone-card-status.gps-active { background: #dbeafe; color: #1e40af; }
+    .drone-card-status.waiting { background: #fef3c7; color: #92400e; }
     .drone-card-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 13px; color: #475569; margin-bottom: 14px; }
     .drone-card-info-item { display: flex; align-items: center; gap: 4px; }
     .drone-card-info-item .info-label { color: #94a3b8; min-width: 48px; }
@@ -132,7 +133,7 @@
     <div><strong>无人机统一注册说明</strong></div>
     <div>1. 在此页面注册无人机后，系统会自动创建对应的<strong>远程控制设备</strong>和<strong>GPS追踪设备</strong>，无需在各功能模块重复添加。</div>
     <div>2. <strong>远程控制</strong>（SSH/VNC/RDP）：在"远程桌面控制"页面可直接选择已注册的无人机进行连接。</div>
-    <div>3. <strong>GPS/电池/飞行任务</strong>：只要无人机上运行了 <code>hw-agent</code>，数据会自动推送到平台，实时显示在各功能模块中。</div>
+    <div>3. <strong>GPS/电池/飞行任务</strong>：只要无人机上运行了 <code>hw-agent</code>，数据会自动推送到平台，实时显示在各功能模块中。注册时无需填写经纬度，系统会在无人机 Agent 首次推送 GPS 数据时自动获取真实位置并回填。</div>
     <div>4. <strong>Agent ID</strong> 是无人机上报数据的唯一标识。在伴飞计算机上运行 <code>hw-agent -server http://主控端IP:8080 -id "你的AgentID"</code> 即可关联。</div>
     <div>5. 编辑或删除无人机时，关联的远程设备和GPS设备会自动同步更新或级联删除。</div>
   </div>
@@ -169,10 +170,6 @@
           <label>Agent ID</label>
           <input id="fAgentId" type="text" placeholder="例如: drone-SN-001" />
           <div style="font-size:11px;color:#94a3b8;margin-top:3px;">hw-agent 的 -id 参数值，留空则默认使用名称</div>
-        </div>
-        <div>
-          <label>序列号</label>
-          <input id="fSN" type="text" placeholder="例如: SN-20240301-001" />
         </div>
         <div>
           <label>机型</label>
@@ -240,18 +237,21 @@
         <div class="form-section">
           <div class="form-section-title">&#x1F4CD; GPS / 位置信息</div>
         </div>
+        <div class="full-width" style="font-size:12px;color:#64748b;background:#f0f9ff;padding:8px 12px;border-radius:6px;line-height:1.6;">
+          以下坐标为可选项。若留空（或填0），系统将在无人机 Agent 首次推送 GPS 数据时自动获取真实位置并回填。
+        </div>
         <div class="col-3">
           <div>
             <label>初始经度</label>
-            <input id="fLng" type="number" step="any" placeholder="116.397" />
+            <input id="fLng" type="number" step="any" placeholder="可选，Agent自动推送" />
           </div>
           <div>
             <label>初始纬度</label>
-            <input id="fLat" type="number" step="any" placeholder="39.908" />
+            <input id="fLat" type="number" step="any" placeholder="可选，Agent自动推送" />
           </div>
           <div>
             <label>初始海拔(m)</label>
-            <input id="fAlt" type="number" step="any" value="0" />
+            <input id="fAlt" type="number" step="any" placeholder="可选，默认0" />
           </div>
         </div>
 
@@ -389,14 +389,15 @@
       }
       container.innerHTML = items.map(d => {
         const isGpsActive = d.gps_online;
-        const statusCls = isGpsActive ? 'gps-active' : (d.status === 'online' ? 'online' : 'offline');
-        const statusText = isGpsActive ? 'GPS推送中' : (d.status === 'online' ? '在线' : '离线');
+        const isWaiting = d.gps_status === '等待连接';
+        const statusCls = isGpsActive ? 'gps-active' : (d.status === 'online' ? 'online' : (isWaiting ? 'waiting' : 'offline'));
+        const statusText = isGpsActive ? 'GPS推送中' : (d.status === 'online' ? '在线' : (isWaiting ? '等待连接' : '离线'));
         return `
         <div class="drone-card">
           <div class="drone-card-header">
             <div>
               <div class="drone-card-name">${esc(d.name)}</div>
-              <div class="drone-card-model">${esc(d.model || d.serial_number || 'Agent: ' + (d.agent_id || '-'))}</div>
+              <div class="drone-card-model">${esc(d.model || 'Agent: ' + (d.agent_id || '-'))}</div>
             </div>
             <span class="drone-card-status ${statusCls}">${statusText}</span>
           </div>
@@ -438,12 +439,12 @@
       editingId = null;
       $('#droneModalTitle').textContent = '注册无人机';
       $('#btnSubmit').textContent = '确认注册';
-      $('#fName').value = ''; $('#fAgentId').value = ''; $('#fSN').value = ''; $('#fModel').value = ''; $('#fDesc').value = '';
+      $('#fName').value = ''; $('#fAgentId').value = ''; $('#fModel').value = ''; $('#fDesc').value = '';
       $('#fIP').value = ''; $('#fProtocol').value = 'SSH';
       $('#fSSHPort').value = '22'; $('#fVNCPort').value = '5900'; $('#fRDPPort').value = '3389';
       $('#fUsername').value = ''; $('#fPassword').value = '';
       $('#fAutoConnect').checked = false; $('#fLogEnabled').checked = false;
-      $('#fLng').value = '116.397'; $('#fLat').value = '39.908'; $('#fAlt').value = '0';
+      $('#fLng').value = ''; $('#fLat').value = ''; $('#fAlt').value = '';
       $('#fFenceEnabled').checked = false; toggleFence();
       $('#fFenceLng').value = ''; $('#fFenceLat').value = ''; $('#fFenceRadius').value = '500';
       $('#fVideoUrl').value = '';
@@ -460,7 +461,6 @@
         $('#btnSubmit').textContent = '确认保存';
         $('#fName').value = d.name || '';
         $('#fAgentId').value = d.agent_id || '';
-        $('#fSN').value = d.serial_number || '';
         $('#fModel').value = d.model || '';
         $('#fDesc').value = d.description || '';
         $('#fIP').value = d.ip || '';
@@ -490,7 +490,6 @@
       const body = {
         name: $('#fName').value.trim(),
         agent_id: $('#fAgentId').value.trim(),
-        serial_number: $('#fSN').value.trim(),
         model: $('#fModel').value.trim(),
         description: $('#fDesc').value.trim(),
         ip: $('#fIP').value.trim(),
@@ -591,7 +590,6 @@
         const dc = $('#detailContent');
         dc.innerHTML = `
           <div class="detail-label">名称</div><div class="detail-value"><strong>${esc(d.name)}</strong></div>
-          <div class="detail-label">序列号</div><div class="detail-value">${esc(d.serial_number) || '-'}</div>
           <div class="detail-label">机型</div><div class="detail-value">${esc(d.model) || '-'}</div>
           <div class="detail-label">Agent ID</div><div class="detail-value"><code>${esc(d.agent_id)}</code></div>
           <div class="detail-label">描述</div><div class="detail-value">${esc(d.description) || '-'}</div>
@@ -601,7 +599,7 @@
           <div class="detail-label">端口</div><div class="detail-value">SSH: ${d.ssh_port} / VNC: ${d.vnc_port} / RDP: ${d.rdp_port}</div>
           <div class="detail-label">用户名</div><div class="detail-value">${esc(d.username) || '-'}</div>
           <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">GPS / 位置</div><div></div>
-          <div class="detail-label">初始坐标</div><div class="detail-value">经度: ${d.initial_lng}, 纬度: ${d.initial_lat}, 海拔: ${d.initial_alt}m</div>
+          <div class="detail-label">初始坐标</div><div class="detail-value">${(d.initial_lat === 0 && d.initial_lng === 0) ? '<span style="color:#94a3b8;">等待 Agent 首次推送 GPS 后自动填充</span>' : '经度: ' + d.initial_lng + ', 纬度: ' + d.initial_lat + ', 海拔: ' + d.initial_alt + 'm'}</div>
           <div class="detail-label">电子围栏</div><div class="detail-value">${d.fence_enabled ? '已启用 (半径: '+d.fence_radius+'m)' : '未启用'}</div>
           <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">视频监控</div><div></div>
           <div class="detail-label">视频流</div><div class="detail-value">${d.video_url ? '<code style="word-break:break-all;">' + esc(d.video_url) + '</code>' : '<span style="color:#94a3b8;">未配置</span>'}</div>

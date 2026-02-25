@@ -336,6 +336,8 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		api.GET("/gps/devices/stats", a.GpsStats)
 		api.GET("/gps/devices/:id", a.GpsDevicesGet)
 		api.POST("/gps/devices/:id/push", a.GpsDevicesPush)
+		api.POST("/gps/devices/:id/reset-location", a.GpsDevicesResetLocation)
+		api.POST("/gps/devices/:id/toggle-map", a.GpsDevicesToggleMapVisible)
 		api.GET("/gps/devices/:id/history", a.GpsDevicesHistory)
 		api.GET("/gps/fence-alerts", a.GpsFenceAlerts)
 		api.POST("/gps/fence-alerts/:id/ack", a.GpsFenceAlertAck)
@@ -711,8 +713,8 @@ func fetchAgentMetrics(targetIP string) (*agentMetrics, error) {
 func (a *API) updateHardwareFromAgent(id int, ip string) (bool, string) {
 	m, err := fetchAgentMetrics(ip)
 	if err != nil {
-		// Agent unreachable, mark as offline
-		_, _ = a.db.Exec("UPDATE hardware_items SET status = '离线', detected_at = datetime('now'), updated_at = datetime('now') WHERE id = ?", id)
+		// Agent unreachable, mark as offline (preserve last known metrics and detected_at)
+		_, _ = a.db.Exec("UPDATE hardware_items SET status = '离线', updated_at = datetime('now') WHERE id = ?", id)
 		return false, err.Error()
 	}
 	// Agent reachable, update with real data
@@ -814,7 +816,7 @@ func (a *API) HardwareCheckAgent(c *gin.Context) {
 // the merged result directly. This bypasses the DB write→read round-trip for minimal latency.
 // DB is updated asynchronously in the background so persistent data stays fresh.
 func (a *API) HardwareItemsLive(c *gin.Context) {
-	rows, err := a.db.Query("SELECT id, name, type, ip, description FROM hardware_items")
+	rows, err := a.db.Query("SELECT id, name, type, ip, description, temperature, cpu_usage, mem_usage, network_bandwidth, detected_at FROM hardware_items")
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -822,16 +824,25 @@ func (a *API) HardwareItemsLive(c *gin.Context) {
 	defer rows.Close()
 
 	type hwItem struct {
-		ID          int    `json:"id"`
-		Name        string `json:"name"`
-		Type        string `json:"type"`
-		IP          string `json:"ip"`
-		Description string `json:"description"`
+		ID               int
+		Name             string
+		Type             string
+		IP               string
+		Description      string
+		Temperature      float64
+		CPUUsage         float64
+		MemUsage         float64
+		NetworkBandwidth string
+		DetectedAt       string
 	}
 	var items []hwItem
 	for rows.Next() {
 		var h hwItem
-		if err := rows.Scan(&h.ID, &h.Name, &h.Type, &h.IP, &h.Description); err == nil {
+		var detectedAt sql.NullString
+		if err := rows.Scan(&h.ID, &h.Name, &h.Type, &h.IP, &h.Description, &h.Temperature, &h.CPUUsage, &h.MemUsage, &h.NetworkBandwidth, &detectedAt); err == nil {
+			if detectedAt.Valid {
+				h.DetectedAt = detectedAt.String
+			}
 			items = append(items, h)
 		}
 	}
@@ -864,11 +875,19 @@ func (a *API) HardwareItemsLive(c *gin.Context) {
 			m, err := fetchAgentMetrics(item.IP)
 			if err != nil {
 				r.Status = "离线"
-				r.NetworkBandwidth = "0B/s"
-				r.DetectedAt = time.Now().UTC().Format("2006-01-02T15:04:05Z")
-				// Update DB status asynchronously
+				// Preserve last known metrics from DB instead of returning zeros
+				r.Temperature = item.Temperature
+				r.CPUUsage = item.CPUUsage
+				r.MemUsage = item.MemUsage
+				r.NetworkBandwidth = item.NetworkBandwidth
+				if item.DetectedAt != "" {
+					r.DetectedAt = item.DetectedAt
+				} else {
+					r.DetectedAt = time.Now().UTC().Format("2006-01-02T15:04:05Z")
+				}
+				// Update DB status asynchronously (only status, preserve metrics)
 				go func() {
-					_, _ = a.db.Exec("UPDATE hardware_items SET status='离线', detected_at=datetime('now'), updated_at=datetime('now') WHERE id=?", item.ID)
+					_, _ = a.db.Exec("UPDATE hardware_items SET status='离线', updated_at=datetime('now') WHERE id=?", item.ID)
 				}()
 			} else {
 				r.Status = "在线"

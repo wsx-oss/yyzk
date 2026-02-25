@@ -496,6 +496,8 @@ func main() {
 
 	// Data source selection flags
 	simulate := flag.Bool("simulate", false, "Use simulated GPS/battery/flight data (for demo/testing)")
+	simLat := flag.Float64("sim-lat", 0, "Simulated GPS center latitude (default: Beijing 39.908)")
+	simLng := flag.Float64("sim-lng", 0, "Simulated GPS center longitude (default: Beijing 116.397)")
 	mavlinkAddr := flag.String("mavlink", "", "MAVLink UDP listen address for real flight controller (e.g. :14550)")
 	gpsSerial := flag.String("gps-serial", "", "NMEA GPS serial port or gpsd address (e.g. COM3, /dev/ttyUSB0, tcp:localhost:2947)")
 
@@ -511,8 +513,8 @@ func main() {
 		var provider DroneDataProvider
 		switch {
 		case *simulate:
-			log.Printf("[Agent] Data source: SIMULATED (demo mode)")
-			provider = NewSimulatedProvider()
+			log.Printf("[Agent] Data source: SIMULATED (demo mode, center: %.4f, %.4f)", *simLat, *simLng)
+			provider = NewSimulatedProvider(*simLat, *simLng)
 		case *mavlinkAddr != "":
 			log.Printf("[Agent] Data source: MAVLink (real flight controller on %s)", *mavlinkAddr)
 			provider = NewMAVLinkProvider(*mavlinkAddr)
@@ -525,7 +527,7 @@ func main() {
 			mavProv := NewMAVLinkProvider(":14550")
 			if err := mavProv.Start(); err != nil {
 				log.Printf("[Agent] MAVLink not available (%v), falling back to SIMULATED mode", err)
-				provider = NewSimulatedProvider()
+				provider = NewSimulatedProvider(*simLat, *simLng)
 			} else {
 				// Wait briefly to see if we get real data
 				time.Sleep(3 * time.Second)
@@ -536,7 +538,7 @@ func main() {
 					log.Printf("[Agent] No MAVLink data received, falling back to SIMULATED mode")
 					log.Printf("[Agent] To use real data, connect a flight controller or specify -mavlink / -gps-serial")
 					mavProv.Stop()
-					provider = NewSimulatedProvider()
+					provider = NewSimulatedProvider(*simLat, *simLng)
 				}
 			}
 		}
@@ -545,7 +547,7 @@ func main() {
 		if _, isMav := provider.(*MAVLinkProvider); !isMav || *mavlinkAddr != "" {
 			if err := provider.Start(); err != nil {
 				log.Printf("[Agent] WARNING: Provider start failed: %v, falling back to simulated", err)
-				provider = NewSimulatedProvider()
+				provider = NewSimulatedProvider(*simLat, *simLng)
 				provider.Start()
 			}
 		}
@@ -580,6 +582,8 @@ func main() {
 	log.Printf("")
 	log.Printf("  Data source flags:")
 	log.Printf("    -simulate          Use simulated data (demo/testing)")
+	log.Printf("    -sim-lat 30.27     Simulated GPS center latitude  (with -simulate)")
+	log.Printf("    -sim-lng 120.15    Simulated GPS center longitude (with -simulate)")
 	log.Printf("    -mavlink :14550    Read from MAVLink flight controller (PX4/ArduPilot)")
 	log.Printf("    -gps-serial COM3   Read GPS from serial NMEA device")
 	log.Printf("    -gps-serial tcp:localhost:2947  Read GPS from gpsd")
