@@ -60,17 +60,7 @@ function authHeaders(){
   return h;
 }
 
-async function setDeviceStatus(status, keepalive=false){
-  if(!deviceId) return;
-  try{
-    await fetch(`/api/devices/${encodeURIComponent(deviceId)}/status`, {
-      method:'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({Status: status}),
-      keepalive
-    });
-  }catch(e){ /* ignore */ }
-}
+// Device online/offline status is driven by Agent push data, not by VNC connection state.
 
 async function incrUserConn(){
   try{ await fetch('/api/user/stats/incr_connection', { method:'POST', headers: authHeaders() }); }catch(e){ /* ignore */ }
@@ -177,8 +167,7 @@ async function connect(){
     rfb.addEventListener('connect', () => {
       updateState('connected', '✓ 已连接');
       hideError();
-      // 成功连接：设备置为在线、更新最近连接时间、自增用户总连接次数
-      setDeviceStatus('online');
+      // 成功连接：自增用户总连接次数
       incrUserConn();
     });
     
@@ -189,8 +178,6 @@ async function connect(){
       // 断开：进入冷却
       setAllowedAt('disconnect', Date.now() + DISCONNECT_CD_MS);
       startCdTicker();
-      // 断开：设备置为离线
-      setDeviceStatus('offline');
       if(e.detail.clean === false) {
         showError(`连接断开: ${e.detail.reason || '未知原因'}`);
       }
@@ -234,8 +221,7 @@ function disconnect(){
   }
 }
 
-// 页面关闭时确保下线
-window.addEventListener('beforeunload', ()=>{ setDeviceStatus('offline', true); });
+// Device online/offline status is driven by Agent push data, no beforeunload needed.
 
 window.addEventListener('DOMContentLoaded', ()=>{
   btnConnect.addEventListener('click', connect);

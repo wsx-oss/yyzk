@@ -249,9 +249,7 @@
           '<td><span class="status-dot ' + (isOnline ? 'online' : 'offline') + '"></span>' + (isOnline ? '<span style="color:#10b981;">在线</span>' : '<span style="color:#ef4444;">离线</span>') + '</td>' +
           '<td>' + (it.last_connected_at ? formatDate(it.last_connected_at) : '-') + '</td>' +
           '<td>' +
-            (isOnline
-              ? '<button class="btn btn-secondary" style="padding:4px 12px;font-size:12px;margin-right:4px;" onclick="doDisconnect(' + it.id + ')">断开</button>'
-              : '<button class="btn btn-primary" style="padding:4px 12px;font-size:12px;margin-right:4px;" onclick="doConnect(' + i + ')">连接</button>') +
+            '<button class="btn btn-primary" style="padding:4px 12px;font-size:12px;margin-right:4px;" onclick="doConnect(' + i + ')">连接</button>' +
           '</td>';
         tb.appendChild(tr);
       }
@@ -379,44 +377,32 @@
         showToast('已下载 RDP 文件，请双击打开以连接远程桌面', 'success');
       }
 
-      // 设置状态为在线
-      try {
-        await api('/devices/' + id + '/status', { method: 'POST', body: { Status: 'online' } });
-      } catch (e) {}
+      // Device online status is driven by Agent push — no manual status change here
       setTimeout(function() { loadDevices(); }, 1500);
     }
 
     async function doDisconnect(id) {
-      try {
-        await api('/devices/' + id + '/status', { method: 'POST', body: { Status: 'offline' } });
-        showToast('已断开连接', 'success');
-      } catch (e) { showToast('断开失败', 'error'); }
-      // 关闭远程窗口
+      // 关闭远程窗口（设备在线状态由 Agent 推送驱动，不在此处修改）
       var w = remoteWindows[id];
       if (w && !w.closed) { try { w.close(); } catch (e) {} }
+      showToast('已断开远程窗口', 'success');
       await loadDevices();
     }
 
     function disconnectAll() {
-      var onlineCount = 0;
-      for (var i = 0; i < allDevices.length; i++) {
-        if ((allDevices[i].status || '').toLowerCase() === 'online') onlineCount++;
+      // 关闭所有打开的远程窗口（设备在线状态由 Agent 推送驱动，不在此处修改）
+      var closedCount = 0;
+      for (var key in remoteWindows) {
+        var w = remoteWindows[key];
+        if (w && !w.closed) { try { w.close(); closedCount++; } catch (e) {} }
       }
-      if (onlineCount === 0) { showToast('当前没有在线连接', 'info'); return; }
-      showConfirm('断开所有连接', '确定要断开所有 ' + onlineCount + ' 个在线连接吗？断开后设备将无法进行远程控制。', async function() {
-        try {
-          await api('/devices/disconnect-all', { method: 'POST', body: {} });
-          // 关闭所有远程窗口
-          for (var key in remoteWindows) {
-            var w = remoteWindows[key];
-            if (w && !w.closed) { try { w.close(); } catch (e) {} }
-          }
-          remoteWindows = {};
-          showToast('已断开所有连接', 'success');
-        } catch (e) { showToast('操作失败', 'error'); }
-        closeConfirm();
-        await loadDevices();
-      });
+      remoteWindows = {};
+      if (closedCount > 0) {
+        showToast('已关闭 ' + closedCount + ' 个远程窗口', 'success');
+      } else {
+        showToast('当前没有打开的远程窗口', 'info');
+      }
+      loadDevices();
     }
 
     /* ---- Confirm Modal ---- */

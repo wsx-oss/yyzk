@@ -238,5 +238,9 @@ func runOfflineDetection(database *sql.DB, interval time.Duration) {
 		database.Exec(`UPDATE gps_devices SET status='离线' WHERE status='在线' AND last_update IS NOT NULL AND datetime(last_update) < datetime('now','-15 seconds')`)
 		// Mark linked drones as offline if their GPS device is offline
 		database.Exec(`UPDATE drones SET status='offline', updated_at=datetime('now') WHERE status='online' AND linked_gps_device_id > 0 AND linked_gps_device_id IN (SELECT id FROM gps_devices WHERE status='离线')`)
+		// Mark linked remote-control devices as offline if their drone is offline
+		database.Exec(`UPDATE devices SET status='offline', updated_at=datetime('now') WHERE status='online' AND drone_id > 0 AND drone_id IN (SELECT id FROM drones WHERE status='offline')`)
+		// Mark hardware_items as offline if no push for 15 seconds
+		database.Exec(`UPDATE hardware_items SET status='离线' WHERE status='在线' AND detected_at IS NOT NULL AND datetime(detected_at) < datetime('now','-15 seconds')`)
 	}
 }

@@ -956,6 +956,9 @@ func (a *API) HardwarePush(c *gin.Context) {
 		}
 		newID, _ := res.LastInsertId()
 		log.Printf("[Push] Auto-created hardware_item id=%d for agent %s (%s)", newID, p.AgentID, name)
+		// Also mark linked remote-control device as online
+		a.db.Exec(`UPDATE devices SET status='online', last_connected_at=datetime('now'), updated_at=datetime('now')
+			WHERE id IN (SELECT linked_device_id FROM drones WHERE agent_id=? AND linked_device_id>0)`, p.AgentID)
 		c.JSON(200, gin.H{"ok": true, "message": "设备已自动注册", "id": newID})
 		return
 	} else if err != nil {
@@ -973,6 +976,12 @@ func (a *API) HardwarePush(c *gin.Context) {
 		c.JSON(500, gin.H{"ok": false, "message": err.Error()})
 		return
 	}
+
+	// Also mark linked remote-control device (devices table) as online.
+	// Linkage: agent_id → drones.agent_id → drones.linked_device_id → devices.id
+	a.db.Exec(`UPDATE devices SET status='online', last_connected_at=datetime('now'), updated_at=datetime('now')
+		WHERE id IN (SELECT linked_device_id FROM drones WHERE agent_id=? AND linked_device_id>0)`, p.AgentID)
+
 	c.JSON(200, gin.H{"ok": true, "id": id})
 }
 
