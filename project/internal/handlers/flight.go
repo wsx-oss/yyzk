@@ -132,6 +132,14 @@ func (a *API) FlightMissionsCreate(c *gin.Context) {
 		return
 	}
 
+	// 检查任务名称是否重复
+	var existCount int
+	a.db.QueryRow(`SELECT COUNT(*) FROM flight_missions WHERE name=?`, p.Name).Scan(&existCount)
+	if existCount > 0 {
+		c.JSON(400, gin.H{"error": "任务名称已存在，请修改名称"})
+		return
+	}
+
 	res, err := a.db.Exec(
 		`INSERT INTO flight_missions(name, route, target, estimated_duration, description, status, current_phase, progress, device_id) VALUES(?,?,?,?,?,?,?,?,?)`,
 		p.Name, p.Route, p.Target, p.EstimatedDuration, p.Description, "待起飞", "待命", 0, p.DeviceID,
@@ -223,6 +231,15 @@ func (a *API) FlightMissionsUpdate(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "任务名称不能为空"})
 		return
 	}
+
+	// 检查任务名称是否与其他任务重复（排除自身）
+	var existCount int
+	a.db.QueryRow(`SELECT COUNT(*) FROM flight_missions WHERE name=? AND id!=?`, p.Name, id).Scan(&existCount)
+	if existCount > 0 {
+		c.JSON(400, gin.H{"error": "任务名称已存在，请修改名称"})
+		return
+	}
+
 	_, err := a.db.Exec(
 		`UPDATE flight_missions SET name=?, route=?, target=?, estimated_duration=?, description=?, device_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
 		p.Name, p.Route, p.Target, p.EstimatedDuration, p.Description, p.DeviceID, id,

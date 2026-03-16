@@ -19,18 +19,21 @@ import (
 // FlightPlanCreate accepts a planning request, calls the LLM, stores the draft, and returns the plan.
 // POST /api/flight/missions/plan
 func (a *API) FlightPlanCreate(c *gin.Context) {
-	var req llm.PlanRequest
-	if err := c.BindJSON(&req); err != nil {
+	var request struct {
+		llm.PlanRequest
+		WithReasoning bool `json:"with_reasoning"` // 是否包含思维链分析
+	}
+	if err := c.BindJSON(&request); err != nil {
 		c.JSON(400, gin.H{"error": "请求格式错误: " + err.Error()})
 		return
 	}
 
 	// Basic validation
-	if req.Start.Lat == 0 && req.Start.Lon == 0 {
+	if request.Start.Lat == 0 && request.Start.Lon == 0 {
 		c.JSON(400, gin.H{"error": "起点坐标不能为空"})
 		return
 	}
-	if req.Goal.Lat == 0 && req.Goal.Lon == 0 {
+	if request.Goal.Lat == 0 && request.Goal.Lon == 0 {
 		c.JSON(400, gin.H{"error": "终点坐标不能为空"})
 		return
 	}
@@ -39,9 +42,9 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 	amapClient := amap.NewClient()
 	var mapCtx *amap.MapContext
 	if amapClient.Available() {
-		mapCtx = amapClient.BuildContext(req.Start.Lat, req.Start.Lon, req.Goal.Lat, req.Goal.Lon)
+		mapCtx = amapClient.BuildContext(request.Start.Lat, request.Start.Lon, request.Goal.Lat, request.Goal.Lon)
 		if mapCtx != nil && mapCtx.Summary != "" {
-			req.MapContextStr = mapCtx.Summary
+			request.MapContextStr = mapCtx.Summary
 			log.Printf("[FlightPlan] Map context: %s", mapCtx.Summary)
 		}
 	}
@@ -49,35 +52,60 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 	client := llm.NewClient()
 
 	var result *llm.PlanResult
+	var reasoningChain *llm.ReasoningChain
 	var planSource string
+	var reasoningError string
 
 	if client.Available() {
 		var err error
-		result, err = client.GeneratePlan(req)
-		if err != nil {
-			// Fallback to simple planner on LLM failure
-			result = llm.GenerateFallbackPlan(req)
-			result.Warnings = append(result.Warnings, llm.Warning{
-				Level:   "warning",
-				Message: "LLM调用失败，已降级为直线规划: " + err.Error(),
-			})
-			planSource = "fallback"
+
+		if request.WithReasoning {
+			// 使用带思维链的规划
+			result, reasoningChain, err = client.GeneratePlanWithReasoning(request.PlanRequest)
+			if err != nil {
+				reasoningError = err.Error()
+				// 降级为普通规划
+				result, err = client.GeneratePlan(request.PlanRequest)
+				if err != nil {
+					result = llm.GenerateFallbackPlan(request.PlanRequest)
+					result.Warnings = append(result.Warnings, llm.Warning{
+						Level:   "warning",
+						Message: "LLM调用失败，已降级为直线规划: " + err.Error(),
+					})
+					planSource = "fallback"
+				} else {
+					planSource = "llm"
+				}
+			} else {
+				planSource = "llm_with_reasoning"
+			}
 		} else {
-			planSource = "llm"
+			// 普通规划
+			result, err = client.GeneratePlan(request.PlanRequest)
+			if err != nil {
+				result = llm.GenerateFallbackPlan(request.PlanRequest)
+				result.Warnings = append(result.Warnings, llm.Warning{
+					Level:   "warning",
+					Message: "LLM调用失败，已降级为直线规划: " + err.Error(),
+				})
+				planSource = "fallback"
+			} else {
+				planSource = "llm"
+			}
 		}
 	} else {
-		result = llm.GenerateFallbackPlan(req)
+		result = llm.GenerateFallbackPlan(request.PlanRequest)
 		planSource = "fallback"
 	}
 
 	// Serialize for storage
-	reqJSON, _ := json.Marshal(req)
+	reqJSON, _ := json.Marshal(request.PlanRequest)
 	resultJSON, _ := json.Marshal(result)
 
 	// Store in database
 	res, err := a.db.Exec(
 		`INSERT INTO flight_plans(drone_id, request_json, result_json, source, status) VALUES(?,?,?,?,?)`,
-		req.DroneID, string(reqJSON), string(resultJSON), planSource, "draft",
+		request.DroneID, string(reqJSON), string(resultJSON), planSource, "draft",
 	)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "保存规划失败: " + err.Error()})
@@ -91,9 +119,46 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 		"source":  planSource,
 		"plan":    result,
 	}
+
 	if mapCtx != nil {
 		respData["map_context"] = mapCtx
 	}
+
+	if reasoningChain != nil {
+		respData["reasoning_chain"] = reasoningChain
+		respData["reasoning_display"] = reasoningChain.FormatForDisplay()
+
+		// 同步保存到 cot_chains 表，使 AI决策记录 页面可以展示
+		go func() {
+			stepsJSON, err := json.Marshal(reasoningChain.Steps)
+			if err != nil {
+				log.Printf("[FlightPlan] marshal reasoning steps: %v", err)
+				return
+			}
+			metadata := map[string]interface{}{
+				"source":  planSource,
+				"plan_id": planID,
+			}
+			metaJSON, _ := json.Marshal(metadata)
+			_, err = a.db.Exec(
+				`INSERT INTO cot_chains (id, task_type, task_id, created_at, steps, final_decision, overall_confidence, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				reasoningChain.ID, reasoningChain.TaskType, reasoningChain.TaskID,
+				reasoningChain.CreatedAt.Format("2006-01-02 15:04:05"),
+				string(stepsJSON), reasoningChain.FinalDecision,
+				reasoningChain.OverallConfidence, string(metaJSON),
+			)
+			if err != nil {
+				log.Printf("[FlightPlan] save reasoning chain to cot_chains: %v", err)
+			} else {
+				log.Printf("[FlightPlan] reasoning chain %s saved to cot_chains", reasoningChain.ID)
+			}
+		}()
+	}
+
+	if reasoningError != "" {
+		respData["reasoning_error"] = reasoningError
+	}
+
 	c.JSON(200, respData)
 }
 

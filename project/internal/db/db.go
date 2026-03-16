@@ -480,5 +480,27 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 
+	// CoT (Chain of Thought) reasoning chains
+	cotTables := []string{
+		`CREATE TABLE IF NOT EXISTS cot_chains (
+			id TEXT PRIMARY KEY,
+			task_type TEXT NOT NULL,
+			task_id TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			steps TEXT NOT NULL DEFAULT '[]',
+			final_decision TEXT DEFAULT '',
+			overall_confidence REAL DEFAULT 0.0,
+			metadata TEXT DEFAULT '{}'
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_cot_chains_task_type ON cot_chains(task_type)`,
+		`CREATE INDEX IF NOT EXISTS idx_cot_chains_task_id ON cot_chains(task_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_cot_chains_created ON cot_chains(created_at)`,
+	}
+	for _, s := range cotTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("cot_chains table: %w", err)
+		}
+	}
+
 	return nil
 }

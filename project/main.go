@@ -77,6 +77,7 @@ func main() {
 	r.Use(authMiddleware(apiToken))
 
 	handlers.RegisterRoutes(r, database)
+	handlers.RegisterCoTRoutes(r, database)
 
 	sub, _ := fs.Sub(webFS, "web")
 	r.StaticFS("/app", http.FS(sub))

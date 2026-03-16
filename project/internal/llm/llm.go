@@ -1,9 +1,9 @@
 package llm
 
 import (
-	"context"
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -99,9 +99,9 @@ type Constraints struct {
 
 // PlanRequest is the input for LLM-based flight planning
 type PlanRequest struct {
-	Start         Coordinate `json:"start"`
-	Goal          Coordinate `json:"goal"`
-	Actions       []Action   `json:"actions"`
+	Start         Coordinate  `json:"start"`
+	Goal          Coordinate  `json:"goal"`
+	Actions       []Action    `json:"actions"`
 	Constraints   Constraints `json:"constraints,omitempty"`
 	DroneID       int         `json:"drone_id,omitempty"`
 	DroneName     string      `json:"drone_name,omitempty"`
@@ -134,9 +134,9 @@ type PlanResult struct {
 
 // Estimates for the planned route
 type Estimates struct {
-	DistanceM            float64 `json:"distance_m"`
-	TimeS                float64 `json:"time_s"`
-	ExpectedBatteryDrop  float64 `json:"expected_battery_drop_percent"`
+	DistanceM           float64 `json:"distance_m"`
+	TimeS               float64 `json:"time_s"`
+	ExpectedBatteryDrop float64 `json:"expected_battery_drop_percent"`
 }
 
 // ======================== LLM Client ========================
@@ -197,6 +197,12 @@ type chatResponse struct {
 	Error   *struct {
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
+}
+
+// CallRaw sends a chat completion request and returns the raw assistant message content.
+// This is the public version of call() for use by other packages.
+func (c *Client) CallRaw(systemPrompt, userPrompt string) (string, error) {
+	return c.call(systemPrompt, userPrompt)
 }
 
 // call sends a chat completion request and returns the assistant message content

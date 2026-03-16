@@ -44,6 +44,28 @@
     .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
     .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
     .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
+
+    /* AI Analysis styles */
+    .btn-ai { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; }
+    .btn-ai:hover { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
+    .cot-steps { max-height: 400px; overflow-y: auto; margin: 12px 0; }
+    .cot-step { border-left: 3px solid #6366f1; background: #f8fafc; padding: 12px 16px; margin-bottom: 10px; border-radius: 0 8px 8px 0; }
+    .cot-step-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .cot-step-num { background: #6366f1; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; margin-right: 6px; }
+    .cot-step-type { font-size: 11px; font-weight: 500; color: #6366f1; text-transform: uppercase; }
+    .cot-step-q { font-weight: 600; color: #0f172a; margin-bottom: 4px; font-size: 13px; }
+    .cot-step-thought { color: #475569; font-size: 13px; line-height: 1.5; margin-bottom: 4px; }
+    .cot-step-answer { background: #e0e7ff; padding: 6px 10px; border-radius: 6px; color: #3730a3; font-size: 13px; font-weight: 500; }
+    .cot-final { background: linear-gradient(135deg, #f0f9ff, #ede9fe); border: 2px solid #6366f1; padding: 16px; border-radius: 10px; margin-top: 16px; }
+    .cot-final-title { font-size: 15px; font-weight: 600; color: #3730a3; margin-bottom: 8px; }
+    .cot-final-content { color: #0f172a; line-height: 1.6; font-size: 14px; white-space: pre-wrap; }
+    .cot-confidence { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #e0e7ff; color: #4338ca; margin-left: 8px; }
+    .cot-loading { text-align: center; padding: 40px; color: #64748b; }
+    .cot-loading .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #e2e8f0; border-top-color: #6366f1; border-radius: 50%; animation: cotspin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+    @keyframes cotspin { to { transform: rotate(360deg); } }
+    .cot-source { font-size: 11px; padding: 2px 8px; border-radius: 8px; margin-left: 8px; }
+    .cot-source-llm { background: #dcfce7; color: #166534; }
+    .cot-source-fallback { background: #fef3c7; color: #92400e; }
   </style>
 </head>
 <body>
@@ -215,6 +237,17 @@
       <div class="detail-grid" id="detailContent"></div>
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Analysis Modal -->
+  <div class="modal-overlay" id="aiModal">
+    <div class="modal-box" style="width:720px;max-height:90vh;overflow-y:auto;">
+      <div class="modal-title" id="aiModalTitle">AI智能分析</div>
+      <div id="aiModalContent"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeAIModal()">关闭</button>
       </div>
     </div>
   </div>
@@ -399,6 +432,13 @@
           resolveBtn.onclick = () => resolveAlert(it.id);
           tdActions.appendChild(resolveBtn);
         }
+
+        const aiBtn = document.createElement('button');
+        aiBtn.className = 'btn btn-ai btn-action';
+        aiBtn.textContent = 'AI分析';
+        aiBtn.style.marginLeft = '6px';
+        aiBtn.onclick = () => triggerAIAnalysis(it);
+        tdActions.appendChild(aiBtn);
 
         tr.appendChild(tdTime);
         tr.appendChild(tdCat);
@@ -594,6 +634,89 @@
         }
       } catch (e) { showToast(e.message || '导入失败（请检查JSON格式）', 'error'); }
     }
+
+    // ========== AI Analysis ==========
+    async function triggerAIAnalysis(alert) {
+      $('#aiModalTitle').textContent = 'AI智能分析 - ' + (alert.category || '报警');
+      $('#aiModalContent').innerHTML = '<div class="cot-loading"><span class="spinner"></span> 正在调用AI进行思维链分析，请稍候...</div>';
+      $('#aiModal').classList.add('active');
+
+      try {
+        const res = await api('/cot/analyze', {
+          method: 'POST',
+          body: {
+            scenario: 'emergency_analysis',
+            task_id: 'alert_' + alert.id,
+            description: (alert.category || '') + ' - ' + (alert.description || alert.message || '未知报警'),
+            context: {
+              alert_id: alert.id,
+              category: alert.category,
+              priority: alert.priority,
+              status: alert.status,
+              device: alert.device,
+              description: alert.description || alert.message,
+              alert_time: alert.alert_time || alert.created_at
+            }
+          }
+        });
+        const data = await res.json();
+        if (data.error) {
+          $('#aiModalContent').innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">' + escHtml(data.error) + '</div>';
+          return;
+        }
+        renderAIResult(data);
+      } catch (e) {
+        $('#aiModalContent').innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">分析失败: ' + escHtml(e.message) + '</div>';
+      }
+    }
+
+    function renderAIResult(data) {
+      const chain = data.chain;
+      if (!chain) { $('#aiModalContent').innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">未获取到分析结果</div>'; return; }
+
+      const sourceLabel = data.source === 'llm' ? 'LLM智能分析' : '基础分析';
+      const sourceCls = data.source === 'llm' ? 'cot-source-llm' : 'cot-source-fallback';
+
+      let html = '<div style="margin-bottom:12px;font-size:13px;color:#64748b;">';
+      html += '<span class="cot-source ' + sourceCls + '">' + sourceLabel + '</span>';
+      html += '<span class="cot-confidence">置信度: ' + ((chain.confidence || 0) * 100).toFixed(1) + '%</span>';
+      html += '</div>';
+
+      // Steps
+      if (chain.steps && chain.steps.length) {
+        html += '<div class="cot-steps">';
+        chain.steps.forEach(function(step, idx) {
+          html += '<div class="cot-step">';
+          html += '<div class="cot-step-head">';
+          html += '<div><span class="cot-step-num">' + (step.step || idx + 1) + '</span><span class="cot-step-type">' + escHtml(step.type || 'analysis') + '</span></div>';
+          html += '<div style="font-size:11px;color:#64748b;">置信度: ' + ((step.confidence || 0) * 100).toFixed(1) + '%</div>';
+          html += '</div>';
+          if (step.context) html += '<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">' + escHtml(step.context) + '</div>';
+          html += '<div class="cot-step-q">' + escHtml(step.question || '') + '</div>';
+          if (step.thought) html += '<div class="cot-step-thought">' + escHtml(step.thought) + '</div>';
+          html += '<div class="cot-step-answer">' + escHtml(step.answer || '') + '</div>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      // Final decision
+      html += '<div class="cot-final">';
+      html += '<div class="cot-final-title">🎯 最终决策与建议</div>';
+      html += '<div class="cot-final-content">' + escHtml(chain.final_decision || '无') + '</div>';
+      html += '</div>';
+
+      $('#aiModalContent').innerHTML = html;
+    }
+
+    function escHtml(s) {
+      if (!s) return '';
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function closeAIModal() { $('#aiModal').classList.remove('active'); }
 
     // ========== Init ==========
     window.addEventListener('DOMContentLoaded', () => {

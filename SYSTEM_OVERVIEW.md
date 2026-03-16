@@ -276,6 +276,8 @@
 
 - **功能**
   - 飞行任务创建/编辑/删除
+  - 编辑任务时自动预填并保留已有信息（可仅修改单个字段，如仅更换执行无人机）
+  - 起点/终点支持从路线文本回填：坐标自动识别，地址可自动地理编码并在地图标注
   - 飞行阶段状态机（待命→起飞→巡航→执行任务→返航→降落）
   - 任务日志记录
   - 批量导入/导出（JSON）
@@ -299,6 +301,7 @@
   - 基于大模型（LLM）的智能航线规划（支持多航点、动作序列、高度/速度配置）
   - LLM 不可用时自动降级为直线规划器
   - 规划结果以草稿形式保存，可采纳转为正式飞行任务
+  - 规划时自动保存推理链到 `cot_chains` 表
   - AMap（高德地图）地理编码/逆地理编码集成
   - 规划状态检查（LLM 和 AMap 可用性）
 - **后端接口**
@@ -315,6 +318,24 @@
 - **环境变量**
   - `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`（大模型配置）
   - `AMAP_KEY`（高德地图 Key）
+
+### 1.19 思维链（CoT）AI 分析
+
+- **功能**
+  - 统一的 AI 分析入口（`POST /api/cot/analyze`），支持多场景思维链推理
+  - 内联集成到飞行任务详情、硬件状态检测、异常报警、电池监控模块（无独立页面）
+  - 飞行任务详情直接展示创建任务时生成的完整思维链（步骤 + 最终决策），无需手动再次触发
+  - 推理链自动保存到数据库，可随时回顾
+  - 支持场景：飞行规划（`flight_planning`）、故障诊断（`fault_diagnosis`）、异常分析（`emergency_analysis`）、电池分析（`battery_analysis`）
+- **后端接口**
+  - `POST /api/cot/analyze`（统一 AI 分析入口）
+  - `GET /api/cot/chains`（列出思维链记录）
+  - `GET /api/cot/chains/:id`（获取思维链详情）
+  - `DELETE /api/cot/chains/:id`（删除思维链记录）
+- **数据落地**
+  - SQLite 表：`cot_chains`
+- **环境变量**
+  - 复用 `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`
 
 ---
 
@@ -337,7 +358,7 @@
 - **`project/internal/db/db.go`**
   - `Open(path)`：打开 SQLite（WAL 模式、外键开启）
   - `Migrate(db)`：创建并初始化表结构、索引、以及 `sync_status` 初始行
-  - 涉及表：`recordings`、`logs`、`alerts`、`updates`、`sync_tasks`、`users`、`sessions`、`devices`、`user_stats`、`drones`、`gps_devices`、`gps_history`、`gps_fence_alerts`、`battery_records`、`battery_alerts`、`flight_missions`、`mission_logs`、`hardware_items`、`perf_reports`、`flight_plans`、`video_sources`(已废弃)
+  - 涉及表：`recordings`、`logs`、`alerts`、`updates`、`sync_tasks`、`users`、`sessions`、`devices`、`user_stats`、`drones`、`gps_devices`、`gps_history`、`gps_fence_alerts`、`battery_records`、`battery_alerts`、`flight_missions`、`mission_logs`、`hardware_items`、`perf_reports`、`flight_plans`、`cot_chains`、`video_sources`(已废弃)
 
 ### 2.3 业务接口层（Handlers）
 
@@ -377,6 +398,12 @@
 - **`project/internal/handlers/flight_plan.go`**
 
   - 智能航线规划 API（LLM 规划创建/采纳/丢弃/列表/状态检查、AMap 地理编码/逆编码）
+  - 规划时自动保存推理链到 `cot_chains` 表
+- **`project/internal/handlers/cot.go`**
+
+  - 思维链（CoT）AI 分析 API（`/api/cot/analyze` 统一分析入口、`/api/cot/chains` CRUD）
+  - 支持场景：`flight_planning`、`fault_diagnosis`、`emergency_analysis`、`battery_analysis`
+  - 内联集成到飞行任务、硬件检测、异常报警、电池监控模块
 - **`project/internal/handlers/wshub.go`**
 
   - WebSocket 事件广播中心（按 topic 分组管理客户端连接，支持 Subscribe/Unsubscribe/Broadcast，线程安全）
@@ -451,7 +478,7 @@
 - **`project/web/dashboard.html`**
 
   - 登录后的主界面（左侧导航 + iframe 加载各模块页面）
-  - 默认加载 `modules/monitor.html`
+  - 默认加载 `modules/drones.html`（无人机管理）
 
 ### 3.2 功能模块页面（iframe 内加载：`project/web/modules/`）
 

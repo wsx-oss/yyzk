@@ -104,6 +104,27 @@
     .btn-llm { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; }
     .btn-llm:hover { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
 
+    /* Inline CoT reasoning styles */
+    .cot-inline-section { margin-top: 16px; border: 2px solid #6366f1; border-radius: 10px; overflow: hidden; }
+    .cot-inline-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: linear-gradient(135deg, #eef2ff, #faf5ff); cursor: pointer; user-select: none; }
+    .cot-inline-header:hover { background: linear-gradient(135deg, #e0e7ff, #f3e8ff); }
+    .cot-inline-title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #3730a3; font-size: 14px; }
+    .cot-inline-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .cot-inline-body { padding: 16px; display: none; background: #fff; }
+    .cot-inline-body.open { display: block; }
+    .cot-step { border-left: 3px solid #6366f1; background: #f8fafc; padding: 12px 16px; margin-bottom: 10px; border-radius: 0 8px 8px 0; }
+    .cot-step-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .cot-step-num { background: #6366f1; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; margin-right: 6px; }
+    .cot-step-type { font-size: 11px; font-weight: 500; color: #6366f1; text-transform: uppercase; }
+    .cot-step-q { font-weight: 600; color: #0f172a; margin-bottom: 4px; font-size: 13px; }
+    .cot-step-thought { color: #475569; font-size: 13px; line-height: 1.5; margin-bottom: 4px; }
+    .cot-step-answer { background: #e0e7ff; padding: 6px 10px; border-radius: 6px; color: #3730a3; font-size: 13px; font-weight: 500; }
+    .cot-final { background: linear-gradient(135deg, #f0f9ff, #ede9fe); border: 2px solid #6366f1; padding: 16px; border-radius: 10px; margin-top: 12px; }
+    .cot-final-title { font-size: 14px; font-weight: 600; color: #3730a3; margin-bottom: 8px; }
+    .cot-final-content { color: #0f172a; line-height: 1.6; font-size: 13px; white-space: pre-wrap; }
+    .cot-confidence { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #e0e7ff; color: #4338ca; }
+    .cot-toggle-icon { transition: transform 0.3s; font-size: 16px; color: #6366f1; }
+
     /* Map containers */
     .plan-picker-map { width: 100%; height: 220px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 6px; }
     .plan-picker-hint { font-size: 11px; color: #94a3b8; margin-top: 4px; }
@@ -335,6 +356,13 @@
           <div class="plan-actions-list" id="mActionsList"></div>
         </div>
 
+        <!-- CoT Reasoning Option -->
+        <div class="full-width" style="display:flex;align-items:center;gap:8px;padding:12px;background:#f0f9ff;border-radius:8px;border:1px solid #e0f2fe;">
+          <input type="checkbox" id="reasoningCheckbox" style="margin:0;width:16px;height:16px;" />
+          <label for="reasoningCheckbox" style="margin:0;font-weight:500;color:#0c4a6e;">启用思维链分析（记录AI决策过程）</label>
+          <span style="font-size:11px;color:#64748b;">生成后可查看详细推理步骤</span>
+        </div>
+
         <!-- Manual fields (auto-filled by smart plan) -->
         <div class="full-width">
           <label>飞行路线 *</label>
@@ -371,6 +399,7 @@
       <div class="detail-grid" id="detailContent"></div>
       <div class="phase-control" id="phaseControl"></div>
       <div class="log-timeline" id="logTimeline"></div>
+      <div id="detailAISection"></div>
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
       </div>
@@ -698,8 +727,21 @@
         if (a > 60) { const tmp = a; a = b; b = tmp; }
         latInput.value = a.toFixed(6);
         lonInput.value = b.toFixed(6);
-        candDiv.innerHTML = '<span style="color:#10b981;font-size:12px;">已识别为坐标</span>';
         updatePickerMarker(which, a, b);
+        // Reverse geocode to show address name
+        candDiv.innerHTML = '<span style="color:#64748b;font-size:12px;">解析地址中...</span>';
+        api('/amap/regeocode', { method: 'POST', body: { latitude: a, longitude: b } })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.formatted) {
+              addrInput.value = d.formatted;
+              candDiv.innerHTML = '<span style="color:#10b981;font-size:12px;">已定位: ' + esc(d.formatted) + '</span>';
+            } else {
+              candDiv.innerHTML = '<span style="color:#10b981;font-size:12px;">已识别为坐标</span>';
+            }
+          }).catch(function() {
+            candDiv.innerHTML = '<span style="color:#10b981;font-size:12px;">已识别为坐标</span>';
+          });
         return;
       }
 
@@ -827,23 +869,80 @@
         mLastMapCtx = null; mLastPlan = null;
         $('#missionModalTitle').textContent = '编辑飞行任务';
         $('#btnSubmitMission').textContent = '确认保存';
-        $('#btnSmartPlan').style.display = 'none';
+        $('#btnSmartPlan').style.display = '';
         $('#missionName').value = m.name || '';
         await loadDrones();
         $('#missionDevice').value = m.device_id || '0';
-        $('#mStartAddr').value = ''; $('#mStartLat').value = ''; $('#mStartLon').value = '';
-        $('#mGoalAddr').value = ''; $('#mGoalLat').value = ''; $('#mGoalLon').value = '';
+
+        // Pre-fill start/goal from route string
+        var route = m.route || '';
+        // Helper: resolve one endpoint (address or coords) and fill fields + map marker
+        function fillEndpoint(which, text) {
+          var addrInput = which === 'start' ? $('#mStartAddr') : $('#mGoalAddr');
+          var latInput = which === 'start' ? $('#mStartLat') : $('#mGoalLat');
+          var lonInput = which === 'start' ? $('#mStartLon') : $('#mGoalLon');
+          var candDiv = which === 'start' ? $('#mStartCandidates') : $('#mGoalCandidates');
+          text = (text || '').trim();
+          if (!text) { addrInput.value = ''; latInput.value = ''; lonInput.value = ''; candDiv.innerHTML = ''; return; }
+          addrInput.value = text;
+          // Check if text is coordinates
+          var cm = text.match(/^([\d.]+)\s*[,，]\s*([\d.]+)$/);
+          if (cm) {
+            var a = parseFloat(cm[1]), b = parseFloat(cm[2]);
+            if (a > 60) { var t = a; a = b; b = t; }
+            latInput.value = a.toFixed(6); lonInput.value = b.toFixed(6);
+            updatePickerMarker(which, a, b);
+            candDiv.innerHTML = '<span style="color:#64748b;font-size:12px;">解析地址中...</span>';
+            api('/amap/regeocode', { method: 'POST', body: { latitude: a, longitude: b } })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d.formatted) { addrInput.value = d.formatted; candDiv.innerHTML = '<span style="color:#10b981;font-size:12px;">已定位: ' + esc(d.formatted) + '</span>'; }
+                else { candDiv.innerHTML = '<span style="color:#10b981;font-size:12px;">已识别坐标</span>'; }
+              }).catch(function() { candDiv.innerHTML = '<span style="color:#10b981;font-size:12px;">已识别坐标</span>'; });
+          } else {
+            // It's an address name — forward geocode to get coordinates
+            candDiv.innerHTML = '<span style="color:#64748b;font-size:12px;">解析坐标中...</span>';
+            api('/amap/geocode', { method: 'POST', body: { address: text, city: '' } })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                var items = d.items || [];
+                if (items.length > 0) {
+                  var c = items[0];
+                  latInput.value = c.lat.toFixed(6); lonInput.value = c.lon.toFixed(6);
+                  updatePickerMarker(which, c.lat, c.lon);
+                  candDiv.innerHTML = '<span style="color:#10b981;font-size:12px;">已定位: ' + esc(c.formatted_address || text) + '</span>';
+                } else {
+                  candDiv.innerHTML = '<span style="color:#f59e0b;font-size:12px;">未能解析地址坐标，请手动输入</span>';
+                }
+              }).catch(function() { candDiv.innerHTML = '<span style="color:#f59e0b;font-size:12px;">地址解析失败</span>'; });
+          }
+        }
+        // Split route by → to get start and goal parts
+        var routeParts = route.split(/\s*→\s*/);
+        var startText = routeParts.length >= 1 ? routeParts[0] : '';
+        var goalText = routeParts.length >= 2 ? routeParts[routeParts.length - 1] : '';
+        // Delay fill until map is ready
+        var _editStartText = startText, _editGoalText = goalText;
+
+        $('#mStartAddr').value = startText; $('#mStartLat').value = ''; $('#mStartLon').value = '';
+        $('#mGoalAddr').value = goalText; $('#mGoalLat').value = ''; $('#mGoalLon').value = '';
         $('#mStartCandidates').innerHTML = ''; $('#mGoalCandidates').innerHTML = '';
         $('#mAlt').value = '80'; $('#mSpeed').value = '8';
         renderMissionActions();
-        $('#missionRoute').value = m.route || '';
+        $('#missionRoute').value = route;
         $('#missionTarget').value = m.target || '';
         $('#missionDuration').value = m.estimated_duration || '';
         $('#missionDesc').value = m.description || '';
         $('#mPlanResultArea').style.display = 'none';
         $('#mPlanResultArea').innerHTML = '';
+        if (mResultMap) { mResultMap.destroy(); mResultMap = null; }
         $('#missionModal').classList.add('active');
-        setTimeout(initMissionPickerMap, 200);
+        setTimeout(function() {
+          initMissionPickerMap();
+          // Geocode start/goal addresses and place markers on map
+          if (_editStartText) fillEndpoint('start', _editStartText);
+          if (_editGoalText) fillEndpoint('goal', _editGoalText);
+        }, 300);
       } catch (e) {
         showToast('加载任务失败', 'error');
       }
@@ -869,6 +968,7 @@
 
       try {
         let res;
+        const wasEditing = editingId;
         if (editingId) {
           res = await api('/flight/missions/' + editingId, { method: 'PUT', body });
         } else {
@@ -876,10 +976,14 @@
         }
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
-        showToast(editingId ? '任务已更新' : '任务已创建', 'success');
+        showToast(wasEditing ? '任务已更新' : '任务已创建', 'success');
         closeMissionModal();
         loadMissions();
         loadStats();
+        // If detail modal is open for the edited mission, refresh it
+        if (wasEditing && $('#detailModal').classList.contains('active')) {
+          viewDetail(wasEditing);
+        }
       } catch (e) {
         showToast('操作失败', 'error');
       }
@@ -1009,15 +1113,80 @@
           lt.innerHTML = '<div style="color:#94a3b8;font-size:13px;margin-top:8px;">暂无日志记录</div>';
         }
 
+        // AI Analysis section
+        await loadDetailAISection(m);
+
         $('#detailModal').classList.add('active');
       } catch (e) {
         showToast('加载详情失败', 'error');
       }
     }
 
+    async function loadDetailAISection(mission) {
+      var sec = $('#detailAISection');
+      try {
+        // Query the most recent flight_planning reasoning chain
+        var res = await api('/cot/chains?task_type=flight_planning&page_size=10');
+        var data = await res.json();
+        var items = (data.items || []).filter(function(c) {
+          return c.task_id && (c.task_id.indexOf('drone_') >= 0);
+        });
+
+        if (!items.length) {
+          sec.innerHTML = '<div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">' +
+            '<strong style="font-size:13px;color:#475569;">🧠 AI智能分析</strong>' +
+            '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:12px;">暂无AI分析记录（创建任务时通过智能航线规划自动生成）</div></div>';
+          return;
+        }
+
+        // Load the full chain detail for the most recent entry
+        var latest = items[0];
+        var chainRes = await api('/cot/chains/' + encodeURIComponent(latest.id));
+        var chainData = await chainRes.json();
+        if (chainData.error) {
+          sec.innerHTML = '<div style="color:#ef4444;padding:16px;">' + esc(chainData.error) + '</div>';
+          return;
+        }
+        // Backend wraps data under "chain" key: {ok, chain: {chain_id, steps, ...}}
+        var chain = chainData.chain || chainData;
+
+        var html = '<div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">';
+        html += '<strong style="font-size:13px;color:#475569;">🧠 AI智能分析（创建任务时生成）</strong>';
+        html += '<div style="font-size:11px;color:#94a3b8;margin-top:2px;margin-bottom:8px;">' + esc(chain.created_at || latest.created_at || '') + '</div>';
+        html += '<div class="cot-inline-section">';
+        html += '<div class="cot-inline-header" onclick="this.nextElementSibling.classList.toggle(\'open\');this.querySelector(\'.cot-toggle-icon\').style.transform=this.nextElementSibling.classList.contains(\'open\')?\'rotate(180deg)\':\'\';">';
+        html += '<div class="cot-inline-title"><span>\uD83E\uDDE0</span> 推理过程</div>';
+        var steps = chain.steps || [];
+        html += '<div class="cot-inline-meta"><span class="cot-confidence">' + steps.length + ' 步 · 置信度 ' + ((chain.overall_confidence || chain.confidence || 0) * 100).toFixed(1) + '%</span><span class="cot-toggle-icon">▲</span></div>';
+        html += '</div>';
+        html += '<div class="cot-inline-body open">';
+        if (steps.length) {
+          steps.forEach(function(step, idx) {
+            html += '<div class="cot-step"><div class="cot-step-head">';
+            html += '<div><span class="cot-step-num">' + (step.step || idx + 1) + '</span><span class="cot-step-type">' + esc(step.type || 'analysis') + '</span></div>';
+            html += '<div style="font-size:11px;color:#64748b;">置信度: ' + ((step.confidence || 0) * 100).toFixed(1) + '%</div></div>';
+            if (step.context) html += '<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">' + esc(step.context) + '</div>';
+            html += '<div class="cot-step-q">' + esc(step.question || '') + '</div>';
+            if (step.thought) html += '<div class="cot-step-thought">' + esc(step.thought) + '</div>';
+            html += '<div class="cot-step-answer">' + esc(step.answer || '') + '</div></div>';
+          });
+        }
+        html += '<div class="cot-final"><div class="cot-final-title">\uD83C\uDFAF 最终决策</div>';
+        html += '<div class="cot-final-content">' + esc(chain.final_decision || '') + '</div></div>';
+        html += '</div></div>';
+        html += '</div>';
+        sec.innerHTML = html;
+      } catch(e) {
+        sec.innerHTML = '<div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px;">' +
+          '<strong style="font-size:13px;color:#475569;">🧠 AI智能分析</strong>' +
+          '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:8px;">加载AI分析记录失败</div></div>';
+      }
+    }
+
     function closeDetailModal() {
       var rc = document.getElementById('realtimeCard');
       if (rc) rc.remove();
+      $('#detailAISection').innerHTML = '';
       $('#detailModal').classList.remove('active');
     }
 
@@ -1115,6 +1284,21 @@
       if (deg == null) return '';
       var dirs = ['北','东北','东','东南','南','西南','西','西北'];
       return dirs[Math.round(((deg % 360 + 360) % 360) / 45) % 8];
+    }
+
+    // ========== CoT inline toggle ==========
+    function toggleCoTBody() {
+      var body = document.getElementById('cotInlineBody');
+      var icon = document.getElementById('cotToggleIcon');
+      if (body) {
+        body.classList.toggle('open');
+        if (icon) icon.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+      }
+    }
+
+    // ========== CoT Detail Viewer (fallback for history page) ==========
+    function viewCoTDetail(chainID) {
+      window.open('/app/modules/cot.html?chain_id=' + encodeURIComponent(chainID), '_blank');
     }
 
     // ========== Reverse geocoding for detail modal ==========
@@ -1222,13 +1406,17 @@
       const droneId = parseInt(droneSel.value) || 0;
       const droneName = droneSel.selectedOptions[0]?.text || '';
 
+      // 检查是否启用思维链分析
+      const withReasoning = $('#reasoningCheckbox')?.checked || false;
+      
       const reqBody = {
         start: { lat: startLat, lon: startLon, alt_m: alt },
         goal: { lat: goalLat, lon: goalLon, alt_m: alt },
         actions: missionActions,
         constraints: { max_speed_mps: speed, max_alt_m: alt + 50, battery_return_threshold_percent: 20 },
         drone_id: droneId,
-        drone_name: droneName !== '未指定' ? droneName : ''
+        drone_name: droneName !== '未指定' ? droneName : '',
+        with_reasoning: withReasoning
       };
 
       // Show loading
@@ -1295,7 +1483,7 @@
         }
 
         // --- Render plan result visualization ---
-        renderSmartPlanResult(plan, source, data.plan_id);
+        renderSmartPlanResult(plan, source, data.plan_id, data.reasoning_chain);
         btn.disabled = false;
         btn.innerHTML = '&#x1F9E0; 重新规划';
       } catch(e) {
@@ -1305,13 +1493,13 @@
       }
     }
 
-    function renderSmartPlanResult(plan, source, planId) {
-      const sourceLabel = source === 'llm' ? 'LLM智能规划' : '降级直线规划';
-      const sourceColor = source === 'llm' ? '#6366f1' : '#f59e0b';
+    function renderSmartPlanResult(plan, source, planId, reasoningChain) {
+      const sourceLabel = source === 'llm' ? 'LLM智能规划' : source === 'llm_with_reasoning' ? 'LLM智能规划（含思维链）' : '降级直线规划';
+      const sourceColor = source === 'llm_with_reasoning' ? '#8b5cf6' : (source === 'llm' ? '#6366f1' : '#f59e0b');
       const area = $('#mPlanResultArea');
 
       let html = '<div class="plan-result">';
-      html += `<div class="plan-result-title"><span style="color:${sourceColor};">&#x2714;</span> 规划完成 · 已自动回填 <span style="font-size:12px;color:${sourceColor};background:${source==='llm'?'#e0e7ff':'#fef3c7'};padding:2px 8px;border-radius:8px;">${sourceLabel}</span></div>`;
+      html += `<div class="plan-result-title"><span style="color:${sourceColor};">&#x2714;</span> 规划完成 · 已自动回填 <span style="font-size:12px;color:${sourceColor};background:${source==='llm_with_reasoning'?'#e9d5ff':(source==='llm'?'#e0e7ff':'#fef3c7')};padding:2px 8px;border-radius:8px;">${sourceLabel}</span></div>`;
 
       // Estimates
       if (plan.estimates) {
@@ -1367,6 +1555,34 @@
       // Explanation
       if (plan.explanation) {
         html += `<div class="plan-explanation"><strong>规划说明：</strong>${esc(plan.explanation)}</div>`;
+      }
+
+      // CoT Reasoning inline display
+      if (reasoningChain && reasoningChain.id) {
+        var stepsCount = reasoningChain.steps ? reasoningChain.steps.length : 0;
+        var confidence = ((reasoningChain.overall_confidence || 0) * 100).toFixed(1);
+        html += '<div class="cot-inline-section">';
+        html += '<div class="cot-inline-header" onclick="toggleCoTBody()">';
+        html += '<div class="cot-inline-title"><span>\uD83E\uDDE0</span> \u601D\u7EF4\u94FE\u63A8\u7406\u8FC7\u7A0B</div>';
+        html += '<div class="cot-inline-meta"><span class="cot-confidence">' + stepsCount + ' \u6B65 \u00B7 \u7F6E\u4FE1\u5EA6 ' + confidence + '%</span><span class="cot-toggle-icon" id="cotToggleIcon">\u25BC</span></div>';
+        html += '</div>';
+        html += '<div class="cot-inline-body" id="cotInlineBody">';
+        // Steps
+        if (reasoningChain.steps && reasoningChain.steps.length) {
+          reasoningChain.steps.forEach(function(step, idx) {
+            html += '<div class="cot-step"><div class="cot-step-head">';
+            html += '<div><span class="cot-step-num">' + (step.step || idx + 1) + '</span><span class="cot-step-type">' + esc(step.type || 'analysis') + '</span></div>';
+            html += '<div style="font-size:11px;color:#64748b;">\u7F6E\u4FE1\u5EA6: ' + ((step.confidence || 0) * 100).toFixed(1) + '%</div></div>';
+            if (step.context) html += '<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">' + esc(step.context) + '</div>';
+            html += '<div class="cot-step-q">' + esc(step.question || '') + '</div>';
+            if (step.thought) html += '<div class="cot-step-thought">' + esc(step.thought) + '</div>';
+            html += '<div class="cot-step-answer">' + esc(step.answer || '') + '</div></div>';
+          });
+        }
+        // Final decision
+        html += '<div class="cot-final"><div class="cot-final-title">\uD83C\uDFAF \u6700\u7EC8\u51B3\u7B56</div>';
+        html += '<div class="cot-final-content">' + esc(reasoningChain.final_decision || '') + '</div></div>';
+        html += '</div></div>';
       }
 
       html += '<div style="text-align:center;margin-top:12px;color:#10b981;font-size:13px;font-weight:600;">以上信息已自动回填到表单中，确认无误后点击「确认创建」即可</div>';

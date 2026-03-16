@@ -250,7 +250,7 @@
             <input id="fLat" type="number" step="any" placeholder="可选，Agent自动推送" />
           </div>
           <div>
-            <label>初始海拔(m)</label>
+            <label>初始高度(m)</label>
             <input id="fAlt" type="number" step="any" placeholder="可选，默认0" />
           </div>
         </div>
@@ -599,7 +599,7 @@
           <div class="detail-label">端口</div><div class="detail-value">SSH: ${d.ssh_port} / VNC: ${d.vnc_port} / RDP: ${d.rdp_port}</div>
           <div class="detail-label">用户名</div><div class="detail-value">${esc(d.username) || '-'}</div>
           <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">GPS / 位置</div><div></div>
-          <div class="detail-label">初始坐标</div><div class="detail-value">${(d.initial_lat === 0 && d.initial_lng === 0) ? '<span style="color:#94a3b8;">等待 Agent 首次推送 GPS 后自动填充</span>' : '经度: ' + d.initial_lng + ', 纬度: ' + d.initial_lat + ', 海拔: ' + d.initial_alt + 'm'}</div>
+          <div class="detail-label">初始坐标</div><div class="detail-value">${(d.initial_lat === 0 && d.initial_lng === 0) ? '<span style="color:#94a3b8;">等待 Agent 首次推送 GPS 后自动填充</span>' : '经度: ' + d.initial_lng + ', 纬度: ' + d.initial_lat + ', 高度: ' + d.initial_alt + 'm'}</div>
           <div class="detail-label">电子围栏</div><div class="detail-value">${d.fence_enabled ? '已启用 (半径: '+d.fence_radius+'m)' : '未启用'}</div>
           <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">视频监控</div><div></div>
           <div class="detail-label">视频流</div><div class="detail-value">${d.video_url ? '<code style="word-break:break-all;">' + esc(d.video_url) + '</code>' : '<span style="color:#94a3b8;">未配置</span>'}</div>

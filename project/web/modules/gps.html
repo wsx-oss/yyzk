@@ -157,7 +157,7 @@
             <th>无人机名称</th>
             <th>经度</th>
             <th>纬度</th>
-            <th>海拔(m)</th>
+            <th>高度(m)</th>
             <th>速度(m/s)</th>
             <th>状态</th>
             <th>围栏</th>
@@ -260,7 +260,7 @@
           <input id="pushLat" type="number" step="any" />
         </div>
         <div>
-          <label>海拔(m)</label>
+          <label>高度(m)</label>
           <input id="pushAlt" type="number" step="any" value="100" />
         </div>
         <div>
@@ -384,7 +384,7 @@
             <span style="color:${color};font-weight:500;">${statusLabel}</span>
             <hr style="margin:6px 0;border:none;border-top:1px solid #e2e8f0;">
             经度: ${d.longitude.toFixed(6)}<br>纬度: ${d.latitude.toFixed(6)}<br>
-            海拔: ${d.altitude.toFixed(1)}m<br>速度: ${d.speed.toFixed(1)} m/s<br>航向: ${d.heading.toFixed(0)}°<br>
+            高度: ${d.altitude.toFixed(1)}m<br>速度: ${d.speed.toFixed(1)} m/s<br>航向: ${d.heading.toFixed(0)}°<br>
             定位精度: ${acc > 0 ? acc.toFixed(1) + 'm' : '-'} <span style="color:${gpsQColor};font-weight:600;">${gpsQuality}</span>
             <hr style="margin:6px 0;border:none;border-top:1px solid #e2e8f0;">
             <div style="display:flex;gap:6px;margin-top:4px;">
@@ -673,7 +673,7 @@
           <div class="detail-label">无人机名称</div><div class="detail-value"><strong>${esc(d.name)}</strong></div>
           <div class="detail-label">经度</div><div class="detail-value">${d.longitude.toFixed(6)}</div>
           <div class="detail-label">纬度</div><div class="detail-value">${d.latitude.toFixed(6)}</div>
-          <div class="detail-label">海拔</div><div class="detail-value">${d.altitude.toFixed(1)} m</div>
+          <div class="detail-label">高度</div><div class="detail-value">${d.altitude.toFixed(1)} m</div>
           <div class="detail-label">速度</div><div class="detail-value">${d.speed.toFixed(1)} m/s</div>
           <div class="detail-label">航向</div><div class="detail-value">${d.heading.toFixed(0)}°</div>
           <div class="detail-label">精度</div><div class="detail-value">${d.accuracy.toFixed(1)} m</div>

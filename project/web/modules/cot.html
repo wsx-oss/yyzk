@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI决策记录</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <style>
+    .module-title::before { content: "\1F9E0"; }
+    .cot-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .cot-header-row .module-title { margin-bottom: 0; }
+    .cot-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    
+    /* Task type badges */
+    .task-type-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .task-type-scheduling { background: #e0e7ff; color: #3730a3; }
+    .task-type-fault_diagnosis { background: #fef3c7; color: #92400e; }
+    .task-type-path_optimization { background: #dbeafe; color: #1e40af; }
+    .task-type-mission_planning { background: #d1fae5; color: #065f46; }
+    
+    /* Confidence indicator */
+    .confidence-bar {
+      display: inline-block;
+      width: 100px;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    .confidence-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981);
+      transition: width 0.3s;
+    }
+    
+    /* Chain detail modal */
+    .chain-steps {
+      max-height: 400px;
+      overflow-y: auto;
+      margin: 16px 0;
+    }
+    .chain-step {
+      border-left: 3px solid #0ea5e9;
+      background: #f8fafc;
+      padding: 16px;
+      margin-bottom: 12px;
+      border-radius: 0 8px 8px 0;
+    }
+    .chain-step-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .step-number {
+      background: #0ea5e9;
+      color: #fff;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+    .step-type {
+      font-size: 12px;
+      font-weight: 500;
+      color: #0ea5e9;
+      text-transform: uppercase;
+    }
+    .step-content {
+      margin: 8px 0;
+    }
+    .step-question {
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .step-thought {
+      color: #475569;
+      margin-bottom: 4px;
+      line-height: 1.5;
+    }
+    .step-answer {
+      background: #e0f2fe;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #0c4a6e;
+      font-weight: 500;
+    }
+    .final-decision {
+      background: linear-gradient(135deg, #f0f9ff, #f0fdf4);
+      border: 2px solid #0ea5e9;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 20px;
+    }
+    .final-decision-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #0c4a6e;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .final-decision-content {
+      color: #0f172a;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    
+    /* Create chain modal */
+    .cot-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .cot-form .full-width { grid-column: 1 / -1; }
+    .cot-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
+    .cot-form select, .cot-form input, .cot-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .cot-form textarea { resize: vertical; min-height: 80px; }
+    .cot-form input:focus, .cot-form select:focus, .cot-form textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    
+    /* Context editor */
+    .context-editor { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+    .context-item { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; align-items: center; }
+    .context-item input { margin: 0; }
+    .btn-add-context { grid-column: 1 / -1; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="module-header">
+    <div class="cot-header-row">
+      <div class="module-title">AI决策记录</div>
+      <div class="cot-header-btns">
+                <button class="btn btn-secondary" onclick="refreshList()">刷新</button>
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>任务类型</label>
+        <select id="filterTaskType">
+          <option value="">全部</option>
+          <option value="scheduling">无人机调度</option>
+          <option value="fault_diagnosis">故障诊断</option>
+          <option value="path_optimization">路径优化</option>
+          <option value="mission_planning">任务规划</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>关联任务ID</label>
+        <input id="filterTaskID" type="text" placeholder="输入任务ID" />
+      </div>
+      <div class="filter-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="search()" style="width:100%;">搜索</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>思维链ID</th>
+          <th>任务类型</th>
+          <th>关联任务</th>
+          <th>创建时间</th>
+          <th>步骤数</th>
+          <th>总体置信度</th>
+          <th>最终决策</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="chainsTbody"></tbody>
+    </table>
+    <div class="pagination-bar">
+      <span id="paginationInfo">共 0 条</span>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button id="btnPrev" onclick="changePage(-1)" disabled>&lt; 上一页</button>
+        <span id="pageIndicator">1/1</span>
+        <button id="btnNext" onclick="changePage(1)" disabled>下一页 &gt;</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Chain Modal -->
+  <div class="modal-overlay" id="createModal">
+    <div class="modal-box" style="width:640px;max-height:85vh;overflow-y:auto;">
+      <div class="modal-title">创建思维链</div>
+      <div class="cot-form">
+        <div class="full-width">
+          <label>任务类型 *</label>
+          <select id="cotTaskType">
+            <option value="">选择任务类型</option>
+            <option value="scheduling">无人机调度</option>
+            <option value="fault_diagnosis">故障诊断</option>
+            <option value="path_optimization">路径优化</option>
+            <option value="mission_planning">任务规划</option>
+          </select>
+        </div>
+        <div class="full-width">
+          <label>关联任务ID</label>
+          <input id="cotTaskID" type="text" placeholder="例如: mission_123 或 drone_456" />
+        </div>
+        <div class="full-width">
+          <label>推理类型</label>
+          <select id="cotReasoningType">
+            <option value="auto">自动选择</option>
+            <option value="scheduling">调度推理</option>
+            <option value="fault_diagnosis">故障诊断推理</option>
+            <option value="path_optimization">路径优化推理</option>
+            <option value="mission_planning">任务规划推理</option>
+          </select>
+        </div>
+        <div class="full-width">
+          <label>上下文数据（JSON格式）</label>
+          <textarea id="cotContext" placeholder='例如: {&quot;key&quot;: &quot;value&quot;}'></textarea>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">可选：提供额外的上下文信息帮助推理</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeCreateModal()">取消</button>
+        <button class="btn btn-primary" onclick="createChain()">创建思维链</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal-box" style="width:800px;max-height:90vh;overflow-y:auto;">
+      <div class="modal-title" id="detailTitle">思维链详情</div>
+      <div id="detailContent"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+        <button class="btn btn-danger" onclick="deleteCurrentChain()">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    let currentPage = 1;
+    const pageSize = 20;
+    let totalItems = 0;
+    let currentChainID = null;
+
+    // Load chains list
+    async function loadChains() {
+      try {
+        const params = new URLSearchParams();
+        const taskType = $('#filterTaskType').value;
+        const taskID = $('#filterTaskID').value.trim();
+        
+        if (taskType) params.append('task_type', taskType);
+        if (taskID) params.append('task_id', taskID);
+        params.append('page', currentPage);
+        params.append('page_size', pageSize);
+
+        const res = await api('/cot/chains?' + params.toString());
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        totalItems = data.total || 0;
+        
+        renderTable(items);
+        updatePagination();
+      } catch (e) {
+        console.error('loadChains error:', e);
+        $('#chainsTbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:40px;">加载失败: ' + e.message + '</td></tr>';
+      }
+    }
+
+    function renderTable(items) {
+      const tbody = $('#chainsTbody');
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:40px;">暂无思维链数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = items.map(item => {
+        const stepCount = item.steps ? item.steps.length : 0;
+        const confidence = item.confidence || 0;
+        const confidenceWidth = Math.round(confidence * 100);
+        
+        return `
+          <tr>
+            <td><code style="font-size:12px;">${esc(item.id)}</code></td>
+            <td>${taskTypeBadge(item.task_type)}</td>
+            <td>${esc(item.task_id) || '-'}</td>
+            <td>${formatDate(item.created_at)}</td>
+            <td>${stepCount}</td>
+            <td>
+              ${(confidence * 100).toFixed(1)}%
+              <div class="confidence-bar">
+                <div class="confidence-fill" style="width:${confidenceWidth}%"></div>
+              </div>
+            </td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(item.final_decision)}">${esc(item.final_decision)}</td>
+            <td>
+              <button class="btn btn-primary btn-action" onclick="viewChainDetail('${esc(item.id)}')">查看</button>
+              <button class="btn btn-danger btn-action" onclick="deleteChain('${esc(item.id)}')">删除</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function taskTypeBadge(taskType) {
+      const typeMap = {
+        'scheduling': { label: '调度', class: 'task-type-scheduling' },
+        'fault_diagnosis': { label: '故障诊断', class: 'task-type-fault_diagnosis' },
+        'path_optimization': { label: '路径优化', class: 'task-type-path_optimization' },
+        'mission_planning': { label: '任务规划', class: 'task-type-mission_planning' },
+        'flight_planning': { label: '飞行规划', class: 'task-type-path_optimization' },
+        'emergency_analysis': { label: '应急分析', class: 'task-type-fault_diagnosis' },
+        'battery_analysis': { label: '电池分析', class: 'task-type-scheduling' }
+      };
+      const config = typeMap[taskType] || { label: taskType, class: 'task-type-mission_planning' };
+      return `<span class="task-type-badge ${config.class}">${config.label}</span>`;
+    }
+
+    function esc(s) {
+      if (!s && s !== 0) return '';
+      if (typeof s === 'number') return s.toString();
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      try {
+        const d = new Date(dateStr.replace(' ', 'T'));
+        return d.toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return dateStr;
+      }
+    }
+
+    // Pagination
+    function updatePagination() {
+      const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+      $('#paginationInfo').textContent = `共 ${totalItems} 条`;
+      $('#pageIndicator').textContent = `${currentPage}/${totalPages}`;
+      $('#btnPrev').disabled = currentPage <= 1;
+      $('#btnNext').disabled = currentPage >= totalPages;
+    }
+
+    function changePage(delta) {
+      currentPage += delta;
+      loadChains();
+    }
+
+    function search() {
+      currentPage = 1;
+      loadChains();
+    }
+
+    // Create modal
+    function openCreateModal() {
+      $('#cotTaskType').value = '';
+      $('#cotTaskID').value = '';
+      $('#cotReasoningType').value = 'auto';
+      $('#cotContext').value = '';
+      $('#createModal').classList.add('active');
+    }
+
+    function closeCreateModal() {
+      $('#createModal').classList.remove('active');
+    }
+
+    async function createChain() {
+      const taskType = $('#cotTaskType').value;
+      const taskID = $('#cotTaskID').value.trim();
+      const reasoningType = $('#cotReasoningType').value;
+      const contextStr = $('#cotContext').value.trim();
+
+      if (!taskType) {
+        showToast('请选择任务类型', 'error');
+        return;
+      }
+
+      let context = {};
+      if (contextStr) {
+        try {
+          context = JSON.parse(contextStr);
+        } catch (e) {
+          showToast('上下文数据格式错误，请检查JSON格式', 'error');
+          return;
+        }
+      }
+
+      const body = {
+        task_type: taskType,
+        task_id: taskID,
+        reasoning_type: reasoningType,
+        context: context
+      };
+
+      try {
+        const btn = $('#createModal .btn-primary');
+        btn.disabled = true;
+        btn.textContent = '创建中...';
+
+        const res = await api('/cot/chains', { method: 'POST', body });
+        const data = await res.json();
+        
+        if (data.error) {
+          showToast(data.error, 'error');
+          return;
+        }
+
+        showToast('思维链创建成功', 'success');
+        closeCreateModal();
+        loadChains();
+        
+        // Auto view detail
+        setTimeout(() => viewChainDetail(data.chain.chain_id), 500);
+      } catch (e) {
+        showToast('创建失败: ' + e.message, 'error');
+      } finally {
+        const btn = $('#createModal .btn-primary');
+        btn.disabled = false;
+        btn.textContent = '创建思维链';
+      }
+    }
+
+    // Detail modal
+    async function viewChainDetail(chainID) {
+      try {
+        const res = await api('/cot/chains/' + chainID);
+        const data = await res.json();
+        
+        if (!data.ok || !data.chain) {
+          showToast('加载失败: ' + (data.error || '未知错误'), 'error');
+          return;
+        }
+
+        const chain = data.chain;
+        currentChainID = chainID;
+
+        $('#detailTitle').textContent = `思维链详情 - ${chain.task_type}`;
+        
+        let html = '<div style="margin-bottom:16px;padding:16px;background:#f8fafc;border-radius:8px;">';
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">`;
+        html += `<div><strong>思维链ID:</strong><br><code style="font-size:12px;">${esc(chain.id)}</code></div>`;
+        html += `<div><strong>任务类型:</strong><br>${taskTypeBadge(chain.task_type)}</div>`;
+        html += `<div><strong>关联任务:</strong><br>${esc(chain.task_id) || '-'}</div>`;
+        html += `<div><strong>创建时间:</strong><br>${formatDate(chain.created_at)}</div>`;
+        html += `</div>`;
+        html += `<div style="margin-top:12px;"><strong>总体置信度:</strong> ${(chain.confidence * 100).toFixed(1)}%</div>`;
+        html += '</div>';
+
+        // Steps
+        if (chain.steps && chain.steps.length) {
+          html += '<div class="chain-steps">';
+          html += '<h3 style="font-size:14px;font-weight:600;margin-bottom:12px;">推理步骤</h3>';
+          chain.steps.forEach((step, idx) => {
+            html += '<div class="chain-step">';
+            html += '<div class="chain-step-header">';
+            html += `<div><span class="step-number">${step.step || idx + 1}</span><span class="step-type">${esc(step.type)}</span></div>`;
+            html += `<div style="font-size:12px;color:#64748b;">置信度: ${((step.confidence || 0) * 100).toFixed(1)}%</div>`;
+            html += '</div>';
+            if (step.context) {
+              html += `<div class="step-content"><strong>上下文:</strong> ${esc(step.context)}</div>`;
+            }
+            html += `<div class="step-content step-question">${esc(step.question)}</div>`;
+            if (step.thought) {
+              html += `<div class="step-content step-thought">思考: ${esc(step.thought)}</div>`;
+            }
+            html += `<div class="step-answer">${esc(step.answer)}</div>`;
+            html += '</div>';
+          });
+          html += '</div>';
+        }
+
+        // Final decision
+        html += '<div class="final-decision">';
+        html += '<div class="final-decision-title">🎯 最终决策</div>';
+        html += `<div class="final-decision-content">${esc(chain.final_decision)}</div>`;
+        html += '</div>';
+
+        // Raw display text
+        if (data.display_text) {
+          html += '<div style="margin-top:16px;">';
+          html += '<div style="font-size:13px;font-weight:600;margin-bottom:8px;">原始文本:</div>';
+          html += `<pre style="background:#f1f5f9;padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;">${esc(data.display_text)}</pre>`;
+          html += '</div>';
+        }
+
+        $('#detailContent').innerHTML = html;
+        $('#detailModal').classList.add('active');
+      } catch (e) {
+        showToast('加载详情失败: ' + e.message, 'error');
+      }
+    }
+
+    function closeDetailModal() {
+      $('#detailModal').classList.remove('active');
+      currentChainID = null;
+    }
+
+    // Delete
+    async function deleteChain(chainID) {
+      if (!confirm('确定删除该思维链？此操作不可恢复。')) return;
+      
+      try {
+        const res = await api('/cot/chains/' + chainID, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (data.error) {
+          showToast(data.error, 'error');
+          return;
+        }
+        
+        showToast('思维链已删除', 'success');
+        loadChains();
+      } catch (e) {
+        showToast('删除失败: ' + e.message, 'error');
+      }
+    }
+
+    async function deleteCurrentChain() {
+      if (!currentChainID) return;
+      await deleteChain(currentChainID);
+      closeDetailModal();
+    }
+
+    function refreshList() {
+      loadChains();
+    }
+
+    // Init
+    // Check if there's a chain_id in URL params (from flight planning)
+    const urlParams = new URLSearchParams(window.location.search);
+    const chainIdFromUrl = urlParams.get('chain_id');
+    
+    if (chainIdFromUrl) {
+      // Auto load and display the specific chain
+      loadChains().then(() => {
+        setTimeout(() => viewChainDetail(chainIdFromUrl), 300);
+      });
+    } else {
+      loadChains();
+    }
+  </script>
+</body>
+</html>
