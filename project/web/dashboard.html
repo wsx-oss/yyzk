@@ -56,6 +56,72 @@
       margin-right: 8px;
       font-size: 8px;
     }
+    .nav-group-header {
+      padding: 14px 16px;
+      color: rgba(255,255,255,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .nav-group-header:hover {
+      background: rgba(255,255,255,0.1);
+      border-left-color: #60a5fa;
+    }
+    .nav-group-header.active {
+      background: rgba(255,255,255,0.15);
+      border-left-color: #fff;
+      font-weight: 500;
+    }
+    .nav-group-header .nav-group-icon::before {
+      content: '▶';
+      font-size: 9px;
+      margin-right: 8px;
+      display: inline-block;
+      transition: transform 0.2s;
+    }
+    .nav-group-header.open .nav-group-icon::before {
+      transform: rotate(90deg);
+    }
+    .nav-sub-list {
+      display: none;
+      background: rgba(0,0,0,0.15);
+    }
+    .nav-sub-list.open {
+      display: block;
+    }
+    .nav-sub-item {
+      padding: 11px 16px 11px 32px;
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      transition: all 0.2s;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+    }
+    .nav-sub-item:hover {
+      background: rgba(255,255,255,0.08);
+      border-left-color: #60a5fa;
+      color: #fff;
+    }
+    .nav-sub-item.active {
+      background: rgba(255,255,255,0.12);
+      border-left-color: #60a5fa;
+      color: #fff;
+      font-weight: 500;
+    }
+    .nav-sub-item::before {
+      content: '–';
+      margin-right: 8px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+    }
     .main-content {
       flex: 1;
       display: flex;
@@ -114,19 +180,35 @@
     <aside class="sidebar">
       <div class="sidebar-header">系统菜单</div>
       <a class="nav-item active" data-page="drones">无人机管理</a>
-      <a class="nav-item" data-page="flight">飞行任务管理</a>
-      <a class="nav-item" data-page="remote">远程桌面控制</a>
-      <a class="nav-item" data-page="gps">GPS/位置信息</a>
-      <a class="nav-item" data-page="video">视频监控</a>
-      <a class="nav-item" data-page="alerts">异常报警</a>
-      <a class="nav-item" data-page="battery">电池监控</a>
-      <a class="nav-item" data-page="hardware">硬件状态检测</a>
-      <a class="nav-item" data-page="monitor">系统状态监控</a>
-      <a class="nav-item" data-page="audio">语音交互记录</a>
-      <a class="nav-item" data-page="performance">性能分析报告</a>
-      <a class="nav-item" data-page="updates">软件更新管理</a>
-      <a class="nav-item" data-page="logs">维护操作日志</a>
-      <a class="nav-item" data-page="sync">数据同步状态</a>
+      <div class="nav-group-header open" id="navFlightGroup" onclick="toggleNavGroup(this)">
+        <span><span class="nav-group-icon"></span>飞行任务管理</span>
+      </div>
+      <div class="nav-sub-list open" id="navFlightSub">
+        <a class="nav-sub-item" data-page="noflyzone">禁飞区</a>
+        <a class="nav-sub-item" data-page="flight">航线规划</a>
+        <a class="nav-sub-item" data-page="gps">GPS/位置信息</a>
+      </div>
+      <div class="nav-group-header" id="navStatusGroup" onclick="toggleNavGroup(this)">
+        <span><span class="nav-group-icon"></span>无人机状态监控</span>
+      </div>
+      <div class="nav-sub-list" id="navStatusSub">
+        <a class="nav-sub-item" data-page="video">视频监控</a>
+        <a class="nav-sub-item" data-page="remote">远程桌面控制</a>
+        <a class="nav-sub-item" data-page="alerts">异常报警</a>
+        <a class="nav-sub-item" data-page="battery">电池监控</a>
+        <a class="nav-sub-item" data-page="hardware">硬件状态检测</a>
+      </div>
+      <div class="nav-group-header" id="navLogsGroup" onclick="toggleNavGroup(this)">
+        <span><span class="nav-group-icon"></span>日志管理</span>
+      </div>
+      <div class="nav-sub-list" id="navLogsSub">
+        <a class="nav-sub-item" data-page="monitor">系统状态监控</a>
+        <a class="nav-sub-item" data-page="audio">语音交互记录</a>
+        <a class="nav-sub-item" data-page="performance">性能分析报告</a>
+        <a class="nav-sub-item" data-page="updates">软件更新管理</a>
+        <a class="nav-sub-item" data-page="logs">维护操作日志</a>
+        <a class="nav-sub-item" data-page="sync">数据同步状态</a>
+      </div>
     </aside>
     <main class="main-content">
       <div class="top-bar">
@@ -158,17 +240,44 @@
       window.location.href = '/app/login.html';
     });
     
-    const navItems = document.querySelectorAll('.nav-item');
     const iframe = document.getElementById('contentFrame');
-    
-    navItems.forEach(item => {
-      item.addEventListener('click', () => {
-        navItems.forEach(i => i.classList.remove('active'));
-        item.classList.add('active');
-        const page = item.dataset.page;
-        iframe.src = `/app/modules/${page}.html`;
-      });
+
+    function toggleNavGroup(header) {
+      header.classList.toggle('open');
+      const sub = header.nextElementSibling;
+      if (sub && sub.classList.contains('nav-sub-list')) {
+        sub.classList.toggle('open');
+      }
+    }
+
+    function navigateTo(page) {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      document.querySelectorAll('.nav-sub-item').forEach(i => i.classList.remove('active'));
+      const target = document.querySelector(`[data-page="${page}"]`);
+      if (target) {
+        target.classList.add('active');
+        // If sub-item, open the parent group
+        if (target.classList.contains('nav-sub-item')) {
+          const subList = target.closest('.nav-sub-list');
+          if (subList) {
+            subList.classList.add('open');
+            const header = subList.previousElementSibling;
+            if (header) header.classList.add('open');
+          }
+        }
+      }
+      iframe.src = `/app/modules/${page}.html`;
+    }
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => { navigateTo(item.dataset.page); });
     });
+    document.querySelectorAll('.nav-sub-item').forEach(item => {
+      item.addEventListener('click', () => { navigateTo(item.dataset.page); });
+    });
+
+    // Handle navigation from iframe (child page can call parent.navigateTo)
+    window.navigateTo = navigateTo;
   </script>
 </body>
 </html>

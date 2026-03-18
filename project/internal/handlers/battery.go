@@ -96,11 +96,11 @@ func (a *API) BatteryReport(c *gin.Context) {
 		return
 	}
 
-	// determine status
+	// determine status (level=-1 means unknown — treat as normal)
 	status := "正常"
-	if p.Level <= 10 {
+	if p.Level >= 0 && p.Level <= 10 {
 		status = "严重不足"
-	} else if p.Level <= 20 {
+	} else if p.Level >= 0 && p.Level <= 20 {
 		status = "电量低"
 	} else if p.Temperature >= 50 {
 		status = "温度过高"
@@ -118,8 +118,8 @@ func (a *API) BatteryReport(c *gin.Context) {
 	}
 	id, _ := res.LastInsertId()
 
-	// auto-generate alerts for abnormal conditions
-	if p.Level <= 20 {
+	// auto-generate alerts for abnormal conditions (skip when level is unknown/-1)
+	if p.Level >= 0 && p.Level <= 20 {
 		msg := fmt.Sprintf("无人机[%s]电量低: %d%%", deviceName, p.Level)
 		alertType := "电量低"
 		if p.Level <= 10 {
@@ -348,11 +348,11 @@ func (a *API) BatteryPushByAgent(c *gin.Context) {
 		return
 	}
 
-	// Determine status
+	// Determine status (level=-1 means unknown, e.g. NMEA mode — treat as normal)
 	status := "正常"
-	if p.Level <= 10 {
+	if p.Level >= 0 && p.Level <= 10 {
 		status = "严重不足"
-	} else if p.Level <= 20 {
+	} else if p.Level >= 0 && p.Level <= 20 {
 		status = "电量低"
 	} else if p.Temperature >= 50 {
 		status = "温度过高"
@@ -370,8 +370,8 @@ func (a *API) BatteryPushByAgent(c *gin.Context) {
 	}
 	id, _ := res.LastInsertId()
 
-	// Auto-generate alerts for abnormal conditions
-	if p.Level <= 20 {
+	// Auto-generate alerts for abnormal conditions (skip when level is unknown/-1)
+	if p.Level >= 0 && p.Level <= 20 {
 		msg := fmt.Sprintf("无人机[%s]电量低: %d%%", deviceName, p.Level)
 		alertType := "电量低"
 		if p.Level <= 10 {

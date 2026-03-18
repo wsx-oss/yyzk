@@ -365,6 +365,16 @@ func RegisterRoutes(r *gin.Engine, database *sql.DB) {
 		r.GET("/api/gps/stream", a.GpsStream)
 		r.GET("/api/battery/stream", a.BatteryStream)
 		r.GET("/api/flight/stream", a.FlightStream)
+
+		// No-fly zone management
+		api.GET("/noflyzone", a.NoFlyZoneList)
+		api.POST("/noflyzone", a.NoFlyZoneCreate)
+		api.GET("/noflyzone/:id", a.NoFlyZoneGet)
+		api.PUT("/noflyzone/:id", a.NoFlyZoneUpdate)
+		api.DELETE("/noflyzone/:id", a.NoFlyZoneDelete)
+
+		// Public frontend config (map keys etc.)
+		r.GET("/api/config", a.AppConfig)
 	}
 }
 

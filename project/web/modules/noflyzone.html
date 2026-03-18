@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>禁飞区管理</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+  <style>
+    html,body{height:100%;margin:0;padding:0;overflow:hidden;}
+    .nfz-layout{display:flex;height:100vh;overflow:hidden;}
+    .nfz-sidebar{width:300px;flex-shrink:0;background:#fff;display:flex;flex-direction:column;box-shadow:2px 0 8px rgba(0,0,0,.12);z-index:10;}
+    .nfz-header{padding:14px;background:#1e3a8a;color:#fff;flex-shrink:0;}
+    .nfz-header-title{font-size:15px;font-weight:700;margin-bottom:10px;}
+    .search-input{width:100%;padding:7px 10px;background:rgba(255,255,255,.15);border:none;border-radius:6px;color:#fff;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:6px;}
+    .search-input::placeholder{color:rgba(255,255,255,.6);}
+    .nfz-list-body{flex:1;overflow-y:auto;padding:8px;}
+    .nfz-item{padding:11px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:7px;background:#fff;cursor:pointer;transition:all .15s;}
+    .nfz-item:hover{border-color:#0ea5e9;box-shadow:0 2px 8px rgba(14,165,233,.15);}
+    .nfz-item.selected{border-color:#0ea5e9;background:#f0f9ff;}
+    .nfz-item-row1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px;}
+    .nfz-item-name{font-weight:600;font-size:13px;color:#0f172a;}
+    .nfz-item-meta{font-size:11px;color:#64748b;margin-bottom:2px;}
+    .nfz-item-addr{font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+    .nfz-item-time{font-size:10px;color:#cbd5e1;margin-top:2px;}
+    .nfz-item-btns{display:flex;gap:5px;margin-top:7px;}
+    .nfz-item-btns button{padding:3px 9px;border:none;border-radius:4px;font-size:11px;cursor:pointer;}
+    .btn-view-z{background:#e0f2fe;color:#0369a1;}
+    .btn-edit-z{background:#fef9c3;color:#713f12;}
+    .btn-del-z{background:#fee2e2;color:#991b1b;}
+    .badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600;}
+    .badge-noflyzone{background:#fee2e2;color:#991b1b;}
+    .badge-warnzone{background:#fff7ed;color:#c2410c;}
+    .badge-polygon{background:#e0e7ff;color:#3730a3;margin-left:3px;}
+    .badge-circle{background:#dcfce7;color:#166534;margin-left:3px;}
+    .nfz-pagination{padding:8px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#64748b;flex-shrink:0;}
+    .nfz-pagination select{padding:2px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;}
+    .nfz-pagination button{padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;font-size:11px;}
+    .nfz-pagination button:disabled{opacity:.4;cursor:not-allowed;}
+    .nfz-map-area{flex:1;position:relative;}
+    #nfzMap{width:100%;height:100%;}
+    .nfz-right-panel{position:absolute;top:16px;right:16px;z-index:800;background:rgba(255,255,255,.96);border-radius:10px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:170px;}
+    .right-panel-title{font-size:13px;font-weight:700;color:#0f172a;margin-bottom:10px;text-align:center;}
+    .btn-draw{display:block;width:100%;padding:8px;margin-bottom:7px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;}
+    .btn-draw:hover{background:#b91c1c;}
+    .btn-confirm-draw{display:none;width:100%;padding:7px;margin-bottom:6px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;}
+    .btn-cancel-draw{display:none;width:100%;padding:7px;background:#64748b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;}
+    .nfz-legend{margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;}
+    .legend-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#475569;margin-bottom:4px;}
+    .legend-swatch{width:22px;height:12px;border-radius:3px;}
+    .swatch-noflyzone{background:rgba(239,68,68,.45);border:2px solid #dc2626;}
+    .swatch-warnzone{background:rgba(251,146,60,.4);border:2px solid #ea580c;}
+    .draw-hint{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 18px;border-radius:20px;font-size:12px;z-index:800;display:none;white-space:nowrap;}
+    .draw-hint.visible{display:block;}
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:2000;justify-content:center;align-items:center;}
+    .modal-overlay.active{display:flex;}
+    .modal-box{background:#fff;border-radius:12px;padding:24px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+    .modal-title{font-size:15px;font-weight:700;margin-bottom:16px;color:#0f172a;}
+    .form-g{margin-bottom:13px;}
+    .form-g label{display:block;font-size:13px;color:#475569;font-weight:500;margin-bottom:4px;}
+    .form-g input,.form-g select{width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;background:#fff;box-sizing:border-box;}
+    .form-g input:focus,.form-g select:focus{outline:none;border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.1);}
+    .toggle-row{display:flex;align-items:center;gap:8px;font-size:13px;color:#475569;cursor:pointer;margin-bottom:6px;}
+    .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+    .btn-modal-cancel{padding:8px 18px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:14px;}
+    .btn-modal-save{padding:8px 18px;background:#0ea5e9;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;}
+    .btn-modal-save:hover{background:#0284c7;}
+    .nfz-empty{text-align:center;color:#94a3b8;padding:30px 16px;font-size:13px;}
+  </style>
+</head>
+<body>
+<div class="nfz-layout">
+  <div class="nfz-sidebar">
+    <div class="nfz-header">
+      <div class="nfz-header-title">区域列表</div>
+      <input class="search-input" id="searchName" type="text" placeholder="请输入要搜索的名称" oninput="filterAndRender()" />
+      <input class="search-input" id="searchAddr" type="text" placeholder="请输入要搜索的地址" oninput="filterAndRender()" />
+    </div>
+    <div class="nfz-list-body" id="nfzListBody"><div class="nfz-empty">加载中...</div></div>
+    <div class="nfz-pagination">
+      <span id="nfzTotal">共 0 条</span>
+      <div style="display:flex;align-items:center;gap:5px;">
+        <select id="pageSize" onchange="currentPage=1;renderList()">
+          <option value="5">5条/页</option>
+          <option value="10" selected>10条/页</option>
+          <option value="20">20条/页</option>
+        </select>
+        <button onclick="changePage(-1)" id="btnPrev">&lt;</button>
+        <span id="pageInfo">1/1</span>
+        <button onclick="changePage(1)" id="btnNext">&gt;</button>
+      </div>
+    </div>
+  </div>
+  <div class="nfz-map-area">
+    <div id="nfzMap"></div>
+    <div class="nfz-right-panel">
+      <div class="right-panel-title">区域管理</div>
+      <button class="btn-draw" id="btnDrawPolygon" onclick="startDraw('polygon')">✏ 绘制多边形区域</button>
+      <button class="btn-draw" id="btnDrawCircle" onclick="startDraw('circle')">⊙ 绘制圆形区域</button>
+      <button class="btn-confirm-draw" id="btnConfirmDraw" onclick="openSaveModal()">✔ 确认绘制</button>
+      <button class="btn-cancel-draw" id="btnCancelDraw" onclick="cancelDraw()">✕ 取消绘制</button>
+      <div class="nfz-legend">
+        <div class="legend-row"><div class="legend-swatch swatch-noflyzone"></div>禁飞区域</div>
+        <div class="legend-row"><div class="legend-swatch swatch-warnzone"></div>警告区域</div>
+      </div>
+    </div>
+    <div class="draw-hint" id="drawHint"></div>
+  </div>
+</div>
+
+<!-- Save/Edit Modal -->
+<div class="modal-overlay" id="saveModal">
+  <div class="modal-box">
+    <div class="modal-title" id="saveModalTitle">保存禁飞区</div>
+    <div class="form-g">
+      <label>区域名称 *</label>
+      <input id="zoneName" type="text" placeholder="请输入唯一名称" />
+    </div>
+    <div class="form-g">
+      <label>区域类型</label>
+      <select id="zoneType">
+        <option value="禁飞区">禁飞区</option>
+        <option value="警告区域">警告区域</option>
+      </select>
+    </div>
+    <div class="form-g">
+      <label>飞行高度限制（可选）</label>
+      <label class="toggle-row">
+        <input type="checkbox" id="altEnabled" onchange="toggleAltLimit()" />
+        启用高度限制
+      </label>
+      <div id="altLimitRow" style="display:none;">
+        <input id="altLimit" type="number" min="0" max="5000" placeholder="最大飞行高度（米，此高度以下禁飞）" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeSaveModal()">取消</button>
+      <button class="btn-modal-save" onclick="saveZone()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="/app/modules/common.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script>
+  let TIANDITU_KEY = '1d109683f4d84198e37a38c442d68311';
+  let map = null;
+  let allZones = [], filteredZones = [];
+  let zoneLayerMap = {};
+  let currentPage = 1;
+  let editingZoneId = null;
+
+  // ---- Drawing state ----
+  let drawMode = null; // null | 'polygon' | 'circle'
+  let polyVerts = [];
+  let polyVertMarkers = [];
+  let polyLineLayer = null;
+  let polyTempLine = null;
+  let circleCenter = null;
+  let circleCenterMarker = null;
+  let circlePreviewLayer = null;
+  let pendingShape = null;
+  let pendingShapeType = '';
+
+  // Interaction state
+  let _rightDrag = null;
+  let _circleRadiusDragging = false;
+  let _leftDownPos = null;
+
+  const POLY_STYLE = { color: '#f97316', weight: 2.5, opacity: 0.9, fillColor: '#dc2626', fillOpacity: 0.35 };
+  const CIRC_STYLE = { color: '#f97316', weight: 2.5, opacity: 0.9, fillColor: '#dc2626', fillOpacity: 0.35 };
+
+  function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  function showToast(msg, type) {
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:10px 20px;border-radius:8px;font-size:14px;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);';
+    t.style.background = type === 'error' ? '#ef4444' : '#10b981';
+    t.textContent = msg; document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+  }
+
+  fetch('/api/config').then(r => r.json()).then(cfg => {
+    if (cfg.tianditu_key) TIANDITU_KEY = cfg.tianditu_key;
+    initMap(); loadZones();
+  }).catch(() => { initMap(); loadZones(); });
+
+  function initMap() {
+    map = L.map('nfzMap', { center: [34.7616, 113.6654], zoom: 13, doubleClickZoom: false });
+    L.tileLayer(`https://t{s}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
+      { subdomains: ['0','1','2','3','4','5','6','7'], attribution: '© 天地图', maxZoom: 18 }).addTo(map);
+    L.tileLayer(`https://t{s}.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
+      { subdomains: ['0','1','2','3','4','5','6','7'], maxZoom: 18 }).addTo(map);
+    setupDrawEvents();
+
+    map.on('click', function(e) {
+      if (drawMode === 'polygon') {
+        if (e.originalEvent && e.originalEvent.detail >= 2) return; // ignore 2nd click of dblclick
+        polyVerts.push(e.latlng);
+        const m = L.circleMarker(e.latlng, { radius: 5, color: '#f97316', fillColor: '#f97316', fillOpacity: 1, weight: 2 }).addTo(map);
+        polyVertMarkers.push(m);
+        updatePolyPreview();
+        const hint = document.getElementById('drawHint');
+        hint.textContent = polyVerts.length >= 3
+          ? '继续点击添加顶点或点击右上角「确认绘制」完成；双击也可完成；右键拖动移动地图'
+          : '继续点击添加顶点 (' + polyVerts.length + '/至少3个)；右键拖动移动地图';
+      } else if (drawMode === 'circle' && !circleCenter) {
+        circleCenter = e.latlng;
+        circleCenterMarker = L.circleMarker(e.latlng, { radius: 6, color: '#f97316', fillColor: '#fff', fillOpacity: 1, weight: 3 }).addTo(map);
+        document.getElementById('drawHint').textContent = '按住左键向外拖动设置圆形半径；右键拖动移动地图';
+      }
+    });
+
+    map.on('dblclick', function(e) {
+      if (drawMode !== 'polygon') return;
+      L.DomEvent.stop(e);
+      if (polyVerts.length < 3) { showToast('至少需要3个顶点', 'error'); return; }
+      finishPolygon();
+    });
+
+    map.on('mousemove', function(e) {
+      if (drawMode === 'polygon' && polyVerts.length > 0) {
+        if (polyTempLine) map.removeLayer(polyTempLine);
+        polyTempLine = L.polyline([polyVerts[polyVerts.length - 1], e.latlng], {
+          color: '#f97316', weight: 2, dashArray: '6,4', opacity: 0.65
+        }).addTo(map);
+      }
+    });
+  }
+
+  function setupDrawEvents() {
+    const cont = map.getContainer();
+
+    cont.addEventListener('mousedown', function(e) {
+      if (!drawMode) return;
+      if (e.button === 2) {
+        _rightDrag = { x: e.clientX, y: e.clientY };
+        e.preventDefault(); e.stopPropagation();
+      } else if (e.button === 0 && drawMode === 'circle' && circleCenter) {
+        _leftDownPos = { x: e.clientX, y: e.clientY };
+        _circleRadiusDragging = true;
+        e.preventDefault(); e.stopPropagation();
+      }
+    }, true);
+
+    cont.addEventListener('mousemove', function(e) {
+      if (_rightDrag) {
+        const dx = _rightDrag.x - e.clientX, dy = _rightDrag.y - e.clientY;
+        _rightDrag = { x: e.clientX, y: e.clientY };
+        map.panBy([dx, dy], { animate: false, noMoveStart: true });
+        e.preventDefault(); e.stopPropagation();
+      }
+      if (_circleRadiusDragging && circleCenter) {
+        const rect = cont.getBoundingClientRect();
+        const latlng = map.containerPointToLatLng(L.point(e.clientX - rect.left, e.clientY - rect.top));
+        const r = Math.max(circleCenter.distanceTo(latlng), 10);
+        if (circlePreviewLayer) map.removeLayer(circlePreviewLayer);
+        circlePreviewLayer = L.circle(circleCenter, Object.assign({}, CIRC_STYLE, { radius: r })).addTo(map);
+      }
+    }, true);
+
+    cont.addEventListener('mouseup', function(e) {
+      if (e.button === 2) { _rightDrag = null; return; }
+      if (e.button === 0 && _circleRadiusDragging) {
+        _circleRadiusDragging = false;
+        _leftDownPos = null;
+        if (circlePreviewLayer) {
+          pendingShape = circlePreviewLayer;
+          pendingShapeType = 'circle';
+          circlePreviewLayer = null;
+          enableCircleResize(pendingShape);
+          showConfirmButtons();
+        }
+      }
+    }, true);
+
+    cont.addEventListener('contextmenu', function(e) {
+      if (drawMode || _rightDrag) e.preventDefault();
+    }, true);
+  }
+
+  function enableCircleResize(circleLayer) {
+    circleLayer.on('mousedown', function(e) {
+      if (e.originalEvent.button !== 0) return;
+      const center = circleLayer.getLatLng();
+      const r = circleLayer.getRadius();
+      const distToCenter = center.distanceTo(e.latlng);
+      if (Math.abs(distToCenter - r) > Math.max(r * 0.18, 25)) return;
+      L.DomEvent.stop(e);
+      const cont = map.getContainer();
+      function onMove(ev) {
+        const rect = cont.getBoundingClientRect();
+        const ll = map.containerPointToLatLng(L.point(ev.clientX - rect.left, ev.clientY - rect.top));
+        circleLayer.setRadius(Math.max(center.distanceTo(ll), 10));
+      }
+      function onUp() {
+        cont.removeEventListener('mousemove', onMove, true);
+        document.removeEventListener('mouseup', onUp);
+      }
+      cont.addEventListener('mousemove', onMove, true);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  function startDraw(type) {
+    cancelDraw();
+    drawMode = type;
+    map.dragging.disable();
+    map.getContainer().style.cursor = 'crosshair';
+    document.getElementById('btnDrawPolygon').style.display = 'none';
+    document.getElementById('btnDrawCircle').style.display = 'none';
+    document.getElementById('btnCancelDraw').style.display = 'block';
+    const hint = document.getElementById('drawHint');
+    hint.textContent = type === 'polygon'
+      ? '左键点击添加多边形顶点，双击完成绘制；右键拖动移动地图'
+      : '左键点击选取圆心；右键拖动移动地图';
+    hint.classList.add('visible');
+  }
+
+  function updatePolyPreview() {
+    if (polyLineLayer) { map.removeLayer(polyLineLayer); polyLineLayer = null; }
+    if (polyVerts.length >= 3) {
+      polyLineLayer = L.polygon(polyVerts, { color: '#f97316', weight: 2.5, opacity: 0.9, fillColor: '#dc2626', fillOpacity: 0.28 }).addTo(map);
+    } else if (polyVerts.length === 2) {
+      polyLineLayer = L.polyline(polyVerts, { color: '#f97316', weight: 2.5, opacity: 0.85 }).addTo(map);
+    }
+    if (polyVerts.length >= 2) {
+      document.getElementById('btnConfirmDraw').style.display = 'block';
+    }
+  }
+
+  function finishPolygon() {
+    polyVertMarkers.forEach(m => map.removeLayer(m)); polyVertMarkers = [];
+    if (polyLineLayer) { map.removeLayer(polyLineLayer); polyLineLayer = null; }
+    if (polyTempLine) { map.removeLayer(polyTempLine); polyTempLine = null; }
+    pendingShape = L.polygon(polyVerts, POLY_STYLE).addTo(map);
+    pendingShapeType = 'polygon';
+    polyVerts = [];
+    showConfirmButtons();
+  }
+
+  function showConfirmButtons() {
+    drawMode = null;
+    map.dragging.enable();
+    map.getContainer().style.cursor = '';
+    document.getElementById('drawHint').classList.remove('visible');
+    document.getElementById('btnConfirmDraw').style.display = 'block';
+    document.getElementById('btnCancelDraw').style.display = 'block';
+    document.getElementById('btnDrawPolygon').style.display = 'none';
+    document.getElementById('btnDrawCircle').style.display = 'none';
+  }
+
+  function cancelDraw() {
+    if (!map) return;
+    drawMode = null;
+    _rightDrag = null;
+    _circleRadiusDragging = false;
+    _leftDownPos = null;
+    polyVerts = [];
+    polyVertMarkers.forEach(m => map.removeLayer(m)); polyVertMarkers = [];
+    if (polyLineLayer) { map.removeLayer(polyLineLayer); polyLineLayer = null; }
+    if (polyTempLine) { map.removeLayer(polyTempLine); polyTempLine = null; }
+    circleCenter = null;
+    if (circleCenterMarker) { map.removeLayer(circleCenterMarker); circleCenterMarker = null; }
+    if (circlePreviewLayer) { map.removeLayer(circlePreviewLayer); circlePreviewLayer = null; }
+    if (pendingShape) { map.removeLayer(pendingShape); pendingShape = null; }
+    pendingShapeType = '';
+    editingZoneId = null;
+    map.dragging.enable();
+    map.getContainer().style.cursor = '';
+    document.getElementById('btnDrawPolygon').style.display = 'block';
+    document.getElementById('btnDrawCircle').style.display = 'block';
+    document.getElementById('btnConfirmDraw').style.display = 'none';
+    document.getElementById('btnCancelDraw').style.display = 'none';
+    document.getElementById('drawHint').classList.remove('visible');
+  }
+
+  function openSaveModal(){
+    if(drawMode==='polygon'&&polyVerts.length>=3){finishPolygon();}
+    if(!pendingShape){showToast('请先在地图上绘制区域','error');return;}
+    document.getElementById('saveModalTitle').textContent=editingZoneId?'编辑禁飞区':'保存禁飞区';
+    if(!editingZoneId){
+      document.getElementById('zoneName').value='';
+      document.getElementById('zoneType').value='禁飞区';
+      document.getElementById('altEnabled').checked=false;
+      document.getElementById('altLimit').value='';
+      document.getElementById('altLimitRow').style.display='none';
+    }
+    document.getElementById('saveModal').classList.add('active');
+  }
+
+  function closeSaveModal(){document.getElementById('saveModal').classList.remove('active');}
+
+  function toggleAltLimit(){
+    document.getElementById('altLimitRow').style.display=
+      document.getElementById('altEnabled').checked?'block':'none';
+  }
+
+  async function saveZone(){
+    const name=document.getElementById('zoneName').value.trim();
+    const zoneType=document.getElementById('zoneType').value;
+    const altEnabled=document.getElementById('altEnabled').checked;
+    const altLimit=altEnabled?parseInt(document.getElementById('altLimit').value)||0:-1;
+    if(!name){showToast('请输入区域名称','error');return;}
+    if(!pendingShape){showToast('请先绘制区域','error');return;}
+
+    let shapeJSON,areaM2=0;
+    if(pendingShapeType==='circle'){
+      const c=pendingShape.getLatLng(),r=pendingShape.getRadius();
+      shapeJSON=JSON.stringify({type:'circle',center:{lat:c.lat,lon:c.lng},radius:r});
+      areaM2=Math.PI*r*r;
+    } else {
+      const latlngs=pendingShape.getLatLngs()[0];
+      const pts=latlngs.map(p=>({lat:p.lat,lon:p.lng}));
+      shapeJSON=JSON.stringify({type:'polygon',points:pts});
+      areaM2=calcPolygonArea(pts);
+    }
+
+    let address = '';
+    try {
+      let cLat, cLon;
+      if(pendingShapeType==='circle'){
+        const c=pendingShape.getLatLng(); cLat=c.lat; cLon=c.lng;
+      } else {
+        const pts=pendingShape.getLatLngs()[0];
+        cLat=pts.reduce((s,p)=>s+p.lat,0)/pts.length;
+        cLon=pts.reduce((s,p)=>s+p.lng,0)/pts.length;
+      }
+      const geoRes=await fetch(`https://api.tianditu.gov.cn/geocoder?postStr=${encodeURIComponent(JSON.stringify({lon:cLon,lat:cLat,ver:1}))}&type=geocode&tk=${TIANDITU_KEY}`);
+      const geoData=await geoRes.json();
+      if(geoData.result&&geoData.result.formatted_address) address=geoData.result.formatted_address;
+    } catch(e){}
+    const body={name,zone_type:zoneType,shape_type:pendingShapeType,shape_json:shapeJSON,
+      altitude_limit:altLimit,altitude_enabled:altEnabled,area_m2:areaM2,address};
+
+    try{
+      let res;
+      if(editingZoneId){
+        res=await api('/noflyzone/'+editingZoneId,{method:'PUT',body});
+      } else {
+        res=await api('/noflyzone',{method:'POST',body});
+      }
+      const data=await res.json();
+      if(data.error){showToast(data.error,'error');return;}
+      showToast(editingZoneId?'已更新':'已保存','success');
+      closeSaveModal();
+      cancelDraw();
+      loadZones();
+    } catch(e){showToast('保存失败','error');}
+  }
+
+  function calcPolygonArea(pts){
+    let area=0;const n=pts.length;
+    for(let i=0;i<n;i++){
+      const j=(i+1)%n;
+      const lat1=pts[i].lat*Math.PI/180,lat2=pts[j].lat*Math.PI/180;
+      const lon1=pts[i].lon*Math.PI/180,lon2=pts[j].lon*Math.PI/180;
+      area+=lon1*Math.sin(lat2)-lon2*Math.sin(lat1);
+    }
+    return Math.abs(area/2)*6371000*6371000;
+  }
+
+  async function loadZones(){
+    try{
+      const res=await api('/noflyzone');
+      const data=await res.json();
+      allZones=Array.isArray(data.items)?data.items:[];
+      filteredZones=[...allZones];
+      renderAllOnMap();
+      renderList();
+    }catch(e){
+      document.getElementById('nfzListBody').innerHTML='<div class="nfz-empty">加载失败</div>';
+    }
+  }
+
+  function filterAndRender(){
+    const nm=document.getElementById('searchName').value.trim().toLowerCase();
+    const ad=document.getElementById('searchAddr').value.trim().toLowerCase();
+    filteredZones=allZones.filter(z=>{
+      const nameOk=!nm||z.name.toLowerCase().includes(nm);
+      const addrOk=!ad||(z.address||'').toLowerCase().includes(ad);
+      return nameOk&&addrOk;
+    });
+    currentPage=1;renderList();
+  }
+
+  function renderList(){
+    const pageSize=parseInt(document.getElementById('pageSize').value)||10;
+    const total=filteredZones.length;
+    const totalPages=Math.max(1,Math.ceil(total/pageSize));
+    if(currentPage>totalPages)currentPage=totalPages;
+    const start=(currentPage-1)*pageSize,end=Math.min(start+pageSize,total);
+    const page=filteredZones.slice(start,end);
+    document.getElementById('nfzTotal').textContent='共 '+total+' 条';
+    document.getElementById('pageInfo').textContent=currentPage+'/'+totalPages;
+    document.getElementById('btnPrev').disabled=currentPage<=1;
+    document.getElementById('btnNext').disabled=currentPage>=totalPages;
+    const body=document.getElementById('nfzListBody');
+    if(!page.length){body.innerHTML='<div class="nfz-empty">暂无禁飞区数据</div>';return;}
+    body.innerHTML=page.map(z=>{
+      const areaKm=(z.area_m2/1e6).toFixed(2);
+      const shapeLabel=z.shape_type==='circle'?'圆形':'多边形';
+      const badgeCls=z.zone_type==='警告区域'?'badge-warnzone':'badge-noflyzone';
+      const altStr=z.altitude_enabled?'&nbsp;·&nbsp; 限高'+z.altitude_limit+'m':'';
+      const dt=z.created_at?z.created_at.replace('T',' ').substring(0,16):'';
+      return `<div class="nfz-item" id="nfz-item-${z.id}" onclick="focusZone(${z.id})">
+        <div class="nfz-item-name">${esc(z.name)}</div>
+        <div class="nfz-item-meta">面积: ${areaKm} km²&nbsp;&nbsp;<span class="badge ${badgeCls}">${shapeLabel} ${esc(z.zone_type)}</span>${altStr}</div>
+        ${z.address?`<div class="nfz-item-addr">地址: ${esc(z.address)}</div>`:''}
+        <div class="nfz-item-time">创建时间: ${dt}</div>
+        <div class="nfz-item-btns">
+          <button class="btn-view-z" onclick="event.stopPropagation();focusZone(${z.id})">查看</button>
+          <button class="btn-edit-z" onclick="event.stopPropagation();editZone(${z.id})">编辑</button>
+          <button class="btn-del-z" onclick="event.stopPropagation();deleteZone(${z.id})">删除</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function changePage(d){
+    const pageSize=parseInt(document.getElementById('pageSize').value)||10;
+    const total=filteredZones.length;
+    const totalPages=Math.max(1,Math.ceil(total/pageSize));
+    currentPage=Math.max(1,Math.min(currentPage+d,totalPages));
+    renderList();
+  }
+
+  function renderAllOnMap(){
+    Object.values(zoneLayerMap).forEach(l=>map.removeLayer(l));
+    zoneLayerMap={};
+    allZones.forEach(z=>addZoneLayer(z));
+  }
+
+  function addZoneLayer(z){
+    const isWarn=z.zone_type==='警告区域';
+    const color=isWarn?'#ea580c':'#dc2626';
+    const fill=isWarn?'rgba(251,146,60,.35)':'rgba(239,68,68,.4)';
+    let layer;
+    try{
+      const shape=JSON.parse(z.shape_json||'{}');
+      if(shape.type==='circle'&&shape.center){
+        layer=L.circle([shape.center.lat,shape.center.lon],{
+          radius:shape.radius,color,fillColor:fill,fillOpacity:1,weight:2
+        });
+      } else if(shape.type==='polygon'&&shape.points&&shape.points.length){
+        const latlngs=shape.points.map(p=>[p.lat,p.lon]);
+        layer=L.polygon(latlngs,{color,fillColor:fill,fillOpacity:1,weight:2});
+      }
+      if(layer){
+        const altStr=z.altitude_enabled?('<br>限高: '+z.altitude_limit+'m'):'';
+        layer.bindTooltip(`<b>${esc(z.name)}</b><br>${esc(z.zone_type)}${altStr}`,{sticky:true});
+        layer.addTo(map);
+        zoneLayerMap[z.id]=layer;
+      }
+    }catch(e){}
+  }
+
+  function focusZone(id){
+    document.querySelectorAll('.nfz-item').forEach(el=>el.classList.remove('selected'));
+    const item=document.getElementById('nfz-item-'+id);
+    if(item){item.classList.add('selected');item.scrollIntoView({block:'nearest'});}
+    const layer=zoneLayerMap[id];
+    if(layer){
+      const bounds=layer.getBounds?layer.getBounds():null;
+      if(bounds)map.fitBounds(bounds,{maxZoom:16,padding:[40,40]});
+      else if(layer.getLatLng)map.setView(layer.getLatLng(),15);
+    }
+  }
+
+  async function editZone(id){
+    const z=allZones.find(x=>x.id===id);
+    if(!z)return;
+    cancelDraw();
+    editingZoneId=id;
+    document.getElementById('zoneName').value=z.name;
+    document.getElementById('zoneType').value=z.zone_type;
+    document.getElementById('altEnabled').checked=z.altitude_enabled;
+    document.getElementById('altLimit').value=z.altitude_enabled?z.altitude_limit:'';
+    document.getElementById('altLimitRow').style.display=z.altitude_enabled?'block':'none';
+    const oldLayer=zoneLayerMap[id];
+    if(oldLayer){map.removeLayer(oldLayer);delete zoneLayerMap[id];}
+    const shape=JSON.parse(z.shape_json||'{}');
+    if(shape.type==='circle'&&shape.center){
+      pendingShape=L.circle([shape.center.lat,shape.center.lon],Object.assign({},CIRC_STYLE,{radius:shape.radius})).addTo(map);
+      pendingShapeType='circle';
+      enableCircleResize(pendingShape);
+    } else if(shape.type==='polygon'&&shape.points){
+      pendingShape=L.polygon(shape.points.map(p=>[p.lat,p.lon]),POLY_STYLE).addTo(map);
+      pendingShapeType='polygon';
+    }
+    if(pendingShape){
+      document.getElementById('btnDrawPolygon').style.display='none';
+      document.getElementById('btnDrawCircle').style.display='none';
+      document.getElementById('btnConfirmDraw').style.display='block';
+      document.getElementById('btnCancelDraw').style.display='block';
+      focusZone(id);
+    }
+    document.getElementById('saveModalTitle').textContent='编辑禁飞区';
+    document.getElementById('saveModal').classList.add('active');
+  }
+
+  async function deleteZone(id){
+    if(!confirm('确定删除该禁飞区？'))return;
+    try{
+      const res=await api('/noflyzone/'+id,{method:'DELETE'});
+      const data=await res.json();
+      if(data.error){showToast(data.error,'error');return;}
+      showToast('已删除','success');
+      if(zoneLayerMap[id]){map.removeLayer(zoneLayerMap[id]);delete zoneLayerMap[id];}
+      loadZones();
+    }catch(e){showToast('删除失败','error');}
+  }
+</script>
+</body>
+</html>

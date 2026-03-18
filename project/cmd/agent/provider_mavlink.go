@@ -305,7 +305,8 @@ func (p *MAVLinkProvider) parseGlobalPositionInt(payload []byte) {
 }
 
 // parseGPSRawInt handles MSG_ID 24 — fallback GPS if GLOBAL_POSITION_INT not available.
-// Fields: time_usec(8), fix_type(1), lat(4), lon(4), alt(4), eph(2), epv(2), vel(2), cog(2), satellites(1)
+// MAVLink wire order (sorted by type size): time_usec(8,off0), lat(4,off8), lon(4,off12),
+// alt(4,off16), eph(2,off20), epv(2,off22), vel(2,off24), cog(2,off26), fix_type(1,off28), sats(1,off29)
 func (p *MAVLinkProvider) parseGPSRawInt(payload []byte) {
 	if len(payload) < 30 {
 		return
@@ -318,17 +319,17 @@ func (p *MAVLinkProvider) parseGPSRawInt(payload []byte) {
 		return // prefer GLOBAL_POSITION_INT
 	}
 
-	fixType := payload[8]
+	fixType := payload[28] // uint8 at wire offset 28
 	if fixType < 2 {
 		return // no fix
 	}
 
-	lat := float64(int32(binary.LittleEndian.Uint32(payload[9:13]))) / 1e7
-	lon := float64(int32(binary.LittleEndian.Uint32(payload[13:17]))) / 1e7
-	alt := float64(int32(binary.LittleEndian.Uint32(payload[17:21]))) / 1000.0
-	eph := float64(binary.LittleEndian.Uint16(payload[21:23])) / 100.0 // HDOP
-	vel := float64(binary.LittleEndian.Uint16(payload[25:27])) / 100.0 // m/s
-	cog := float64(binary.LittleEndian.Uint16(payload[27:29])) / 100.0 // degrees
+	lat := float64(int32(binary.LittleEndian.Uint32(payload[8:12]))) / 1e7
+	lon := float64(int32(binary.LittleEndian.Uint32(payload[12:16]))) / 1e7
+	alt := float64(int32(binary.LittleEndian.Uint32(payload[16:20]))) / 1000.0
+	eph := float64(binary.LittleEndian.Uint16(payload[20:22])) / 100.0 // HDOP
+	vel := float64(binary.LittleEndian.Uint16(payload[24:26])) / 100.0 // m/s
+	cog := float64(binary.LittleEndian.Uint16(payload[26:28])) / 100.0 // degrees
 
 	p.mu.Lock()
 	p.gpsLat = lat
@@ -402,18 +403,18 @@ func (p *MAVLinkProvider) parseSysStatus(payload []byte) {
 }
 
 // parseBatteryStatus handles MSG_ID 147 — detailed battery info.
-// Fields: ... voltages(10*2) at offset 10, current_battery(2) at offset 30,
-//         current_consumed(4) at offset 32, energy_consumed(4) at offset 36,
-//         temperature(2) at offset 40, battery_remaining(1) at offset 42
+// MAVLink wire order (sorted by type size): current_consumed(4,off0), energy_consumed(4,off4),
+// voltages[10](2×10,off8), temperature(2,off28), current_battery(2,off30),
+// id(1,off32), battery_function(1,off33), type(1,off34), battery_remaining(1,off35)
 func (p *MAVLinkProvider) parseBatteryStatus(payload []byte) {
-	if len(payload) < 42 {
+	if len(payload) < 36 {
 		return
 	}
 
-	// Sum cell voltages for total voltage
+	// Sum cell voltages for total voltage (10 × uint16 starting at wire offset 8)
 	var totalMV uint32
 	for i := 0; i < 10; i++ {
-		cellMV := binary.LittleEndian.Uint16(payload[10+i*2 : 12+i*2])
+		cellMV := binary.LittleEndian.Uint16(payload[8+i*2 : 10+i*2])
 		if cellMV == 0xFFFF {
 			break // unused cell
 		}
@@ -421,12 +422,9 @@ func (p *MAVLinkProvider) parseBatteryStatus(payload []byte) {
 	}
 
 	current := float64(int16(binary.LittleEndian.Uint16(payload[30:32]))) / 100.0 // cA → A
-	temp := float64(int16(binary.LittleEndian.Uint16(payload[40:42]))) / 100.0    // cdegC → degC
+	temp := float64(int16(binary.LittleEndian.Uint16(payload[28:30]))) / 100.0    // cdegC → degC
 
-	remaining := int8(-1)
-	if len(payload) > 42 {
-		remaining = int8(payload[42])
-	}
+	remaining := int8(payload[35]) // battery_remaining at wire offset 35
 
 	p.mu.Lock()
 	if totalMV > 0 {

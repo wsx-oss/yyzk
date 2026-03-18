@@ -133,6 +133,9 @@ func (c *Client) GeneratePlanWithReasoning(req PlanRequest) (*PlanResult, *Reaso
 		OverallConfidence: calculateOverallConfidence(result.Reasoning),
 	}
 
+	// Geometric post-correction for circle NFZs (same as GeneratePlan)
+	CorrectNFZViolations(&req, planResult)
+
 	// 验证规划结果
 	if warnings := Validate(&req, planResult); len(warnings) > 0 {
 		planResult.Warnings = append(planResult.Warnings, warnings...)

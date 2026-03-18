@@ -480,6 +480,33 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 
+	// No-fly zones management
+	noFlyZoneTables := []string{
+		`CREATE TABLE IF NOT EXISTS no_fly_zones (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL UNIQUE,
+			zone_type TEXT NOT NULL DEFAULT '禁飞区',
+			shape_type TEXT NOT NULL DEFAULT 'polygon',
+			shape_json TEXT NOT NULL DEFAULT '[]',
+			altitude_limit INTEGER DEFAULT -1,
+			altitude_enabled INTEGER DEFAULT 0,
+			area_m2 REAL DEFAULT 0,
+			address TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_no_fly_zones_name ON no_fly_zones(name)`,
+		`CREATE INDEX IF NOT EXISTS idx_no_fly_zones_type ON no_fly_zones(zone_type)`,
+	}
+	for _, s := range noFlyZoneTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("no_fly_zones table: %w", err)
+		}
+	}
+
+	// Add waypoints_json to flight_missions for detail map rendering
+	db.Exec(`ALTER TABLE flight_missions ADD COLUMN waypoints_json TEXT DEFAULT ''`)
+
 	// CoT (Chain of Thought) reasoning chains
 	cotTables := []string{
 		`CREATE TABLE IF NOT EXISTS cot_chains (

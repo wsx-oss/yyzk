@@ -115,6 +115,7 @@ func (a *API) FlightMissionsCreate(c *gin.Context) {
 		EstimatedDuration string `json:"estimated_duration"`
 		Description       string `json:"description"`
 		DeviceID          int    `json:"device_id"`
+		WaypointsJSON     string `json:"waypoints_json"`
 	}
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(400, gin.H{"error": "bad json"})
@@ -141,8 +142,8 @@ func (a *API) FlightMissionsCreate(c *gin.Context) {
 	}
 
 	res, err := a.db.Exec(
-		`INSERT INTO flight_missions(name, route, target, estimated_duration, description, status, current_phase, progress, device_id) VALUES(?,?,?,?,?,?,?,?,?)`,
-		p.Name, p.Route, p.Target, p.EstimatedDuration, p.Description, "待起飞", "待命", 0, p.DeviceID,
+		`INSERT INTO flight_missions(name, route, target, estimated_duration, description, status, current_phase, progress, device_id, waypoints_json) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		p.Name, p.Route, p.Target, p.EstimatedDuration, p.Description, "待起飞", "待命", 0, p.DeviceID, p.WaypointsJSON,
 	)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -165,11 +166,12 @@ func (a *API) FlightMissionsGet(c *gin.Context) {
 		Name, Route, Target, EstDur, Status, Phase, Desc string
 		Progress, DeviceID                               int
 		DroneName                                        string
+		WaypointsJSON                                    sql.NullString
 		StartTime, EndTime, Created, Updated             sql.NullString
 	}
 	err := a.db.QueryRow(
-		`SELECT f.id, f.name, f.route, f.target, f.estimated_duration, f.status, f.current_phase, f.progress, f.start_time, f.end_time, f.description, f.created_at, f.updated_at, f.device_id, COALESCE(g.name,'') FROM flight_missions f LEFT JOIN gps_devices g ON f.device_id=g.id WHERE f.id=?`, id,
-	).Scan(&m.ID, &m.Name, &m.Route, &m.Target, &m.EstDur, &m.Status, &m.Phase, &m.Progress, &m.StartTime, &m.EndTime, &m.Desc, &m.Created, &m.Updated, &m.DeviceID, &m.DroneName)
+		`SELECT f.id, f.name, f.route, f.target, f.estimated_duration, f.status, f.current_phase, f.progress, f.start_time, f.end_time, f.description, f.created_at, f.updated_at, f.device_id, COALESCE(g.name,''), COALESCE(f.waypoints_json,'') FROM flight_missions f LEFT JOIN gps_devices g ON f.device_id=g.id WHERE f.id=?`, id,
+	).Scan(&m.ID, &m.Name, &m.Route, &m.Target, &m.EstDur, &m.Status, &m.Phase, &m.Progress, &m.StartTime, &m.EndTime, &m.Desc, &m.Created, &m.Updated, &m.DeviceID, &m.DroneName, &m.WaypointsJSON)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "任务不存在"})
 		return
@@ -180,6 +182,7 @@ func (a *API) FlightMissionsGet(c *gin.Context) {
 		"progress": m.Progress, "start_time": m.StartTime.String, "end_time": m.EndTime.String,
 		"description": m.Desc, "created_at": m.Created.String, "updated_at": m.Updated.String,
 		"device_id": m.DeviceID, "drone_name": m.DroneName,
+		"waypoints_json": m.WaypointsJSON.String,
 	}
 
 	// Attach GPS position if device is linked

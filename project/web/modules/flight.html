@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>飞行任务管理</title>
+  <title>航线规划</title>
   <link rel="stylesheet" href="/app/modules/common.css" />
-  <!-- Chart.js and AMap SDK loaded asynchronously at bottom to avoid blocking first paint -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+  <!-- Chart.js and Leaflet loaded asynchronously at bottom -->
   <style>
     .module-title::before { content: "\2708\FE0F"; }
     .flight-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
@@ -171,7 +172,7 @@
   <!-- Header with filters -->
   <div class="module-header">
     <div class="flight-header-row">
-      <div class="module-title">飞行任务管理</div>
+      <div class="module-title">航线规划</div>
       <div class="flight-header-btns">
         <span class="btn btn-success" id="btnAutoRefresh" style="cursor:default;">🟢 实时监控中</span>
         <button class="btn btn-primary" onclick="openNewModal()">创建任务</button>
@@ -321,9 +322,17 @@
           </div>
         </div>
 
+        <!-- No-fly zone selection -->
+        <div class="full-width" style="background:#fff7ed;padding:12px;border-radius:8px;border:1px solid #fed7aa;">
+          <label style="font-weight:600;color:#9a3412;">禁飞区约束（选择适用的禁飞区，AI规划将自动绕行）</label>
+          <div id="nfzCheckboxList" style="margin-top:8px;max-height:100px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px;">
+            <span style="font-size:12px;color:#94a3b8;">加载中...</span>
+          </div>
+        </div>
+
         <!-- Map picker -->
         <div class="full-width">
-          <label style="font-size:12px;color:#64748b;">也可以在地图上选点（左键=起点，右键=终点）</label>
+          <label style="font-size:12px;color:#64748b;">也可以在地图上选点（左键=起点，右键=终点，禁飞区已标注）</label>
           <div id="mPickerMap" class="plan-picker-map"></div>
         </div>
 
@@ -394,9 +403,10 @@
 
   <!-- Detail Modal -->
   <div class="modal-overlay" id="detailModal">
-    <div class="modal-box" style="width:640px;">
+    <div class="modal-box" style="width:680px;">
       <div class="modal-title">任务详情</div>
       <div class="detail-grid" id="detailContent"></div>
+      <div id="detailRouteMap" style="height:280px;border-radius:8px;margin-top:12px;display:none;"></div>
       <div class="phase-control" id="phaseControl"></div>
       <div class="log-timeline" id="logTimeline"></div>
       <div id="detailAISection"></div>
@@ -667,47 +677,182 @@
       loadStats();
     }
 
+    // ========== Tianditu + No-fly zone state ==========
+    let TIANDITU_KEY = '1d109683f4d84198e37a38c442d68311';
+    let tdtReady = false;
+    let allNoFlyZones = [];
+
+    function tdtImgLayer() {
+      return L.tileLayer(
+        `https://t{s}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
+        { subdomains:['0','1','2','3','4','5','6','7'], attribution:'© 天地图', maxZoom:18 }
+      );
+    }
+    function tdtCiaLayer() {
+      return L.tileLayer(
+        `https://t{s}.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
+        { subdomains:['0','1','2','3','4','5','6','7'], maxZoom:18 }
+      );
+    }
+
+    function addNoFlyZonesToMap(targetMap, layers) {
+      allNoFlyZones.forEach(z => {
+        const isWarn = z.zone_type === '警告区域';
+        const color = isWarn ? '#ea580c' : '#dc2626';
+        const fill = isWarn ? 'rgba(251,146,60,.35)' : 'rgba(239,68,68,.4)';
+        try {
+          const shape = JSON.parse(z.shape_json || '{}');
+          let layer;
+          if (shape.type === 'circle' && shape.center) {
+            layer = L.circle([shape.center.lat, shape.center.lon], { radius: shape.radius, color, fillColor: fill, fillOpacity: 1, weight: 2 });
+          } else if (shape.type === 'polygon' && shape.points && shape.points.length) {
+            layer = L.polygon(shape.points.map(p => [p.lat, p.lon]), { color, fillColor: fill, fillOpacity: 1, weight: 2 });
+          }
+          if (layer) {
+            const altStr = z.altitude_enabled ? ('<br>限高: ' + z.altitude_limit + 'm') : '';
+            layer.bindTooltip(`<b>${esc(z.name)}</b><br>${esc(z.zone_type)}${altStr}`, { sticky: true });
+            layer.addTo(targetMap);
+            if (layers) layers.push(layer);
+          }
+        } catch(e) {}
+      });
+    }
+
+    // Front-end no-fly zone containment check
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    function pointInPolygon(lat, lon, points) {
+      let inside = false; const n = points.length; let j = n-1;
+      for (let i = 0; i < n; i++) {
+        const xi = points[i].lon, yi = points[i].lat, xj = points[j].lon, yj = points[j].lat;
+        if (((yi > lat) !== (yj > lat)) && (lon < (xj-xi)*(lat-yi)/(yj-yi)+xi)) inside = !inside;
+        j = i;
+      }
+      return inside;
+    }
+    function findNoFlyZoneContaining(lat, lon, selectedIds) {
+      return allNoFlyZones.filter(z => selectedIds.includes(z.id)).find(z => {
+        try {
+          const shape = JSON.parse(z.shape_json || '{}');
+          if (shape.type === 'circle' && shape.center) return getDistance(lat, lon, shape.center.lat, shape.center.lon) <= shape.radius;
+          if (shape.type === 'polygon' && shape.points) return pointInPolygon(lat, lon, shape.points);
+        } catch(e) {}
+        return false;
+      });
+    }
+
+    async function loadNoFlyZones() {
+      try {
+        const res = await api('/noflyzone');
+        const data = await res.json();
+        allNoFlyZones = Array.isArray(data.items) ? data.items : [];
+        renderNFZCheckboxes();
+      } catch(e) { allNoFlyZones = []; }
+    }
+
+    function renderNFZCheckboxes() {
+      const container = $('#nfzCheckboxList');
+      if (!container) return;
+      if (!allNoFlyZones.length) {
+        container.innerHTML = '<span style="font-size:12px;color:#94a3b8;">暂无禁飞区，可先在“禁飞区”功能中创建</span>';
+        return;
+      }
+      container.innerHTML = allNoFlyZones.map(z => {
+        const color = z.zone_type === '警告区域' ? '#c2410c' : '#991b1b';
+        const bg = z.zone_type === '警告区域' ? '#fff7ed' : '#fee2e2';
+        return `<label style="display:flex;align-items:center;gap:5px;padding:4px 8px;background:${bg};border-radius:6px;cursor:pointer;font-size:12px;color:${color};">
+          <input type="checkbox" name="nfzSel" value="${z.id}" style="margin:0;" />
+          ${esc(z.name)} (${z.shape_type === 'circle' ? '圆形' : '多边形'})${z.altitude_enabled ? ' 限高'+z.altitude_limit+'m' : ''}
+        </label>`;
+      }).join('');
+    }
+
+    function getSelectedNFZIds() {
+      const checks = document.querySelectorAll('input[name="nfzSel"]:checked');
+      return Array.from(checks).map(c => parseInt(c.value));
+    }
+
+    function getSelectedNoFlyZones() {
+      const ids = getSelectedNFZIds();
+      return allNoFlyZones.filter(z => ids.includes(z.id)).map(z => {
+        try {
+          const shape = JSON.parse(z.shape_json || '{}');
+          if (shape.type === 'circle' && shape.center) {
+            // Approximate circle as 20-point polygon so LLM has exact boundary coordinates
+            const pts = [];
+            const N = 20;
+            const cosLat = Math.cos(shape.center.lat * Math.PI / 180);
+            for (let i = 0; i < N; i++) {
+              const angle = (2 * Math.PI * i) / N;
+              pts.push({
+                lat: shape.center.lat + (shape.radius / 111320) * Math.cos(angle),
+                lon: shape.center.lon + (shape.radius / (111320 * cosLat)) * Math.sin(angle)
+              });
+            }
+            return {
+              name: z.name,
+              type: 'circle',
+              center: { lat: shape.center.lat, lon: shape.center.lon },
+              radius_m: shape.radius,
+              polygon: pts,
+              alt_limit_m: z.altitude_enabled ? z.altitude_limit : -1
+            };
+          } else if (shape.type === 'polygon' && shape.points) {
+            return {
+              name: z.name,
+              type: 'polygon',
+              polygon: shape.points.map(p => ({ lat: p.lat, lon: p.lon })),
+              alt_limit_m: z.altitude_enabled ? z.altitude_limit : -1
+            };
+          }
+        } catch(e) {}
+        return null;
+      }).filter(Boolean);
+    }
+
     // ========== Create / Edit Modal (integrated with smart planning) ==========
     let missionActions = [];
     let mPickerMap = null;
+    let mPickerNFZLayers = [];
     let mStartMarker = null;
     let mGoalMarker = null;
     let mResultMap = null;
+    let mResultNFZLayers = [];
+    let mDetailRouteMap = null;
     let mLastMapCtx = null;
     let mLastPlan = null;
-    let amapOK = (typeof AMap !== 'undefined');
 
     function initMissionPickerMap() {
-      if (!amapOK) return;
-      if (mPickerMap) { mPickerMap.destroy(); mPickerMap = null; }
+      if (!tdtReady) return;
+      if (mPickerMap) { mPickerMap.remove(); mPickerMap = null; }
       mStartMarker = null; mGoalMarker = null;
+      mPickerNFZLayers.forEach(l => { try { l.remove(); } catch(e) {} });
+      mPickerNFZLayers = [];
       try {
-        mPickerMap = new AMap.Map('mPickerMap', {
-          zoom: 13, center: [104.066, 30.573], mapStyle: 'amap://styles/light'
-        });
+        mPickerMap = L.map('mPickerMap', { center: [30.573, 104.066], zoom: 12 });
+        tdtImgLayer().addTo(mPickerMap);
+        tdtCiaLayer().addTo(mPickerMap);
+        addNoFlyZonesToMap(mPickerMap, mPickerNFZLayers);
         mPickerMap.on('click', function(e) {
-          $('#mStartLat').value = e.lnglat.getLat().toFixed(6);
-          $('#mStartLon').value = e.lnglat.getLng().toFixed(6);
-          $('#mStartAddr').value = e.lnglat.getLat().toFixed(6) + ',' + e.lnglat.getLng().toFixed(6);
-          if (mStartMarker) mStartMarker.setPosition(e.lnglat);
-          else {
-            mStartMarker = new AMap.Marker({ position: e.lnglat, map: mPickerMap,
-              label: { content: '<span style="background:#10b981;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;">起点</span>', direction: 'top' }
-            });
-          }
+          const lat = e.latlng.lat, lon = e.latlng.lng;
+          $('#mStartLat').value = lat.toFixed(6);
+          $('#mStartLon').value = lon.toFixed(6);
+          $('#mStartAddr').value = lat.toFixed(6) + ',' + lon.toFixed(6);
+          updatePickerMarker('start', lat, lon);
         });
-        mPickerMap.on('rightclick', function(e) {
-          $('#mGoalLat').value = e.lnglat.getLat().toFixed(6);
-          $('#mGoalLon').value = e.lnglat.getLng().toFixed(6);
-          $('#mGoalAddr').value = e.lnglat.getLat().toFixed(6) + ',' + e.lnglat.getLng().toFixed(6);
-          if (mGoalMarker) mGoalMarker.setPosition(e.lnglat);
-          else {
-            mGoalMarker = new AMap.Marker({ position: e.lnglat, map: mPickerMap,
-              label: { content: '<span style="background:#ef4444;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;">终点</span>', direction: 'top' }
-            });
-          }
+        mPickerMap.on('contextmenu', function(e) {
+          L.DomEvent.preventDefault(e);
+          const lat = e.latlng.lat, lon = e.latlng.lng;
+          $('#mGoalLat').value = lat.toFixed(6);
+          $('#mGoalLon').value = lon.toFixed(6);
+          $('#mGoalAddr').value = lat.toFixed(6) + ',' + lon.toFixed(6);
+          updatePickerMarker('goal', lat, lon);
         });
-      } catch(e) { console.warn('AMap picker init failed:', e); }
+      } catch(e) { console.warn('Picker map init failed:', e); }
     }
 
     // --- Address geocoding ---
@@ -789,24 +934,23 @@
     }
 
     function updatePickerMarker(which, lat, lon) {
-      if (!amapOK || !mPickerMap) return;
-      const lnglat = new AMap.LngLat(lon, lat);
+      if (!tdtReady || !mPickerMap) return;
+      const iconHtml = which === 'start'
+        ? '<div style="background:#10b981;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">起点</div>'
+        : '<div style="background:#ef4444;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">终点</div>';
+      const icon = L.divIcon({ className: '', html: iconHtml, iconAnchor: [20, 10] });
       if (which === 'start') {
-        if (mStartMarker) mStartMarker.setPosition(lnglat);
-        else {
-          mStartMarker = new AMap.Marker({ position: lnglat, map: mPickerMap,
-            label: { content: '<span style="background:#10b981;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;">起点</span>', direction: 'top' }
-          });
-        }
+        if (mStartMarker) mStartMarker.setLatLng([lat, lon]);
+        else mStartMarker = L.marker([lat, lon], { icon }).addTo(mPickerMap);
       } else {
-        if (mGoalMarker) mGoalMarker.setPosition(lnglat);
-        else {
-          mGoalMarker = new AMap.Marker({ position: lnglat, map: mPickerMap,
-            label: { content: '<span style="background:#ef4444;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;">终点</span>', direction: 'top' }
-          });
-        }
+        if (mGoalMarker) mGoalMarker.setLatLng([lat, lon]);
+        else mGoalMarker = L.marker([lat, lon], { icon }).addTo(mPickerMap);
       }
-      mPickerMap.setFitView();
+      const bounds = [];
+      if (mStartMarker) bounds.push(mStartMarker.getLatLng());
+      if (mGoalMarker) bounds.push(mGoalMarker.getLatLng());
+      if (bounds.length > 1) mPickerMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+      else if (bounds.length === 1) mPickerMap.setView(bounds[0], 13);
     }
 
     // --- Actions management ---
@@ -853,10 +997,11 @@
       $('#missionDesc').value = '';
       $('#mPlanResultArea').style.display = 'none';
       $('#mPlanResultArea').innerHTML = '';
-      if (mResultMap) { mResultMap.destroy(); mResultMap = null; }
+      if (mResultMap) { mResultMap.remove(); mResultMap = null; }
+      mResultNFZLayers = [];
       loadDrones().then(() => {
         $('#missionModal').classList.add('active');
-        setTimeout(initMissionPickerMap, 200);
+        loadNoFlyZones().then(() => { setTimeout(initMissionPickerMap, 200); });
       });
     }
 
@@ -935,14 +1080,16 @@
         $('#missionDesc').value = m.description || '';
         $('#mPlanResultArea').style.display = 'none';
         $('#mPlanResultArea').innerHTML = '';
-        if (mResultMap) { mResultMap.destroy(); mResultMap = null; }
+        if (mResultMap) { mResultMap.remove(); mResultMap = null; }
+        mResultNFZLayers = [];
         $('#missionModal').classList.add('active');
-        setTimeout(function() {
-          initMissionPickerMap();
-          // Geocode start/goal addresses and place markers on map
-          if (_editStartText) fillEndpoint('start', _editStartText);
-          if (_editGoalText) fillEndpoint('goal', _editGoalText);
-        }, 300);
+        loadNoFlyZones().then(() => {
+          setTimeout(function() {
+            initMissionPickerMap();
+            if (_editStartText) fillEndpoint('start', _editStartText);
+            if (_editGoalText) fillEndpoint('goal', _editGoalText);
+          }, 300);
+        });
       } catch (e) {
         showToast('加载任务失败', 'error');
       }
@@ -951,17 +1098,51 @@
     function closeMissionModal() {
       $('#missionModal').classList.remove('active');
       editingId = null;
-      if (mResultMap) { mResultMap.destroy(); mResultMap = null; }
+      if (mPickerMap) { mPickerMap.remove(); mPickerMap = null; }
+      mPickerNFZLayers = []; mStartMarker = null; mGoalMarker = null;
+      if (mResultMap) { mResultMap.remove(); mResultMap = null; }
+      mResultNFZLayers = [];
     }
 
     async function submitMission() {
+      const startLat = parseFloat($('#mStartLat').value);
+      const startLon = parseFloat($('#mStartLon').value);
+      const goalLat = parseFloat($('#mGoalLat').value);
+      const goalLon = parseFloat($('#mGoalLon').value);
+      const selectedIds = getSelectedNFZIds();
+
+      // No-fly zone validation: block if start or end point is inside selected no-fly zone
+      if (!isNaN(startLat) && !isNaN(startLon) && selectedIds.length) {
+        const hitZone = findNoFlyZoneContaining(startLat, startLon, selectedIds);
+        if (hitZone) {
+          showToast(`⚠ 起点位于禁飞区 "${hitZone.name}" 内，禁止创建任务！`, 'error');
+          alert(`起点位于禁飞区 "${hitZone.name}" 内，请重新选择起点位置后再创建任务。`);
+          return;
+        }
+      }
+      if (!isNaN(goalLat) && !isNaN(goalLon) && selectedIds.length) {
+        const hitZone = findNoFlyZoneContaining(goalLat, goalLon, selectedIds);
+        if (hitZone) {
+          showToast(`⚠ 终点位于禁飞区 "${hitZone.name}" 内，禁止创建任务！`, 'error');
+          alert(`终点位于禁飞区 "${hitZone.name}" 内，请重新选择终点位置后再创建任务。`);
+          return;
+        }
+      }
+
+      // Build waypoints_json from last plan
+      let waypointsJSON = '';
+      if (mLastPlan && mLastPlan.waypoints && mLastPlan.waypoints.length) {
+        waypointsJSON = JSON.stringify(mLastPlan.waypoints);
+      }
+
       const body = {
         name: $('#missionName').value.trim(),
         device_id: parseInt($('#missionDevice').value) || 0,
         route: $('#missionRoute').value.trim(),
         target: $('#missionTarget').value.trim(),
         estimated_duration: $('#missionDuration').value.trim(),
-        description: $('#missionDesc').value.trim()
+        description: $('#missionDesc').value.trim(),
+        waypoints_json: waypointsJSON
       };
       if (!body.name) { showToast('请输入任务名称', 'error'); return; }
       if (!body.route) { showToast('请输入飞行路线（或先点击"智能规划并回填"）', 'error'); return; }
@@ -1116,6 +1297,38 @@
         // AI Analysis section
         await loadDetailAISection(m);
 
+        // Route map below 飞行路线: render if waypoints_json is available
+        const routeMapDiv = document.getElementById('detailRouteMap');
+        if (routeMapDiv) {
+          if (mDetailRouteMap) { mDetailRouteMap.remove(); mDetailRouteMap = null; }
+          let waypoints = [];
+          if (m.waypoints_json) {
+            try { waypoints = JSON.parse(m.waypoints_json); } catch(e) {}
+          }
+          if (waypoints.length && tdtReady) {
+            routeMapDiv.style.display = 'block';
+            setTimeout(() => {
+              const coords = waypoints.map(wp => [wp.lat, wp.lon]);
+              mDetailRouteMap = L.map(routeMapDiv, {
+                center: [coords[0][0], coords[0][1]], zoom: 13
+              });
+              tdtImgLayer().addTo(mDetailRouteMap);
+              tdtCiaLayer().addTo(mDetailRouteMap);
+              addNoFlyZonesToMap(mDetailRouteMap, []);
+              L.polyline(coords, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mDetailRouteMap);
+              const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316' };
+              waypoints.forEach((wp, i) => {
+                const color = actionColors[wp.action] || (i === 0 ? '#10b981' : (i === waypoints.length-1 ? '#ef4444' : '#6366f1'));
+                const html = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);">${i+1}.${esc(wp.action||'')}</div>`;
+                L.marker([wp.lat, wp.lon], { icon: L.divIcon({ className:'', html, iconAnchor:[20,8] }) }).addTo(mDetailRouteMap);
+              });
+              mDetailRouteMap.fitBounds(coords, { padding: [30, 30] });
+            }, 200);
+          } else {
+            routeMapDiv.style.display = 'none';
+          }
+        }
+
         $('#detailModal').classList.add('active');
       } catch (e) {
         showToast('加载详情失败', 'error');
@@ -1187,6 +1400,9 @@
       var rc = document.getElementById('realtimeCard');
       if (rc) rc.remove();
       $('#detailAISection').innerHTML = '';
+      if (mDetailRouteMap) { mDetailRouteMap.remove(); mDetailRouteMap = null; }
+      const routeMapDiv = document.getElementById('detailRouteMap');
+      if (routeMapDiv) routeMapDiv.style.display = 'none';
       $('#detailModal').classList.remove('active');
     }
 
@@ -1409,11 +1625,26 @@
       // 检查是否启用思维链分析
       const withReasoning = $('#reasoningCheckbox')?.checked || false;
       
+      // Validate no start/end in selected no-fly zones before planning
+      const selectedIds = getSelectedNFZIds();
+      if (selectedIds.length) {
+        const startHit = findNoFlyZoneContaining(startLat, startLon, selectedIds);
+        if (startHit) { showToast(`⚠ 起点位于禁飞区 "${startHit.name}" 内，请重新选择起点！`, 'error'); return; }
+        const goalHit = findNoFlyZoneContaining(goalLat, goalLon, selectedIds);
+        if (goalHit) { showToast(`⚠ 终点位于禁飞区 "${goalHit.name}" 内，请重新选择终点！`, 'error'); return; }
+      }
+
+      const selectedNFZs = getSelectedNoFlyZones();
       const reqBody = {
         start: { lat: startLat, lon: startLon, alt_m: alt },
         goal: { lat: goalLat, lon: goalLon, alt_m: alt },
         actions: missionActions,
-        constraints: { max_speed_mps: speed, max_alt_m: alt + 50, battery_return_threshold_percent: 20 },
+        constraints: {
+          max_speed_mps: speed,
+          max_alt_m: alt + 50,
+          battery_return_threshold_percent: 20,
+          no_fly_zones: selectedNFZs
+        },
         drone_id: droneId,
         drone_name: droneName !== '未指定' ? droneName : '',
         with_reasoning: withReasoning
@@ -1519,7 +1750,7 @@
       // Map context
       if (mLastMapCtx) {
         html += '<div class="plan-map-context">';
-        html += '<strong>&#x1F30D; 地图信息（高德地图）</strong><br>';
+        html += '<strong>&#x1F30D; 地图信息（天地图）</strong><br>';
         if (mLastMapCtx.start_address) html += '起点: ' + esc(mLastMapCtx.start_address) + '<br>';
         if (mLastMapCtx.goal_address) html += '终点: ' + esc(mLastMapCtx.goal_address) + '<br>';
         if (mLastMapCtx.ref_distance) html += '地面参考距离: ' + mLastMapCtx.ref_distance + 'm<br>';
@@ -1541,15 +1772,27 @@
         html += '</tbody></table></div>';
       }
 
-      // Warnings
+      // Warnings — separate critical NFZ violations into a prominent block
       if (plan.warnings && plan.warnings.length) {
-        html += '<div class="plan-warnings">';
-        plan.warnings.forEach(w => {
-          const cls = 'plan-warning-' + (w.level || 'info');
-          const icon = w.level === 'critical' ? '&#x26A0;' : w.level === 'warning' ? '&#x26A0;' : '&#x2139;';
-          html += `<div class="plan-warning-item ${cls}">${icon} ${esc(w.message)}</div>`;
-        });
-        html += '</div>';
+        const nfzCritical = plan.warnings.filter(w => w.level === 'critical' && w.message && w.message.includes('禁飞区'));
+        const others = plan.warnings.filter(w => !(w.level === 'critical' && w.message && w.message.includes('禁飞区')));
+        if (nfzCritical.length) {
+          html += '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:8px;padding:12px;margin-top:10px;">';
+          html += '<div style="font-weight:700;color:#dc2626;font-size:13px;margin-bottom:6px;">🚫 禁飞区违规提示（已由系统自动修正绕行）</div>';
+          nfzCritical.forEach(w => {
+            html += `<div style="font-size:12px;color:#b91c1c;margin-bottom:3px;">⚠ ${esc(w.message)}</div>`;
+          });
+          html += '</div>';
+        }
+        if (others.length) {
+          html += '<div class="plan-warnings">';
+          others.forEach(w => {
+            const cls = 'plan-warning-' + (w.level || 'info');
+            const icon = w.level === 'critical' ? '&#x26A0;' : w.level === 'warning' ? '&#x26A0;' : '&#x2139;';
+            html += `<div class="plan-warning-item ${cls}">${icon} ${esc(w.message)}</div>`;
+          });
+          html += '</div>';
+        }
       }
 
       // Explanation
@@ -1594,9 +1837,22 @@
       setTimeout(function() { renderMResultMap(plan); }, 200);
     }
 
+    var mResultPathPolyline = null;
+    var mResultDragMarkers = [];
+
+    function redrawResultPath() {
+      if (!mResultPathPolyline || !mLastPlan) return;
+      const coords = mLastPlan.waypoints.map(wp => [wp.lat, wp.lon]);
+      mResultPathPolyline.setLatLngs(coords);
+    }
+
     function renderMResultMap(plan) {
-      if (!amapOK || !plan.waypoints || !plan.waypoints.length) return;
-      if (mResultMap) { mResultMap.destroy(); mResultMap = null; }
+      if (!tdtReady || !plan.waypoints || !plan.waypoints.length) return;
+      if (mResultMap) { mResultMap.remove(); mResultMap = null; }
+      mResultNFZLayers.forEach(l => { try { l.remove(); } catch(e) {} });
+      mResultNFZLayers = [];
+      mResultDragMarkers = [];
+      mResultPathPolyline = null;
 
       try {
         let sumLat = 0, sumLon = 0;
@@ -1604,41 +1860,76 @@
         const cLat = sumLat / plan.waypoints.length;
         const cLon = sumLon / plan.waypoints.length;
 
-        mResultMap = new AMap.Map('mResultMapContainer', {
-          zoom: 14, center: [cLon, cLat], mapStyle: 'amap://styles/light'
-        });
+        mResultMap = L.map('mResultMapContainer', { center: [cLat, cLon], zoom: 13 });
+        tdtImgLayer().addTo(mResultMap);
+        tdtCiaLayer().addTo(mResultMap);
 
-        // Flight path polyline
-        const path = plan.waypoints.map(wp => new AMap.LngLat(wp.lon, wp.lat));
-        new AMap.Polyline({ path, map: mResultMap, strokeColor: '#6366f1', strokeWeight: 4, strokeOpacity: 0.8, strokeStyle: 'solid', lineJoin: 'round', showDir: true });
+        // Draw no-fly zones
+        addNoFlyZonesToMap(mResultMap, mResultNFZLayers);
 
-        // Reference polyline
-        if (mLastMapCtx && mLastMapCtx.ref_polyline && mLastMapCtx.ref_polyline.length > 1) {
-          const refPath = mLastMapCtx.ref_polyline.map(p => new AMap.LngLat(p[0], p[1]));
-          new AMap.Polyline({ path: refPath, map: mResultMap, strokeColor: '#94a3b8', strokeWeight: 2, strokeOpacity: 0.5, strokeStyle: 'dashed' });
-        }
+        // Flight path polyline (kept as variable for live update)
+        const coords = plan.waypoints.map(wp => [wp.lat, wp.lon]);
+        mResultPathPolyline = L.polyline(coords, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mResultMap);
 
-        // Waypoint markers
+        // Draggable waypoint markers
         const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316' };
         plan.waypoints.forEach((wp, i) => {
           const color = actionColors[wp.action] || '#6366f1';
-          new AMap.Marker({ position: new AMap.LngLat(wp.lon, wp.lat), map: mResultMap,
-            label: { content: `<span style="background:${color};color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;white-space:nowrap;">${i+1}. ${wp.action||i+1}</span>`, direction: 'top' }
-          });
-        });
+          const labelHtml = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:grab;">${i+1}. ${esc(wp.action||String(i+1))}</div>`;
+          const marker = L.marker([wp.lat, wp.lon], {
+            icon: L.divIcon({ className:'', html: labelHtml, iconAnchor:[20,8] }),
+            draggable: true
+          }).addTo(mResultMap);
 
-        // POI markers
-        if (mLastMapCtx && mLastMapCtx.nearby_pois) {
-          mLastMapCtx.nearby_pois.forEach(p => {
-            if (p.lat && p.lon) {
-              new AMap.Marker({ position: new AMap.LngLat(p.lon, p.lat), map: mResultMap,
-                label: { content: `<span style="background:#fbbf24;color:#78350f;padding:1px 5px;border-radius:4px;font-size:9px;">&#x26A0; ${p.name}</span>`, direction: 'bottom' }
-              });
+          marker.on('drag', function(e) {
+            const ll = e.target.getLatLng();
+            mLastPlan.waypoints[i].lat = Math.round(ll.lat * 1e6) / 1e6;
+            mLastPlan.waypoints[i].lon = Math.round(ll.lng * 1e6) / 1e6;
+            redrawResultPath();
+          });
+
+          marker.on('dragend', function() {
+            // Update waypoints table row if visible
+            const tbl = document.querySelector('.plan-waypoints tbody');
+            if (tbl) {
+              const rows = tbl.querySelectorAll('tr');
+              if (rows[i]) {
+                const cells = rows[i].querySelectorAll('td');
+                if (cells[1]) cells[1].textContent = mLastPlan.waypoints[i].lat.toFixed(6);
+                if (cells[2]) cells[2].textContent = mLastPlan.waypoints[i].lon.toFixed(6);
+              }
+            }
+            // Show adjusted hint
+            let hint = document.getElementById('mDragHint');
+            if (!hint) {
+              hint = document.createElement('div');
+              hint.id = 'mDragHint';
+              hint.style.cssText = 'text-align:center;font-size:12px;color:#6366f1;font-weight:600;margin-top:6px;';
+              hint.textContent = '✏ 航线已手动调整，坐标已同步更新';
+              const mapEl = document.getElementById('mResultMapContainer');
+              if (mapEl && mapEl.parentNode) mapEl.parentNode.insertBefore(hint, mapEl.nextSibling);
             }
           });
+
+          mResultDragMarkers.push(marker);
+        });
+
+        // Hint label above map
+        const mapEl = document.getElementById('mResultMapContainer');
+        if (mapEl) {
+          const hintTop = document.createElement('div');
+          hintTop.style.cssText = 'font-size:11px;color:#64748b;margin-bottom:4px;';
+          hintTop.textContent = '💡 可拖拽航点标记来手动调整航线路径';
+          mapEl.parentNode.insertBefore(hintTop, mapEl);
         }
 
-        mResultMap.setFitView();
+        // Reference polyline (dashed)
+        if (mLastMapCtx && mLastMapCtx.ref_polyline && mLastMapCtx.ref_polyline.length > 1) {
+          const refCoords = mLastMapCtx.ref_polyline.map(p => [p[1], p[0]]);
+          L.polyline(refCoords, { color: '#94a3b8', weight: 2, opacity: 0.5, dashArray: '6,4' }).addTo(mResultMap);
+        }
+
+        mResultMap.fitBounds(coords, { padding: [30, 30] });
       } catch(e) { console.warn('Result map render failed:', e); }
     }
 
@@ -1680,10 +1971,18 @@
       })
       .catch(function(e) { console.warn('Chart.js load failed:', e); });
 
-    // Phase 3: Load AMap SDK async (only needed when opening create modal)
-    loadScript('https://webapi.amap.com/maps?v=2.0&key=dd1c139ca98be9925c57001ab97a7bbe')
-      .then(function() { amapOK = true; })
-      .catch(function(e) { console.warn('AMap SDK load failed (map features disabled):', e); });
+    // Phase 3: Load Leaflet, then load Tianditu key from config
+    loadScript('https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js')
+      .then(function() {
+        return fetch('/api/config').then(r => r.json()).then(cfg => {
+          if (cfg.tianditu_key) TIANDITU_KEY = cfg.tianditu_key;
+        }).catch(() => {});
+      })
+      .then(function() {
+        tdtReady = true;
+        loadNoFlyZones();
+      })
+      .catch(function(e) { console.warn('Leaflet load failed (map features disabled):', e); });
   </script>
 </body>
 </html>

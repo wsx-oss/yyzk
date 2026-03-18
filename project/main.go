@@ -143,7 +143,7 @@ func authMiddleware(token string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		p := c.Request.URL.Path
 		// allow unauth for health, websocket metrics, vnc proxy, sync data exchange and static
-		if p == "/api/healthz" || p == "/api/metrics/stream" || p == "/api/vnc/ws" || p == "/api/ssh/ws" ||
+		if p == "/api/healthz" || p == "/api/config" || p == "/api/metrics/stream" || p == "/api/vnc/ws" || p == "/api/ssh/ws" ||
 			p == "/api/sync/ping" || p == "/api/sync/export-data" || p == "/api/sync/import-data" ||
 			p == "/api/hardware/push" || p == "/api/gps/push" || p == "/api/battery/push" || p == "/api/flight/missions/push" ||
 			p == "/api/gps/stream" || p == "/api/battery/stream" || p == "/api/flight/stream" ||

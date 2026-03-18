@@ -305,17 +305,28 @@
     let detailMap = null, historyMap = null;
     let statusChart = null, fenceChart = null;
     let allDevices = [];
-    // Track last applied search params so auto-refresh reuses them
     let activeFilterName = '';
     let activeFilterStatus = '';
+    let TIANDITU_KEY = '1d109683f4d84198e37a38c442d68311';
+
+    function tdtImgLayer() {
+      return L.tileLayer(
+        `https://t{s}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
+        { subdomains:['0','1','2','3','4','5','6','7'], attribution:'© 天地图', maxZoom:18 }
+      );
+    }
+    function tdtCiaLayer() {
+      return L.tileLayer(
+        `https://t{s}.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
+        { subdomains:['0','1','2','3','4','5','6','7'], maxZoom:18 }
+      );
+    }
 
     // ========== Map Init ==========
     function initMap() {
       map = L.map('mapContainer').setView([39.908, 116.397], 5);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
-        maxZoom: 18
-      }).addTo(map);
+      tdtImgLayer().addTo(map);
+      tdtCiaLayer().addTo(map);
       // MarkerCluster: handles overlapping markers — click cluster to spiderfy (fan out)
       markerClusterGroup = L.markerClusterGroup({
         maxClusterRadius: 45,
@@ -685,7 +696,8 @@
         setTimeout(() => {
           if (detailMap) { detailMap.remove(); detailMap = null; }
           detailMap = L.map('detailMap').setView([d.latitude || 39.908, d.longitude || 116.397], 14);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(detailMap);
+          tdtImgLayer().addTo(detailMap);
+          tdtCiaLayer().addTo(detailMap);
           if (d.latitude !== 0 || d.longitude !== 0) {
             L.marker([d.latitude, d.longitude]).addTo(detailMap).bindPopup(d.name).openPopup();
             if (d.fence_enabled && d.fence_radius > 0) {
@@ -709,7 +721,8 @@
         setTimeout(() => {
           if (historyMap) { historyMap.remove(); historyMap = null; }
           historyMap = L.map('historyMap').setView([39.908, 116.397], 5);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(historyMap);
+          tdtImgLayer().addTo(historyMap);
+          tdtCiaLayer().addTo(historyMap);
           if (items.length) {
             const coords = items.map(h => [h.latitude, h.longitude]).reverse();
             L.polyline(coords, { color: '#0ea5e9', weight: 3 }).addTo(historyMap);
@@ -797,10 +810,11 @@
     }
 
     // ========== Init ==========
-    initMap();
-    initCharts();
-    loadDevices();
-    loadStats();
+    fetch('/api/config').then(r=>r.json()).then(cfg=>{
+      if(cfg.tianditu_key) TIANDITU_KEY=cfg.tianditu_key;
+    }).catch(()=>{}).finally(()=>{
+      initMap(); initCharts(); loadDevices(); loadStats();
+    });
   </script>
 </body>
 </html>
