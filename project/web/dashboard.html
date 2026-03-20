@@ -16,7 +16,7 @@
       height: 100vh;
     }
     .sidebar {
-      width: 200px;
+      width: 220px;
       background: #1e3a8a;
       color: #fff;
       display: flex;
@@ -26,7 +26,7 @@
     .sidebar-header {
       padding: 20px 16px;
       background: #1e40af;
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 600;
       text-align: center;
       border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -37,7 +37,7 @@
       text-decoration: none;
       display: flex;
       align-items: center;
-      font-size: 14px;
+      font-size: 15px;
       transition: all 0.2s;
       cursor: pointer;
       border-left: 3px solid transparent;
@@ -62,7 +62,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 14px;
+      font-size: 15px;
       cursor: pointer;
       border-left: 3px solid transparent;
       transition: all 0.2s;
@@ -100,7 +100,7 @@
       text-decoration: none;
       display: flex;
       align-items: center;
-      font-size: 13px;
+      font-size: 14px;
       transition: all 0.2s;
       cursor: pointer;
       border-left: 3px solid transparent;
@@ -139,14 +139,14 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .top-bar h1 {
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 600;
     }
     .user-info {
       display: flex;
       align-items: center;
       gap: 16px;
-      font-size: 14px;
+      font-size: 15px;
     }
     .btn-logout {
       background: rgba(255,255,255,0.2);
@@ -188,20 +188,20 @@
         <a class="nav-sub-item" data-page="flight">航线规划</a>
         <a class="nav-sub-item" data-page="gps">GPS/位置信息</a>
       </div>
-      <div class="nav-group-header" id="navStatusGroup" onclick="toggleNavGroup(this)">
+      <div class="nav-group-header open" id="navStatusGroup" onclick="toggleNavGroup(this)">
         <span><span class="nav-group-icon"></span>无人机状态监控</span>
       </div>
-      <div class="nav-sub-list" id="navStatusSub">
+      <div class="nav-sub-list open" id="navStatusSub">
         <a class="nav-sub-item" data-page="video">视频监控</a>
         <a class="nav-sub-item" data-page="remote">远程桌面控制</a>
         <a class="nav-sub-item" data-page="alerts">异常报警</a>
         <a class="nav-sub-item" data-page="battery">电池监控</a>
         <a class="nav-sub-item" data-page="hardware">硬件状态检测</a>
       </div>
-      <div class="nav-group-header" id="navLogsGroup" onclick="toggleNavGroup(this)">
+      <div class="nav-group-header open" id="navLogsGroup" onclick="toggleNavGroup(this)">
         <span><span class="nav-group-icon"></span>日志管理</span>
       </div>
-      <div class="nav-sub-list" id="navLogsSub">
+      <div class="nav-sub-list open" id="navLogsSub">
         <a class="nav-sub-item" data-page="monitor">系统状态监控</a>
         <a class="nav-sub-item" data-page="audio">语音交互记录</a>
         <a class="nav-sub-item" data-page="performance">性能分析报告</a>

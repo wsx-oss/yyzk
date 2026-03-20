@@ -9,42 +9,49 @@
   <style>
     html,body{height:100%;margin:0;padding:0;overflow:hidden;}
     .nfz-layout{display:flex;height:100vh;overflow:hidden;}
-    .nfz-sidebar{width:300px;flex-shrink:0;background:#fff;display:flex;flex-direction:column;box-shadow:2px 0 8px rgba(0,0,0,.12);z-index:10;}
-    .nfz-header{padding:14px;background:#1e3a8a;color:#fff;flex-shrink:0;}
-    .nfz-header-title{font-size:15px;font-weight:700;margin-bottom:10px;}
-    .search-input{width:100%;padding:7px 10px;background:rgba(255,255,255,.15);border:none;border-radius:6px;color:#fff;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:6px;}
+    .nfz-sidebar{width:320px;flex-shrink:0;background:rgba(30,41,59,.92);display:flex;flex-direction:column;box-shadow:2px 0 8px rgba(0,0,0,.12);z-index:10;backdrop-filter:blur(8px);}
+    .nfz-header{padding:16px;background:#1e3a8a;color:#fff;flex-shrink:0;}
+    .nfz-header-title{font-size:17px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+    .nfz-header-title::before{content:'≡';font-size:18px;}
+    .search-input{width:100%;padding:8px 11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:6px;color:#fff;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:7px;}
     .search-input::placeholder{color:rgba(255,255,255,.6);}
-    .nfz-list-body{flex:1;overflow-y:auto;padding:8px;}
-    .nfz-item{padding:11px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:7px;background:#fff;cursor:pointer;transition:all .15s;}
-    .nfz-item:hover{border-color:#0ea5e9;box-shadow:0 2px 8px rgba(14,165,233,.15);}
-    .nfz-item.selected{border-color:#0ea5e9;background:#f0f9ff;}
-    .nfz-item-row1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px;}
-    .nfz-item-name{font-weight:600;font-size:13px;color:#0f172a;}
-    .nfz-item-meta{font-size:11px;color:#64748b;margin-bottom:2px;}
-    .nfz-item-addr{font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
-    .nfz-item-time{font-size:10px;color:#cbd5e1;margin-top:2px;}
-    .nfz-item-btns{display:flex;gap:5px;margin-top:7px;}
-    .nfz-item-btns button{padding:3px 9px;border:none;border-radius:4px;font-size:11px;cursor:pointer;}
-    .btn-view-z{background:#e0f2fe;color:#0369a1;}
-    .btn-edit-z{background:#fef9c3;color:#713f12;}
+    .nfz-list-body{flex:1;overflow-y:auto;padding:10px;background:transparent;}
+    /* --- dark semi-transparent card style (Image style) --- */
+    .nfz-item{padding:14px 16px;border:1px solid rgba(148,163,184,.25);border-radius:10px;margin-bottom:10px;background:rgba(30,41,59,.75);backdrop-filter:blur(6px);cursor:pointer;transition:all .15s;}
+    .nfz-item:hover{border-color:rgba(59,130,246,.5);box-shadow:0 3px 12px rgba(59,130,246,.2);background:rgba(30,41,59,.85);}
+    .nfz-item.selected{border-color:#3b82f6;background:rgba(59,130,246,.2);}
+    .nfz-item-name{font-weight:700;font-size:15px;color:#f1f5f9;margin-bottom:6px;}
+    .nfz-item-meta{font-size:13px;color:#cbd5e1;margin-bottom:4px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+    .nfz-item-addr{font-size:13px;color:#94a3b8;margin-bottom:3px;word-break:break-all;white-space:normal;line-height:1.5;}
+    .nfz-item-time{font-size:12px;color:#64748b;margin-bottom:8px;}
+    .nfz-item-btns{display:flex;gap:7px;}
+    .nfz-item-btns button{padding:4px 12px;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+    .nfz-item-btns button:hover{opacity:.85;transform:translateY(-1px);}
+    .btn-view-z{background:#dcfce7;color:#166534;}
+    .btn-edit-z{background:#fef9c3;color:#854d0e;}
     .btn-del-z{background:#fee2e2;color:#991b1b;}
-    .badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600;}
+    .badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;}
     .badge-noflyzone{background:#fee2e2;color:#991b1b;}
     .badge-warnzone{background:#fff7ed;color:#c2410c;}
-    .badge-polygon{background:#e0e7ff;color:#3730a3;margin-left:3px;}
-    .badge-circle{background:#dcfce7;color:#166534;margin-left:3px;}
-    .nfz-pagination{padding:8px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#64748b;flex-shrink:0;}
-    .nfz-pagination select{padding:2px 5px;border:1px solid #cbd5e1;border-radius:4px;font-size:11px;}
-    .nfz-pagination button{padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;font-size:11px;}
+    .badge-polygon{background:#e0e7ff;color:#3730a3;}
+    .badge-circle{background:#dcfce7;color:#166534;}
+    .nfz-pagination{padding:10px 12px;border-top:1px solid rgba(148,163,184,.25);display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#cbd5e1;flex-shrink:0;background:rgba(30,41,59,.6);}
+    .nfz-pagination select{padding:3px 6px;border:1px solid rgba(148,163,184,.4);border-radius:4px;font-size:12px;background:rgba(30,41,59,.8);color:#e2e8f0;}
+    .nfz-pagination button{padding:3px 10px;border:1px solid rgba(148,163,184,.4);background:rgba(30,41,59,.8);color:#e2e8f0;border-radius:4px;cursor:pointer;font-size:12px;}
     .nfz-pagination button:disabled{opacity:.4;cursor:not-allowed;}
     .nfz-map-area{flex:1;position:relative;}
     #nfzMap{width:100%;height:100%;}
-    .nfz-right-panel{position:absolute;top:16px;right:16px;z-index:800;background:rgba(255,255,255,.96);border-radius:10px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:170px;}
-    .right-panel-title{font-size:13px;font-weight:700;color:#0f172a;margin-bottom:10px;text-align:center;}
-    .btn-draw{display:block;width:100%;padding:8px;margin-bottom:7px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;}
+    .nfz-right-panel{position:absolute;top:16px;right:16px;z-index:800;background:rgba(255,255,255,.97);border-radius:10px;padding:14px 16px;box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:180px;}
+    .right-panel-title{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px;text-align:center;}
+    .map-search-row{display:flex;gap:5px;margin-bottom:10px;}
+    .map-search-input{flex:1;padding:6px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;outline:none;min-width:0;}
+    .map-search-input:focus{border-color:#3b82f6;}
+    .map-search-btn{padding:6px 10px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;}
+    .map-search-btn:hover{background:#2563eb;}
+    .btn-draw{display:block;width:100%;padding:9px;margin-bottom:7px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;}
     .btn-draw:hover{background:#b91c1c;}
-    .btn-confirm-draw{display:none;width:100%;padding:7px;margin-bottom:6px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;}
-    .btn-cancel-draw{display:none;width:100%;padding:7px;background:#64748b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;}
+    .btn-confirm-draw{display:none;width:100%;padding:8px;margin-bottom:6px;background:#16a34a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;}
+    .btn-cancel-draw{display:none;width:100%;padding:8px;background:#64748b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;}
     .nfz-legend{margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;}
     .legend-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#475569;margin-bottom:4px;}
     .legend-swatch{width:22px;height:12px;border-radius:3px;}
@@ -65,7 +72,7 @@
     .btn-modal-cancel{padding:8px 18px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:14px;}
     .btn-modal-save{padding:8px 18px;background:#0ea5e9;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;}
     .btn-modal-save:hover{background:#0284c7;}
-    .nfz-empty{text-align:center;color:#94a3b8;padding:30px 16px;font-size:13px;}
+    .nfz-empty{text-align:center;color:#94a3b8;padding:30px 16px;font-size:14px;background:rgba(30,41,59,.5);border-radius:8px;margin:10px;}
   </style>
 </head>
 <body>
@@ -95,6 +102,10 @@
     <div id="nfzMap"></div>
     <div class="nfz-right-panel">
       <div class="right-panel-title">区域管理</div>
+      <div class="map-search-row">
+        <input class="map-search-input" id="mapSearchInput" type="text" placeholder="搜索地址跳转..." onkeydown="if(event.key==='Enter')searchMapLocation()" />
+        <button class="map-search-btn" onclick="searchMapLocation()">搜索</button>
+      </div>
       <button class="btn-draw" id="btnDrawPolygon" onclick="startDraw('polygon')">✏ 绘制多边形区域</button>
       <button class="btn-draw" id="btnDrawCircle" onclick="startDraw('circle')">⊙ 绘制圆形区域</button>
       <button class="btn-confirm-draw" id="btnConfirmDraw" onclick="openSaveModal()">✔ 确认绘制</button>
@@ -183,6 +194,66 @@
     if (cfg.tianditu_key) TIANDITU_KEY = cfg.tianditu_key;
     initMap(); loadZones();
   }).catch(() => { initMap(); loadZones(); });
+
+  let _searchMarker = null;
+  async function searchMapLocation() {
+    const kw = document.getElementById('mapSearchInput').value.trim();
+    if (!kw) { showToast('请输入要搜索的地址', 'error'); return; }
+    
+    // Try Tianditu search first
+    try {
+      const url = `https://api.tianditu.gov.cn/search?postStr=${encodeURIComponent(JSON.stringify({keyWord: kw, level: 12, mapBound: '113.0,34.0,114.5,35.5', queryType: 7, start: 0, count: 1}))}&type=query&tk=${TIANDITU_KEY}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.status === '0' && data.pois && data.pois.length > 0) {
+        const poi = data.pois[0];
+        const lon = parseFloat(poi.lonlat.split(' ')[0]);
+        const lat = parseFloat(poi.lonlat.split(' ')[1]);
+        map.setView([lat, lon], 15);
+        if (_searchMarker) { map.removeLayer(_searchMarker); }
+        _searchMarker = L.marker([lat, lon], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div style="background:#3b82f6;color:#fff;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">${esc(poi.name || kw)}</div>`,
+            iconAnchor: [0, 0]
+          })
+        }).addTo(map);
+        showToast('已跳转到: ' + (poi.name || kw), 'success');
+        return;
+      }
+    } catch(e) {
+      console.warn('Tianditu search failed, falling back to AMap:', e);
+    }
+    
+    // Fallback to AMap geocoding API
+    try {
+      const res = await api('/amap/geocode', { method: 'POST', body: { address: kw, city: '' } });
+      const data = await res.json();
+      if (data.error) {
+        showToast('搜索失败: ' + data.error, 'error');
+        return;
+      }
+      const items = data.items || [];
+      if (items.length > 0) {
+        const item = items[0];
+        map.setView([item.lat, item.lon], 15);
+        if (_searchMarker) { map.removeLayer(_searchMarker); }
+        _searchMarker = L.marker([item.lat, item.lon], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div style="background:#3b82f6;color:#fff;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">${esc(item.name || kw)}</div>`,
+            iconAnchor: [0, 0]
+          })
+        }).addTo(map);
+        showToast('已跳转到: ' + (item.name || kw), 'success');
+      } else {
+        showToast('未找到该地址，请尝试更具体的关键词', 'error');
+      }
+    } catch(e) {
+      console.error('AMap geocode also failed:', e);
+      showToast('搜索失败，请配置 AMAP_KEY 环境变量', 'error');
+    }
+  }
 
   function initMap() {
     map = L.map('nfzMap', { center: [34.7616, 113.6654], zoom: 13, doubleClickZoom: false });
@@ -500,12 +571,18 @@
       const areaKm=(z.area_m2/1e6).toFixed(2);
       const shapeLabel=z.shape_type==='circle'?'圆形':'多边形';
       const badgeCls=z.zone_type==='警告区域'?'badge-warnzone':'badge-noflyzone';
-      const altStr=z.altitude_enabled?'&nbsp;·&nbsp; 限高'+z.altitude_limit+'m':'';
-      const dt=z.created_at?z.created_at.replace('T',' ').substring(0,16):'';
+      const shapeBadgeCls=z.shape_type==='circle'?'badge-circle':'badge-polygon';
+      const altStr=z.altitude_enabled?` <span style="font-size:12px;color:#64748b;">· 限高${z.altitude_limit}m</span>`:'';
+      const dt=z.created_at?z.created_at.replace('T',' ').substring(0,19):'';
       return `<div class="nfz-item" id="nfz-item-${z.id}" onclick="focusZone(${z.id})">
         <div class="nfz-item-name">${esc(z.name)}</div>
-        <div class="nfz-item-meta">面积: ${areaKm} km²&nbsp;&nbsp;<span class="badge ${badgeCls}">${shapeLabel} ${esc(z.zone_type)}</span>${altStr}</div>
-        ${z.address?`<div class="nfz-item-addr">地址: ${esc(z.address)}</div>`:''}
+        <div class="nfz-item-meta">
+          <span>面积: <b>${areaKm} km²</b></span>
+          <span class="badge ${shapeBadgeCls}">${shapeLabel}</span>
+          <span class="badge ${badgeCls}">${esc(z.zone_type)}</span>
+          ${altStr}
+        </div>
+        ${z.address?`<div class="nfz-item-addr">📍 ${esc(z.address)}</div>`:''}
         <div class="nfz-item-time">创建时间: ${dt}</div>
         <div class="nfz-item-btns">
           <button class="btn-view-z" onclick="event.stopPropagation();focusZone(${z.id})">查看</button>

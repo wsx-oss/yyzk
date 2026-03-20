@@ -95,6 +95,30 @@
     .plan-warning-warning { background: #fffbeb; color: #92400e; }
     .plan-warning-critical { background: #fef2f2; color: #991b1b; }
     .plan-estimates { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }
+
+    /* Multi-plan cards — stacked vertical layout, map on left + stats on right */
+    .multi-plan-grid { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+    .multi-plan-card { border: 2px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #fafafa; transition: border-color .15s,box-shadow .15s; }
+    .multi-plan-card:hover { border-color: #6366f1; box-shadow: 0 4px 16px rgba(99,102,241,.12); }
+    .multi-plan-card.selected { border-color: #10b981; background: #f0fdf4; box-shadow: 0 4px 16px rgba(16,185,129,.15); }
+    .multi-plan-label { font-size: 14px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .multi-plan-label-efficient { color: #0369a1; }
+    .multi-plan-label-balanced  { color: #6366f1; }
+    .multi-plan-label-safe      { color: #15803d; }
+    .multi-plan-body { display: grid; grid-template-columns: 220px 1fr; gap: 12px; align-items: start; }
+    @media(max-width:480px){ .multi-plan-body { grid-template-columns: 1fr; } }
+    .multi-plan-map { height: 190px; border-radius: 8px; overflow: hidden; background: #e8f0fe; }
+    .multi-plan-stat { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
+    .multi-plan-stat:last-of-type { border-bottom: none; }
+    .multi-plan-stat .stat-label { color: #94a3b8; }
+    .multi-plan-stat .stat-val   { font-weight: 600; color: #0f172a; }
+    .multi-plan-btn { margin-top: 10px; width: 100%; padding: 8px; border: none; border-radius: 8px; background: #6366f1; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+    .multi-plan-btn:hover { background: #4f46e5; }
+    .multi-plan-btn.selected-btn { background: #10b981; }
+    .multi-plan-warn-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 500; margin-top: 6px; }
+    .multi-plan-warn-ok   { background: #d1fae5; color: #065f46; }
+    .multi-plan-warn-warn { background: #fef9c3; color: #854d0e; }
+    .multi-plan-warn-crit { background: #fee2e2; color: #991b1b; }
     .plan-est-box { background: #f8fafc; border-radius: 8px; padding: 10px; text-align: center; }
     .plan-est-label { font-size: 11px; color: #94a3b8; }
     .plan-est-value { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 2px; }
@@ -288,6 +312,7 @@
         <div class="full-width">
           <label>任务名称 *</label>
           <input id="missionName" type="text" placeholder="请输入任务名称" />
+          <div id="missionNameHint" style="font-size:11px;margin-top:4px;min-height:16px;"></div>
         </div>
         <div class="full-width">
           <label>执行无人机</label>
@@ -370,6 +395,13 @@
           <input type="checkbox" id="reasoningCheckbox" style="margin:0;width:16px;height:16px;" />
           <label for="reasoningCheckbox" style="margin:0;font-weight:500;color:#0c4a6e;">启用思维链分析（记录AI决策过程）</label>
           <span style="font-size:11px;color:#64748b;">生成后可查看详细推理步骤</span>
+        </div>
+
+        <!-- Multi-Candidate Plan Option -->
+        <div class="full-width" style="display:flex;align-items:center;gap:8px;padding:12px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+          <input type="checkbox" id="multiPlanCheckbox" style="margin:0;width:16px;height:16px;" />
+          <label for="multiPlanCheckbox" style="margin:0;font-weight:500;color:#14532d;">生成多候选方案（高效 / 均衡 / 保守）</label>
+          <span style="font-size:11px;color:#64748b;">同时生成3条路线供选择，耗时较长</span>
         </div>
 
         <!-- Manual fields (auto-filled by smart plan) -->
@@ -984,6 +1016,7 @@
       $('#btnSubmitMission').textContent = '确认创建';
       $('#btnSmartPlan').style.display = '';
       $('#missionName').value = '';
+      if ($('#missionNameHint')) $('#missionNameHint').textContent = '';
       $('#missionDevice').value = '0';
       $('#mStartAddr').value = ''; $('#mStartLat').value = ''; $('#mStartLon').value = '';
       $('#mGoalAddr').value = ''; $('#mGoalLat').value = ''; $('#mGoalLon').value = '';
@@ -1104,6 +1137,42 @@
       mResultNFZLayers = [];
     }
 
+    // Real-time duplicate mission name check
+    function checkMissionNameDuplicate() {
+      const nameInput = $('#missionName');
+      const hint = $('#missionNameHint');
+      if (!nameInput || !hint) return;
+
+      const name = nameInput.value.trim();
+      if (!name) {
+        hint.textContent = '';
+        hint.style.color = '';
+        return;
+      }
+
+      // Skip check if editing the same mission
+      if (editingId) {
+        const editingMission = _lastMissionItems.find(m => m.id === editingId);
+        if (editingMission && editingMission.name === name) {
+          hint.textContent = '';
+          hint.style.color = '';
+          return;
+        }
+      }
+
+      // Check against cached mission list
+      const duplicate = _lastMissionItems.find(m => m.name === name && m.id !== editingId);
+      if (duplicate) {
+        hint.textContent = '⚠ 任务名称已存在，请使用其他名称';
+        hint.style.color = '#dc2626';
+        hint.style.fontWeight = '500';
+      } else {
+        hint.textContent = '✓ 任务名称可用';
+        hint.style.color = '#10b981';
+        hint.style.fontWeight = '400';
+      }
+    }
+
     async function submitMission() {
       const startLat = parseFloat($('#mStartLat').value);
       const startLon = parseFloat($('#mStartLon').value);
@@ -1146,6 +1215,15 @@
       };
       if (!body.name) { showToast('请输入任务名称', 'error'); return; }
       if (!body.route) { showToast('请输入飞行路线（或先点击"智能规划并回填"）', 'error'); return; }
+
+      // Final duplicate check before submission
+      if (!editingId) {
+        const duplicate = _lastMissionItems.find(m => m.name === body.name);
+        if (duplicate) {
+          showToast('⚠ 任务名称已存在，请使用其他名称', 'error');
+          return;
+        }
+      }
 
       try {
         let res;
@@ -1624,7 +1702,8 @@
 
       // 检查是否启用思维链分析
       const withReasoning = $('#reasoningCheckbox')?.checked || false;
-      
+      const multiPlan = $('#multiPlanCheckbox')?.checked || false;
+
       // Validate no start/end in selected no-fly zones before planning
       const selectedIds = getSelectedNFZIds();
       if (selectedIds.length) {
@@ -1647,16 +1726,21 @@
         },
         drone_id: droneId,
         drone_name: droneName !== '未指定' ? droneName : '',
-        with_reasoning: withReasoning
+        with_reasoning: withReasoning,
+        multi_plan: multiPlan
       };
 
       // Show loading
       const btn = $('#btnSmartPlan');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> 规划中...';
+      btn.innerHTML = multiPlan
+        ? '<span class="spinner"></span> 生成3套方案中（约需30秒）...'
+        : '<span class="spinner"></span> 规划中...';
       const area = $('#mPlanResultArea');
       area.style.display = 'block';
-      area.innerHTML = '<div class="plan-loading"><span class="spinner"></span> 正在调用大模型进行路径规划，请稍候...</div>';
+      area.innerHTML = multiPlan
+        ? '<div class="plan-loading"><span class="spinner"></span> 正在生成高效/均衡/保守三套方案，请耐心等待...</div>'
+        : '<div class="plan-loading"><span class="spinner"></span> 正在调用大模型进行路径规划，请稍候...</div>';
 
       try {
         const res = await api('/flight/missions/plan', { method: 'POST', body: reqBody });
@@ -1668,6 +1752,16 @@
           return;
         }
         mLastMapCtx = data.map_context || null;
+
+        // ── Multi-plan branch ─────────────────────────────────────────────────
+        if (data.multi_plan && Array.isArray(data.plans)) {
+          btn.disabled = false;
+          btn.innerHTML = '&#x1F9E0; 重新规划';
+          renderMultiPlanCards(data.plans, data.labels, data.plan_ids,
+            startLat, startLon, goalLat, goalLon, alt, speed);
+          return;
+        }
+
         mLastPlan = data.plan;
         const plan = data.plan;
         const source = data.source;
@@ -1837,6 +1931,173 @@
       setTimeout(function() { renderMResultMap(plan); }, 200);
     }
 
+    var _multiPlanMaps = [];
+
+    // ── renderMultiPlanCards: shows 3 candidate plan cards with route maps ───────
+    function renderMultiPlanCards(plans, labels, planIds, sLat, sLon, gLat, gLon, alt, speed) {
+      // Destroy previous mini-maps
+      _multiPlanMaps.forEach(function(m) { try { m.remove(); } catch(e) {} });
+      _multiPlanMaps = [];
+
+      const area = $('#mPlanResultArea');
+      const icons = ['⚡', '⚖️', '🛡️'];
+      const labelClasses = ['multi-plan-label-efficient', 'multi-plan-label-balanced', 'multi-plan-label-safe'];
+      const lineColors = ['#0369a1', '#6366f1', '#15803d'];
+
+      let html = '<div class="plan-result">';
+      html += '<div class="plan-result-title">✔ 已生成 <strong>3 套候选方案</strong>，请选择一套回填表单</div>';
+      html += '<div class="multi-plan-grid">';
+
+      plans.forEach((plan, idx) => {
+        const label = (labels && labels[idx]) ? labels[idx] : ('方案' + (idx + 1));
+        const dist = plan.estimates ? (plan.estimates.distance_m / 1000).toFixed(2) : '--';
+        const timeMins = plan.estimates ? Math.ceil(plan.estimates.time_s / 60) : '--';
+        const battery = plan.estimates ? (plan.estimates.expected_battery_drop_percent?.toFixed(1) || '0') : '--';
+        const wpCount = plan.waypoints ? plan.waypoints.length : '--';
+
+        const criticals = (plan.warnings || []).filter(w => w.level === 'critical').length;
+        const warns = (plan.warnings || []).filter(w => w.level === 'warning').length;
+        let warnBadge = criticals > 0
+          ? `<span class="multi-plan-warn-badge multi-plan-warn-crit">⚠ ${criticals}项违规</span>`
+          : warns > 0
+            ? `<span class="multi-plan-warn-badge multi-plan-warn-warn">${warns}项提示</span>`
+            : '<span class="multi-plan-warn-badge multi-plan-warn-ok">✓ 安全</span>';
+
+        const expl = plan.explanation
+          ? (plan.explanation.length > 100 ? plan.explanation.slice(0, 100) + '…' : plan.explanation)
+          : '';
+
+        html += `<div class="multi-plan-card" id="mpc-${idx}">`;
+        html += `<div class="multi-plan-label ${labelClasses[idx] || ''}">${icons[idx] || ''} ${esc(label)}</div>`;
+        html += '<div class="multi-plan-body">';
+        // Left: map
+        html += `<div id="mpc-map-${idx}" class="multi-plan-map"></div>`;
+        // Right: stats + actions
+        html += '<div class="multi-plan-details">';
+        html += `<div class="multi-plan-stat"><span class="stat-label">总距离</span><span class="stat-val">${dist} km</span></div>`;
+        html += `<div class="multi-plan-stat"><span class="stat-label">预计耗时</span><span class="stat-val">${timeMins} min</span></div>`;
+        html += `<div class="multi-plan-stat"><span class="stat-label">电量消耗</span><span class="stat-val">${battery}%</span></div>`;
+        html += `<div class="multi-plan-stat"><span class="stat-label">航点数量</span><span class="stat-val">${wpCount}</span></div>`;
+        html += warnBadge;
+        if (expl) html += `<div style="font-size:11px;color:#64748b;margin-top:8px;line-height:1.5;">${esc(expl)}</div>`;
+        html += `<button class="multi-plan-btn" id="mpc-btn-${idx}" onclick="selectMultiPlan(${idx})">选择此方案</button>`;
+        html += '</div></div></div>';
+      });
+
+      html += '</div>';
+      html += '<div style="text-align:center;margin-top:12px;font-size:12px;color:#94a3b8;">选择方案后将自动回填表单，点击「确认创建」完成</div>';
+      html += '</div>';
+      area.innerHTML = html;
+
+      // Store plans globally for selection
+      window._multiPlans = plans;
+      window._multiPlanIds = planIds || [];
+      window._multiPlanMeta = { sLat, sLon, gLat, gLon, alt, speed };
+
+      // Initialize mini-maps after DOM update
+      setTimeout(function() {
+        if (!tdtReady) return;
+        plans.forEach(function(plan, idx) {
+          if (!plan.waypoints || plan.waypoints.length < 2) return;
+          const container = document.getElementById('mpc-map-' + idx);
+          if (!container) return;
+          try {
+            let sumLat = 0, sumLon = 0;
+            plan.waypoints.forEach(function(wp) { sumLat += wp.lat; sumLon += wp.lon; });
+            const cLat = sumLat / plan.waypoints.length;
+            const cLon = sumLon / plan.waypoints.length;
+
+            const m = L.map('mpc-map-' + idx, {
+              center: [cLat, cLon], zoom: 13,
+              zoomControl: false, attributionControl: false,
+              dragging: false, scrollWheelZoom: false, doubleClickZoom: false
+            });
+            tdtImgLayer().addTo(m);
+            tdtCiaLayer().addTo(m);
+
+            // NFZ layers
+            const nfzLayersBuf = [];
+            addNoFlyZonesToMap(m, nfzLayersBuf);
+
+            // Flight path polyline
+            const coords = plan.waypoints.map(function(wp) { return [wp.lat, wp.lon]; });
+            const lineColor = lineColors[idx] || '#6366f1';
+            const poly = L.polyline(coords, { color: lineColor, weight: 3, opacity: 0.9 }).addTo(m);
+
+            // Action waypoint markers (only for waypoints with actions)
+            const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316' };
+            plan.waypoints.forEach(function(wp, wi) {
+              if (!wp.action && wi !== 0 && wi !== plan.waypoints.length - 1) return;
+              const color = actionColors[wp.action] || lineColor;
+              const labelHtml = `<div style="background:${color};color:#fff;padding:1px 5px;border-radius:4px;font-size:9px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3);">${wi+1}.${esc(wp.action||'')}</div>`;
+              L.marker([wp.lat, wp.lon], {
+                icon: L.divIcon({ className: '', html: labelHtml, iconAnchor: [16, 8] })
+              }).addTo(m);
+            });
+
+            m.fitBounds(poly.getBounds().pad(0.25));
+            _multiPlanMaps.push(m);
+          } catch(e) { console.warn('mini map init failed:', idx, e); }
+        });
+      }, 200);
+    }
+
+    function selectMultiPlan(idx) {
+      const plans = window._multiPlans;
+      if (!plans || !plans[idx]) return;
+      const plan = plans[idx];
+      const meta = window._multiPlanMeta || {};
+
+      // Update card styles
+      [0, 1, 2].forEach(i => {
+        const card = document.getElementById('mpc-' + i);
+        const btn = document.getElementById('mpc-btn-' + i);
+        if (card) card.classList.toggle('selected', i === idx);
+        if (btn) {
+          btn.classList.toggle('selected-btn', i === idx);
+          btn.textContent = i === idx ? '✓ 已选择' : '选择此方案';
+        }
+      });
+
+      // Fill form fields
+      mLastPlan = plan;
+      const startAddr = $('#mStartAddr').value.trim() || `${meta.sLat},${meta.sLon}`;
+      const goalAddr  = $('#mGoalAddr').value.trim()  || `${meta.gLat},${meta.gLon}`;
+      let routeStr = startAddr + ' → ' + goalAddr;
+      if (plan.waypoints && plan.waypoints.length > 2) {
+        const midPoints = plan.waypoints.slice(1, -1).filter(w => w.action && w.action !== '').map(w => w.action);
+        if (midPoints.length) routeStr = startAddr + ' → ' + midPoints.join(' → ') + ' → ' + goalAddr;
+      }
+      $('#missionRoute').value = routeStr;
+
+      if (plan.estimates && plan.estimates.time_s) {
+        const mins = Math.ceil(plan.estimates.time_s / 60);
+        $('#missionDuration').value = mins >= 60
+          ? Math.floor(mins / 60) + '小时' + (mins % 60 > 0 ? mins % 60 + '分' : '')
+          : mins + '分钟';
+      }
+
+      const actionLabels = { 'CAPTURE_PHOTO': '航拍', 'RECORD_VIDEO': '录像', 'LOITER': '悬停观测', 'SCAN_AREA': '区域扫描', 'INSPECT': '巡检', 'SPRAY': '喷洒作业', 'DROP_PAYLOAD': '投放' };
+      if (missionActions.length) {
+        $('#missionTarget').value = missionActions.map(a => actionLabels[a.type] || a.type).join('、');
+      }
+
+      let desc = plan.explanation || '';
+      if (plan.estimates) {
+        desc += '\n\n预计距离: ' + (plan.estimates.distance_m / 1000).toFixed(2) + 'km';
+        desc += '，耗时: ' + Math.ceil(plan.estimates.time_s / 60) + '分钟';
+        desc += '，电量消耗: ' + (plan.estimates.expected_battery_drop_percent?.toFixed(1) || '0') + '%';
+      }
+      $('#missionDesc').value = desc.trim();
+
+      if (!$('#missionName').value.trim()) {
+        const dateStr = new Date().toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+        $('#missionName').value = dateStr + ' ' + startAddr.substring(0, 8) + '→' + goalAddr.substring(0, 8);
+      }
+
+      showToast('已选择方案，请确认后点击「确认创建」', 'success');
+    }
+
     var mResultPathPolyline = null;
     var mResultDragMarkers = [];
 
@@ -1962,6 +2223,13 @@
     loadMissions();
     connectFlightWS();
     connectGpsWS();
+
+    // Bind real-time duplicate name check
+    const missionNameInput = $('#missionName');
+    if (missionNameInput) {
+      missionNameInput.addEventListener('input', checkMissionNameDuplicate);
+      missionNameInput.addEventListener('blur', checkMissionNameDuplicate);
+    }
 
     // Phase 2: Load Chart.js async, then init charts + stats
     loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js')

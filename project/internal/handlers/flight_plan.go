@@ -3,7 +3,9 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +24,7 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 	var request struct {
 		llm.PlanRequest
 		WithReasoning bool `json:"with_reasoning"` // 是否包含思维链分析
+		MultiPlan     bool `json:"multi_plan"`     // 是否生成多候选方案
 	}
 	if err := c.BindJSON(&request); err != nil {
 		c.JSON(400, gin.H{"error": "请求格式错误: " + err.Error()})
@@ -38,18 +41,70 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 		return
 	}
 
+	// Case-Based Reasoning: inject similar adopted plans as context for the LLM
+	if caseCtx := loadSimilarCases(a.db, request.PlanRequest); caseCtx != "" {
+		if request.MapContextStr != "" {
+			request.MapContextStr += caseCtx
+		} else {
+			request.MapContextStr = caseCtx
+		}
+		log.Printf("[FlightPlan] CBR: injected similar historical cases into prompt")
+	}
+
 	// Gather real map data from AMap if available
 	amapClient := amap.NewClient()
 	var mapCtx *amap.MapContext
 	if amapClient.Available() {
 		mapCtx = amapClient.BuildContext(request.Start.Lat, request.Start.Lon, request.Goal.Lat, request.Goal.Lon)
 		if mapCtx != nil && mapCtx.Summary != "" {
-			request.MapContextStr = mapCtx.Summary
+			// Prepend amap context; keep any CBR context already appended
+			if request.MapContextStr != "" {
+				request.MapContextStr = mapCtx.Summary + request.MapContextStr
+			} else {
+				request.MapContextStr = mapCtx.Summary
+			}
 			log.Printf("[FlightPlan] Map context: %s", mapCtx.Summary)
 		}
 	}
 
 	client := llm.NewClient()
+
+	// ── Multi-plan mode: generate three candidate plans ──────────────────────────
+	if request.MultiPlan && client.Available() {
+		multiResult := client.GenerateMultiplePlans(request.PlanRequest)
+		reqJSON, _ := json.Marshal(request.PlanRequest)
+		planIDs := make([]int64, 0, 3)
+		for i, plan := range multiResult.Plans {
+			resultJSON, _ := json.Marshal(plan)
+			src := "llm_multi_" + multiResult.Labels[i]
+			res, err := a.db.Exec(
+				`INSERT INTO flight_plans(drone_id, request_json, result_json, source, status) VALUES(?,?,?,?,?)`,
+				request.DroneID, string(reqJSON), string(resultJSON), src, "draft",
+			)
+			if err == nil {
+				id, _ := res.LastInsertId()
+				planIDs = append(planIDs, id)
+			}
+		}
+		respData := gin.H{
+			"ok":        true,
+			"multi_plan": true,
+			"plans":     multiResult.Plans,
+			"labels":    multiResult.Labels,
+			"plan_ids":  planIDs,
+			"source":    "llm_multi",
+		}
+		if mapCtx := func() *amap.MapContext {
+			if amap.NewClient().Available() {
+				return amap.NewClient().BuildContext(request.Start.Lat, request.Start.Lon, request.Goal.Lat, request.Goal.Lon)
+			}
+			return nil
+		}(); mapCtx != nil {
+			respData["map_context"] = mapCtx
+		}
+		c.JSON(200, respData)
+		return
+	}
 
 	var result *llm.PlanResult
 	var reasoningChain *llm.ReasoningChain
@@ -360,6 +415,99 @@ func (a *API) FlightPlanStatus(c *gin.Context) {
 		"model":          client.Model,
 		"base_url":       client.BaseURL,
 	})
+}
+
+// loadSimilarCases queries recently adopted flight plans whose start/end points lie
+// within 5 km of the current request, and returns a formatted context string
+// to inject into the LLM prompt as Case-Based Reasoning (CBR) examples.
+func loadSimilarCases(db *sql.DB, req llm.PlanRequest) string {
+	rows, err := db.Query(`
+		SELECT request_json, result_json
+		FROM flight_plans
+		WHERE status = 'adopted'
+		ORDER BY datetime(created_at) DESC
+		LIMIT 20
+	`)
+	if err != nil {
+		return ""
+	}
+	defer rows.Close()
+
+	type caseItem struct {
+		req    llm.PlanRequest
+		result llm.PlanResult
+	}
+	var cases []caseItem
+	for rows.Next() {
+		var reqJSON, resultJSON string
+		if err := rows.Scan(&reqJSON, &resultJSON); err != nil {
+			continue
+		}
+		var histReq llm.PlanRequest
+		var histResult llm.PlanResult
+		if json.Unmarshal([]byte(reqJSON), &histReq) != nil {
+			continue
+		}
+		if json.Unmarshal([]byte(resultJSON), &histResult) != nil {
+			continue
+		}
+		if geoDistKm(req.Start.Lat, req.Start.Lon, histReq.Start.Lat, histReq.Start.Lon) < 5.0 &&
+			geoDistKm(req.Goal.Lat, req.Goal.Lon, histReq.Goal.Lat, histReq.Goal.Lon) < 5.0 {
+			cases = append(cases, caseItem{histReq, histResult})
+			if len(cases) >= 3 {
+				break
+			}
+		}
+	}
+	if len(cases) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n\n【历史成功规划案例参考（请借鉴绕行策略）】")
+	for i, c := range cases {
+		sb.WriteString(fmt.Sprintf("\n案例%d（已被用户采纳）：", i+1))
+		sb.WriteString(fmt.Sprintf("\n  起点:(%.6f,%.6f) 终点:(%.6f,%.6f)",
+			c.req.Start.Lat, c.req.Start.Lon, c.req.Goal.Lat, c.req.Goal.Lon))
+		if len(c.req.Constraints.NoFlyZones) > 0 {
+			sb.WriteString(fmt.Sprintf(" 禁飞区%d个", len(c.req.Constraints.NoFlyZones)))
+		}
+		if len(c.result.Waypoints) > 2 {
+			midPts := []string{}
+			for _, wp := range c.result.Waypoints[1 : len(c.result.Waypoints)-1] {
+				if wp.Action != "" {
+					midPts = append(midPts, fmt.Sprintf("(%.5f,%.5f)[%s]", wp.Lat, wp.Lon, wp.Action))
+				} else {
+					midPts = append(midPts, fmt.Sprintf("(%.5f,%.5f)", wp.Lat, wp.Lon))
+				}
+				if len(midPts) >= 4 {
+					break
+				}
+			}
+			if len(midPts) > 0 {
+				sb.WriteString(fmt.Sprintf("\n  中间路径: %s", strings.Join(midPts, "→")))
+			}
+		}
+		if expl := c.result.Explanation; expl != "" {
+			if len(expl) > 150 {
+				expl = expl[:150] + "..."
+			}
+			sb.WriteString(fmt.Sprintf("\n  说明: %s", expl))
+		}
+		sb.WriteString(fmt.Sprintf("\n  总距离:%.0fm", c.result.Estimates.DistanceM))
+	}
+	return sb.String()
+}
+
+// geoDistKm returns the great-circle distance in kilometres between two points.
+func geoDistKm(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371.0
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLon := (lon2 - lon1) * math.Pi / 180
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 }
 
 // AmapGeocode converts an address string to coordinate candidates.

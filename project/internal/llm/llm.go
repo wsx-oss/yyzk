@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -209,8 +210,8 @@ func (c *Client) CallRaw(systemPrompt, userPrompt string) (string, error) {
 	return c.call(systemPrompt, userPrompt)
 }
 
-// call sends a chat completion request and returns the assistant message content
-func (c *Client) call(systemPrompt, userPrompt string) (string, error) {
+// callWithTemp sends a chat completion request with a configurable sampling temperature.
+func (c *Client) callWithTemp(systemPrompt, userPrompt string, temperature float64) (string, error) {
 	if !c.Available() {
 		return "", errors.New("LLM API key not configured (set LLM_API_KEY environment variable)")
 	}
@@ -221,7 +222,7 @@ func (c *Client) call(systemPrompt, userPrompt string) (string, error) {
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		Temperature: 0.3,
+		Temperature: temperature,
 		MaxTokens:   4096,
 	}
 
@@ -274,57 +275,58 @@ func (c *Client) call(systemPrompt, userPrompt string) (string, error) {
 	return chatResp.Choices[0].Message.Content, nil
 }
 
+// call sends a chat completion request with the default temperature (0.3).
+func (c *Client) call(systemPrompt, userPrompt string) (string, error) {
+	return c.callWithTemp(systemPrompt, userPrompt, 0.3)
+}
+
 // ======================== Flight Planning ========================
 
-const systemPrompt = `你是一个无人机飞行路径规划专家。用户会给你起点坐标、终点坐标、中间动作列表和约束条件。
-你需要规划一条从起点到终点的最优飞行路线，在合适的位置插入用户要求的动作（如拍照、悬停、扫描等）。
+const systemPrompt = `你是一个无人机飞行路径规划专家。接收起终点坐标、任务动作列表和飞行约束，输出结构化飞行计划。
 
-你必须严格按照以下JSON格式输出，不要输出任何其他内容（不要输出markdown代码块标记）：
+【输出格式】仅输出纯JSON，绝对不允许添加任何说明文字或代码块标记（禁止输出` + "```" + `等符号）：
 {
   "waypoints": [
-    {"lat": 数字, "lon": 数字, "alt_m": 数字, "speed_mps": 数字, "action": "动作名称或空字符串"}
+    {"lat": 数字, "lon": 数字, "alt_m": 数字, "speed_mps": 数字, "action": "动作名或空字符串"}
   ],
-  "actions": [
-    {"type": "动作类型", "params": {}}
-  ],
+  "actions": [{"type": "动作类型", "params": {}}],
   "estimates": {
     "distance_m": 总距离米,
     "time_s": 预计耗时秒,
-    "expected_battery_drop_percent": 预计电量消耗百分比
+    "expected_battery_drop_percent": 电量消耗百分比
   },
-  "warnings": [
-    {"level": "info/warning/critical", "message": "提示信息"}
-  ],
-  "explanation": "对规划路线的中文解释，说明为什么这样规划、有哪些风险点"
+  "warnings": [{"level": "info/warning/critical", "message": "提示信息"}],
+  "explanation": "中文路线说明，重点描述绕行决策和路径逻辑"
 }
 
-规划规则：
-1. 第一个航点必须是起点（含TAKEOFF动作），最后一个航点必须是终点（含LAND动作）
-2. 中间航点应合理分布，严格避开所有禁飞区
-3. 在需要执行动作的位置插入对应航点
-4. 默认飞行高度80m，默认速度8m/s，除非约束另有规定
-5. 电量消耗按每公里2%估算
-6. 【最重要、零容忍】禁飞区绕行规则（必须100%遵守，允许大幅度远距离绕路）：
+【规划规则】
+1. 第一个航点动作=TAKEOFF，最后一个航点动作=LAND
+2. 默认高度80m、速度8m/s；constraints字段另有规定时以constraints为准
+3. 电量估算：总距离(km) × 2%
+4. 航点精简原则（重要）：总航点数控制在5~20个；禁止生成两两相距不足50m的相邻重复航点；
+   用最少航点表达完整路径语义，不要冗余插点
+5. 任务动作插入：将actions中的每个动作插入到合理地理位置对应的航点中
 
-   ■ polygon（多边形）禁飞区处理方法：
-     - polygon字段中的坐标是多边形的顶点列表，这些顶点围成的区域是严禁飞行的
-     - 判断方法：对于路径上每一段（航点A→航点B），必须确保该线段不穿越多边形内部
-     - 绕行方法：找到多边形的外围顶点，选择绕行距离较短的一侧，在多边形顶点向外扩展100m处规划绕行航点
-     - 具体操作：若直线路径穿越多边形，必须在多边形边界的左侧或右侧规划1-3个中间航点，使整条路径完全在多边形外部
-     - 允许绕路增加50%以上的飞行距离，安全优先于效率
+【禁飞区绕行 — 零容忍，允许大幅绕路】
+注：后端几何引擎会对你的输出做精确校正，但你必须在语义层面主动避开禁飞区。
 
-   ■ circle（圆形）禁飞区处理方法：
-     - center字段为圆心坐标，radius_m为半径（米）
-     - 所有航点与圆心的距离必须大于(radius_m + 100m)
-     - 路径线段不得穿越圆形区域，须在圆形边界外100m处绕行
+■ polygon（多边形禁飞区）：
+  - polygon数组中的坐标围成严禁飞入的封闭区域
+  - 要求：每段航线(A→B)不得与多边形任意边相交，且航点不得落入多边形内部
+  - 绕行：路径与多边形相交时，选取相交侧的1~2个多边形顶点，在其外扩150m处插入绕行航点，
+    选择总绕行距离较短的一侧（左绕或右绕）
 
-   ■ 通用规则：
-     - 每个航点生成后，必须自我检查：该点是否在任何禁飞区内？若是，必须重新计算
-     - 不得以任何理由（包括路线过长、效率低）穿越禁飞区
-     - 规划完成后在explanation中详细说明绕行路线和绕行理由
+■ circle（圆形禁飞区）：
+  - 所有航点到center距离必须 > (radius_m + 150m)
+  - 每段航线亦不得穿越圆形区域；须在圆外150m处规划切线绕行航点
 
-7. 如果路线仍穿过禁飞区，在warnings中给出critical级别警告
-8. 如果预计电量消耗超过电池返航阈值，必须在warnings中给出critical警告`
+■ 三步自检（每个航点输出后必须执行）：
+  ① 该航点是否落入任意多边形内部？→ 是则推移至多边形外
+  ② 该航点到任意圆心距离是否 ≤ (radius_m+150)？→ 是则推移至圆外
+  ③ 该航点与前一航点的连线是否穿越任意禁飞区？→ 是则插入中间绕行航点
+
+6. 路线仍有违规时，在warnings中给出critical级别警告
+7. 电量消耗超过返航阈值时，在warnings中给出critical级别警告`
 
 // cleanLLMJSON strips markdown code fences from LLM output
 func cleanLLMJSON(raw string) string {
@@ -340,7 +342,7 @@ func cleanLLMJSON(raw string) string {
 	return raw
 }
 
-// collectNFZViolations returns a description of waypoints inside NFZs (empty string = no violations)
+// collectNFZViolations returns a description of waypoints/segments inside or crossing NFZs (empty = no violations)
 func collectNFZViolations(req *PlanRequest, result *PlanResult) string {
 	var msgs []string
 	for _, nfz := range req.Constraints.NoFlyZones {
@@ -348,6 +350,7 @@ func collectNFZViolations(req *PlanRequest, result *PlanResult) string {
 		if name == "" {
 			name = "未命名禁飞区"
 		}
+		// Check each waypoint is not inside NFZ
 		for i, wp := range result.Waypoints {
 			inside := false
 			if nfz.Type == "circle" && nfz.Center != nil && nfz.RadiusM > 0 {
@@ -359,11 +362,20 @@ func collectNFZViolations(req *PlanRequest, result *PlanResult) string {
 				msgs = append(msgs, fmt.Sprintf("  - 航点%d(%.6f,%.6f)位于禁飞区[%s]内", i, wp.Lat, wp.Lon, name))
 			}
 		}
+		// Check each path segment does not cross the polygon boundary
+		if len(nfz.Polygon) >= 3 {
+			for i := 1; i < len(result.Waypoints); i++ {
+				a, b := result.Waypoints[i-1], result.Waypoints[i]
+				if segmentCrossesPolygon(a, b, nfz.Polygon) {
+					msgs = append(msgs, fmt.Sprintf("  - 路径段%d→%d(%.6f,%.6f)→(%.6f,%.6f)穿越禁飞区[%s]边界，必须绕行", i-1, i, a.Lat, a.Lon, b.Lat, b.Lon, name))
+				}
+			}
+		}
 	}
 	if len(msgs) == 0 {
 		return ""
 	}
-	return "【严重错误】以下航点仍位于禁飞区内，必须规划绕行路线，所有航点坐标必须在禁飞区边界外部：\n" + strings.Join(msgs, "\n")
+	return "【严重错误】以下航点或路径段仍位于或穿越禁飞区，必须规划绕行路线，所有路径段必须完全在禁飞区边界外部：\n" + strings.Join(msgs, "\n")
 }
 
 // segmentCircleBypass inserts a bypass waypoint when segment a→b passes through a circle NFZ.
@@ -420,58 +432,81 @@ func segmentCircleBypass(a, b Waypoint, nfz NoFlyZone, bufM float64) []Waypoint 
 	}}
 }
 
-// CorrectNFZViolations geometrically fixes waypoints that fall inside circle NFZs and
-// inserts bypass waypoints for path segments that cross circle NFZ buffers.
+// CorrectNFZViolations geometrically fixes the plan in two passes:
+//  1. Push any waypoint that landed inside an NFZ to just outside the boundary.
+//  2. For every segment that still crosses an NFZ, find the optimal detour using
+//     a visibility-graph + Dijkstra search among the NFZ boundary vertices.
 func CorrectNFZViolations(req *PlanRequest, result *PlanResult) {
-	const bufM = 100.0 // 100 m safety buffer beyond NFZ radius
-
-	var circles []NoFlyZone
-	for _, nfz := range req.Constraints.NoFlyZones {
-		if nfz.Type == "circle" && nfz.Center != nil && nfz.RadiusM > 0 {
-			circles = append(circles, nfz)
-		}
-	}
-	if len(circles) == 0 {
+	const bufM = 150.0
+	if len(req.Constraints.NoFlyZones) == 0 {
 		return
 	}
 
-	// Pass 1: push any waypoint inside a circle outside to radius+buffer
+	// ── Pass 1: push waypoints that are inside any NFZ to just outside ─────────────
 	for idx := range result.Waypoints {
 		wp := &result.Waypoints[idx]
-		for _, nfz := range circles {
-			dist := haversine(wp.Lat, wp.Lon, nfz.Center.Lat, nfz.Center.Lon)
-			target := nfz.RadiusM + bufM
-			if dist < target {
-				if dist < 1 {
-					dist = 1
+		for _, nfz := range req.Constraints.NoFlyZones {
+			if nfz.Type == "circle" && nfz.Center != nil && nfz.RadiusM > 0 {
+				d := haversine(wp.Lat, wp.Lon, nfz.Center.Lat, nfz.Center.Lon)
+				if target := nfz.RadiusM + bufM; d < target {
+					if d < 1 {
+						d = 1
+					}
+					scale := target / d
+					wp.Lat = math.Round((nfz.Center.Lat+(wp.Lat-nfz.Center.Lat)*scale)*1e6) / 1e6
+					wp.Lon = math.Round((nfz.Center.Lon+(wp.Lon-nfz.Center.Lon)*scale)*1e6) / 1e6
 				}
-				scale := target / dist
-				wp.Lat = math.Round((nfz.Center.Lat+(wp.Lat-nfz.Center.Lat)*scale)*1e6) / 1e6
-				wp.Lon = math.Round((nfz.Center.Lon+(wp.Lon-nfz.Center.Lon)*scale)*1e6) / 1e6
+			}
+			if len(nfz.Polygon) >= 3 && pointInPolygon(wp.Lat, wp.Lon, nfz.Polygon) {
+				var cLat, cLon float64
+				for _, p := range nfz.Polygon {
+					cLat += p.Lat
+					cLon += p.Lon
+				}
+				cLat /= float64(len(nfz.Polygon))
+				cLon /= float64(len(nfz.Polygon))
+				cosLat := math.Cos(cLat * math.Pi / 180)
+				mLonP, mLatP := 111320.0*cosLat, 111320.0
+				vx := (wp.Lon - cLon) * mLonP
+				vy := (wp.Lat - cLat) * mLatP
+				vLen := math.Sqrt(vx*vx + vy*vy)
+				if vLen < 1 {
+					vx, vy, vLen = 0, 1, 1
+				}
+				var maxR float64
+				for _, p := range nfz.Polygon {
+					if d := haversine(cLat, cLon, p.Lat, p.Lon); d > maxR {
+						maxR = d
+					}
+				}
+				if target := maxR + bufM; vLen < target {
+					scale := target / vLen
+					wp.Lon = math.Round((cLon+vx*scale/mLonP)*1e6) / 1e6
+					wp.Lat = math.Round((cLat+vy*scale/mLatP)*1e6) / 1e6
+				}
 			}
 		}
 	}
 
-	// Pass 2: insert bypass waypoints for segments that still cross circles
-	newWPs := make([]Waypoint, 0, len(result.Waypoints)+6)
+	// ── Pass 2: visibility-graph detour for segments still crossing NFZs ────────
+	newWPs := make([]Waypoint, 0, len(result.Waypoints)+20)
 	newWPs = append(newWPs, result.Waypoints[0])
 	for i := 1; i < len(result.Waypoints); i++ {
 		a := newWPs[len(newWPs)-1]
 		b := result.Waypoints[i]
-		for _, nfz := range circles {
-			if bypass := segmentCircleBypass(a, b, nfz, bufM); len(bypass) > 0 {
-				newWPs = append(newWPs, bypass...)
-				break
-			}
+		if bypass := visibilityGraphBypass(a, b, req.Constraints.NoFlyZones, bufM); len(bypass) > 0 {
+			newWPs = append(newWPs, bypass...)
 		}
 		newWPs = append(newWPs, b)
 	}
 	result.Waypoints = newWPs
+
+	// ── Post-process: greedy removal of redundant waypoints ─────────────────────
+	result.Waypoints = simplifyPath(result.Waypoints, req.Constraints.NoFlyZones)
 }
 
-// GeneratePlan calls the LLM to produce a flight plan, retries once on NFZ violations,
-// then applies geometric correction and validates.
-func (c *Client) GeneratePlan(req PlanRequest) (*PlanResult, error) {
+// generateWithTemp is the core LLM planning function with a configurable sampling temperature.
+func (c *Client) generateWithTemp(req PlanRequest, temperature float64) (*PlanResult, error) {
 	userPrompt, err := json.MarshalIndent(req, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -481,7 +516,7 @@ func (c *Client) GeneratePlan(req PlanRequest) (*PlanResult, error) {
 		promptStr += "\n\n以下是真实地图数据（来自高德地图API），请参考这些信息进行更准确的规划：\n" + req.MapContextStr
 	}
 
-	raw, err := c.call(systemPrompt, promptStr)
+	raw, err := c.callWithTemp(systemPrompt, promptStr, temperature)
 	if err != nil {
 		return nil, err
 	}
@@ -495,7 +530,7 @@ func (c *Client) GeneratePlan(req PlanRequest) (*PlanResult, error) {
 	// If NFZ violations exist, retry with explicit error feedback
 	if feedback := collectNFZViolations(&req, &result); feedback != "" && len(req.Constraints.NoFlyZones) > 0 {
 		retryPrompt := promptStr + "\n\n" + feedback
-		if raw2, err2 := c.call(systemPrompt, retryPrompt); err2 == nil {
+		if raw2, err2 := c.callWithTemp(systemPrompt, retryPrompt, temperature); err2 == nil {
 			raw2 = cleanLLMJSON(raw2)
 			var result2 PlanResult
 			if json.Unmarshal([]byte(raw2), &result2) == nil {
@@ -504,7 +539,7 @@ func (c *Client) GeneratePlan(req PlanRequest) (*PlanResult, error) {
 		}
 	}
 
-	// Geometric post-correction for circle NFZs
+	// Geometric post-correction
 	CorrectNFZViolations(&req, &result)
 
 	// Final validation
@@ -512,6 +547,40 @@ func (c *Client) GeneratePlan(req PlanRequest) (*PlanResult, error) {
 		result.Warnings = append(result.Warnings, warnings...)
 	}
 	return &result, nil
+}
+
+// GeneratePlan calls the LLM to produce a flight plan with balanced parameters.
+func (c *Client) GeneratePlan(req PlanRequest) (*PlanResult, error) {
+	return c.generateWithTemp(req, 0.3)
+}
+
+// MultiPlanResult holds multiple candidate flight plans generated with different styles.
+type MultiPlanResult struct {
+	Plans  []*PlanResult `json:"plans"`
+	Labels []string      `json:"labels"`
+}
+
+// GenerateMultiplePlans generates three candidate flight plans in parallel using different
+// temperature settings:
+//   - 高效方案 (temp=0.10): focuses on shortest path
+//   - 均衡方案 (temp=0.35): balanced route
+//   - 保守方案 (temp=0.65): safety-first with creative detours
+func (c *Client) GenerateMultiplePlans(req PlanRequest) *MultiPlanResult {
+	labels := []string{"高效方案", "均衡方案", "保守方案"}
+	temps := []float64{0.10, 0.35, 0.65}
+	plans := make([]*PlanResult, 3)
+	for i, temp := range temps {
+		result, err := c.generateWithTemp(req, temp)
+		if err != nil {
+			result = GenerateFallbackPlan(req)
+			result.Warnings = append(result.Warnings, Warning{
+				Level:   "warning",
+				Message: fmt.Sprintf("LLM调用失败(%s)，已降级为直线规划: %s", labels[i], err.Error()),
+			})
+		}
+		plans[i] = result
+	}
+	return &MultiPlanResult{Plans: plans, Labels: labels}
 }
 
 // GenerateFallbackPlan creates a simple direct-line plan without LLM
@@ -566,6 +635,24 @@ func GenerateFallbackPlan(req PlanRequest) *PlanResult {
 		},
 		Explanation: fmt.Sprintf("直线飞行路线：从起点(%.6f,%.6f)直飞至终点(%.6f,%.6f)，总距离%.0fm，预计耗时%.0fs。中间动作按等距插入。",
 			req.Start.Lat, req.Start.Lon, req.Goal.Lat, req.Goal.Lon, dist, timeS),
+	}
+
+	// Apply geometric NFZ correction even on fallback straight-line plans
+	CorrectNFZViolations(&req, result)
+
+	// Recalculate estimates after correction (path may now be longer)
+	correctedDist := 0.0
+	for i := 1; i < len(result.Waypoints); i++ {
+		correctedDist += haversine(
+			result.Waypoints[i-1].Lat, result.Waypoints[i-1].Lon,
+			result.Waypoints[i].Lat, result.Waypoints[i].Lon,
+		)
+	}
+	if correctedDist > 0 {
+		correctedTimeS := correctedDist / speed
+		result.Estimates.DistanceM = math.Round(correctedDist*10) / 10
+		result.Estimates.TimeS = math.Round(correctedTimeS*10) / 10
+		result.Estimates.ExpectedBatteryDrop = math.Round(correctedDist/1000*2*10) / 10
 	}
 
 	if warnings := Validate(&req, result); len(warnings) > 0 {
@@ -674,6 +761,441 @@ func Validate(req *PlanRequest, result *PlanResult) []Warning {
 }
 
 // ======================== Geometry Helpers ========================
+
+// segmentClearOfAllNFZs returns true if segment a→b does not enter any NFZ.
+func segmentClearOfAllNFZs(a, b Waypoint, nfzs []NoFlyZone) bool {
+	for _, nfz := range nfzs {
+		if len(nfz.Polygon) >= 3 && segmentCrossesPolygon(a, b, nfz.Polygon) {
+			return false
+		}
+		if nfz.Type == "circle" && nfz.Center != nil && nfz.RadiusM > 0 && segmentCrossesCircle(a, b, nfz) {
+			return false
+		}
+	}
+	return true
+}
+
+// visibilityGraphBypass finds the globally shortest NFZ-free detour between waypoints a and b
+// using a visibility graph built from NFZ boundary vertices and Dijkstra's algorithm.
+// Returns nil when a→b is already clear; returns intermediate waypoints otherwise.
+func visibilityGraphBypass(a, b Waypoint, nfzs []NoFlyZone, bufM float64) []Waypoint {
+	if segmentClearOfAllNFZs(a, b, nfzs) {
+		return nil
+	}
+
+	alt := (a.AltM + b.AltM) / 2
+	if alt < 80 {
+		alt = 80
+	}
+
+	// ─ Build node list: start + NFZ boundary offset-vertices + goal ─────────────
+	type vgNode struct{ lat, lon float64 }
+	nodes := []vgNode{{a.Lat, a.Lon}}
+
+	for _, nfz := range nfzs {
+		if len(nfz.Polygon) >= 3 {
+			var cLat, cLon float64
+			for _, p := range nfz.Polygon {
+				cLat += p.Lat
+				cLon += p.Lon
+			}
+			cLat /= float64(len(nfz.Polygon))
+			cLon /= float64(len(nfz.Polygon))
+			cosLat := math.Cos(cLat * math.Pi / 180)
+			mLonN, mLatN := 111320.0*cosLat, 111320.0
+			for _, p := range nfz.Polygon {
+				vx := (p.Lon - cLon) * mLonN
+				vy := (p.Lat - cLat) * mLatN
+				vLen := math.Sqrt(vx*vx + vy*vy)
+				if vLen < 1 {
+					continue
+				}
+				scale := (vLen + bufM) / vLen
+				nodes = append(nodes, vgNode{
+					lat: math.Round((cLat+vy*scale/mLatN)*1e6) / 1e6,
+					lon: math.Round((cLon+vx*scale/mLonN)*1e6) / 1e6,
+				})
+			}
+		}
+		if nfz.Type == "circle" && nfz.Center != nil && nfz.RadiusM > 0 {
+			r := nfz.RadiusM + bufM
+			cosLat := math.Cos(nfz.Center.Lat * math.Pi / 180)
+			mLonN, mLatN := 111320.0*cosLat, 111320.0
+			for i := 0; i < 8; i++ {
+				angle := float64(i) * math.Pi / 4
+				nodes = append(nodes, vgNode{
+					lat: math.Round((nfz.Center.Lat+r/mLatN*math.Sin(angle))*1e6) / 1e6,
+					lon: math.Round((nfz.Center.Lon+r/mLonN*math.Cos(angle))*1e6) / 1e6,
+				})
+			}
+		}
+	}
+
+	goalIdx := len(nodes)
+	nodes = append(nodes, vgNode{b.Lat, b.Lon})
+	n := len(nodes)
+
+	toWP := func(nd vgNode) Waypoint {
+		return Waypoint{Lat: nd.lat, Lon: nd.lon, AltM: alt, SpeedMPS: a.SpeedMPS}
+	}
+
+	// ─ Build visibility matrix (O(n²) segment checks) ─────────────────────────
+	vis := make([][]bool, n)
+	edgeDist := make([][]float64, n)
+	for i := range vis {
+		vis[i] = make([]bool, n)
+		edgeDist[i] = make([]float64, n)
+		for j := range edgeDist[i] {
+			edgeDist[i][j] = math.Inf(1)
+		}
+	}
+	for i := 0; i < n; i++ {
+		for j := i + 1; j < n; j++ {
+			wi, wj := toWP(nodes[i]), toWP(nodes[j])
+			if segmentClearOfAllNFZs(wi, wj, nfzs) {
+				d := haversine(wi.Lat, wi.Lon, wj.Lat, wj.Lon)
+				vis[i][j], vis[j][i] = true, true
+				edgeDist[i][j], edgeDist[j][i] = d, d
+			}
+		}
+	}
+
+	// ─ Dijkstra from node 0 (start) to goalIdx ────────────────────────────
+	distArr := make([]float64, n)
+	prev := make([]int, n)
+	for i := range distArr {
+		distArr[i] = math.Inf(1)
+		prev[i] = -1
+	}
+	distArr[0] = 0
+	visited := make([]bool, n)
+	for range nodes {
+		u := -1
+		for i := 0; i < n; i++ {
+			if !visited[i] && (u == -1 || distArr[i] < distArr[u]) {
+				u = i
+			}
+		}
+		if u == -1 || math.IsInf(distArr[u], 1) {
+			break
+		}
+		visited[u] = true
+		if u == goalIdx {
+			break
+		}
+		for v := 0; v < n; v++ {
+			if vis[u][v] && !visited[v] {
+				if nd := distArr[u] + edgeDist[u][v]; nd < distArr[v] {
+					distArr[v] = nd
+					prev[v] = u
+				}
+			}
+		}
+	}
+
+	if math.IsInf(distArr[goalIdx], 1) {
+		// Visibility graph found no path – fall back to single extreme-vertex bypass
+		for _, nfz := range nfzs {
+			if len(nfz.Polygon) >= 3 && segmentCrossesPolygon(a, b, nfz.Polygon) {
+				return polygonBypassWaypoints(a, b, nfz.Polygon, bufM)
+			}
+		}
+		return nil
+	}
+
+	// ─ Reconstruct path ─────────────────────────────────────────────────────
+	path := []int{}
+	for cur := goalIdx; cur != -1; cur = prev[cur] {
+		path = append(path, cur)
+	}
+	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+		path[i], path[j] = path[j], path[i]
+	}
+	var bypass []Waypoint
+	for k := 1; k < len(path)-1; k++ {
+		bypass = append(bypass, toWP(nodes[path[k]]))
+	}
+	return bypass
+}
+
+// segmentsCross2D reports whether segment [ax,ay]→[bx,by] and [cx,cy]→[dx,dy] share an interior point
+func segmentsCross2D(ax, ay, bx, by, cx, cy, dx, dy float64) bool {
+	d1x, d1y := bx-ax, by-ay
+	d2x, d2y := dx-cx, dy-cy
+	denom := d1x*d2y - d1y*d2x
+	if math.Abs(denom) < 1e-12 {
+		return false
+	}
+	t := ((cx-ax)*d2y - (cy-ay)*d2x) / denom
+	u := ((cx-ax)*d1y - (cy-ay)*d1x) / denom
+	return t > 1e-9 && t < 1-1e-9 && u > 1e-9 && u < 1-1e-9
+}
+
+// segmentCrossesPolygon reports whether segment a→b crosses any polygon edge,
+// or whether the midpoint of the segment lies inside the polygon.
+func segmentCrossesPolygon(a, b Waypoint, poly []Coordinate) bool {
+	n := len(poly)
+	if n < 3 {
+		return false
+	}
+	// Check if midpoint is inside polygon (handles case where A and B are both outside
+	// but the path passes entirely through the polygon interior)
+	midLat := (a.Lat + b.Lat) / 2
+	midLon := (a.Lon + b.Lon) / 2
+	if pointInPolygon(midLat, midLon, poly) {
+		return true
+	}
+	// Check if either endpoint is inside
+	if pointInPolygon(a.Lat, a.Lon, poly) || pointInPolygon(b.Lat, b.Lon, poly) {
+		return true
+	}
+	// Check edge crossings
+	for i := 0; i < n; i++ {
+		j := (i + 1) % n
+		if segmentsCross2D(a.Lon, a.Lat, b.Lon, b.Lat,
+			poly[i].Lon, poly[i].Lat, poly[j].Lon, poly[j].Lat) {
+			return true
+		}
+	}
+	return false
+}
+
+// polygonBypassWaypoints returns the minimal set of bypass waypoints to route around
+// a polygon NFZ for segment a→b.
+// Strategy: first try a single extreme-vertex bypass (cheapest); if that single point
+// still clips the polygon, fall back to boundary traversal.
+func polygonBypassWaypoints(a, b Waypoint, poly []Coordinate, bufM float64) []Waypoint {
+	if !segmentCrossesPolygon(a, b, poly) {
+		return nil
+	}
+	n := len(poly)
+
+	// Compute centroid
+	var cLat, cLon float64
+	for _, p := range poly {
+		cLat += p.Lat
+		cLon += p.Lon
+	}
+	cLat /= float64(n)
+	cLon /= float64(n)
+	cosLat := math.Cos(cLat * math.Pi / 180)
+	mLon := 111320.0 * cosLat
+	mLat := 111320.0
+
+	// Build offset vertices (each vertex pushed outward from centroid by bufM)
+	alt := (a.AltM + b.AltM) / 2
+	if alt < 80 {
+		alt = 80
+	}
+	offsetVerts := make([]Waypoint, n)
+	for i, p := range poly {
+		vx := (p.Lon - cLon) * mLon
+		vy := (p.Lat - cLat) * mLat
+		vLen := math.Sqrt(vx*vx + vy*vy)
+		if vLen < 1 {
+			offsetVerts[i] = Waypoint{Lat: p.Lat, Lon: p.Lon, AltM: alt, SpeedMPS: a.SpeedMPS}
+			continue
+		}
+		scale := (vLen + bufM) / vLen
+		offsetVerts[i] = Waypoint{
+			Lat:      math.Round((cLat+vy*scale/mLat)*1e6) / 1e6,
+			Lon:      math.Round((cLon+vx*scale/mLon)*1e6) / 1e6,
+			AltM:     alt,
+			SpeedMPS: a.SpeedMPS,
+		}
+	}
+
+	// Segment direction in metres
+	abLonM := (b.Lon - a.Lon) * mLon
+	abLatM := (b.Lat - a.Lat) * mLat
+	segLen := math.Sqrt(abLonM*abLonM + abLatM*abLatM)
+	if segLen < 1 {
+		return nil
+	}
+
+	// Find the extreme polygon vertex on each side (left/right) of A→B
+	var maxLeft, maxRight float64
+	leftIdx, rightIdx := 0, 0
+	maxLeft, maxRight = math.Inf(-1), math.Inf(-1)
+	for i, p := range poly {
+		px := (p.Lon - a.Lon) * mLon
+		py := (p.Lat - a.Lat) * mLat
+		if lp := (-abLatM*px + abLonM*py) / segLen; lp > maxLeft {
+			maxLeft = lp
+			leftIdx = i
+		}
+		if rp := (abLatM*px - abLonM*py) / segLen; rp > maxRight {
+			maxRight = rp
+			rightIdx = i
+		}
+	}
+
+	lbp := offsetVerts[leftIdx]
+	rbp := offsetVerts[rightIdx]
+
+	pathDist1 := func(bp Waypoint) float64 {
+		return haversine(a.Lat, a.Lon, bp.Lat, bp.Lon) + haversine(bp.Lat, bp.Lon, b.Lat, b.Lon)
+	}
+
+	// ── Step 1: try single-vertex bypass – preferred because it produces the fewest waypoints
+	leftClear := !segmentCrossesPolygon(a, lbp, poly) && !segmentCrossesPolygon(lbp, b, poly)
+	rightClear := !segmentCrossesPolygon(a, rbp, poly) && !segmentCrossesPolygon(rbp, b, poly)
+
+	if leftClear && rightClear {
+		if pathDist1(lbp) <= pathDist1(rbp) {
+			return []Waypoint{lbp}
+		}
+		return []Waypoint{rbp}
+	}
+	if leftClear {
+		return []Waypoint{lbp}
+	}
+	if rightClear {
+		return []Waypoint{rbp}
+	}
+
+	// ── Step 2: boundary traversal fallback (for very concave polygons)
+	type crossInfo struct {
+		edgeIdx int
+		t       float64
+	}
+	var crosses []crossInfo
+	for i := 0; i < n; i++ {
+		j := (i + 1) % n
+		edgeLonM := (poly[j].Lon - poly[i].Lon) * mLon
+		edgeLatM := (poly[j].Lat - poly[i].Lat) * mLat
+		denom := abLonM*edgeLatM - abLatM*edgeLonM
+		if math.Abs(denom) < 1e-9 {
+			continue
+		}
+		diffLonM := (poly[i].Lon - a.Lon) * mLon
+		diffLatM := (poly[i].Lat - a.Lat) * mLat
+		t := (diffLonM*edgeLatM - diffLatM*edgeLonM) / denom
+		u := (diffLonM*abLatM - diffLatM*abLonM) / denom
+		if t > 1e-9 && t < 1-1e-9 && u > 1e-9 && u < 1-1e-9 {
+			crosses = append(crosses, crossInfo{i, t})
+		}
+	}
+	sort.Slice(crosses, func(i, j int) bool { return crosses[i].t < crosses[j].t })
+
+	pathDistWPs := func(wps []Waypoint) float64 {
+		if len(wps) == 0 {
+			return math.Inf(1)
+		}
+		d := haversine(a.Lat, a.Lon, wps[0].Lat, wps[0].Lon)
+		for k := 1; k < len(wps); k++ {
+			d += haversine(wps[k-1].Lat, wps[k-1].Lon, wps[k].Lat, wps[k].Lon)
+		}
+		d += haversine(wps[len(wps)-1].Lat, wps[len(wps)-1].Lon, b.Lat, b.Lon)
+		return d
+	}
+
+	if len(crosses) >= 2 {
+		entryEdge := crosses[0].edgeIdx
+		exitEdge := crosses[len(crosses)-1].edgeIdx
+		cwPath := []Waypoint{}
+		for idx := (entryEdge + 1) % n; ; idx = (idx + 1) % n {
+			cwPath = append(cwPath, offsetVerts[idx])
+			if idx == (exitEdge+1)%n || len(cwPath) > n {
+				break
+			}
+		}
+		ccwPath := []Waypoint{}
+		for idx := entryEdge; ; idx = (idx - 1 + n) % n {
+			ccwPath = append(ccwPath, offsetVerts[idx])
+			if idx == exitEdge || len(ccwPath) > n {
+				break
+			}
+		}
+		if pathDistWPs(cwPath) <= pathDistWPs(ccwPath) {
+			return cwPath
+		}
+		return ccwPath
+	}
+
+	// Last resort: use the extreme vertex even if it may still clip
+	if pathDist1(lbp) <= pathDist1(rbp) {
+		return []Waypoint{lbp}
+	}
+	return []Waypoint{rbp}
+}
+
+// simplifyPath removes redundant intermediate waypoints while preserving NFZ avoidance.
+// A waypoint is removed when the direct segment skipping it clears all NFZs.
+// Waypoints with mission-critical actions (TAKEOFF, LAND, PHOTO, HOVER, RTH) are always kept.
+func simplifyPath(wps []Waypoint, nfzs []NoFlyZone) []Waypoint {
+	if len(wps) <= 2 {
+		return wps
+	}
+
+	isCritical := func(wp Waypoint) bool {
+		a := wp.Action
+		return a == "TAKEOFF" || a == "LAND" || a == "PHOTO" || a == "HOVER" || a == "RTH"
+	}
+
+	segClear := func(a, b Waypoint) bool {
+		for _, nfz := range nfzs {
+			if len(nfz.Polygon) >= 3 && segmentCrossesPolygon(a, b, nfz.Polygon) {
+				return false
+			}
+			if nfz.Type == "circle" && nfz.Center != nil && nfz.RadiusM > 0 {
+				if segmentCrossesCircle(a, b, nfz) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+
+	// Greedy: from each position, jump as far forward as possible without crossing an NFZ
+	// or skipping a critical waypoint.
+	result := []Waypoint{wps[0]}
+	i := 0
+	for i < len(wps)-1 {
+		j := len(wps) - 1
+		for j > i+1 {
+			// Don't skip any critical waypoints between i and j
+			skippable := true
+			for k := i + 1; k < j; k++ {
+				if isCritical(wps[k]) {
+					skippable = false
+					break
+				}
+			}
+			if skippable && segClear(wps[i], wps[j]) {
+				break
+			}
+			j--
+		}
+		result = append(result, wps[j])
+		i = j
+	}
+	return result
+}
+
+// segmentCrossesCircle reports whether the closest point on segment a→b to the
+// circle centre is within the circle's radius.
+func segmentCrossesCircle(a, b Waypoint, nfz NoFlyZone) bool {
+	if nfz.Center == nil || nfz.RadiusM <= 0 {
+		return false
+	}
+	cx, cy := nfz.Center.Lon, nfz.Center.Lat
+	cosLat := math.Cos(cy * math.Pi / 180)
+	mLon := 111320.0 * cosLat
+	mLat := 111320.0
+	ax := (a.Lon - cx) * mLon
+	ay := (a.Lat - cy) * mLat
+	bx := (b.Lon - cx) * mLon
+	by := (b.Lat - cy) * mLat
+	dx, dy := bx-ax, by-ay
+	lenSq := dx*dx + dy*dy
+	if lenSq < 1 {
+		return math.Sqrt(ax*ax+ay*ay) <= nfz.RadiusM
+	}
+	t := math.Max(0, math.Min(1, -(ax*dx+ay*dy)/lenSq))
+	px, py := ax+t*dx, ay+t*dy
+	return math.Sqrt(px*px+py*py) <= nfz.RadiusM
+}
 
 // haversine returns the distance in meters between two lat/lon points
 func haversine(lat1, lon1, lat2, lon2 float64) float64 {
