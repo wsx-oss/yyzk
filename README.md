@@ -11,7 +11,7 @@
 
 - 后端位于 `project/`，使用 Go + Gin 提供 API 服务，SQLite 持久化。
 - 前端静态页面位于 `project/web/`，由后端内嵌静态资源并通过 `/app` 提供访问。
-- 主要能力包含：用户认证、无人机管理、GPS/位置信息、电池监控、飞行任务管理、硬件状态检测、远程桌面控制（VNC/SSH/RDP）、视频监控、系统状态监控、异常报警、维护操作日志、语音交互记录、软件更新管理、数据同步、性能分析报告等。
+- 主要能力包含：用户认证、无人机管理、GPS/位置信息、电池监控、飞行任务管理（LLM智能规划+NFZ纠偏+多候选方案）、禁飞区管理、AI决策记录（CoT思维链）、硬件状态检测、远程桌面控制（VNC/SSH/RDP）、视频监控、系统状态监控、异常报警、维护操作日志、语音交互记录、软件更新管理、数据同步、性能分析报告等。
 
 **目标**：在多人协作下持续迭代功能，确保代码质量、提交可追溯、分支清晰、可稳定交付。
 
@@ -84,7 +84,7 @@ project/
   go.mod / go.sum             # Go 依赖管理
   app.db                      # SQLite 数据库文件
   cmd/
-    agent/main.go             # hw-agent 独立程序（部署在无人机/目标设备上）
+    agent/main.go             # hw-agent 独立程序（部署在地面站电脑上，MAVLink中继：读取飞控数据→推送云端后端）
   internal/
     agent/agent.go            # 内嵌 Agent（主服务启动时自动运行本机 Agent）
     db/db.go                  # 数据库初始化与表结构定义
@@ -106,6 +106,8 @@ project/
       gps.html                # GPS/位置信息
       battery.html            # 电池监控
       flight.html             # 飞行任务管理
+      noflyzone.html          # 禁飞区管理
+      cot.html                # AI决策记录（思维链历史）
       hardware.html           # 硬件状态检测
       remote.html             # 远程桌面控制
       video.html              # 视频监控
