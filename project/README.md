@@ -5,9 +5,9 @@
 
 **企业级智能管控平台 | 实时监控 | 远程控制 | 性能分析**
 
-基于 Go 1.20 + Gin + SQLite + WebSocket + noVNC 的完整解决方案
+基于 Go 1.24 + Gin + SQLite + WebSocket + noVNC 的完整解决方案
 
-[![Go Version](https://img.shields.io/badge/Go-1.20+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
@@ -23,6 +23,7 @@
 - [17大功能模块](#17大功能模块)
 - [API接口文档](#api接口文档)
 - [部署指南](#部署指南)
+- [停止运行](#停止运行)
 - [故障排查](#故障排查)
 
 ---
@@ -58,39 +59,75 @@ CloudControl是一套面向企业级应用的综合性管控平台。
 
 ## 🚀 快速开始
 
-### 1. 安装依赖
+### 1. 环境准备
 
 ```bash
 cd project
+go version
 go mod tidy
 ```
 
-### 1.1 环境变量文件（团队协作推荐）
+建议使用 Go 1.24 及以上版本。
 
-- 仓库提供：`project/.env.example`（可提交）
-- 你本地运行时使用：`project/.env`（已被 `.gitignore` 忽略，不会提交到 GitHub）
+### 2. 配置环境变量
 
-首次运行建议：
+项目启动时会自动读取当前工作目录下的 `.env` 文件；如果没有该文件，则使用系统环境变量和内置默认值。
 
-```bash
-# 在 project/ 目录下
-cp .env.example .env
+常用变量如下：
+
+- `SC_LISTEN_ADDR`：Web 服务监听地址，默认 `:8080`
+- `SC_DB_PATH`：SQLite 数据库路径，默认 `app.db`
+- `SC_AGENT_PORT`：内嵌硬件 Agent 端口，默认 `9100`
+- `SC_API_TOKEN`：API 认证 Token，留空表示关闭
+- `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`：智能规划相关配置
+- `AMAP_KEY`：高德地图 Key
+
+示例 `.env`：
+
+```env
+SC_LISTEN_ADDR=:8080
+SC_DB_PATH=app.db
+SC_AGENT_PORT=9100
+SC_API_TOKEN=
+LLM_API_KEY=
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_MODEL=qwen-plus
+AMAP_KEY=
 ```
 
-然后按需填写：`SC_API_TOKEN`、`LLM_API_KEY`、`AMAP_KEY` 等。
+### 3. 启动服务
 
-### 2. 启动服务
+开发模式：
 
 ```bash
-# 开发模式
 go run .
-
-# 或编译后运行
-go build -o sc.exe .
-./sc.exe
 ```
 
-### 3. 访问系统
+编译后运行：
+
+```bash
+# Windows
+go build -o sc.exe .
+.\sc.exe
+
+# Linux / macOS
+go build -o sc .
+./sc
+```
+
+Windows 后台运行示例：
+
+```powershell
+Start-Process -FilePath ".\sc.exe" -WorkingDirectory (Get-Location).Path
+```
+
+Linux 后台运行示例：
+
+```bash
+nohup ./sc > run.out.log 2> run.err.log &
+```
+
+### 4. 访问系统
 
 浏览器打开: `http://127.0.0.1:8080`
 
@@ -99,7 +136,26 @@ go build -o sc.exe .
 listening on :8080
 ```
 
-### 4. 首次使用
+健康检查：
+
+```bash
+curl http://127.0.0.1:8080/api/healthz
+```
+
+预期返回：
+
+```json
+{"status":"ok"}
+```
+
+说明：
+
+- 主 Web 服务默认监听 `8080`
+- 内嵌硬件 Agent 默认监听 `9100`
+- 前端静态资源已经通过 `embed` 打进二进制，部署时不需要单独拷贝 `web/` 目录
+- 音频上传目录会在运行时自动创建
+
+### 5. 首次使用
 
 1. 访问注册页面创建账号
 2. 登录后进入仪表盘
@@ -400,31 +456,80 @@ curl "http://127.0.0.1:8080/api/alerts/list?page=2&page_size=20"
 
 ## 🚀 部署指南
 
-### 编译
+### 单机部署（Windows / Linux）
+
+推荐用于课程展示、内网服务器或单机环境。
 
 ```bash
-# 当前平台
+# 进入项目目录
+cd project
+
+# 下载依赖
+go mod tidy
+
+# Windows 构建
 go build -o sc.exe .
 
-# 交叉编译 Linux
-$env:GOOS="linux"
+# Linux 构建
 go build -o sc .
 ```
 
-### Docker 部署
+部署时至少保留以下内容：
 
-```bash
-docker build -t smartcontrol .
-docker run -d -p 8080:8080 smartcontrol
+- 可执行文件 `sc.exe` 或 `sc`
+- `.env`（如果你使用文件方式管理环境变量）
+- 数据库文件 `app.db`（已有数据时）
+- `data/` 目录（已有录音文件时）
+
+说明：
+
+- 程序默认会在当前工作目录下读写 `app.db`
+- 首次上传录音时会自动创建 `data/recordings/`
+- 静态页面已嵌入二进制，不需要额外部署 `web/`
+
+### Windows 部署命令
+
+前台运行：
+
+```powershell
+.\sc.exe
 ```
 
-### systemd 服务
+后台运行：
 
-创建 `/etc/systemd/system/smartcontrol.service`:
+```powershell
+Start-Process -FilePath ".\sc.exe" -WorkingDirectory (Get-Location).Path
+```
+
+### Linux / 服务器部署命令
+
+前台运行：
+
+```bash
+./sc
+```
+
+后台运行：
+
+```bash
+nohup ./sc > run.out.log 2> run.err.log &
+```
+
+### 交叉编译 Linux
+
+```powershell
+$env:GOOS="linux"
+$env:GOARCH="amd64"
+go build -o sc .
+```
+
+### systemd 服务（Linux 可选）
+
+创建 `/etc/systemd/system/smartcontrol.service`：
 
 ```ini
 [Unit]
-Description=Smart Control System
+Description=CloudControl
 After=network.target
 
 [Service]
@@ -432,6 +537,7 @@ Type=simple
 ExecStart=/opt/smartcontrol/sc
 WorkingDirectory=/opt/smartcontrol
 Restart=on-failure
+Environment=SC_LISTEN_ADDR=:8080
 
 [Install]
 WantedBy=multi-user.target
@@ -441,6 +547,55 @@ WantedBy=multi-user.target
 ```bash
 sudo systemctl enable smartcontrol
 sudo systemctl start smartcontrol
+sudo systemctl status smartcontrol
+```
+
+### Docker 说明
+
+当前仓库未提供 `Dockerfile` 或 `docker-compose.yml`，因此 README 不再给出不可直接执行的 Docker 命令。
+
+---
+
+## 🛑 停止运行
+
+### 前台运行时停止
+
+直接在启动该进程的终端按 `Ctrl + C`。
+
+### Windows 后台运行时停止
+
+按进程名停止：
+
+```powershell
+Get-Process sc | Stop-Process -Force
+```
+
+按端口定位后停止：
+
+```powershell
+Get-NetTCPConnection -LocalPort 8080 | Select-Object OwningProcess
+Stop-Process -Id <PID> -Force
+```
+
+### Linux 后台运行时停止
+
+按进程名停止：
+
+```bash
+pkill -f "./sc"
+```
+
+按端口定位后停止：
+
+```bash
+lsof -i :8080
+kill <PID>
+```
+
+### systemd 停止
+
+```bash
+sudo systemctl stop smartcontrol
 ```
 
 ---
@@ -474,7 +629,7 @@ kill -9 <进程ID>
 **解决方案（任选其一）**:
 
 - **方案一：以管理员权限运行**（推荐）
-  - 右键点击 `smartcontrol.exe` 或 `hw-agent.exe` → "以管理员身份运行"
+  - 右键点击 `sc.exe` 或 `agent.exe` → "以管理员身份运行"
   - 管理员权限下 WMI `MSAcpi_ThermalZoneTemperature` 接口可正常返回温度数据
 
 - **方案二：安装 LibreHardwareMonitor**
@@ -505,8 +660,8 @@ rm app.db-shm app.db-wal
 ## ❓ 常见问题
 
 **Q: 如何修改端口？**
-```bash
-export SC_LISTEN_ADDR=":9000"
+```powershell
+$env:SC_LISTEN_ADDR=":9000"
 go run .
 ```
 
@@ -516,8 +671,8 @@ rm app.db  # 删除数据库重新注册
 ```
 
 **Q: 如何启用 API 认证？**
-```bash
-export SC_API_TOKEN="your-token"
+```powershell
+$env:SC_API_TOKEN="your-token"
 go run .
 ```
 

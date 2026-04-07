@@ -1,0 +1,10 @@
+./api.go
+./auth.go
+./battery.go
+./cot.go
+./drones.go
+./flight.go
+./flight_plan.go
+./gps.go
+./noflyzone.go
+./wshub.go
