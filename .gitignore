@@ -9,3 +9,6 @@ project/.env
 # IDE
 .idea/
 .vscode/
+project/app.db
+project/app.db-shm
+project/app.db-wal
