@@ -15,6 +15,30 @@
 
 **目标**：在多人协作下持续迭代功能，确保代码质量、提交可追溯、分支清晰、可稳定交付。
 
+### 1.1 运行与部署入口
+
+仓库中真正可直接运行的程序位于 `project/` 目录，根目录主要存放团队规范和项目资料。
+
+本地运行最短路径：
+
+```bash
+cd project
+go mod tidy
+go run .
+```
+
+启动后默认访问地址：
+
+- `http://127.0.0.1:8080/`
+- 健康检查：`http://127.0.0.1:8080/api/healthz`
+
+停止运行：
+
+- 前台运行时，在当前终端按 `Ctrl + C`
+- Windows 后台运行时，可先执行 `Get-NetTCPConnection -LocalPort 8080 | Select-Object OwningProcess` 查询 PID，再执行 `Stop-Process -Id <PID> -Force`
+
+详细的部署、运行、停止说明请查看 `project/README.md`。
+
 ## 2. 团队分工原则
 
 - **模块负责制**：每个功能模块设 1 名负责人（Owner），负责需求拆分、接口约定、代码评审合入。

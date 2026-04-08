@@ -17,6 +17,7 @@
 ## 📋 目录
 
 - [项目简介](#项目简介)
+- [运行与停止速查](#运行与停止速查)
 - [快速开始](#快速开始)
 - [系统访问地址](#系统访问地址)
 - [环境变量配置](#环境变量配置)
@@ -54,6 +55,63 @@ CloudControl是一套面向企业级应用的综合性管控平台。
 - CPU、内存、磁盘、网络监控
 - WebSocket 实时推送
 - 阈值自动告警
+
+---
+
+## ⚡ 运行与停止速查
+
+以下命令基于仓库当前结构整理，默认都在 `project/` 目录执行。
+
+### 本地开发运行
+
+```bash
+cd project
+go mod tidy
+go run .
+```
+
+启动成功后访问：
+
+- `http://127.0.0.1:8080/`
+- `http://127.0.0.1:8080/api/healthz`
+
+预期健康检查返回：
+
+```json
+{"status":"ok"}
+```
+
+### Windows 后台运行
+
+源码直接后台运行：
+
+```powershell
+Start-Process -FilePath "go" -ArgumentList "run","." -WorkingDirectory (Get-Location).Path -RedirectStandardOutput "run.out.log" -RedirectStandardError "run.err.log"
+```
+
+编译后后台运行：
+
+```powershell
+go build -o sc.exe .
+Start-Process -FilePath ".\sc.exe" -WorkingDirectory (Get-Location).Path
+```
+
+### 停止运行
+
+前台运行时，在当前终端按 `Ctrl + C`。
+
+Windows 后台运行时，优先按端口查询 PID 再停止：
+
+```powershell
+Get-NetTCPConnection -LocalPort 8080 | Select-Object OwningProcess
+Stop-Process -Id <PID> -Force
+```
+
+如果是编译后的 `sc.exe`，也可以直接按进程名停止：
+
+```powershell
+Get-Process sc | Stop-Process -Force
+```
 
 ---
 
@@ -97,13 +155,19 @@ AMAP_KEY=
 
 ### 3. 启动服务
 
-开发模式：
+开发模式（推荐用于本地调试）：
 
 ```bash
 go run .
 ```
 
-编译后运行：
+如果需要后台运行并输出日志，可以使用：
+
+```powershell
+Start-Process -FilePath "go" -ArgumentList "run","." -WorkingDirectory (Get-Location).Path -RedirectStandardOutput "run.out.log" -RedirectStandardError "run.err.log"
+```
+
+编译后运行（推荐用于部署）：
 
 ```bash
 # Windows
@@ -127,7 +191,7 @@ Linux 后台运行示例：
 nohup ./sc > run.out.log 2> run.err.log &
 ```
 
-### 4. 访问系统
+### 4. 访问系统与运行验证
 
 浏览器打开: `http://127.0.0.1:8080`
 
@@ -152,8 +216,9 @@ curl http://127.0.0.1:8080/api/healthz
 
 - 主 Web 服务默认监听 `8080`
 - 内嵌硬件 Agent 默认监听 `9100`
+- 项目默认以当前工作目录作为运行根目录，因此建议始终在 `project/` 目录内执行启动命令
 - 前端静态资源已经通过 `embed` 打进二进制，部署时不需要单独拷贝 `web/` 目录
-- 音频上传目录会在运行时自动创建
+- 音频上传目录会在首次上传时自动创建为 `data/recordings/`
 
 ### 5. 首次使用
 
@@ -458,7 +523,7 @@ curl "http://127.0.0.1:8080/api/alerts/list?page=2&page_size=20"
 
 ### 单机部署（Windows / Linux）
 
-推荐用于课程展示、内网服务器或单机环境。
+推荐用于课程展示、内网服务器或单机环境。部署时建议优先使用编译后的二进制，而不是长期使用 `go run .`。
 
 ```bash
 # 进入项目目录
@@ -483,9 +548,10 @@ go build -o sc .
 
 说明：
 
-- 程序默认会在当前工作目录下读写 `app.db`
+- 程序默认会在当前工作目录下读写 `app.db`、`.env` 和 `data/`
 - 首次上传录音时会自动创建 `data/recordings/`
 - 静态页面已嵌入二进制，不需要额外部署 `web/`
+- 因此部署目录应保持为一个独立工作目录，并从该目录启动程序
 
 ### Windows 部署命令
 
@@ -562,7 +628,16 @@ sudo systemctl status smartcontrol
 
 直接在启动该进程的终端按 `Ctrl + C`。
 
-### Windows 后台运行时停止
+### Windows 后台运行时停止（通用方法）
+
+无论你是通过 `go run .` 还是 `sc.exe` 启动，都可以先按端口定位进程：
+
+```powershell
+Get-NetTCPConnection -LocalPort 8080 | Select-Object OwningProcess
+Stop-Process -Id <PID> -Force
+```
+
+### Windows 后台运行时停止（编译产物）
 
 按进程名停止：
 
@@ -570,11 +645,12 @@ sudo systemctl status smartcontrol
 Get-Process sc | Stop-Process -Force
 ```
 
-按端口定位后停止：
+### Windows 后台运行时停止（源码运行）
+
+如果你是通过 `go run .` 后台启动，实际进程通常是 `smartcontrol`，也可以直接停止：
 
 ```powershell
-Get-NetTCPConnection -LocalPort 8080 | Select-Object OwningProcess
-Stop-Process -Id <PID> -Force
+Get-Process smartcontrol | Stop-Process -Force
 ```
 
 ### Linux 后台运行时停止
