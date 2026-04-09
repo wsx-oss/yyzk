@@ -25,6 +25,15 @@ import (
 //go:embed web/*
 var webFS embed.FS
 
+func init() {
+	// 设置默认时区为中国上海 (UTC+8)
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		loc = time.FixedZone("CST", 8*3600)
+	}
+	time.Local = loc
+}
+
 func main() {
 	addr := getenv("SC_LISTEN_ADDR", ":8080")
 	dbDriver := getenv("SC_DB_DRIVER", "sqlite")

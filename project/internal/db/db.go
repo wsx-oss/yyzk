@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	_ "modernc.org/sqlite"
 )
 
@@ -137,17 +137,29 @@ func openSQLite(path string) (*sql.DB, error) {
 }
 
 func openMySQL(dsn string) (*sql.DB, error) {
-	database, err := sql.Open("mysql", dsn)
+	// 解析 DSN 并注入 time_zone 参数，确保连接池中每个连接都使用上海时区
+	cfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse DSN: %w", err)
 	}
+	if cfg.Params == nil {
+		cfg.Params = make(map[string]string)
+	}
+	cfg.Params["time_zone"] = "'+08:00'"
+	cfg.Loc = time.FixedZone("CST", 8*3600)
+
+	connector, err := mysql.NewConnector(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("mysql connector: %w", err)
+	}
+	database := sql.OpenDB(connector)
 	database.SetMaxOpenConns(25)
 	database.SetMaxIdleConns(10)
 	database.SetConnMaxLifetime(5 * time.Minute)
 	if err := database.Ping(); err != nil {
 		return nil, fmt.Errorf("MySQL ping: %w", err)
 	}
-	log.Println("[DB] Connected to MySQL")
+	log.Println("[DB] Connected to MySQL (timezone: Asia/Shanghai, every connection)")
 	return database, nil
 }
 

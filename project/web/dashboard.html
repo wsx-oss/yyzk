@@ -23,6 +23,26 @@
       flex-direction: column;
       flex-shrink: 0;
     }
+    .sidebar-nav {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.3) transparent;
+    }
+    .sidebar-nav::-webkit-scrollbar {
+      width: 5px;
+    }
+    .sidebar-nav::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .sidebar-nav::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.3);
+      border-radius: 3px;
+    }
+    .sidebar-nav::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.5);
+    }
     .sidebar-header {
       padding: 20px 16px;
       background: #1e40af;
@@ -179,6 +199,7 @@
   <div class="container">
     <aside class="sidebar">
       <div class="sidebar-header">系统菜单</div>
+      <div class="sidebar-nav">
       <a class="nav-item active" data-page="drones">无人机管理</a>
       <div class="nav-group-header open" id="navFlightGroup" onclick="toggleNavGroup(this)">
         <span><span class="nav-group-icon"></span>飞行任务管理</span>
@@ -210,6 +231,7 @@
         <a class="nav-sub-item" data-page="sync">数据同步状态</a>
       </div>
       <a class="nav-item" data-page="cot">CoT 智能决策</a>
+      </div>
     </aside>
     <main class="main-content">
       <div class="top-bar">
