@@ -21,7 +21,7 @@
 - [快速开始](#快速开始)
 - [系统访问地址](#系统访问地址)
 - [环境变量配置](#环境变量配置)
-- [17大功能模块](#17大功能模块)
+- [20大功能模块](#20大功能模块)
 - [API接口文档](#api接口文档)
 - [项目结构](#项目结构)
 - [部署指南](#部署指南)
@@ -188,7 +188,7 @@ go run .
 
 ---
 
-## 17大功能模块
+## 20大功能模块
 
 | # | 模块名称 | 功能说明 |
 |---|----------|----------|
@@ -209,6 +209,9 @@ go run .
 | 15 | 性能分析报告 | 响应时间/吞吐量/错误率、四种图表 |
 | 16 | AI决策记录 | CoT 思维链推理历史、多场景分析归档 |
 | 17 | 无人机连接与部署 | hw-agent 地面站部署、MAVLink 中继、Push 模式 |
+| 18 | 备份与数据回滚 | 自动/手动备份、数据恢复与回滚、备份记录管理、恢复进度追踪、备份文件上传恢复 |
+| 19 | AI 智能助手 | 右下角浮窗、多轮对话、快捷指令、知识库问答、模块跳转、数据查询 |
+| 20 | 消息通知中心 | 右上角铃铛、未读计数、类型筛选、AI 定时巡检、点击跳转、批量已读 |
 
 ---
 
@@ -252,6 +255,21 @@ go run .
 | 监控 | WS | `/api/metrics/stream` | 实时监控流 |
 | 同步 | GET | `/api/sync/tasks` | 同步任务列表 |
 | 性能 | GET | `/api/report/perf` | 性能报告 |
+| 备份 | GET | `/api/backup/list` | 备份记录列表 |
+| 备份 | GET | `/api/backup/status` | 备份状态概览（总数/成功/失败/空间） |
+| 备份 | POST | `/api/backup/manual` | 手动触发备份 |
+| 备份 | POST | `/api/backup/restore/:id` | 从指定备份恢复数据 |
+| 备份 | POST | `/api/backup/restore-upload` | 上传 SQL 文件恢复数据 |
+| 备份 | GET | `/api/backup/restore-progress` | 恢复进度查询（轮询） |
+| 备份 | DELETE | `/api/backup/:id` | 删除备份记录及文件 |
+| 备份 | GET | `/api/backup/download/:id` | 下载备份文件 |
+| 备份 | POST | `/api/backup/auto-toggle` | 开关自动备份 |
+| 备份 | POST | `/api/backup/cleanup` | 清理旧备份（保留最近 N 份） |
+| 通知 | GET | `/api/notifications` | 通知列表（支持类型筛选） |
+| 通知 | POST | `/api/notifications/read/:id` | 标记通知已读 |
+| 通知 | POST | `/api/notifications/read-all` | 全部标记已读 |
+| AI助手 | POST | `/api/ai-assistant/chat` | AI 助手对话 |
+| AI助手 | GET | `/api/ai-assistant/suggestions` | 获取快捷指令建议 |
 
 ### 分页参数
 
@@ -278,12 +296,18 @@ project/
 │   │   └── migrate_sqlite.go       # SQLite 建表 DDL
 │   ├── handlers/                   # API 处理函数
 │   │   ├── api.go                  # 通用 API（设备、硬件、报警、日志、更新、同步等）
+│   │   ├── auth.go                 # 用户认证（注册/登录/登出/Token 验证）
 │   │   ├── drones.go               # 无人机管理
 │   │   ├── gps.go                  # GPS/位置信息
 │   │   ├── battery.go              # 电池监控
 │   │   ├── flight.go               # 飞行任务管理
 │   │   ├── flight_plan.go          # 智能航线规划（LLM + AMap）
+│   │   ├── noflyzone.go            # 禁飞区管理
 │   │   ├── cot.go                  # 思维链 AI 分析
+│   │   ├── backup.go               # 备份与数据回滚（自动/手动/恢复/进度追踪）
+│   │   ├── ai_assistant.go         # AI 智能助手（多轮对话/知识库/快捷指令）
+│   │   ├── notification.go         # 消息通知中心
+│   │   ├── patrol.go               # AI 定时巡检（模拟机/日志/设备安全检查）
 │   │   └── wshub.go                # WebSocket 事件广播
 │   ├── llm/llm.go                  # LLM 大模型调用封装
 │   ├── amap/amap.go                # 高德地图 API 封装
@@ -294,13 +318,17 @@ project/
 │   ├── index.html                  # 系统首页
 │   ├── dashboard.html              # 仪表盘导航（含侧边栏滚动）
 │   ├── vnc.html / ssh.html         # VNC/SSH 客户端页面
-│   └── modules/                    # 17 个功能模块页面
+│   └── modules/                    # 20 个功能模块页面
 │       ├── drones.html / gps.html / battery.html / flight.html
 │       ├── noflyzone.html / cot.html / hardware.html / remote.html
 │       ├── video.html / monitor.html / alerts.html / logs.html
 │       ├── audio.html / updates.html / sync.html / performance.html
+│       ├── backup.html             # 备份与数据回滚管理
+│       ├── ai-assistant.js         # 右下角 AI 智能助手浮窗
+│       ├── notification-bell.js    # 右上角消息通知铃铛
 │       └── common.js / common.css  # 公共工具函数和样式
 └── data/
+    ├── backups/                    # 数据库备份文件存储
     └── recordings/                 # 语音文件存储
 ```
 
@@ -372,7 +400,22 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 ## 版本更新
 
-### v3.1.0 (最新)
+### v3.2.0 (最新)
+
+- 新增备份与数据回滚模块（`backup.go` + `backup.html`）
+  - 自动备份（24h 周期 + 启动首次）、手动备份、备份记录管理
+  - 两种数据恢复方式：从备份记录恢复 / 上传 SQL 文件恢复
+  - 恢复前自动创建安全备份、异步恢复进度追踪
+  - 修复 `confirmAction()` 模态框确认失效 Bug
+  - 优化用户交互：操作即时 Toast 反馈 + 恢复进度弹窗
+- 新增 AI 智能助手（`ai_assistant.go` + `ai-assistant.js`）
+  - 右下角浮窗入口、多轮对话、快捷指令、知识库问答、模块跳转
+- 新增消息通知中心（`notification.go` + `notification-bell.js`）
+  - 右上角铃铛、未读计数、类型筛选、点击跳转、批量已读
+- 新增 AI 定时巡检（`patrol.go`）
+  - 定时检查模拟机、日志、设备安全，发现问题自动生成通知
+
+### v3.1.0
 
 - MySQL 数据库支持（`SC_DB_DRIVER` 切换）
 - SQL 兼容层自动转换（AdaptSQL）
