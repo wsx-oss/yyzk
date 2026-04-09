@@ -18,6 +18,7 @@ import (
 	"smartcontrol/internal/handlers"
 	"smartcontrol/internal/middleware"
 	"smartcontrol/internal/monitor"
+	"smartcontrol/internal/taskpool"
 
 	"github.com/gin-gonic/gin"
 )
@@ -97,6 +98,20 @@ func main() {
 	handlers.RegisterAIAssistantRoutes(r, database)
 	backupAPI := handlers.RegisterBackupRoutes(r, database)
 
+	// ---- Unified task pool ----
+	pool := taskpool.New(taskpool.PoolConfig{
+		IOWorkers:      16,
+		CPUWorkers:     4,
+		QueueSize:      1024,
+		DefaultTimeout: 30 * time.Second,
+	})
+	handlers.PoolRef = pool
+	handlers.RegisterTaskPoolRoutes(r, pool)
+
+	// Stats caches & cached stats API
+	handlers.InitStatsCaches(database)
+	handlers.RegisterCachedStatsRoutes(r)
+
 	sub, _ := fs.Sub(webFS, "web")
 	r.StaticFS("/app", http.FS(sub))
 	r.GET("/", func(c *gin.Context) {
@@ -111,14 +126,18 @@ func main() {
 		c.Redirect(http.StatusFound, "/app/login.html")
 	})
 
-	// background threshold alerting
-	go runThresholdAlerts(database, thCPU, thMEM, thDISK, time.Duration(thInterval)*time.Second)
+	// ---- Register background tasks in the pool ----
 
-	// background drone offline detection: mark drones/gps_devices as offline when GPS stops pushing
-	go runOfflineDetection(database, 10*time.Second)
+	// Threshold alerting (was: raw goroutine)
+	pool.SchedulePeriodic("threshold:alerts", "monitoring", time.Duration(thInterval)*time.Second,
+		taskpool.PriorityHigh, thresholdAlertTask(database, thCPU, thMEM, thDISK))
 
-	// AI patrol inspection: periodically check subsystems and generate notifications
-	handlers.StartPatrolInspection(database)
+	// Drone / GPS offline detection (was: raw goroutine)
+	pool.SchedulePeriodic("offline:detection", "monitoring", 10*time.Second,
+		taskpool.PriorityHigh, offlineDetectionTask(database))
+
+	// AI patrol inspection (was: 6 raw goroutines)
+	handlers.StartPatrolInspection(database, pool)
 
 	// Auto-backup: every 24 hours, keep latest 10 backups
 	backupAPI.StartAutoBackup(24*time.Hour, 10)
@@ -134,6 +153,12 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Printf("shutting down...")
+
+	// Graceful shutdown: flush batchers, stop caches, stop pool, then HTTP server
+	handlers.StopBatchers()
+	handlers.StopStatsCaches()
+	pool.Shutdown(5 * time.Second)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
@@ -209,26 +234,18 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func runThresholdAlerts(database *db.DB, thCPU, thMEM, thDISK int, interval time.Duration) {
-	if interval <= 0 {
-		interval = 10 * time.Second
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+// thresholdAlertTask returns a pool-compatible function for threshold alerting.
+func thresholdAlertTask(database *db.DB, thCPU, thMEM, thDISK int) func(ctx context.Context) error {
 	last := map[string]time.Time{}
 	cooldown := 60 * time.Second
-	for {
-		<-ticker.C
+	return func(ctx context.Context) error {
 		m, err := monitor.CollectMetrics()
 		if err != nil {
-			continue
+			return err
 		}
 		now := time.Now()
 		check := func(key, label string, val float64, th int) {
-			if th <= 0 {
-				return
-			}
-			if val < float64(th) {
+			if th <= 0 || val < float64(th) {
 				return
 			}
 			if t, ok := last[key]; ok && now.Sub(t) < cooldown {
@@ -245,27 +262,17 @@ func runThresholdAlerts(database *db.DB, thCPU, thMEM, thDISK int, interval time
 		check("cpu", "CPU利用率", m.CPUPercent, thCPU)
 		check("mem", "内存占用", m.MemPercent, thMEM)
 		check("disk", "磁盘使用率", m.DiskUsedPercent, thDISK)
+		return nil
 	}
 }
 
-// runOfflineDetection periodically marks GPS devices and their linked drones as offline
-// when the GPS device hasn't pushed data for more than 15 seconds.
-func runOfflineDetection(database *db.DB, interval time.Duration) {
-	if interval <= 0 {
-		interval = 30 * time.Second
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		<-ticker.C
-		// Mark GPS devices as offline if last_update is older than 15 seconds
-		// Skip devices with last_update=NULL (status='等待连接', never received real GPS data)
+// offlineDetectionTask returns a pool-compatible function for offline detection.
+func offlineDetectionTask(database *db.DB) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
 		database.Exec(`UPDATE gps_devices SET status='离线' WHERE status='在线' AND last_update IS NOT NULL AND datetime(last_update) < datetime('now','-15 seconds')`)
-		// Mark linked drones as offline if their GPS device is offline
 		database.Exec(`UPDATE drones SET status='offline', updated_at=datetime('now') WHERE status='online' AND linked_gps_device_id > 0 AND linked_gps_device_id IN (SELECT id FROM gps_devices WHERE status='离线')`)
-		// Mark linked remote-control devices as offline if their drone is offline
 		database.Exec(`UPDATE devices SET status='offline', updated_at=datetime('now') WHERE status='online' AND drone_id > 0 AND drone_id IN (SELECT id FROM drones WHERE status='offline')`)
-		// Mark hardware_items as offline if no push for 15 seconds
 		database.Exec(`UPDATE hardware_items SET status='离线' WHERE status='在线' AND detected_at IS NOT NULL AND datetime(detected_at) < datetime('now','-15 seconds')`)
+		return nil
 	}
 }

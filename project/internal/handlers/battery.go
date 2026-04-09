@@ -143,7 +143,7 @@ func (a *API) BatteryReport(c *gin.Context) {
 		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
 	}
 
-	hub.Broadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": p.DeviceID, "status": status}})
+	ThrottledBroadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": p.DeviceID, "status": status}})
 	c.JSON(200, gin.H{"ok": true, "id": id})
 }
 
@@ -241,7 +241,7 @@ func (a *API) BatteryStats(c *gin.Context) {
 
 	// average level and health across latest records
 	var avgLevel, avgHealth sql.NullFloat64
-	a.db.QueryRow(`SELECT AVG(b.level), AVG(b.health) FROM ` + latestJoin).Scan(&avgLevel, &avgHealth)
+	a.db.QueryRow(`SELECT AVG(b.level), AVG(b.health) FROM `+latestJoin).Scan(&avgLevel, &avgHealth)
 	stats["avg_level"] = int(avgLevel.Float64)
 	stats["avg_health"] = int(avgHealth.Float64)
 
@@ -395,7 +395,7 @@ func (a *API) BatteryPushByAgent(c *gin.Context) {
 		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
 	}
 
-	hub.Broadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": deviceID, "status": status}})
+	ThrottledBroadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": deviceID, "status": status}})
 	c.JSON(200, gin.H{"ok": true, "id": id})
 }
 

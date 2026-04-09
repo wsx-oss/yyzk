@@ -260,9 +260,9 @@ func (a *API) GpsDevicesPush(c *gin.Context) {
 		return
 	}
 
-	// record history
-	a.db.Exec(`INSERT INTO gps_history(device_id, latitude, longitude, altitude, speed, heading) VALUES(?,?,?,?,?,?)`,
-		id, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
+	// record history (batched for high-frequency writes)
+	idInt, _ := strconv.Atoi(id)
+	BatchGPSHistory(a.db, idInt, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
 
 	// check geofence
 	var fenceEnabled int
@@ -275,13 +275,13 @@ func (a *API) GpsDevicesPush(c *gin.Context) {
 			a.db.Exec(`INSERT INTO gps_fence_alerts(device_id, device_name, latitude, longitude, fence_lat, fence_lng, fence_radius, distance, message) VALUES(?,?,?,?,?,?,?,?,?)`,
 				id, devName, p.Latitude, p.Longitude, fLat, fLng, fRadius, dist,
 				devName+" 已超出电子围栏范围，距离中心 "+strconv.FormatFloat(dist, 'f', 1, 64)+"m")
-			// also insert into alerts table for global alerting
 			a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`,
 				"围栏报警", "warning", devName+" 超出电子围栏 (距离: "+strconv.FormatFloat(dist, 'f', 1, 64)+"m)")
 		}
 	}
 
-	hub.Broadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": id, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading}})
+	// Throttled WebSocket broadcast to avoid flooding clients
+	ThrottledBroadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": id, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading}})
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -432,15 +432,14 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 		newID, _ := res.LastInsertId()
 		deviceID = int(newID)
 		// record initial history
-		a.db.Exec(`INSERT INTO gps_history(device_id, latitude, longitude, altitude, speed, heading) VALUES(?,?,?,?,?,?)`,
-			deviceID, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
+		BatchGPSHistory(a.db, deviceID, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
 		// If a drone exists with this agent_id, link them together
 		var droneID int
 		if a.db.QueryRow(`SELECT id FROM drones WHERE agent_id=?`, p.AgentID).Scan(&droneID) == nil && droneID > 0 {
 			a.db.Exec(`UPDATE gps_devices SET drone_id=? WHERE id=?`, droneID, deviceID)
 			a.db.Exec(`UPDATE drones SET linked_gps_device_id=?, status='online', updated_at=datetime('now') WHERE id=?`, deviceID, droneID)
 		}
-		hub.Broadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": deviceID, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading, "created": true}})
+		ThrottledBroadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": deviceID, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading, "created": true}})
 		c.JSON(200, gin.H{"ok": true, "id": deviceID, "created": true})
 		return
 	}
@@ -455,9 +454,8 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 		return
 	}
 
-	// Record history
-	a.db.Exec(`INSERT INTO gps_history(device_id, latitude, longitude, altitude, speed, heading) VALUES(?,?,?,?,?,?)`,
-		deviceID, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
+	// Record history (batched)
+	BatchGPSHistory(a.db, deviceID, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
 
 	// Check geofence
 	var fenceEnabled int
@@ -482,7 +480,7 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 		WHERE linked_gps_device_id=? AND initial_lat=0 AND initial_lng=0`,
 		p.Latitude, p.Longitude, p.Altitude, deviceID)
 
-	hub.Broadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": deviceID, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading}})
+	ThrottledBroadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": deviceID, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading}})
 	c.JSON(200, gin.H{"ok": true, "id": deviceID})
 }
 
