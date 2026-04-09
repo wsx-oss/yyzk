@@ -324,7 +324,7 @@
 
     // ========== Map Init ==========
     function initMap() {
-      map = L.map('mapContainer').setView([39.908, 116.397], 5);
+      map = L.map('mapContainer').setView([34.748, 113.655], 14);
       tdtImgLayer().addTo(map);
       tdtCiaLayer().addTo(map);
       // MarkerCluster: handles overlapping markers — click cluster to spiderfy (fan out)
@@ -695,7 +695,7 @@
         $('#detailModal').classList.add('active');
         setTimeout(() => {
           if (detailMap) { detailMap.remove(); detailMap = null; }
-          detailMap = L.map('detailMap').setView([d.latitude || 39.908, d.longitude || 116.397], 14);
+          detailMap = L.map('detailMap').setView([d.latitude || 34.748, d.longitude || 113.655], 14);
           tdtImgLayer().addTo(detailMap);
           tdtCiaLayer().addTo(detailMap);
           if (d.latitude !== 0 || d.longitude !== 0) {
@@ -720,7 +720,7 @@
         $('#historyModal').classList.add('active');
         setTimeout(() => {
           if (historyMap) { historyMap.remove(); historyMap = null; }
-          historyMap = L.map('historyMap').setView([39.908, 116.397], 5);
+          historyMap = L.map('historyMap').setView([34.748, 113.655], 14);
           tdtImgLayer().addTo(historyMap);
           tdtCiaLayer().addTo(historyMap);
           if (items.length) {

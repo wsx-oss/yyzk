@@ -190,6 +190,56 @@
     .realtime-addr { margin-top: 12px; padding: 10px; background: #fff; border-radius: 8px; font-size: 13px; color: #334155; text-align: center; }
     .realtime-addr strong { color: #0ea5e9; }
     .realtime-update { text-align: center; margin-top: 8px; font-size: 11px; color: #94a3b8; }
+
+    /* Action config cards */
+    .action-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 10px; position: relative; }
+    .action-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .action-card-title { font-size: 14px; font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 6px; }
+    .action-card-remove { cursor: pointer; color: #94a3b8; font-size: 18px; padding: 2px 6px; border-radius: 4px; }
+    .action-card-remove:hover { color: #ef4444; background: #fee2e2; }
+    .action-mode-tabs { display: flex; gap: 0; margin-bottom: 10px; }
+    .action-mode-tab { flex: 1; padding: 7px 10px; text-align: center; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #64748b; transition: all .15s; }
+    .action-mode-tab:first-child { border-radius: 6px 0 0 6px; }
+    .action-mode-tab:last-child { border-radius: 0 6px 6px 0; }
+    .action-mode-tab.active { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+    .action-points-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; min-height: 24px; }
+    .action-point-tag { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; background: #dbeafe; color: #1e40af; border-radius: 10px; font-size: 11px; }
+    .action-point-tag .apt-remove { cursor: pointer; font-size: 13px; margin-left: 2px; color: #3b82f6; }
+    .action-point-tag .apt-remove:hover { color: #ef4444; }
+    .action-interval-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+    .action-interval-row label { font-size: 12px; color: #64748b; white-space: nowrap; }
+    .action-interval-row input { width: 80px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+    .action-config-map { height: 220px; border-radius: 8px; margin-top: 8px; border: 2px solid #0ea5e9; }
+    .action-map-hint { font-size: 11px; color: #64748b; margin-top: 4px; text-align: center; }
+    .action-summary { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-top: 12px; }
+    .action-summary-title { font-size: 13px; font-weight: 600; color: #166534; margin-bottom: 8px; }
+    .action-summary-item { font-size: 12px; color: #334155; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; display: flex; gap: 8px; align-items: baseline; }
+    .action-summary-item:last-child { border-bottom: none; }
+    .action-summary-badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 500; }
+    .asb-point { background: #dbeafe; color: #1e40af; }
+    .asb-interval { background: #fef3c7; color: #92400e; }
+
+    /* Action execution feedback in detail modal */
+    .action-feedback { margin-top: 16px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+    .action-feedback-header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #fff; padding: 12px 16px; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .action-feedback-body { padding: 14px; background: #f8fafc; }
+    .action-fb-item { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+    .action-fb-item:last-child { margin-bottom: 0; }
+    .action-fb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .action-fb-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .action-fb-name { font-weight: 600; font-size: 14px; color: #0f172a; }
+    .action-fb-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .afb-done { background: #d1fae5; color: #065f46; }
+    .afb-pending { background: #fef3c7; color: #92400e; }
+    .afb-running { background: #dbeafe; color: #1e40af; }
+    .action-fb-detail { font-size: 12px; color: #475569; line-height: 1.8; padding-left: 40px; }
+    .action-fb-detail .fb-label { color: #94a3b8; margin-right: 4px; }
+    .action-fb-progress { height: 6px; background: #e2e8f0; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .action-fb-progress-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+    .action-fb-stats { display: flex; gap: 16px; margin-top: 12px; padding: 10px 14px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; }
+    .action-fb-stat { text-align: center; flex: 1; }
+    .action-fb-stat .stat-num { font-size: 20px; font-weight: 700; color: #0f172a; }
+    .action-fb-stat .stat-label { font-size: 11px; color: #64748b; margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -307,23 +357,19 @@
   <div class="modal-overlay" id="missionModal">
     <div class="modal-box" style="width:720px;max-height:90vh;overflow-y:auto;">
       <div class="modal-title" id="missionModalTitle">创建飞行任务</div>
+      <!-- Step indicator -->
+      <div id="stepIndicator" style="display:flex;gap:0;margin-bottom:16px;">
+        <div id="stepInd1" style="flex:1;text-align:center;padding:8px 12px;background:#0ea5e9;color:#fff;border-radius:8px 0 0 8px;font-size:13px;font-weight:600;transition:all .2s;">① 航线规划</div>
+        <div id="stepInd2" style="flex:1;text-align:center;padding:8px 12px;background:#e2e8f0;color:#94a3b8;border-radius:0 8px 8px 0;font-size:13px;font-weight:600;transition:all .2s;">② 任务配置</div>
+      </div>
+      <!-- Step 1: Route Planning -->
+      <div id="routeStep">
       <div class="modal-form">
-        <!-- Basic info -->
-        <div class="full-width">
-          <label>任务名称 *</label>
-          <input id="missionName" type="text" placeholder="请输入任务名称" />
-          <div id="missionNameHint" style="font-size:11px;margin-top:4px;min-height:16px;"></div>
-        </div>
-        <div class="full-width">
-          <label>执行无人机</label>
-          <select id="missionDevice"><option value="0">未指定</option></select>
-        </div>
-
         <!-- Start point: address or coordinates -->
         <div class="full-width" style="background:#f8fafc;padding:12px;border-radius:8px;margin-top:4px;">
           <label style="font-weight:600;color:#0f172a;">起点（输入地址名称 或 经纬度坐标）</label>
           <div style="display:flex;gap:6px;margin-top:6px;">
-            <input id="mStartAddr" type="text" placeholder="例如：成都天府广场 / 30.572961,104.066301" style="flex:1;" />
+            <input id="mStartAddr" type="text" placeholder="例如：郑州大学主校区 / 34.748000,113.655000" style="flex:1;" />
             <button class="btn btn-secondary" type="button" onclick="resolveAddress('start')" style="white-space:nowrap;">解析</button>
           </div>
           <div id="mStartCandidates" style="margin-top:4px;"></div>
@@ -337,7 +383,7 @@
         <div class="full-width" style="background:#f8fafc;padding:12px;border-radius:8px;">
           <label style="font-weight:600;color:#0f172a;">终点（输入地址名称 或 经纬度坐标）</label>
           <div style="display:flex;gap:6px;margin-top:6px;">
-            <input id="mGoalAddr" type="text" placeholder="例如：四川大学望江校区 / 30.580000,104.075000" style="flex:1;" />
+            <input id="mGoalAddr" type="text" placeholder="例如：郑州大学北校区 / 34.757000,113.660000" style="flex:1;" />
             <button class="btn btn-secondary" type="button" onclick="resolveAddress('goal')" style="white-space:nowrap;">解析</button>
           </div>
           <div id="mGoalCandidates" style="margin-top:4px;"></div>
@@ -371,25 +417,6 @@
           <input id="mSpeed" type="number" value="8" min="1" max="30" />
         </div>
 
-        <!-- Actions -->
-        <div class="full-width">
-          <label>飞行动作（可选）</label>
-          <div style="display:flex;gap:6px;">
-            <select id="mActionSelect">
-              <option value="">选择动作...</option>
-              <option value="CAPTURE_PHOTO">拍照</option>
-              <option value="RECORD_VIDEO">录像</option>
-              <option value="LOITER">悬停</option>
-              <option value="SCAN_AREA">区域扫描</option>
-              <option value="INSPECT">巡检</option>
-              <option value="SPRAY">喷洒</option>
-              <option value="DROP_PAYLOAD">投放</option>
-            </select>
-            <button class="btn btn-secondary" onclick="addMissionAction()" type="button">添加</button>
-          </div>
-          <div class="plan-actions-list" id="mActionsList"></div>
-        </div>
-
         <!-- CoT Reasoning Option -->
         <div class="full-width" style="display:flex;align-items:center;gap:8px;padding:12px;background:#f0f9ff;border-radius:8px;border:1px solid #e0f2fe;">
           <input type="checkbox" id="reasoningCheckbox" style="margin:0;width:16px;height:16px;" />
@@ -404,32 +431,75 @@
           <span style="font-size:11px;color:#64748b;">同时生成3条路线供选择，耗时较长</span>
         </div>
 
-        <!-- Manual fields (auto-filled by smart plan) -->
-        <div class="full-width">
-          <label>飞行路线 *</label>
-          <input id="missionRoute" type="text" placeholder="可手动填写，或点击下方按钮由AI自动生成" />
-        </div>
-        <div>
-          <label>任务目标</label>
-          <input id="missionTarget" type="text" placeholder="例如：区域巡检" />
-        </div>
-        <div>
-          <label>预计时长</label>
-          <input id="missionDuration" type="text" placeholder="例如：2小时30分" />
-        </div>
-        <div class="full-width">
-          <label>任务描述</label>
-          <textarea id="missionDesc" placeholder="请输入任务描述（智能规划后自动填充）"></textarea>
-        </div>
-
+        <!-- Route field (hidden from UI, auto-filled by smart plan) -->
+        <input id="missionRoute" type="hidden" />
         <!-- Smart plan result area -->
         <div id="mPlanResultArea" class="full-width" style="display:none;"></div>
       </div>
       <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
         <button class="btn btn-secondary" onclick="closeMissionModal()">取消</button>
         <button class="btn btn-llm" id="btnSmartPlan" onclick="smartPlanAndFill()">&#x1F9E0; 智能规划并回填</button>
-        <button class="btn btn-primary" id="btnSubmitMission" onclick="submitMission()">确认创建</button>
+        <button class="btn btn-primary" id="btnConfirmRoute" onclick="confirmRouteGoToTask()">确认航线，下一步 →</button>
       </div>
+      </div><!-- /routeStep -->
+
+      <!-- Step 2: Task Configuration -->
+      <div id="taskStep" style="display:none;">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#166534;">
+          ✅ 航线已确认：<strong id="routeSummaryText"></strong>
+        </div>
+        <div class="modal-form">
+          <div class="full-width">
+            <label>任务名称 *</label>
+            <input id="missionName" type="text" placeholder="请输入任务名称" />
+            <div id="missionNameHint" style="font-size:11px;margin-top:4px;min-height:16px;"></div>
+          </div>
+          <div class="full-width">
+            <label>执行无人机</label>
+            <select id="missionDevice"><option value="0">未指定</option></select>
+          </div>
+          <div class="full-width">
+            <label style="font-weight:600;">飞行动作（可选）</label>
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <select id="mActionSelect">
+                <option value="">选择动作...</option>
+                <option value="CAPTURE_PHOTO">拍照</option>
+                <option value="RECORD_VIDEO">录像</option>
+                <option value="DROP_PAYLOAD">投放</option>
+                <option value="AIR_SENSOR">空气传感器</option>
+              </select>
+              <button class="btn btn-secondary" onclick="addMissionAction()" type="button">添加动作</button>
+            </div>
+            <div id="mActionCards"></div>
+            <div id="actionMapContainer" style="display:none;">
+              <div id="actionConfigMap" class="action-config-map"></div>
+              <div id="actionMapHint" class="action-map-hint"></div>
+              <div style="text-align:center;margin-top:6px;">
+                <button class="btn btn-primary" onclick="confirmActionMapSelection()" type="button" style="font-size:12px;padding:5px 16px;">✓ 确认选点</button>
+                <button class="btn btn-secondary" onclick="cancelActionMapSelection()" type="button" style="font-size:12px;padding:5px 16px;margin-left:6px;">取消</button>
+              </div>
+            </div>
+            <div id="actionSummary"></div>
+          </div>
+          <div>
+            <label>任务目标</label>
+            <input id="missionTarget" type="text" placeholder="例如：区域巡检" />
+          </div>
+          <div>
+            <label>预计时长</label>
+            <input id="missionDuration" type="text" placeholder="例如：2小时30分" />
+          </div>
+          <div class="full-width">
+            <label>任务描述</label>
+            <textarea id="missionDesc" placeholder="请输入任务描述（智能规划后自动填充）"></textarea>
+          </div>
+        </div>
+        <div class="modal-actions" style="flex-wrap:wrap;gap:8px;">
+          <button class="btn btn-secondary" onclick="backToRouteStep()">← 返回修改航线</button>
+          <button class="btn btn-secondary" onclick="closeMissionModal()">取消</button>
+          <button class="btn btn-primary" id="btnSubmitMission" onclick="submitMission()">确认创建</button>
+        </div>
+      </div><!-- /taskStep -->
     </div>
   </div>
 
@@ -439,6 +509,7 @@
       <div class="modal-title">任务详情</div>
       <div class="detail-grid" id="detailContent"></div>
       <div id="detailRouteMap" style="height:280px;border-radius:8px;margin-top:12px;display:none;"></div>
+      <div id="detailActionFeedback"></div>
       <div class="phase-control" id="phaseControl"></div>
       <div class="log-timeline" id="logTimeline"></div>
       <div id="detailAISection"></div>
@@ -865,7 +936,7 @@
       mPickerNFZLayers.forEach(l => { try { l.remove(); } catch(e) {} });
       mPickerNFZLayers = [];
       try {
-        mPickerMap = L.map('mPickerMap', { center: [30.573, 104.066], zoom: 12 });
+        mPickerMap = L.map('mPickerMap', { center: [34.748, 113.655], zoom: 14 });
         tdtImgLayer().addTo(mPickerMap);
         tdtCiaLayer().addTo(mPickerMap);
         addNoFlyZonesToMap(mPickerMap, mPickerNFZLayers);
@@ -985,25 +1056,318 @@
       else if (bounds.length === 1) mPickerMap.setView(bounds[0], 13);
     }
 
-    // --- Actions management ---
+    // --- Actions management (enhanced with point-select and interval modes) ---
+    const ACTION_LABELS = { 'CAPTURE_PHOTO':'拍照','RECORD_VIDEO':'录像','DROP_PAYLOAD':'投放','AIR_SENSOR':'空气传感器' };
+    let actionConfigMap = null;
+    let actionConfigRoutePolyline = null;
+    let actionConfigMarkers = [];
+    let actionMapEditingIdx = -1;
+    let actionMapTempPoints = [];
+    let actionMapMode = ''; // 'point' or 'interval'
+    let actionIntervalStartMarker = null;
+    let actionIntervalEndMarker = null;
+
     function addMissionAction() {
       const sel = $('#mActionSelect');
       if (!sel.value) return;
-      missionActions.push({ type: sel.value, params: {} });
+      missionActions.push({
+        type: sel.value,
+        mode: 'point', // 'point' or 'interval'
+        points: [],     // [{lat,lon},...] for point mode
+        intervalStart: null, // {lat,lon} for interval mode
+        intervalEnd: null,   // {lat,lon} for interval mode
+        intervalMeters: 100  // default interval distance
+      });
       sel.value = '';
       renderMissionActions();
     }
+
     function removeMissionAction(idx) {
       missionActions.splice(idx, 1);
       renderMissionActions();
+      renderActionSummary();
     }
+
+    function setActionMode(idx, mode) {
+      missionActions[idx].mode = mode;
+      if (mode === 'point') {
+        missionActions[idx].intervalStart = null;
+        missionActions[idx].intervalEnd = null;
+      } else {
+        missionActions[idx].points = [];
+      }
+      renderMissionActions();
+      renderActionSummary();
+    }
+
+    function updateActionInterval(idx, val) {
+      var v = parseInt(val);
+      if (v > 0) missionActions[idx].intervalMeters = v;
+    }
+
     function renderMissionActions() {
-      const container = $('#mActionsList');
-      if (!missionActions.length) { container.innerHTML = '<span style="color:#94a3b8;font-size:12px;">未添加动作</span>'; return; }
-      const labels = { 'CAPTURE_PHOTO':'拍照','RECORD_VIDEO':'录像','LOITER':'悬停','SCAN_AREA':'区域扫描','INSPECT':'巡检','SPRAY':'喷洒','DROP_PAYLOAD':'投放' };
-      container.innerHTML = missionActions.map((a, i) =>
-        `<span class="plan-action-tag">${labels[a.type]||a.type} <span class="remove-action" onclick="removeMissionAction(${i})">&times;</span></span>`
-      ).join('');
+      const container = $('#mActionCards');
+      if (!container) return;
+      if (!missionActions.length) {
+        container.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:8px 0;">未添加动作，请从上方选择动作后点击"添加动作"</div>';
+        return;
+      }
+      container.innerHTML = missionActions.map((a, i) => {
+        const label = ACTION_LABELS[a.type] || a.type;
+        const isPoint = a.mode === 'point';
+        const isInterval = a.mode === 'interval';
+        let html = '<div class="action-card" id="actionCard' + i + '">';
+        html += '<div class="action-card-header"><div class="action-card-title">';
+        html += '<span style="background:#6366f1;color:#fff;padding:2px 8px;border-radius:6px;font-size:12px;">' + (i+1) + '</span> ' + esc(label);
+        html += '</div><span class="action-card-remove" onclick="removeMissionAction(' + i + ')">&times;</span></div>';
+        // Mode tabs
+        html += '<div class="action-mode-tabs">';
+        html += '<div class="action-mode-tab' + (isPoint ? ' active' : '') + '" onclick="setActionMode(' + i + ',\'point\')">📍 点选位置</div>';
+        html += '<div class="action-mode-tab' + (isInterval ? ' active' : '') + '" onclick="setActionMode(' + i + ',\'interval\')">📏 间隔执行</div>';
+        html += '</div>';
+        if (isPoint) {
+          html += '<div style="font-size:12px;color:#475569;margin-bottom:4px;">在航线上点选执行该动作的具体位置（可多个）</div>';
+          html += '<button class="btn btn-secondary" onclick="openActionMap(' + i + ',\'point\')" type="button" style="font-size:12px;padding:4px 12px;">🗺 在航线上选点</button>';
+          html += '<div class="action-points-list" id="actionPts' + i + '">';
+          if (a.points.length) {
+            html += a.points.map(function(p, pi) {
+              return '<span class="action-point-tag">P' + (pi+1) + ': ' + p.lat.toFixed(5) + ',' + p.lon.toFixed(5) +
+                ' <span class="apt-remove" onclick="removeActionPoint(' + i + ',' + pi + ')">&times;</span></span>';
+            }).join('');
+          } else {
+            html += '<span style="color:#94a3b8;font-size:11px;">尚未选择位置</span>';
+          }
+          html += '</div>';
+        } else {
+          html += '<div style="font-size:12px;color:#475569;margin-bottom:4px;">在航线上选择起止范围，按间隔距离重复执行</div>';
+          html += '<button class="btn btn-secondary" onclick="openActionMap(' + i + ',\'interval\')" type="button" style="font-size:12px;padding:4px 12px;">🗺 在航线上选择范围</button>';
+          html += '<div class="action-interval-row">';
+          html += '<label>每隔</label><input type="number" min="10" value="' + (a.intervalMeters || 100) + '" onchange="updateActionInterval(' + i + ',this.value)" style="width:80px;" /><label>米执行一次</label>';
+          html += '</div>';
+          var rangeDesc = '';
+          if (a.intervalStart && a.intervalEnd) {
+            rangeDesc = '起始: ' + a.intervalStart.lat.toFixed(5) + ',' + a.intervalStart.lon.toFixed(5) +
+              ' → 终止: ' + a.intervalEnd.lat.toFixed(5) + ',' + a.intervalEnd.lon.toFixed(5);
+          } else {
+            rangeDesc = '<span style="color:#94a3b8;">尚未选择范围</span>';
+          }
+          html += '<div style="font-size:11px;margin-top:6px;color:#475569;">' + rangeDesc + '</div>';
+        }
+        html += '</div>';
+        return html;
+      }).join('');
+    }
+
+    function removeActionPoint(actionIdx, pointIdx) {
+      missionActions[actionIdx].points.splice(pointIdx, 1);
+      renderMissionActions();
+      renderActionSummary();
+    }
+
+    // --- Action map for point selection / interval range selection ---
+    function getRouteWaypoints() {
+      if (mLastPlan && mLastPlan.waypoints && mLastPlan.waypoints.length) return mLastPlan.waypoints;
+      return [];
+    }
+
+    function openActionMap(idx, mode) {
+      var wps = getRouteWaypoints();
+      if (!wps.length) {
+        showToast('暂无航线数据，请先完成航线规划', 'error');
+        return;
+      }
+      actionMapEditingIdx = idx;
+      actionMapMode = mode;
+      actionMapTempPoints = [];
+      actionIntervalStartMarker = null;
+      actionIntervalEndMarker = null;
+
+      var container = $('#actionMapContainer');
+      container.style.display = 'block';
+      container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      if (actionConfigMap) { actionConfigMap.remove(); actionConfigMap = null; }
+      actionConfigMarkers = [];
+
+      var coords = wps.map(function(wp) { return [wp.lat, wp.lon]; });
+      var sumLat = 0, sumLon = 0;
+      coords.forEach(function(c) { sumLat += c[0]; sumLon += c[1]; });
+      var cLat = sumLat / coords.length, cLon = sumLon / coords.length;
+
+      actionConfigMap = L.map('actionConfigMap', { center: [cLat, cLon], zoom: 14 });
+      tdtImgLayer().addTo(actionConfigMap);
+      tdtCiaLayer().addTo(actionConfigMap);
+
+      // Draw route polyline
+      actionConfigRoutePolyline = L.polyline(coords, { color: '#6366f1', weight: 4, opacity: 0.8 }).addTo(actionConfigMap);
+      actionConfigMap.fitBounds(actionConfigRoutePolyline.getBounds(), { padding: [30, 30] });
+
+      // Draw waypoint dots
+      wps.forEach(function(wp, i) {
+        L.circleMarker([wp.lat, wp.lon], { radius: 3, color: '#6366f1', fillColor: '#6366f1', fillOpacity: 0.6 }).addTo(actionConfigMap);
+      });
+
+      if (mode === 'point') {
+        $('#actionMapHint').innerHTML = '🖱 <b>点击航线上的位置</b>添加执行点（可点击多个位置），完成后点击"确认选点"';
+        actionConfigMap.on('click', onActionMapClickPoint);
+      } else {
+        $('#actionMapHint').innerHTML = '🖱 <b>第1次点击</b>设置起始位置，<b>第2次点击</b>设置终止位置';
+        actionConfigMap.on('click', onActionMapClickInterval);
+      }
+    }
+
+    function snapToRoute(lat, lon) {
+      var wps = getRouteWaypoints();
+      if (!wps.length) return { lat: lat, lon: lon };
+      var minDist = Infinity, best = { lat: wps[0].lat, lon: wps[0].lon };
+      // Snap to nearest segment point
+      for (var i = 0; i < wps.length - 1; i++) {
+        var p = projectPointOnSegment(lat, lon, wps[i].lat, wps[i].lon, wps[i+1].lat, wps[i+1].lon);
+        var d = (p.lat - lat) * (p.lat - lat) + (p.lon - lon) * (p.lon - lon);
+        if (d < minDist) { minDist = d; best = p; }
+      }
+      return best;
+    }
+
+    function projectPointOnSegment(px, py, ax, ay, bx, by) {
+      var dx = bx - ax, dy = by - ay;
+      if (dx === 0 && dy === 0) return { lat: ax, lon: ay };
+      var t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy);
+      t = Math.max(0, Math.min(1, t));
+      return { lat: ax + t * dx, lon: ay + t * dy };
+    }
+
+    function onActionMapClickPoint(e) {
+      var snapped = snapToRoute(e.latlng.lat, e.latlng.lng);
+      actionMapTempPoints.push(snapped);
+      var idx = actionMapTempPoints.length;
+      var marker = L.marker([snapped.lat, snapped.lon], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="background:#1e40af;color:#fff;padding:2px 7px;border-radius:50%;font-size:11px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.3);">' + idx + '</div>',
+          iconAnchor: [12, 12]
+        })
+      }).addTo(actionConfigMap);
+      actionConfigMarkers.push(marker);
+    }
+
+    function onActionMapClickInterval(e) {
+      var snapped = snapToRoute(e.latlng.lat, e.latlng.lng);
+      if (!actionIntervalStartMarker) {
+        actionIntervalStartMarker = L.marker([snapped.lat, snapped.lon], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div style="background:#10b981;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);">起始</div>',
+            iconAnchor: [16, 12]
+          })
+        }).addTo(actionConfigMap);
+        actionMapTempPoints.push(snapped);
+        $('#actionMapHint').innerHTML = '✅ 起始位置已设置，现在<b>点击第2个位置</b>设置终止点';
+      } else if (!actionIntervalEndMarker) {
+        actionIntervalEndMarker = L.marker([snapped.lat, snapped.lon], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);">终止</div>',
+            iconAnchor: [16, 12]
+          })
+        }).addTo(actionConfigMap);
+        actionMapTempPoints.push(snapped);
+        $('#actionMapHint').innerHTML = '✅ 起止范围已设置，点击"确认选点"完成';
+        actionConfigMap.off('click', onActionMapClickInterval);
+      }
+    }
+
+    function confirmActionMapSelection() {
+      var idx = actionMapEditingIdx;
+      if (idx < 0 || idx >= missionActions.length) return;
+      if (actionMapMode === 'point') {
+        if (!actionMapTempPoints.length) { showToast('请至少选择一个位置', 'error'); return; }
+        missionActions[idx].points = missionActions[idx].points.concat(actionMapTempPoints);
+      } else {
+        if (actionMapTempPoints.length < 2) { showToast('请选择起始和终止两个位置', 'error'); return; }
+        missionActions[idx].intervalStart = actionMapTempPoints[0];
+        missionActions[idx].intervalEnd = actionMapTempPoints[1];
+      }
+      closeActionMap();
+      renderMissionActions();
+      renderActionSummary();
+    }
+
+    function cancelActionMapSelection() {
+      closeActionMap();
+    }
+
+    function closeActionMap() {
+      if (actionConfigMap) { actionConfigMap.remove(); actionConfigMap = null; }
+      actionConfigMarkers = [];
+      actionMapTempPoints = [];
+      actionMapEditingIdx = -1;
+      actionMapMode = '';
+      actionIntervalStartMarker = null;
+      actionIntervalEndMarker = null;
+      $('#actionMapContainer').style.display = 'none';
+    }
+
+    // --- Haversine distance ---
+    function haversineM(lat1, lon1, lat2, lon2) {
+      var R = 6371000;
+      var toRad = Math.PI / 180;
+      var dLat = (lat2 - lat1) * toRad;
+      var dLon = (lon2 - lon1) * toRad;
+      var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // --- Compute route distance between two snapped points ---
+    function routeDistanceBetween(startPt, endPt) {
+      var wps = getRouteWaypoints();
+      if (wps.length < 2) return 0;
+      // Find nearest segment index for start and end
+      function nearestSegIdx(pt) {
+        var best = 0, minD = Infinity;
+        for (var i = 0; i < wps.length; i++) {
+          var d = (wps[i].lat - pt.lat) * (wps[i].lat - pt.lat) + (wps[i].lon - pt.lon) * (wps[i].lon - pt.lon);
+          if (d < minD) { minD = d; best = i; }
+        }
+        return best;
+      }
+      var si = nearestSegIdx(startPt), ei = nearestSegIdx(endPt);
+      if (si > ei) { var tmp = si; si = ei; ei = tmp; }
+      var dist = 0;
+      for (var i = si; i < ei; i++) {
+        dist += haversineM(wps[i].lat, wps[i].lon, wps[i+1].lat, wps[i+1].lon);
+      }
+      return dist;
+    }
+
+    // --- Render action summary ---
+    function renderActionSummary() {
+      var container = $('#actionSummary');
+      if (!container) return;
+      var configured = missionActions.filter(function(a) {
+        return (a.mode === 'point' && a.points.length > 0) || (a.mode === 'interval' && a.intervalStart && a.intervalEnd);
+      });
+      if (!configured.length) { container.innerHTML = ''; return; }
+      var html = '<div class="action-summary"><div class="action-summary-title">📋 动作执行计划预览</div>';
+      configured.forEach(function(a, i) {
+        var label = ACTION_LABELS[a.type] || a.type;
+        if (a.mode === 'point') {
+          html += '<div class="action-summary-item"><span class="action-summary-badge asb-point">点选</span>';
+          html += '<b>' + esc(label) + '</b>：共 ' + a.points.length + ' 个执行点';
+          var locs = a.points.map(function(p, pi) { return 'P' + (pi+1) + '(' + p.lat.toFixed(4) + ',' + p.lon.toFixed(4) + ')'; });
+          html += ' <span style="color:#64748b;font-size:11px;">[' + locs.join('、') + ']</span></div>';
+        } else {
+          var dist = routeDistanceBetween(a.intervalStart, a.intervalEnd);
+          var count = Math.max(1, Math.floor(dist / (a.intervalMeters || 100)) + 1);
+          html += '<div class="action-summary-item"><span class="action-summary-badge asb-interval">间隔</span>';
+          html += '<b>' + esc(label) + '</b>：每隔 ' + a.intervalMeters + 'm 执行，';
+          html += '范围约 ' + (dist / 1000).toFixed(2) + 'km，预计执行 <b>' + count + '</b> 次</div>';
+        }
+      });
+      html += '</div>';
+      container.innerHTML = html;
     }
 
     // --- Open / Close / Edit ---
@@ -1023,7 +1387,9 @@
       $('#mStartCandidates').innerHTML = ''; $('#mGoalCandidates').innerHTML = '';
       $('#mAlt').value = '80'; $('#mSpeed').value = '8';
       $('#mActionSelect').value = '';
+      closeActionMap();
       renderMissionActions();
+      if ($('#actionSummary')) $('#actionSummary').innerHTML = '';
       $('#missionRoute').value = '';
       $('#missionTarget').value = '';
       $('#missionDuration').value = '';
@@ -1032,6 +1398,9 @@
       $('#mPlanResultArea').innerHTML = '';
       if (mResultMap) { mResultMap.remove(); mResultMap = null; }
       mResultNFZLayers = [];
+      showRouteStep();
+      var confirmBtn = $('#btnConfirmRoute');
+      if (confirmBtn) { confirmBtn.textContent = '确认航线，下一步 →'; confirmBtn.style.background = ''; }
       loadDrones().then(() => {
         $('#missionModal').classList.add('active');
         loadNoFlyZones().then(() => { setTimeout(initMissionPickerMap, 200); });
@@ -1044,6 +1413,7 @@
         const m = await res.json();
         editingId = id;
         missionActions = [];
+        closeActionMap();
         mLastMapCtx = null; mLastPlan = null;
         $('#missionModalTitle').textContent = '编辑飞行任务';
         $('#btnSubmitMission').textContent = '确认保存';
@@ -1107,6 +1477,7 @@
         $('#mStartCandidates').innerHTML = ''; $('#mGoalCandidates').innerHTML = '';
         $('#mAlt').value = '80'; $('#mSpeed').value = '8';
         renderMissionActions();
+        if ($('#actionSummary')) $('#actionSummary').innerHTML = '';
         $('#missionRoute').value = route;
         $('#missionTarget').value = m.target || '';
         $('#missionDuration').value = m.estimated_duration || '';
@@ -1115,6 +1486,9 @@
         $('#mPlanResultArea').innerHTML = '';
         if (mResultMap) { mResultMap.remove(); mResultMap = null; }
         mResultNFZLayers = [];
+        showRouteStep();
+        var confirmBtn = $('#btnConfirmRoute');
+        if (confirmBtn) { confirmBtn.textContent = '确认航线，下一步 →'; confirmBtn.style.background = ''; }
         $('#missionModal').classList.add('active');
         loadNoFlyZones().then(() => {
           setTimeout(function() {
@@ -1135,6 +1509,41 @@
       mPickerNFZLayers = []; mStartMarker = null; mGoalMarker = null;
       if (mResultMap) { mResultMap.remove(); mResultMap = null; }
       mResultNFZLayers = [];
+      closeActionMap();
+    }
+
+    // --- Step navigation for two-step wizard ---
+    function showRouteStep() {
+      $('#routeStep').style.display = '';
+      $('#taskStep').style.display = 'none';
+      $('#stepInd1').style.background = '#0ea5e9';
+      $('#stepInd1').style.color = '#fff';
+      $('#stepInd2').style.background = '#e2e8f0';
+      $('#stepInd2').style.color = '#94a3b8';
+    }
+
+    function showTaskStep() {
+      $('#routeStep').style.display = 'none';
+      $('#taskStep').style.display = '';
+      $('#stepInd1').style.background = '#10b981';
+      $('#stepInd1').style.color = '#fff';
+      $('#stepInd2').style.background = '#0ea5e9';
+      $('#stepInd2').style.color = '#fff';
+      var routeVal = $('#missionRoute').value.trim();
+      $('#routeSummaryText').textContent = routeVal || '(手动填写)';
+    }
+
+    function confirmRouteGoToTask() {
+      var route = $('#missionRoute').value.trim();
+      if (!route) {
+        showToast('请先完成航线规划（输入飞行路线或点击“智能规划并回填”）', 'error');
+        return;
+      }
+      showTaskStep();
+    }
+
+    function backToRouteStep() {
+      showRouteStep();
     }
 
     // Real-time duplicate mission name check
@@ -1204,13 +1613,40 @@
         waypointsJSON = JSON.stringify(mLastPlan.waypoints);
       }
 
+      // Build actions summary for description
+      let actionsSummary = '';
+      if (missionActions.length) {
+        actionsSummary = '\n\n【动作执行计划】\n';
+        missionActions.forEach(function(a, i) {
+          var lbl = ACTION_LABELS[a.type] || a.type;
+          if (a.mode === 'point' && a.points.length) {
+            actionsSummary += (i+1) + '. ' + lbl + '（点选，' + a.points.length + '个执行点）\n';
+          } else if (a.mode === 'interval' && a.intervalStart && a.intervalEnd) {
+            var dist = routeDistanceBetween(a.intervalStart, a.intervalEnd);
+            var count = Math.max(1, Math.floor(dist / (a.intervalMeters || 100)) + 1);
+            actionsSummary += (i+1) + '. ' + lbl + '（间隔' + a.intervalMeters + 'm，预计' + count + '次）\n';
+          }
+        });
+      }
+
+      // Auto-fill target from actions if empty
+      var targetVal = $('#missionTarget').value.trim();
+      if (!targetVal && missionActions.length) {
+        targetVal = missionActions.map(function(a) { return ACTION_LABELS[a.type] || a.type; }).join('、');
+      }
+
+      var descVal = $('#missionDesc').value.trim();
+      if (actionsSummary && descVal.indexOf('【动作执行计划】') === -1) {
+        descVal += actionsSummary;
+      }
+
       const body = {
         name: $('#missionName').value.trim(),
         device_id: parseInt($('#missionDevice').value) || 0,
         route: $('#missionRoute').value.trim(),
-        target: $('#missionTarget').value.trim(),
+        target: targetVal,
         estimated_duration: $('#missionDuration').value.trim(),
-        description: $('#missionDesc').value.trim(),
+        description: descVal,
         waypoints_json: waypointsJSON
       };
       if (!body.name) { showToast('请输入任务名称', 'error'); return; }
@@ -1394,7 +1830,7 @@
               tdtCiaLayer().addTo(mDetailRouteMap);
               addNoFlyZonesToMap(mDetailRouteMap, []);
               L.polyline(coords, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mDetailRouteMap);
-              const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316' };
+              const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
               waypoints.forEach((wp, i) => {
                 const color = actionColors[wp.action] || (i === 0 ? '#10b981' : (i === waypoints.length-1 ? '#ef4444' : '#6366f1'));
                 const html = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);">${i+1}.${esc(wp.action||'')}</div>`;
@@ -1407,10 +1843,139 @@
           }
         }
 
+        // Action execution feedback
+        renderActionFeedback(m);
+
         $('#detailModal').classList.add('active');
       } catch (e) {
         showToast('加载详情失败', 'error');
       }
+    }
+
+    function renderActionFeedback(m) {
+      const container = $('#detailActionFeedback');
+      if (!container) return;
+      container.innerHTML = '';
+
+      // Parse action plan from description
+      const desc = m.description || '';
+      const planIdx = desc.indexOf('【动作执行计划】');
+      if (planIdx === -1 && !(m.target && m.target.length > 0)) return;
+
+      // Parse actions from description block
+      let parsedActions = [];
+      if (planIdx !== -1) {
+        const planText = desc.substring(planIdx + '【动作执行计划】'.length).trim();
+        const lines = planText.split('\n').filter(l => l.trim());
+        lines.forEach(function(line) {
+          const pointMatch = line.match(/^\d+\.\s*(.+?)（点选[，,]\s*(\d+)\s*个执行点）/);
+          const intervalMatch = line.match(/^\d+\.\s*(.+?)（间隔\s*(\d+)\s*m[，,]\s*预计\s*(\d+)\s*次）/);
+          if (pointMatch) {
+            parsedActions.push({ name: pointMatch[1].trim(), mode: 'point', count: parseInt(pointMatch[2]) });
+          } else if (intervalMatch) {
+            parsedActions.push({ name: intervalMatch[1].trim(), mode: 'interval', intervalM: parseInt(intervalMatch[2]), count: parseInt(intervalMatch[3]) });
+          }
+        });
+      }
+
+      // If no parsed actions from description, try to infer from target field
+      if (!parsedActions.length && m.target) {
+        const targetParts = m.target.split(/[、,，]/);
+        targetParts.forEach(function(t) {
+          t = t.trim();
+          if (t) parsedActions.push({ name: t, mode: 'unknown', count: 0 });
+        });
+      }
+
+      if (!parsedActions.length) return;
+
+      // Determine mission status for feedback
+      const isCompleted = m.status === '已完成';
+      const isRunning = m.status === '执行中' || m.current_phase === '执行任务' || m.current_phase === '巡航';
+      const progress = m.progress || 0;
+
+      // Action icons
+      const actionIcons = { '拍照':'📸', '录像':'🎥', '投放':'📦', '空气传感器':'🌫️' };
+      const actionBgColors = { '拍照':'#dbeafe', '录像':'#ede9fe', '投放':'#ffedd5', '空气传感器':'#ccfbf1' };
+
+      let html = '<div class="action-feedback">';
+      html += '<div class="action-feedback-header">📋 动作执行反馈</div>';
+      html += '<div class="action-feedback-body">';
+
+      let totalActions = 0;
+      let completedActions = 0;
+
+      parsedActions.forEach(function(act, i) {
+        const icon = actionIcons[act.name] || '⚡';
+        const bgColor = actionBgColors[act.name] || '#f1f5f9';
+        let statusBadge = '';
+        let actionProgress = 0;
+        let executedCount = 0;
+
+        if (isCompleted) {
+          statusBadge = '<span class="action-fb-badge afb-done">✓ 已完成</span>';
+          actionProgress = 100;
+          executedCount = act.count || 1;
+          completedActions += executedCount;
+        } else if (isRunning) {
+          // Simulate partial progress based on mission progress
+          var actionProg = Math.min(100, Math.round(progress * 1.1));
+          executedCount = act.count ? Math.round(act.count * actionProg / 100) : 0;
+          if (actionProg >= 100) {
+            statusBadge = '<span class="action-fb-badge afb-done">✓ 已完成</span>';
+            actionProgress = 100;
+            executedCount = act.count || 1;
+          } else {
+            statusBadge = '<span class="action-fb-badge afb-running">⏳ 执行中</span>';
+            actionProgress = actionProg;
+          }
+          completedActions += executedCount;
+        } else {
+          statusBadge = '<span class="action-fb-badge afb-pending">待执行</span>';
+          actionProgress = 0;
+          executedCount = 0;
+        }
+        totalActions += act.count || 1;
+
+        html += '<div class="action-fb-item">';
+        html += '<div class="action-fb-row">';
+        html += '<div class="action-fb-icon" style="background:' + bgColor + ';">' + icon + '</div>';
+        html += '<div style="flex:1;"><div class="action-fb-name">' + esc(act.name) + '</div></div>';
+        html += statusBadge;
+        html += '</div>';
+
+        html += '<div class="action-fb-detail">';
+        if (act.mode === 'point') {
+          html += '<span class="fb-label">执行方式：</span>航线点选（' + act.count + '个位置）<br/>';
+          html += '<span class="fb-label">执行情况：</span>已执行 <b>' + executedCount + '</b> / ' + act.count + ' 个点';
+        } else if (act.mode === 'interval') {
+          html += '<span class="fb-label">执行方式：</span>间隔执行（每隔 ' + act.intervalM + 'm）<br/>';
+          html += '<span class="fb-label">执行情况：</span>已执行 <b>' + executedCount + '</b> / ' + act.count + ' 次';
+        } else {
+          html += '<span class="fb-label">执行方式：</span>自动<br/>';
+          html += '<span class="fb-label">执行情况：</span>' + (isCompleted ? '已完成' : (isRunning ? '执行中' : '待执行'));
+        }
+        html += '</div>';
+
+        // Progress bar
+        var barColor = actionProgress >= 100 ? '#10b981' : (actionProgress > 0 ? '#3b82f6' : '#e2e8f0');
+        html += '<div class="action-fb-progress" style="margin-left:40px;margin-right:8px;">';
+        html += '<div class="action-fb-progress-fill" style="width:' + actionProgress + '%;background:' + barColor + ';"></div>';
+        html += '</div>';
+
+        html += '</div>';
+      });
+
+      // Summary stats
+      html += '<div class="action-fb-stats">';
+      html += '<div class="action-fb-stat"><div class="stat-num">' + parsedActions.length + '</div><div class="stat-label">动作总数</div></div>';
+      html += '<div class="action-fb-stat"><div class="stat-num">' + totalActions + '</div><div class="stat-label">计划执行次数</div></div>';
+      html += '<div class="action-fb-stat"><div class="stat-num">' + completedActions + '</div><div class="stat-label">已完成次数</div></div>';
+      html += '<div class="action-fb-stat"><div class="stat-num">' + (totalActions > 0 ? Math.round(completedActions / totalActions * 100) : 0) + '%</div><div class="stat-label">完成率</div></div>';
+      html += '</div>';
+
+      html += '</div></div>';
+      container.innerHTML = html;
     }
 
     async function loadDetailAISection(mission) {
@@ -1786,7 +2351,7 @@
         }
 
         // Target: from actions
-        const actionLabels = { 'CAPTURE_PHOTO':'航拍','RECORD_VIDEO':'录像','LOITER':'悬停观测','SCAN_AREA':'区域扫描','INSPECT':'巡检','SPRAY':'喷洒作业','DROP_PAYLOAD':'投放' };
+        const actionLabels = { 'CAPTURE_PHOTO':'拍照','RECORD_VIDEO':'录像','DROP_PAYLOAD':'投放','AIR_SENSOR':'空气传感器' };
         if (missionActions.length) {
           $('#missionTarget').value = missionActions.map(a => actionLabels[a.type] || a.type).join('、');
         }
@@ -1811,6 +2376,9 @@
         renderSmartPlanResult(plan, source, data.plan_id, data.reasoning_chain);
         btn.disabled = false;
         btn.innerHTML = '&#x1F9E0; 重新规划';
+        // Highlight confirm route button after successful plan
+        var crBtn = $('#btnConfirmRoute');
+        if (crBtn) { crBtn.textContent = '✓ 航线已规划，点击进入任务配置 →'; crBtn.style.background = '#10b981'; }
       } catch(e) {
         area.innerHTML = `<div style="color:#ef4444;padding:16px;text-align:center;">请求失败: ${esc(e.message)}</div>`;
         btn.disabled = false;
@@ -1922,7 +2490,7 @@
         html += '</div></div>';
       }
 
-      html += '<div style="text-align:center;margin-top:12px;color:#10b981;font-size:13px;font-weight:600;">以上信息已自动回填到表单中，确认无误后点击「确认创建」即可</div>';
+      html += '<div style="text-align:center;margin-top:12px;color:#10b981;font-size:13px;font-weight:600;">航线规划完成！确认无误后点击下方「确认航线，下一步」进入任务配置</div>';
       html += '</div>';
 
       area.innerHTML = html;
@@ -2025,7 +2593,7 @@
             const poly = L.polyline(coords, { color: lineColor, weight: 3, opacity: 0.9 }).addTo(m);
 
             // Action waypoint markers (only for waypoints with actions)
-            const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316' };
+            const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
             plan.waypoints.forEach(function(wp, wi) {
               if (!wp.action && wi !== 0 && wi !== plan.waypoints.length - 1) return;
               const color = actionColors[wp.action] || lineColor;
@@ -2077,7 +2645,7 @@
           : mins + '分钟';
       }
 
-      const actionLabels = { 'CAPTURE_PHOTO': '航拍', 'RECORD_VIDEO': '录像', 'LOITER': '悬停观测', 'SCAN_AREA': '区域扫描', 'INSPECT': '巡检', 'SPRAY': '喷洒作业', 'DROP_PAYLOAD': '投放' };
+      const actionLabels = { 'CAPTURE_PHOTO':'拍照','RECORD_VIDEO':'录像','DROP_PAYLOAD':'投放','AIR_SENSOR':'空气传感器' };
       if (missionActions.length) {
         $('#missionTarget').value = missionActions.map(a => actionLabels[a.type] || a.type).join('、');
       }
@@ -2095,7 +2663,9 @@
         $('#missionName').value = dateStr + ' ' + startAddr.substring(0, 8) + '→' + goalAddr.substring(0, 8);
       }
 
-      showToast('已选择方案，请确认后点击「确认创建」', 'success');
+      showToast('已选择方案，请点击「确认航线」进入任务配置', 'success');
+      var crBtn = $('#btnConfirmRoute');
+      if (crBtn) { crBtn.textContent = '✓ 航线已规划，点击进入任务配置 →'; crBtn.style.background = '#10b981'; }
     }
 
     var mResultPathPolyline = null;
@@ -2133,7 +2703,7 @@
         mResultPathPolyline = L.polyline(coords, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mResultMap);
 
         // Draggable waypoint markers
-        const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316' };
+        const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
         plan.waypoints.forEach((wp, i) => {
           const color = actionColors[wp.action] || '#6366f1';
           const labelHtml = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:grab;">${i+1}. ${esc(wp.action||String(i+1))}</div>`;
