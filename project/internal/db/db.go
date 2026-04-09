@@ -529,5 +529,45 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 
+	// Notifications center
+	notifTables := []string{
+		`CREATE TABLE IF NOT EXISTS notifications (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			type TEXT NOT NULL DEFAULT 'system',
+			title TEXT NOT NULL DEFAULT '',
+			message TEXT NOT NULL DEFAULT '',
+			source TEXT DEFAULT '',
+			link TEXT DEFAULT '',
+			is_read INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type)`,
+		`CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read)`,
+		`CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at)`,
+	}
+	for _, s := range notifTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("notifications table: %w", err)
+		}
+	}
+
+	// AI assistant chat history
+	aiChatTables := []string{
+		`CREATE TABLE IF NOT EXISTS ai_chat_messages (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			session_id TEXT NOT NULL DEFAULT 'default',
+			role TEXT NOT NULL DEFAULT 'user',
+			content TEXT NOT NULL DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_chat_session ON ai_chat_messages(session_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_chat_created ON ai_chat_messages(created_at)`,
+	}
+	for _, s := range aiChatTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("ai_chat_messages table: %w", err)
+		}
+	}
+
 	return nil
 }

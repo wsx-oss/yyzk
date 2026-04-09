@@ -78,6 +78,8 @@ func main() {
 
 	handlers.RegisterRoutes(r, database)
 	handlers.RegisterCoTRoutes(r, database)
+	handlers.RegisterNotificationRoutes(r, database)
+	handlers.RegisterAIAssistantRoutes(r, database)
 
 	sub, _ := fs.Sub(webFS, "web")
 	r.StaticFS("/app", http.FS(sub))
@@ -98,6 +100,9 @@ func main() {
 
 	// background drone offline detection: mark drones/gps_devices as offline when GPS stops pushing
 	go runOfflineDetection(database, 10*time.Second)
+
+	// AI patrol inspection: periodically check subsystems and generate notifications
+	handlers.StartPatrolInspection(database)
 
 	srv := &http.Server{Addr: addr, Handler: r}
 	go func() {

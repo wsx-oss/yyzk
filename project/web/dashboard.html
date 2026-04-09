@@ -209,6 +209,7 @@
         <a class="nav-sub-item" data-page="logs">维护操作日志</a>
         <a class="nav-sub-item" data-page="sync">数据同步状态</a>
       </div>
+      <a class="nav-item" data-page="cot">CoT 智能决策</a>
     </aside>
     <main class="main-content">
       <div class="top-bar">
@@ -279,5 +280,10 @@
     // Handle navigation from iframe (child page can call parent.navigateTo)
     window.navigateTo = navigateTo;
   </script>
+
+  <!-- Notification Bell Widget -->
+  <script src="/app/modules/notification-bell.js"></script>
+  <!-- AI Assistant Widget -->
+  <script src="/app/modules/ai-assistant.js"></script>
 </body>
 </html>

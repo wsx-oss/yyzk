@@ -10,6 +10,20 @@
     .cot-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
     .cot-header-row .module-title { margin-bottom: 0; }
     .cot-header-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 28px; width: 680px; max-width: 95vw; max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* Pagination */
+    .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 12px 0; font-size: 13px; color: #64748b; }
+    .pagination-bar button { padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+    .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
+    .pagination-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-action { padding: 4px 12px; font-size: 12px; border-radius: 4px; }
     
     /* Task type badges */
     .task-type-badge {
@@ -41,84 +55,134 @@
       transition: width 0.3s;
     }
     
-    /* Chain detail modal */
+    /* ====== Detail modal: info card ====== */
+    .detail-info-card {
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+      padding: 20px 24px; margin-bottom: 20px;
+    }
+    .detail-info-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; font-size: 14px;
+    }
+    .detail-info-grid .info-label {
+      font-size: 12px; color: #94a3b8; font-weight: 500; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .detail-info-grid .info-value {
+      font-size: 14px; color: #1e293b; font-weight: 500;
+    }
+    .detail-info-grid .info-value code {
+      font-size: 12px; background: #e2e8f0; padding: 2px 8px; border-radius: 4px; color: #334155;
+    }
+    .detail-confidence-row {
+      margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;
+      display: flex; align-items: center; gap: 12px; font-size: 14px;
+    }
+    .detail-confidence-row .conf-label { color: #64748b; font-weight: 500; }
+    .detail-confidence-row .conf-value { font-size: 18px; font-weight: 700; color: #0ea5e9; }
+    .detail-confidence-bar {
+      flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;
+    }
+    .detail-confidence-bar .fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, #ef4444 0%, #f59e0b 40%, #10b981 100%);
+      transition: width 0.5s ease;
+    }
+
+    /* ====== Detail modal: reasoning steps ====== */
+    .chain-steps-title {
+      font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .chain-steps-title .steps-count {
+      font-size: 12px; background: #0ea5e9; color: #fff; padding: 2px 10px;
+      border-radius: 10px; font-weight: 600;
+    }
     .chain-steps {
-      max-height: 400px;
-      overflow-y: auto;
-      margin: 16px 0;
+      max-height: 420px; overflow-y: auto; margin: 0 0 20px 0;
+      padding-right: 4px;
     }
+    .chain-steps::-webkit-scrollbar { width: 5px; }
+    .chain-steps::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     .chain-step {
-      border-left: 3px solid #0ea5e9;
-      background: #f8fafc;
-      padding: 16px;
-      margin-bottom: 12px;
-      border-radius: 0 8px 8px 0;
+      background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #0ea5e9;
+      padding: 18px 20px; margin-bottom: 14px; border-radius: 0 10px 10px 0;
+      transition: box-shadow 0.2s;
     }
+    .chain-step:hover { box-shadow: 0 2px 12px rgba(14,165,233,0.08); }
+    .chain-step:last-child { margin-bottom: 0; }
     .chain-step-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
     }
+    .chain-step-header-left { display: flex; align-items: center; gap: 10px; }
     .step-number {
-      background: #0ea5e9;
-      color: #fff;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 600;
-      margin-right: 8px;
+      background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff;
+      width: 28px; height: 28px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; flex-shrink: 0;
     }
     .step-type {
-      font-size: 12px;
-      font-weight: 500;
-      color: #0ea5e9;
-      text-transform: uppercase;
+      font-size: 12px; font-weight: 600; color: #fff;
+      background: #0ea5e9; padding: 3px 10px; border-radius: 10px;
+      text-transform: uppercase; letter-spacing: 0.3px;
     }
-    .step-content {
-      margin: 8px 0;
+    .step-confidence-tag {
+      font-size: 12px; color: #64748b; font-weight: 500;
+      background: #f1f5f9; padding: 3px 10px; border-radius: 10px;
+    }
+    .step-section { margin: 10px 0; }
+    .step-section-label {
+      font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .step-context {
+      font-size: 13px; color: #64748b; line-height: 1.6;
     }
     .step-question {
-      font-weight: 600;
-      color: #0f172a;
-      margin-bottom: 4px;
+      font-size: 14px; font-weight: 600; color: #0f172a; line-height: 1.5;
     }
     .step-thought {
-      color: #475569;
-      margin-bottom: 4px;
-      line-height: 1.5;
+      font-size: 13px; color: #475569; line-height: 1.7;
+      background: #f8fafc; padding: 10px 14px; border-radius: 6px;
+      border-left: 3px solid #cbd5e1;
     }
     .step-answer {
-      background: #e0f2fe;
-      padding: 8px 12px;
-      border-radius: 6px;
-      color: #0c4a6e;
-      font-weight: 500;
+      background: linear-gradient(135deg, #e0f2fe, #eff6ff);
+      padding: 12px 16px; border-radius: 8px;
+      color: #0c4a6e; font-size: 14px; font-weight: 600; line-height: 1.5;
     }
+
+    /* ====== Detail modal: final decision ====== */
     .final-decision {
-      background: linear-gradient(135deg, #f0f9ff, #f0fdf4);
-      border: 2px solid #0ea5e9;
-      padding: 20px;
-      border-radius: 12px;
-      margin-top: 20px;
+      background: linear-gradient(135deg, #f0f9ff, #ecfdf5);
+      border: 2px solid #0ea5e9; padding: 22px 24px;
+      border-radius: 12px; margin-top: 4px;
+      position: relative; overflow: hidden;
+    }
+    .final-decision::before {
+      content: ''; position: absolute; top: -30px; right: -30px;
+      width: 80px; height: 80px; border-radius: 50%;
+      background: rgba(14,165,233,0.06);
     }
     .final-decision-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #0c4a6e;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size: 16px; font-weight: 700; color: #0c4a6e;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
     }
     .final-decision-content {
-      color: #0f172a;
-      line-height: 1.6;
-      font-size: 14px;
+      color: #1e293b; line-height: 1.7; font-size: 14px;
+    }
+
+    /* ====== Detail modal: raw text ====== */
+    .raw-text-section {
+      margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px;
+    }
+    .raw-text-toggle {
+      font-size: 13px; color: #64748b; cursor: pointer; font-weight: 500;
+      display: flex; align-items: center; gap: 6px; user-select: none;
+    }
+    .raw-text-toggle:hover { color: #0ea5e9; }
+    .raw-text-pre {
+      background: #1e293b; color: #e2e8f0; padding: 16px 20px;
+      border-radius: 8px; font-size: 12px; line-height: 1.6;
+      overflow-x: auto; margin-top: 10px; font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
     }
     
     /* Create chain modal */
@@ -285,7 +349,7 @@
       }
 
       tbody.innerHTML = items.map(item => {
-        const stepCount = item.steps ? item.steps.length : 0;
+        const stepCount = item.step_count || (item.steps ? item.steps.length : 0);
         const confidence = item.confidence || 0;
         const confidenceWidth = Math.round(confidence * 100);
         
@@ -451,37 +515,55 @@
 
         const chain = data.chain;
         currentChainID = chainID;
+        const confPct = ((chain.confidence || 0) * 100).toFixed(1);
+        const confWidth = Math.round((chain.confidence || 0) * 100);
+        const stepCount = chain.steps ? chain.steps.length : 0;
 
-        $('#detailTitle').textContent = `思维链详情 - ${chain.task_type}`;
-        
-        let html = '<div style="margin-bottom:16px;padding:16px;background:#f8fafc;border-radius:8px;">';
-        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">`;
-        html += `<div><strong>思维链ID:</strong><br><code style="font-size:12px;">${esc(chain.id)}</code></div>`;
-        html += `<div><strong>任务类型:</strong><br>${taskTypeBadge(chain.task_type)}</div>`;
-        html += `<div><strong>关联任务:</strong><br>${esc(chain.task_id) || '-'}</div>`;
-        html += `<div><strong>创建时间:</strong><br>${formatDate(chain.created_at)}</div>`;
-        html += `</div>`;
-        html += `<div style="margin-top:12px;"><strong>总体置信度:</strong> ${(chain.confidence * 100).toFixed(1)}%</div>`;
+        const typeLabels = {
+          scheduling: '无人机调度', fault_diagnosis: '故障诊断',
+          path_optimization: '路径优化', mission_planning: '任务规划',
+          flight_planning: '飞行规划', emergency_analysis: '应急分析',
+          battery_analysis: '电池分析'
+        };
+
+        $('#detailTitle').innerHTML = `🧠 思维链详情 <span style="font-size:13px;font-weight:400;color:#64748b;margin-left:4px;">— ${typeLabels[chain.task_type] || chain.task_type}</span>`;
+
+        let html = '';
+
+        // Info card
+        html += '<div class="detail-info-card">';
+        html += '<div class="detail-info-grid">';
+        html += `<div><div class="info-label">思维链 ID</div><div class="info-value"><code>${esc(chain.chain_id || chain.id)}</code></div></div>`;
+        html += `<div><div class="info-label">任务类型</div><div class="info-value">${taskTypeBadge(chain.task_type)}</div></div>`;
+        html += `<div><div class="info-label">关联任务</div><div class="info-value">${esc(chain.task_id) || '<span style="color:#94a3b8;">无</span>'}</div></div>`;
+        html += `<div><div class="info-label">创建时间</div><div class="info-value">${formatDate(chain.created_at)}</div></div>`;
+        html += '</div>';
+        html += '<div class="detail-confidence-row">';
+        html += `<span class="conf-label">总体置信度</span>`;
+        html += `<span class="conf-value">${confPct}%</span>`;
+        html += `<div class="detail-confidence-bar"><div class="fill" style="width:${confWidth}%"></div></div>`;
+        html += '</div>';
         html += '</div>';
 
         // Steps
-        if (chain.steps && chain.steps.length) {
+        if (stepCount > 0) {
+          html += `<div class="chain-steps-title">📋 推理步骤 <span class="steps-count">${stepCount} 步</span></div>`;
           html += '<div class="chain-steps">';
-          html += '<h3 style="font-size:14px;font-weight:600;margin-bottom:12px;">推理步骤</h3>';
           chain.steps.forEach((step, idx) => {
+            const sConf = ((step.confidence || 0) * 100).toFixed(1);
             html += '<div class="chain-step">';
             html += '<div class="chain-step-header">';
-            html += `<div><span class="step-number">${step.step || idx + 1}</span><span class="step-type">${esc(step.type)}</span></div>`;
-            html += `<div style="font-size:12px;color:#64748b;">置信度: ${((step.confidence || 0) * 100).toFixed(1)}%</div>`;
+            html += `<div class="chain-step-header-left"><span class="step-number">${step.step || idx + 1}</span><span class="step-type">${esc(step.type)}</span></div>`;
+            html += `<span class="step-confidence-tag">置信度 ${sConf}%</span>`;
             html += '</div>';
             if (step.context) {
-              html += `<div class="step-content"><strong>上下文:</strong> ${esc(step.context)}</div>`;
+              html += `<div class="step-section"><div class="step-section-label">上下文</div><div class="step-context">${esc(step.context)}</div></div>`;
             }
-            html += `<div class="step-content step-question">${esc(step.question)}</div>`;
+            html += `<div class="step-section"><div class="step-section-label">问题</div><div class="step-question">${esc(step.question)}</div></div>`;
             if (step.thought) {
-              html += `<div class="step-content step-thought">思考: ${esc(step.thought)}</div>`;
+              html += `<div class="step-section"><div class="step-section-label">思考过程</div><div class="step-thought">${esc(step.thought)}</div></div>`;
             }
-            html += `<div class="step-answer">${esc(step.answer)}</div>`;
+            html += `<div class="step-section"><div class="step-section-label">结论</div><div class="step-answer">${esc(step.answer)}</div></div>`;
             html += '</div>';
           });
           html += '</div>';
@@ -493,11 +575,14 @@
         html += `<div class="final-decision-content">${esc(chain.final_decision)}</div>`;
         html += '</div>';
 
-        // Raw display text
+        // Raw display text (collapsible)
         if (data.display_text) {
-          html += '<div style="margin-top:16px;">';
-          html += '<div style="font-size:13px;font-weight:600;margin-bottom:8px;">原始文本:</div>';
-          html += `<pre style="background:#f1f5f9;padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;">${esc(data.display_text)}</pre>`;
+          const rawId = 'rawText_' + Date.now();
+          html += '<div class="raw-text-section">';
+          html += `<div class="raw-text-toggle" onclick="var el=document.getElementById('${rawId}');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('.arrow').textContent=el.style.display==='none'?'▶':'▼';">`;
+          html += '<span class="arrow">▶</span> 查看原始推理文本';
+          html += '</div>';
+          html += `<pre class="raw-text-pre" id="${rawId}" style="display:none;">${esc(data.display_text)}</pre>`;
           html += '</div>';
         }
 

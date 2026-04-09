@@ -197,8 +197,8 @@ func (a *CoTAPI) ListCoTChains(c *gin.Context) {
 		return
 	}
 
-	// 查询列表
-	query := fmt.Sprintf("SELECT id, task_type, task_id, created_at, final_decision, overall_confidence FROM cot_chains WHERE %s ORDER BY created_at DESC LIMIT ? OFFSET ?", whereClause)
+	// 查询列表（包含 steps JSON 以计算步骤数）
+	query := fmt.Sprintf("SELECT id, task_type, task_id, created_at, steps, final_decision, overall_confidence FROM cot_chains WHERE %s ORDER BY created_at DESC LIMIT ? OFFSET ?", whereClause)
 	args = append(args, pageSize, offset)
 
 	rows, err := a.db.Query(query, args...)
@@ -210,10 +210,16 @@ func (a *CoTAPI) ListCoTChains(c *gin.Context) {
 
 	chains := []gin.H{}
 	for rows.Next() {
-		var id, taskType, taskID, finalDecision, createdAtStr string
+		var id, taskType, taskID, finalDecision, createdAtStr, stepsJSON string
 		var confidence float64
 
-		if err := rows.Scan(&id, &taskType, &taskID, &createdAtStr, &finalDecision, &confidence); err == nil {
+		if err := rows.Scan(&id, &taskType, &taskID, &createdAtStr, &stepsJSON, &finalDecision, &confidence); err == nil {
+			// 计算步骤数
+			var steps []json.RawMessage
+			stepCount := 0
+			if json.Unmarshal([]byte(stepsJSON), &steps) == nil {
+				stepCount = len(steps)
+			}
 			chains = append(chains, gin.H{
 				"id":             id,
 				"task_type":      taskType,
@@ -221,6 +227,7 @@ func (a *CoTAPI) ListCoTChains(c *gin.Context) {
 				"created_at":     createdAtStr,
 				"final_decision": finalDecision,
 				"confidence":     confidence,
+				"step_count":     stepCount,
 			})
 		}
 	}
