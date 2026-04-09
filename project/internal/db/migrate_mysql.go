@@ -373,6 +373,21 @@ func migrateMySQL(db *sql.DB) error {
 			content TEXT NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS backup_records (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			backup_type VARCHAR(50) NOT NULL DEFAULT 'manual',
+			file_path VARCHAR(500) NOT NULL DEFAULT '',
+			file_size BIGINT DEFAULT 0,
+			table_count INT DEFAULT 0,
+			row_count INT DEFAULT 0,
+			status VARCHAR(50) NOT NULL DEFAULT 'running',
+			operator VARCHAR(255) DEFAULT 'system',
+			remark VARCHAR(500) DEFAULT '',
+			duration_ms INT DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			finished_at DATETIME
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 
 	for _, s := range tables {
@@ -437,6 +452,9 @@ func migrateMySQL(db *sql.DB) error {
 		`CREATE INDEX idx_notifications_created ON notifications(created_at)`,
 		`CREATE INDEX idx_ai_chat_session ON ai_chat_messages(session_id)`,
 		`CREATE INDEX idx_ai_chat_created ON ai_chat_messages(created_at)`,
+		`CREATE INDEX idx_backup_records_type ON backup_records(backup_type)`,
+		`CREATE INDEX idx_backup_records_status ON backup_records(status)`,
+		`CREATE INDEX idx_backup_records_created ON backup_records(created_at)`,
 	}
 	for _, s := range indexes {
 		db.Exec(s) // ignore duplicate index errors

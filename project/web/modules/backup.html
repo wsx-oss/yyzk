@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>备份与数据回滚</title>
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <style>
+    .module-title::before { content: '💾'; }
+
+    .backup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .backup-header .action-buttons {
+      margin-top: 0;
+      flex-shrink: 0;
+      gap: 8px;
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .stat-value.success { color: #10b981; }
+    .stat-value.danger  { color: #ef4444; }
+    .stat-value.info    { color: #0ea5e9; }
+
+    .status-success { background: #d1fae5; color: #065f46; }
+    .status-failed  { background: #fee2e2; color: #991b1b; }
+    .status-running { background: #dbeafe; color: #1e40af; }
+
+    .type-auto        { background: #ede9fe; color: #5b21b6; }
+    .type-manual      { background: #e0f2fe; color: #0369a1; }
+    .type-pre_restore { background: #fef3c7; color: #92400e; }
+
+    .btn-sm {
+      padding: 5px 12px; font-size: 12px; border: none; border-radius: 5px;
+      cursor: pointer; font-weight: 500; transition: all 0.2s;
+    }
+    .btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-restore { background: #f59e0b; color: #fff; }
+    .btn-restore:hover:not(:disabled) { background: #d97706; }
+    .btn-download { background: #0ea5e9; color: #fff; }
+    .btn-download:hover { background: #0284c7; }
+    .btn-delete { background: #ef4444; color: #fff; }
+    .btn-delete:hover { background: #dc2626; }
+    .ops-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* Toggle switch */
+    .toggle-row { display: flex; align-items: center; gap: 10px; }
+    .toggle-label { font-size: 13px; color: #475569; font-weight: 500; }
+    .toggle-switch {
+      position: relative; width: 44px; height: 24px;
+      background: #cbd5e1; border-radius: 12px; cursor: pointer;
+      transition: background 0.3s;
+    }
+    .toggle-switch.on { background: #10b981; }
+    .toggle-switch .toggle-knob {
+      position: absolute; top: 2px; left: 2px;
+      width: 20px; height: 20px; background: #fff;
+      border-radius: 50%; transition: left 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle-switch.on .toggle-knob { left: 22px; }
+    .toggle-status { font-size: 12px; font-weight: 600; }
+    .toggle-status.on { color: #10b981; }
+    .toggle-status.off { color: #94a3b8; }
+
+    /* Upload area */
+    .upload-area {
+      border: 2px dashed #cbd5e1; border-radius: 8px; padding: 20px;
+      text-align: center; cursor: pointer; transition: all 0.2s;
+      margin-bottom: 16px; background: #f8fafc;
+    }
+    .upload-area:hover { border-color: #0ea5e9; background: #f0f9ff; }
+    .upload-area.dragover { border-color: #0ea5e9; background: #e0f2fe; }
+    .upload-icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-text { font-size: 14px; color: #475569; }
+    .upload-hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.45); z-index: 9000;
+      justify-content: center; align-items: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 12px; padding: 28px 32px;
+      max-width: 500px; width: 92%;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+    }
+    .modal-box h3 { font-size: 17px; margin-bottom: 12px; color: #0f172a; }
+    .modal-box p  { font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.6; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+    /* Progress modal */
+    .progress-modal-body { text-align: center; }
+    .progress-phase {
+      font-size: 14px; color: #475569; margin-bottom: 12px;
+      min-height: 20px;
+    }
+    .progress-bar-outer {
+      width: 100%; height: 16px; background: #e2e8f0;
+      border-radius: 8px; overflow: hidden; margin-bottom: 8px;
+    }
+    .progress-bar-inner {
+      height: 100%; background: linear-gradient(90deg, #0ea5e9, #10b981);
+      border-radius: 8px; transition: width 0.4s ease;
+      min-width: 0%;
+    }
+    .progress-stats {
+      font-size: 13px; color: #64748b; margin-bottom: 16px;
+    }
+    .progress-result {
+      font-size: 15px; font-weight: 600; padding: 12px;
+      border-radius: 8px; margin-bottom: 12px;
+    }
+    .progress-result.success { background: #d1fae5; color: #065f46; }
+    .progress-result.error   { background: #fee2e2; color: #991b1b; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner {
+      display: inline-block; width: 28px; height: 28px;
+      border: 3px solid #e2e8f0; border-top-color: #0ea5e9;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="module-header">
+    <div class="backup-header">
+      <div>
+        <div class="module-title">备份与数据回滚</div>
+        <div style="font-size:13px; color:#64748b; margin-top:4px;">
+          管理数据库备份、手动/自动备份、数据恢复与回滚操作
+        </div>
+      </div>
+      <div class="action-buttons">
+        <button class="btn btn-primary" onclick="manualBackup()">立即备份</button>
+        <button class="btn btn-secondary" onclick="refreshAll()">刷新</button>
+        <button class="btn btn-danger btn-action" onclick="showCleanup()">清理旧备份</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats cards -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-box">
+      <div class="stat-label">备份总数</div>
+      <div class="stat-value info" id="statTotal">-</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">成功备份</div>
+      <div class="stat-value success" id="statSuccess">-</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">失败备份</div>
+      <div class="stat-value danger" id="statFailed">-</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">占用空间</div>
+      <div class="stat-value info" id="statSize">-</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">最近备份</div>
+      <div class="stat-value" id="statLast" style="font-size:15px;">-</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">自动备份</div>
+      <div class="toggle-row" style="justify-content:center; margin-top:4px;">
+        <div class="toggle-switch on" id="autoToggle" onclick="toggleAuto()">
+          <div class="toggle-knob"></div>
+        </div>
+        <span class="toggle-status on" id="autoLabel">已开启</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restore from file upload -->
+  <div class="card">
+    <div class="card-title">从文件恢复数据</div>
+    <div class="upload-area" id="uploadArea" onclick="$('#fileInput').click()">
+      <div class="upload-icon">📂</div>
+      <div class="upload-text">点击选择或拖拽 SQL 备份文件到此处</div>
+      <div class="upload-hint">支持 .sql 格式的数据库备份文件</div>
+    </div>
+    <input type="file" id="fileInput" accept=".sql" style="display:none" onchange="handleFileSelect(this)">
+  </div>
+
+  <!-- Backup list -->
+  <div class="card">
+    <div class="card-title">备份记录</div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" id="backupTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>类型</th>
+            <th>状态</th>
+            <th>表数</th>
+            <th>行数</th>
+            <th>文件大小</th>
+            <th>耗时</th>
+            <th>操作人</th>
+            <th>备注</th>
+            <th>创建时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="backupBody">
+          <tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:32px;">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="hint-box" style="margin-top:16px;">
+      💡 系统每 24 小时自动执行一次全量数据库备份，最多保留 10 份。恢复操作前系统会自动创建安全备份。
+      可通过备份记录的"恢复"按钮或上方文件上传区域两种方式恢复数据。
+    </div>
+  </div>
+
+  <!-- Confirm modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+      <h3 id="modalTitle">确认操作</h3>
+      <p id="modalMessage">确定要执行此操作吗？</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-danger" id="modalConfirmBtn" onclick="confirmAction()">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restore progress modal -->
+  <div class="modal-overlay" id="progressModal">
+    <div class="modal-box" style="max-width:480px;">
+      <h3>数据恢复进度</h3>
+      <div class="progress-modal-body">
+        <div class="spinner" id="progressSpinner"></div>
+        <div class="progress-phase" id="progressPhase">准备中...</div>
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="progressBar" style="width:0%"></div>
+        </div>
+        <div class="progress-stats" id="progressStats">-</div>
+        <div class="progress-result" id="progressResult" style="display:none;"></div>
+      </div>
+      <div class="modal-actions" id="progressActions" style="display:none;">
+        <button class="btn btn-primary" onclick="closeProgress()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app/modules/common.js"></script>
+  <script>
+    let pendingAction = null;
+    let progressTimer = null;
+    let autoEnabled = true;
+
+    // ---- Status & List ----
+
+    async function loadStatus() {
+      try {
+        const res = await api('/backup/status');
+        const d = await res.json();
+        $('#statTotal').textContent = d.total ?? '-';
+        $('#statSuccess').textContent = d.success ?? '-';
+        $('#statFailed').textContent = d.failed ?? '-';
+        $('#statSize').textContent = formatBytes(d.total_size || 0);
+        $('#statLast').textContent = d.last_backup ? formatDate(d.last_backup) : '暂无';
+        autoEnabled = !!d.auto_enabled;
+        updateAutoUI();
+      } catch (e) {
+        console.error('loadStatus', e);
+      }
+    }
+
+    async function loadList() {
+      try {
+        const res = await api('/backup/list');
+        const d = await res.json();
+        const items = d.items || [];
+        const tbody = $('#backupBody');
+        if (items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:32px;">暂无备份记录</td></tr>';
+          return;
+        }
+        tbody.innerHTML = items.map(r => `
+          <tr>
+            <td>${r.id}</td>
+            <td><span class="status-badge type-${r.backup_type}">${typeLabel(r.backup_type)}</span></td>
+            <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
+            <td>${r.table_count}</td>
+            <td>${r.row_count}</td>
+            <td>${formatBytes(r.file_size)}</td>
+            <td>${r.duration_ms}ms</td>
+            <td>${r.operator}</td>
+            <td title="${escHtml(r.remark)}">${truncate(r.remark, 20)}</td>
+            <td>${formatDate(r.created_at)}</td>
+            <td>
+              <div class="ops-cell">
+                ${r.status === 'success' ? `
+                  <button class="btn-sm btn-restore" onclick="confirmRestore(${r.id})">恢复</button>
+                  <button class="btn-sm btn-download" onclick="downloadBackup(${r.id})">下载</button>
+                ` : ''}
+                <button class="btn-sm btn-delete" onclick="confirmDelete(${r.id})">删除</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error('loadList', e);
+      }
+    }
+
+    // ---- Auto-backup toggle ----
+
+    function updateAutoUI() {
+      const sw = $('#autoToggle');
+      const label = $('#autoLabel');
+      if (autoEnabled) {
+        sw.classList.add('on');
+        label.textContent = '已开启';
+        label.className = 'toggle-status on';
+      } else {
+        sw.classList.remove('on');
+        label.textContent = '已关闭';
+        label.className = 'toggle-status off';
+      }
+    }
+
+    async function toggleAuto() {
+      autoEnabled = !autoEnabled;
+      updateAutoUI();
+      try {
+        const res = await api('/backup/auto-toggle', {
+          method: 'POST',
+          body: { enabled: autoEnabled },
+        });
+        const d = await res.json();
+        if (d.ok) {
+          showToast(autoEnabled ? '自动备份已开启' : '自动备份已关闭', 'success');
+        } else {
+          autoEnabled = !autoEnabled;
+          updateAutoUI();
+          showToast(d.error || '操作失败', 'error');
+        }
+      } catch (e) {
+        autoEnabled = !autoEnabled;
+        updateAutoUI();
+        showToast('请求失败', 'error');
+      }
+    }
+
+    // ---- Manual backup ----
+
+    async function manualBackup() {
+      const username = localStorage.getItem('username') || 'user';
+      try {
+        const res = await api('/backup/manual', {
+          method: 'POST',
+          body: { operator: username, remark: '手动备份' },
+        });
+        const d = await res.json();
+        if (d.ok) {
+          showToast('备份任务已提交，请稍后刷新查看', 'success');
+          setTimeout(refreshAll, 3000);
+        } else {
+          showToast(d.error || '备份失败', 'error');
+        }
+      } catch (e) { showToast('请求失败', 'error'); }
+    }
+
+    // ---- Restore from backup record ----
+
+    function confirmRestore(id) {
+      pendingAction = () => doRestore(id);
+      $('#modalTitle').textContent = '确认数据恢复';
+      $('#modalMessage').innerHTML = `
+        确定从备份 <strong>#${id}</strong> 恢复数据吗？<br><br>
+        ⚠️ 恢复操作将覆盖当前数据库中的数据。<br>
+        系统会在恢复前自动创建一份安全备份。
+      `;
+      $('#modalConfirmBtn').textContent = '确认恢复';
+      $('#confirmModal').classList.add('active');
+    }
+
+    async function doRestore(id) {
+      showToast('正在发起数据恢复请求...', 'info');
+      try {
+        const res = await api(`/backup/restore/${id}`, { method: 'POST' });
+        const d = await res.json();
+        if (d.ok) {
+          showToast('数据恢复已开始', 'success');
+          openProgressModal();
+        } else {
+          showToast(d.error || '恢复失败', 'error');
+        }
+      } catch (e) { showToast('请求失败: ' + e.message, 'error'); }
+    }
+
+    // ---- Restore from file upload ----
+
+    function handleFileSelect(input) {
+      if (input.files && input.files[0]) {
+        confirmUploadRestore(input.files[0]);
+      }
+      input.value = '';
+    }
+
+    // Drag & drop
+    (function() {
+      const area = document.getElementById('uploadArea');
+      area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('dragover'); });
+      area.addEventListener('dragleave', () => area.classList.remove('dragover'));
+      area.addEventListener('drop', e => {
+        e.preventDefault();
+        area.classList.remove('dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          confirmUploadRestore(e.dataTransfer.files[0]);
+        }
+      });
+    })();
+
+    function confirmUploadRestore(file) {
+      if (!file.name.toLowerCase().endsWith('.sql')) {
+        showToast('仅支持 .sql 文件', 'error');
+        return;
+      }
+      pendingAction = () => doUploadRestore(file);
+      $('#modalTitle').textContent = '确认从文件恢复';
+      $('#modalMessage').innerHTML = `
+        确定从文件 <strong>${escHtml(file.name)}</strong> (${formatBytes(file.size)}) 恢复数据吗？<br><br>
+        ⚠️ 恢复操作将覆盖当前数据库中的数据。<br>
+        系统会在恢复前自动创建一份安全备份。
+      `;
+      $('#modalConfirmBtn').textContent = '确认恢复';
+      $('#confirmModal').classList.add('active');
+    }
+
+    async function doUploadRestore(file) {
+      showToast('正在上传文件并发起恢复...', 'info');
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/backup/restore-upload', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        const d = await res.json();
+        if (d.ok) {
+          showToast('数据恢复已开始', 'success');
+          openProgressModal();
+        } else {
+          showToast(d.error || '上传恢复失败', 'error');
+        }
+      } catch (e) { showToast('请求失败: ' + e.message, 'error'); }
+    }
+
+    // ---- Restore progress polling ----
+
+    function openProgressModal() {
+      $('#progressSpinner').style.display = 'inline-block';
+      $('#progressPhase').textContent = '准备中...';
+      $('#progressBar').style.width = '0%';
+      $('#progressStats').textContent = '-';
+      $('#progressResult').style.display = 'none';
+      $('#progressActions').style.display = 'none';
+      $('#progressModal').classList.add('active');
+      startProgressPolling();
+    }
+
+    function startProgressPolling() {
+      if (progressTimer) clearInterval(progressTimer);
+      progressTimer = setInterval(pollProgress, 800);
+    }
+
+    async function pollProgress() {
+      try {
+        const res = await api('/backup/restore-progress');
+        const p = await res.json();
+        updateProgressUI(p);
+        if (!p.running && p.phase === 'done') {
+          clearInterval(progressTimer);
+          progressTimer = null;
+          refreshAll();
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function updateProgressUI(p) {
+      const phaseMap = {
+        'pre_backup': '正在创建恢复前安全备份...',
+        'parsing': '正在解析 SQL 语句...',
+        'restoring': '正在恢复数据...',
+        'done': '恢复完成',
+      };
+      $('#progressPhase').textContent = p.message || phaseMap[p.phase] || p.phase;
+
+      if (p.total > 0) {
+        const pct = Math.round((p.done / p.total) * 100);
+        $('#progressBar').style.width = pct + '%';
+        $('#progressStats').textContent = `${p.done} / ${p.total} 条语句` + (p.errors > 0 ? `  (${p.errors} 条失败)` : '');
+      } else if (p.phase === 'pre_backup' || p.phase === 'parsing') {
+        $('#progressBar').style.width = '15%';
+        $('#progressStats').textContent = '';
+      }
+
+      if (!p.running && p.phase === 'done') {
+        $('#progressSpinner').style.display = 'none';
+        $('#progressBar').style.width = '100%';
+        const result = $('#progressResult');
+        result.style.display = 'block';
+        if (p.errors === 0) {
+          result.className = 'progress-result success';
+          result.textContent = '✅ ' + p.message;
+        } else {
+          result.className = 'progress-result error';
+          result.textContent = '⚠️ ' + p.message;
+        }
+        $('#progressActions').style.display = 'flex';
+      }
+    }
+
+    function closeProgress() {
+      $('#progressModal').classList.remove('active');
+      if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+    }
+
+    // ---- Delete / Cleanup / Download ----
+
+    function confirmDelete(id) {
+      pendingAction = () => doDelete(id);
+      $('#modalTitle').textContent = '确认删除';
+      $('#modalMessage').textContent = `确定删除备份 #${id} 吗？此操作不可撤销。`;
+      $('#modalConfirmBtn').textContent = '确认删除';
+      $('#confirmModal').classList.add('active');
+    }
+
+    function showCleanup() {
+      pendingAction = () => doCleanup();
+      $('#modalTitle').textContent = '清理旧备份';
+      $('#modalMessage').textContent = '将只保留最近 10 份成功备份，其余将被删除。确认继续？';
+      $('#modalConfirmBtn').textContent = '确认清理';
+      $('#confirmModal').classList.add('active');
+    }
+
+    function closeModal() {
+      $('#confirmModal').classList.remove('active');
+      pendingAction = null;
+    }
+    function confirmAction() {
+      const action = pendingAction;
+      closeModal();
+      if (action) action();
+    }
+
+    async function doDelete(id) {
+      showToast('正在删除...', 'info');
+      try {
+        const res = await api(`/backup/${id}`, { method: 'DELETE' });
+        const d = await res.json();
+        if (d.ok) { showToast('已删除', 'success'); refreshAll(); }
+        else showToast(d.error || '删除失败', 'error');
+      } catch (e) { showToast('请求失败', 'error'); }
+    }
+
+    async function doCleanup() {
+      try {
+        const res = await api('/backup/cleanup', { method: 'POST', body: { keep: 10 } });
+        const d = await res.json();
+        showToast(`清理完成，删除了 ${d.deleted || 0} 份旧备份`, 'success');
+        refreshAll();
+      } catch (e) { showToast('请求失败', 'error'); }
+    }
+
+    function downloadBackup(id) {
+      const token = localStorage.getItem('token');
+      window.open(`/api/backup/download/${id}?token=${encodeURIComponent(token)}`, '_blank');
+    }
+
+    // ---- Helpers ----
+
+    function typeLabel(t) {
+      const m = { auto: '自动', manual: '手动', pre_restore: '恢复前' };
+      return m[t] || t;
+    }
+    function statusLabel(s) {
+      const m = { success: '成功', failed: '失败', running: '进行中' };
+      return m[s] || s;
+    }
+    function truncate(s, n) {
+      if (!s) return '-';
+      return s.length > n ? s.slice(0, n) + '…' : s;
+    }
+    function escHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function refreshAll() { loadStatus(); loadList(); }
+
+    // Init
+    refreshAll();
+  </script>
+</body>
+
+</html>

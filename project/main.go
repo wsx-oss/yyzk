@@ -95,6 +95,7 @@ func main() {
 	handlers.RegisterCoTRoutes(r, database)
 	handlers.RegisterNotificationRoutes(r, database)
 	handlers.RegisterAIAssistantRoutes(r, database)
+	backupAPI := handlers.RegisterBackupRoutes(r, database)
 
 	sub, _ := fs.Sub(webFS, "web")
 	r.StaticFS("/app", http.FS(sub))
@@ -118,6 +119,9 @@ func main() {
 
 	// AI patrol inspection: periodically check subsystems and generate notifications
 	handlers.StartPatrolInspection(database)
+
+	// Auto-backup: every 24 hours, keep latest 10 backups
+	backupAPI.StartAutoBackup(24*time.Hour, 10)
 
 	srv := &http.Server{Addr: addr, Handler: r}
 	go func() {
