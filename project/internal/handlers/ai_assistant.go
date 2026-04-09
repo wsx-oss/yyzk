@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"smartcontrol/internal/db"
 	"smartcontrol/internal/llm"
 	"strings"
 	"time"
@@ -14,12 +15,12 @@ import (
 
 // AIAssistantAPI handles AI assistant chat endpoints
 type AIAssistantAPI struct {
-	db  *sql.DB
+	db  *db.DB
 	llm *llm.Client
 }
 
 // NewAIAssistantAPI creates a new AIAssistantAPI
-func NewAIAssistantAPI(db *sql.DB) *AIAssistantAPI {
+func NewAIAssistantAPI(db *db.DB) *AIAssistantAPI {
 	return &AIAssistantAPI{
 		db:  db,
 		llm: llm.NewClient(),
@@ -640,9 +641,9 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 	a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE acknowledged=0").Scan(&alertCnt)
 	if alertCnt > 0 {
 		suggestions = append(suggestions, gin.H{
-			"text": fmt.Sprintf("⚠️ 有 %d 条未处理告警", alertCnt),
+			"text":   fmt.Sprintf("⚠️ 有 %d 条未处理告警", alertCnt),
 			"action": "查看告警详情",
-			"nav": "alerts",
+			"nav":    "alerts",
 		})
 	}
 
@@ -652,9 +653,9 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 		WHERE level < 20 AND created_at > datetime('now', '-10 minutes')`).Scan(&lowBatt)
 	if lowBatt > 0 {
 		suggestions = append(suggestions, gin.H{
-			"text": fmt.Sprintf("🔋 %d 台设备电量低于20%%", lowBatt),
+			"text":   fmt.Sprintf("🔋 %d 台设备电量低于20%%", lowBatt),
 			"action": "查看电池详情",
-			"nav": "battery",
+			"nav":    "battery",
 		})
 	}
 
@@ -663,9 +664,9 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 	a.db.QueryRow("SELECT COUNT(*) FROM drones WHERE status='offline'").Scan(&offlineDrones)
 	if offlineDrones > 0 {
 		suggestions = append(suggestions, gin.H{
-			"text": fmt.Sprintf("🔴 %d 架无人机离线", offlineDrones),
+			"text":   fmt.Sprintf("🔴 %d 架无人机离线", offlineDrones),
 			"action": "查看无人机状态",
-			"nav": "drones",
+			"nav":    "drones",
 		})
 	}
 
@@ -674,9 +675,9 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 	a.db.QueryRow("SELECT COUNT(*) FROM flight_missions WHERE status='飞行中'").Scan(&activeMissions)
 	if activeMissions > 0 {
 		suggestions = append(suggestions, gin.H{
-			"text": fmt.Sprintf("✈️ %d 个任务正在执行", activeMissions),
+			"text":   fmt.Sprintf("✈️ %d 个任务正在执行", activeMissions),
 			"action": "查看任务进度",
-			"nav": "flight",
+			"nav":    "flight",
 		})
 	}
 
@@ -685,9 +686,9 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 	a.db.QueryRow("SELECT COUNT(*) FROM notifications WHERE is_read=0").Scan(&unreadNotif)
 	if unreadNotif > 0 {
 		suggestions = append(suggestions, gin.H{
-			"text": fmt.Sprintf("🔔 有 %d 条未读通知", unreadNotif),
+			"text":   fmt.Sprintf("🔔 有 %d 条未读通知", unreadNotif),
 			"action": "查看通知中心",
-			"nav": "",
+			"nav":    "",
 		})
 	}
 
@@ -732,7 +733,7 @@ func (a *AIAssistantAPI) CoTExplain(c *gin.Context) {
 }
 
 // RegisterAIAssistantRoutes registers all AI assistant routes
-func RegisterAIAssistantRoutes(r *gin.Engine, db *sql.DB) {
+func RegisterAIAssistantRoutes(r *gin.Engine, db *db.DB) {
 	api := NewAIAssistantAPI(db)
 	g := r.Group("/api/ai")
 	{

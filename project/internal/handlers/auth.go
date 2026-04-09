@@ -7,15 +7,17 @@ import (
 	"net/http"
 	"time"
 
+	"smartcontrol/internal/db"
+
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthAPI struct {
-	db *sql.DB
+	db *db.DB
 }
 
-func RegisterAuthRoutes(r *gin.Engine, database *sql.DB) {
+func RegisterAuthRoutes(r *gin.Engine, database *db.DB) {
 	a := &AuthAPI{db: database}
 	auth := r.Group("/api/auth")
 	{
@@ -105,7 +107,7 @@ func (a *AuthAPI) Login(c *gin.Context) {
 	// Generate token and save to database
 	token := generateToken()
 	expiresAt := time.Now().Add(24 * time.Hour) // 24 hours validity
-	
+
 	_, err = a.db.Exec(`INSERT INTO sessions(user_id, token, expires_at) VALUES(?, ?, ?)`,
 		userID, token, expiresAt.Format("2006-01-02 15:04:05"))
 	if err != nil {

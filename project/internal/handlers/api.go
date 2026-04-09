@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"smartcontrol/internal/db"
 	"smartcontrol/internal/monitor"
 	"smartcontrol/internal/syncengine"
 	"smartcontrol/internal/utils"
@@ -27,7 +28,7 @@ import (
 )
 
 type API struct {
-	db      *sql.DB
+	db      *db.DB
 	syncEng *syncengine.Engine
 }
 
@@ -218,7 +219,7 @@ func (a *API) UserStatsIncrConnection(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 
-func RegisterRoutes(r *gin.Engine, database *sql.DB) {
+func RegisterRoutes(r *gin.Engine, database *db.DB) {
 	a := &API{db: database, syncEng: syncengine.New(database)}
 	api := r.Group("/api")
 	{

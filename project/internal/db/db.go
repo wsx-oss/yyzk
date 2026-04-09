@@ -3,13 +3,125 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	_ "modernc.org/sqlite"
 )
 
-func Open(path string) (*sql.DB, error) {
+// Driver holds the active database driver name: "sqlite" or "mysql".
+var Driver string = "sqlite"
+
+// IsMySQL returns true when the active driver is MySQL.
+func IsMySQL() bool { return Driver == "mysql" }
+
+// ---------- SQL compatibility layer ----------
+
+// reDateTime matches datetime(column) or datetime(table.column)
+var reDateTime = regexp.MustCompile(`datetime\((\w+(?:\.\w+)?)\)`)
+
+// reDateTimeFunc matches datetime(FUNC(...)) e.g. datetime(COALESCE(col,'val'))
+var reDateTimeFunc = regexp.MustCompile(`datetime\(([A-Z]+\([^)]+\))\)`)
+
+// AdaptSQL transparently converts SQLite-dialect SQL to MySQL when needed.
+// When the driver is SQLite the input is returned unchanged.
+func AdaptSQL(s string) string {
+	if !IsMySQL() {
+		return s
+	}
+	// DML
+	s = strings.ReplaceAll(s, "INSERT OR IGNORE INTO", "INSERT IGNORE INTO")
+	s = strings.ReplaceAll(s, "INSERT OR REPLACE INTO", "REPLACE INTO")
+	// datetime with offsets (longer patterns first)
+	s = strings.ReplaceAll(s, "datetime('now','-30 seconds')", "DATE_SUB(NOW(), INTERVAL 30 SECOND)")
+	s = strings.ReplaceAll(s, "datetime('now', '-30 seconds')", "DATE_SUB(NOW(), INTERVAL 30 SECOND)")
+	s = strings.ReplaceAll(s, "datetime('now','-15 seconds')", "DATE_SUB(NOW(), INTERVAL 15 SECOND)")
+	s = strings.ReplaceAll(s, "datetime('now', '-15 seconds')", "DATE_SUB(NOW(), INTERVAL 15 SECOND)")
+	s = strings.ReplaceAll(s, "datetime('now','-10 minutes')", "DATE_SUB(NOW(), INTERVAL 10 MINUTE)")
+	s = strings.ReplaceAll(s, "datetime('now', '-10 minutes')", "DATE_SUB(NOW(), INTERVAL 10 MINUTE)")
+	s = strings.ReplaceAll(s, "datetime('now','-7 days')", "DATE_SUB(NOW(), INTERVAL 7 DAY)")
+	s = strings.ReplaceAll(s, "datetime('now', '-7 days')", "DATE_SUB(NOW(), INTERVAL 7 DAY)")
+	// datetime('now') -> NOW()
+	s = strings.ReplaceAll(s, "datetime('now')", "NOW()")
+	// datetime(COALESCE(...)) -> COALESCE(...)
+	s = reDateTimeFunc.ReplaceAllString(s, "$1")
+	// datetime(column) or datetime(t.column) -> column / t.column
+	s = reDateTime.ReplaceAllString(s, "$1")
+	return s
+}
+
+// ---------- DB wrapper (auto-adapts every query) ----------
+
+// DB wraps *sql.DB and calls AdaptSQL on every Exec / Query / QueryRow.
+type DB struct {
+	inner *sql.DB
+}
+
+func (d *DB) Exec(query string, args ...any) (sql.Result, error) {
+	return d.inner.Exec(AdaptSQL(query), args...)
+}
+func (d *DB) Query(query string, args ...any) (*sql.Rows, error) {
+	return d.inner.Query(AdaptSQL(query), args...)
+}
+func (d *DB) QueryRow(query string, args ...any) *sql.Row {
+	return d.inner.QueryRow(AdaptSQL(query), args...)
+}
+func (d *DB) Begin() (*Tx, error) {
+	tx, err := d.inner.Begin()
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{inner: tx}, nil
+}
+func (d *DB) Close() error { return d.inner.Close() }
+
+// Raw returns the underlying *sql.DB (e.g. for driver-specific operations).
+func (d *DB) Raw() *sql.DB { return d.inner }
+
+// Tx wraps *sql.Tx with automatic SQL adaptation.
+type Tx struct {
+	inner *sql.Tx
+}
+
+func (t *Tx) Exec(query string, args ...any) (sql.Result, error) {
+	return t.inner.Exec(AdaptSQL(query), args...)
+}
+func (t *Tx) Query(query string, args ...any) (*sql.Rows, error) {
+	return t.inner.Query(AdaptSQL(query), args...)
+}
+func (t *Tx) QueryRow(query string, args ...any) *sql.Row {
+	return t.inner.QueryRow(AdaptSQL(query), args...)
+}
+func (t *Tx) Prepare(query string) (*sql.Stmt, error) {
+	return t.inner.Prepare(AdaptSQL(query))
+}
+func (t *Tx) Commit() error   { return t.inner.Commit() }
+func (t *Tx) Rollback() error { return t.inner.Rollback() }
+
+// Open connects to the database identified by driver ("sqlite" or "mysql") and dsn.
+// For SQLite dsn is the file path; for MySQL it is a DSN like user:pass@tcp(host:port)/dbname.
+func Open(driver, dsn string) (*DB, error) {
+	Driver = driver
+	var raw *sql.DB
+	var err error
+	switch driver {
+	case "mysql":
+		raw, err = openMySQL(dsn)
+	default:
+		raw, err = openSQLite(dsn)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &DB{inner: raw}, nil
+}
+
+func openSQLite(path string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
@@ -24,7 +136,30 @@ func Open(path string) (*sql.DB, error) {
 	return database, nil
 }
 
-func Migrate(db *sql.DB) error {
+func openMySQL(dsn string) (*sql.DB, error) {
+	database, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+	database.SetMaxOpenConns(25)
+	database.SetMaxIdleConns(10)
+	database.SetConnMaxLifetime(5 * time.Minute)
+	if err := database.Ping(); err != nil {
+		return nil, fmt.Errorf("MySQL ping: %w", err)
+	}
+	log.Println("[DB] Connected to MySQL")
+	return database, nil
+}
+
+// Migrate creates all tables and indexes for the active driver.
+func Migrate(d *DB) error {
+	if IsMySQL() {
+		return migrateMySQL(d.inner)
+	}
+	return migrateSQLite(d.inner)
+}
+
+func migrateSQLite(db *sql.DB) error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS recordings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,28 +1,29 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
-	"smartcontrol/internal/cot"
-	"smartcontrol/internal/llm"
 	"strconv"
 	"strings"
 	"time"
+
+	"smartcontrol/internal/cot"
+	"smartcontrol/internal/db"
+	"smartcontrol/internal/llm"
 
 	"github.com/gin-gonic/gin"
 )
 
 // CoTAPI 思维链API处理器
 type CoTAPI struct {
-	db     *sql.DB
+	db     *db.DB
 	cotMgr *cot.CoTManager
 	llm    *llm.Client
 }
 
 // NewCoTAPI 创建新的CoT API处理器
-func NewCoTAPI(db *sql.DB) *CoTAPI {
+func NewCoTAPI(db *db.DB) *CoTAPI {
 	return &CoTAPI{
 		db:     db,
 		cotMgr: cot.NewCoTManager(),
@@ -768,7 +769,7 @@ func min(a, b int) int {
 }
 
 // RegisterCoTRoutes 注册CoT相关路由
-func RegisterCoTRoutes(r *gin.Engine, db *sql.DB) {
+func RegisterCoTRoutes(r *gin.Engine, db *db.DB) {
 	cotAPI := NewCoTAPI(db)
 
 	cotGroup := r.Group("/api/cot")

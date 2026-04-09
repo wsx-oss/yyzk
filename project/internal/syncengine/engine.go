@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"smartcontrol/internal/db"
 )
 
 // Tables that can be synced between devices
@@ -66,11 +68,11 @@ type TaskState struct {
 type Engine struct {
 	mu    sync.RWMutex
 	tasks map[int]*TaskState // taskID -> state
-	db    *sql.DB
+	db    *db.DB
 }
 
 // New creates a new sync engine
-func New(db *sql.DB) *Engine {
+func New(db *db.DB) *Engine {
 	return &Engine{
 		tasks: make(map[int]*TaskState),
 		db:    db,
@@ -374,7 +376,7 @@ func parseFrequency(freq string) time.Duration {
 }
 
 // ExportLocalData exports all syncable tables from the local database
-func ExportLocalData(db *sql.DB, since string) (*ExportPayload, error) {
+func ExportLocalData(db *db.DB, since string) (*ExportPayload, error) {
 	payload := &ExportPayload{
 		ExportedAt: time.Now().Format(time.RFC3339),
 	}
@@ -390,7 +392,7 @@ func ExportLocalData(db *sql.DB, since string) (*ExportPayload, error) {
 	return payload, nil
 }
 
-func exportTable(db *sql.DB, table, since string) (*TableData, error) {
+func exportTable(db *db.DB, table, since string) (*TableData, error) {
 	query := "SELECT * FROM " + table
 	var args []interface{}
 
@@ -445,7 +447,7 @@ func exportTable(db *sql.DB, table, since string) (*TableData, error) {
 }
 
 // ImportData imports data into the local database
-func ImportData(db *sql.DB, payload *ExportPayload, mode string) (synced int, total int, err error) {
+func ImportData(db *db.DB, payload *ExportPayload, mode string) (synced int, total int, err error) {
 	total = len(payload.Tables)
 
 	for _, td := range payload.Tables {
@@ -458,7 +460,7 @@ func ImportData(db *sql.DB, payload *ExportPayload, mode string) (synced int, to
 	return synced, total, nil
 }
 
-func importTable(db *sql.DB, td *TableData, mode string) error {
+func importTable(db *db.DB, td *TableData, mode string) error {
 	if len(td.Rows) == 0 {
 		return nil // nothing to import
 	}

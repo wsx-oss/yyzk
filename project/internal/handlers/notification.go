@@ -5,16 +5,18 @@ import (
 	"strconv"
 	"strings"
 
+	"smartcontrol/internal/db"
+
 	"github.com/gin-gonic/gin"
 )
 
 // NotificationAPI handles notification center endpoints
 type NotificationAPI struct {
-	db *sql.DB
+	db *db.DB
 }
 
 // NewNotificationAPI creates a new NotificationAPI
-func NewNotificationAPI(db *sql.DB) *NotificationAPI {
+func NewNotificationAPI(db *db.DB) *NotificationAPI {
 	return &NotificationAPI{db: db}
 }
 
@@ -146,7 +148,7 @@ func (n *NotificationAPI) NotificationCreate(c *gin.Context) {
 }
 
 // RegisterNotificationRoutes registers all notification routes
-func RegisterNotificationRoutes(r *gin.Engine, db *sql.DB) {
+func RegisterNotificationRoutes(r *gin.Engine, db *db.DB) {
 	api := NewNotificationAPI(db)
 	g := r.Group("/api/notifications")
 	{

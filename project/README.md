@@ -5,7 +5,7 @@
 
 **企业级智能管控平台 | 实时监控 | 远程控制 | 性能分析**
 
-基于 Go 1.24 + Gin + SQLite + WebSocket + noVNC 的完整解决方案
+基于 Go 1.24 + Gin + SQLite / MySQL + WebSocket + noVNC 的完整解决方案
 
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -140,10 +140,11 @@ go mod tidy
 - `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`：智能规划相关配置
 - `AMAP_KEY`：高德地图 Key
 
-示例 `.env`：
+示例 `.env`（SQLite，默认）：
 
 ```env
 SC_LISTEN_ADDR=:8080
+SC_DB_DRIVER=sqlite
 SC_DB_PATH=app.db
 SC_AGENT_PORT=9100
 SC_API_TOKEN=
@@ -151,6 +152,16 @@ LLM_API_KEY=
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_MODEL=qwen-plus
 AMAP_KEY=
+```
+
+示例 `.env`（MySQL）：
+
+```env
+SC_LISTEN_ADDR=:8080
+SC_DB_DRIVER=mysql
+SC_MYSQL_DSN=root:password@tcp(127.0.0.1:3306)/smartcontrol?charset=utf8mb4
+SC_AGENT_PORT=9100
+SC_API_TOKEN=
 ```
 
 ### 3. 启动服务
@@ -284,11 +295,16 @@ curl http://127.0.0.1:8080/api/healthz
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `SC_LISTEN_ADDR` | `:8080` | 监听地址和端口 |
-| `SC_DB_PATH` | `app.db` | 数据库文件路径 |
+| `SC_DB_DRIVER` | `sqlite` | 数据库驱动（`sqlite` 或 `mysql`） |
+| `SC_DB_PATH` | `app.db` | SQLite 数据库文件路径 |
+| `SC_MYSQL_DSN` | *(见下方)* | MySQL DSN（仅 `SC_DB_DRIVER=mysql` 时生效） |
 | `SC_API_TOKEN` | `""` | API认证Token（空=关闭）|
 | `SC_MAX_UPLOAD_MB` | `64` | 文件上传限制(MB) |
 | `SC_TRUSTED_PROXIES` | `127.0.0.1` | 受信任的代理 IP（多个用英文逗号分隔） |
 | `SC_AGENT_PORT` | `9100` | 内嵌硬件监控 Agent 端口 |
+
+> **MySQL DSN 格式**: `user:password@tcp(host:port)/dbname?charset=utf8mb4`
+> 默认值: `root:@tcp(127.0.0.1:3306)/smartcontrol?charset=utf8mb4`
 
 ### 告警配置
 
@@ -753,8 +769,21 @@ go run .
 ```
 
 **Q: 数据存储在哪里？**
-- 数据库：`app.db`
+- SQLite 数据库：`app.db`（默认）
+- MySQL 数据库：通过 `SC_MYSQL_DSN` 配置
 - 录音文件：`data/recordings/`
+
+**Q: 如何切换到 MySQL？**
+```powershell
+$env:SC_DB_DRIVER="mysql"
+$env:SC_MYSQL_DSN="root:password@tcp(127.0.0.1:3306)/smartcontrol?charset=utf8mb4"
+go run .
+```
+
+**Q: 如何从 SQLite 迁移数据到 MySQL？**
+```bash
+go run ./cmd/migrate --sqlite app.db --mysql "root:pass@tcp(127.0.0.1:3306)/smartcontrol?charset=utf8mb4"
+```
 
 ---
 
@@ -766,10 +795,13 @@ project/
 ├── go.mod / go.sum                 # Go 依赖管理
 ├── app.db                          # SQLite 数据库文件
 ├── cmd/
-│   └── agent/main.go               # hw-agent 独立程序（部署在地面站电脑上，MAVLink中继：读取飞控数据→推送云端后端）
+│   ├── agent/main.go               # hw-agent 独立程序（部署在地面站电脑上，MAVLink中继：读取飞控数据→推送云端后端）
+│   └── migrate/main.go             # SQLite → MySQL 数据迁移工具
 ├── internal/
 │   ├── agent/agent.go              # 内嵌 Agent（主服务启动时自动运行本机 Agent）
-│   ├── db/db.go                    # 数据库初始化与表结构定义
+│   ├── db/
+│   │   ├── db.go                   # 数据库连接、SQL 兼容层（AdaptSQL）、DB/Tx 包装器
+│   │   └── migrate_mysql.go        # MySQL 建表 DDL
 │   ├── handlers/                   # API 处理函数
 │   │   ├── api.go                  # 通用 API（设备、硬件、报警、日志、更新、同步、性能等）
 │   │   ├── drones.go               # 无人机管理 API
@@ -814,7 +846,15 @@ project/
 
 ## 🔄 版本更新
 
-### v3.0.0 (最新)
+### v3.1.0 (最新)
+
+**新增**:
+- ✅ MySQL 数据库支持（通过 `SC_DB_DRIVER` 环境变量切换 SQLite / MySQL）
+- ✅ SQL 兼容层自动转换（AdaptSQL：datetime→NOW()、INSERT OR→MySQL 语法等）
+- ✅ SQLite → MySQL 数据迁移工具（`cmd/migrate`）
+- ✅ DB/Tx 包装器自动适配查询语法
+
+### v3.0.0
 
 **新增**:
 - ✅ 禁飞区管理模块（圆形/多边形，地图可视化，传递给 LLM 规划）

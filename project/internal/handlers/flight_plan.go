@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"smartcontrol/internal/amap"
+	"smartcontrol/internal/db"
 	"smartcontrol/internal/llm"
 
 	"github.com/gin-gonic/gin"
@@ -87,12 +88,12 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 			}
 		}
 		respData := gin.H{
-			"ok":        true,
+			"ok":         true,
 			"multi_plan": true,
-			"plans":     multiResult.Plans,
-			"labels":    multiResult.Labels,
-			"plan_ids":  planIDs,
-			"source":    "llm_multi",
+			"plans":      multiResult.Plans,
+			"labels":     multiResult.Labels,
+			"plan_ids":   planIDs,
+			"source":     "llm_multi",
 		}
 		if mapCtx := func() *amap.MapContext {
 			if amap.NewClient().Available() {
@@ -420,7 +421,7 @@ func (a *API) FlightPlanStatus(c *gin.Context) {
 // loadSimilarCases queries recently adopted flight plans whose start/end points lie
 // within 5 km of the current request, and returns a formatted context string
 // to inject into the LLM prompt as Case-Based Reasoning (CBR) examples.
-func loadSimilarCases(db *sql.DB, req llm.PlanRequest) string {
+func loadSimilarCases(db *db.DB, req llm.PlanRequest) string {
 	rows, err := db.Query(`
 		SELECT request_json, result_json
 		FROM flight_plans

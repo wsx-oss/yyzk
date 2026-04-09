@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"io/fs"
 	"log"
@@ -28,7 +27,14 @@ var webFS embed.FS
 
 func main() {
 	addr := getenv("SC_LISTEN_ADDR", ":8080")
-	dbPath := getenv("SC_DB_PATH", "app.db")
+	dbDriver := getenv("SC_DB_DRIVER", "sqlite")
+	dbDSN := getenv("SC_DB_PATH", "app.db")
+	if dbDriver == "mysql" {
+		dbDSN = getenv("SC_MYSQL_DSN", "")
+		if dbDSN == "" {
+			dbDSN = getenv("MYSQL_DSN", "root:@tcp(127.0.0.1:3306)/smartcontrol?charset=utf8mb4")
+		}
+	}
 	apiToken := getenv("SC_API_TOKEN", "")
 	maxUploadMB := getenvInt("SC_MAX_UPLOAD_MB", 64)
 	trusted := getenv("SC_TRUSTED_PROXIES", "127.0.0.1")
@@ -37,7 +43,7 @@ func main() {
 	thDISK := getenvInt("SC_THRESH_DISK", 90)
 	thInterval := getenvInt("SC_ALERT_INTERVAL_SEC", 10)
 
-	database, err := db.Open(dbPath)
+	database, err := db.Open(dbDriver, dbDSN)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -190,7 +196,7 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func runThresholdAlerts(database *sql.DB, thCPU, thMEM, thDISK int, interval time.Duration) {
+func runThresholdAlerts(database *db.DB, thCPU, thMEM, thDISK int, interval time.Duration) {
 	if interval <= 0 {
 		interval = 10 * time.Second
 	}
@@ -231,7 +237,7 @@ func runThresholdAlerts(database *sql.DB, thCPU, thMEM, thDISK int, interval tim
 
 // runOfflineDetection periodically marks GPS devices and their linked drones as offline
 // when the GPS device hasn't pushed data for more than 15 seconds.
-func runOfflineDetection(database *sql.DB, interval time.Duration) {
+func runOfflineDetection(database *db.DB, interval time.Duration) {
 	if interval <= 0 {
 		interval = 30 * time.Second
 	}

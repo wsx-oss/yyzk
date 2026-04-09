@@ -1,15 +1,16 @@
 package handlers
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
+
+	"smartcontrol/internal/db"
 )
 
 // StartPatrolInspection launches background goroutines that periodically
 // check various subsystems and generate notifications when issues are found.
-func StartPatrolInspection(db *sql.DB) {
+func StartPatrolInspection(db *db.DB) {
 	go patrolBattery(db)
 	go patrolDrones(db)
 	go patrolAlerts(db)
@@ -20,7 +21,7 @@ func StartPatrolInspection(db *sql.DB) {
 }
 
 // insertNotification is a helper to create a notification record
-func insertNotification(db *sql.DB, nType, title, message, source, link string) {
+func insertNotification(db *db.DB, nType, title, message, source, link string) {
 	_, err := db.Exec(
 		"INSERT INTO notifications(type, title, message, source, link) VALUES(?,?,?,?,?)",
 		nType, title, message, source, link,
@@ -31,7 +32,7 @@ func insertNotification(db *sql.DB, nType, title, message, source, link string) 
 }
 
 // patrolBattery checks for low battery and high temperature conditions
-func patrolBattery(db *sql.DB) {
+func patrolBattery(db *db.DB) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	// Track recently notified devices to avoid spam
@@ -81,7 +82,7 @@ func patrolBattery(db *sql.DB) {
 }
 
 // patrolDrones checks for drones that go offline unexpectedly
-func patrolDrones(db *sql.DB) {
+func patrolDrones(db *db.DB) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	prevOnline := map[int]bool{}
@@ -135,7 +136,7 @@ func patrolDrones(db *sql.DB) {
 }
 
 // patrolAlerts checks for new critical/unacknowledged alerts
-func patrolAlerts(db *sql.DB) {
+func patrolAlerts(db *db.DB) {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	var lastCheckID int
@@ -171,7 +172,7 @@ func patrolAlerts(db *sql.DB) {
 }
 
 // patrolHardware checks for hardware items going offline or high resource usage
-func patrolHardware(db *sql.DB) {
+func patrolHardware(db *db.DB) {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	notified := map[int]time.Time{}
@@ -217,7 +218,7 @@ func patrolHardware(db *sql.DB) {
 }
 
 // patrolLogs checks for error-level log entries
-func patrolLogs(db *sql.DB) {
+func patrolLogs(db *db.DB) {
 	ticker := time.NewTicker(120 * time.Second)
 	defer ticker.Stop()
 	var lastCheckID int
@@ -243,7 +244,7 @@ func patrolLogs(db *sql.DB) {
 }
 
 // patrolMissions checks for completed or abnormal flight missions
-func patrolMissions(db *sql.DB) {
+func patrolMissions(db *db.DB) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	notifiedComplete := map[int]bool{}
