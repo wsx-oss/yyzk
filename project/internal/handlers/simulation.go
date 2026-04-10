@@ -128,6 +128,15 @@ func (s *SimAPI) BatchCreate(c *gin.Context) {
 	if p.Name == "" {
 		p.Name = fmt.Sprintf("仿真批次-%s", time.Now().Format("20060102-150405"))
 	}
+	// Check for duplicate batch name
+	existingBatches := s.engine.ListBatches()
+	for _, eb := range existingBatches {
+		if eb.Name == p.Name {
+			c.JSON(400, gin.H{"error": "批次名称 \"" + p.Name + "\" 已存在，请使用不同的名称"})
+			return
+		}
+	}
+
 	if p.SpreadM <= 0 {
 		p.SpreadM = 500
 	}

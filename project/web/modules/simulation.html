@@ -274,7 +274,14 @@ tr:hover { background:rgba(255,255,255,0.03); }
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
         <input type="checkbox" id="mapShowLabels" checked> 显示标签
       </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
+        <input type="checkbox" id="mapShowZones" checked onchange="toggleBatchZones()"> 显示禁飞区
+      </label>
       <span id="mapDroneCount" style="margin-left:auto;font-size:13px;color:var(--text-dim);"></span>
+    </div>
+    <div id="mapBatchButtons" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 12px;background:rgba(0,0,0,0.2);border-bottom:1px solid rgba(255,255,255,0.06);min-height:36px;align-items:center;">
+      <span style="font-size:12px;color:var(--text-dim);margin-right:4px;">🚫 批次禁飞区:</span>
+      <span id="mapBatchBtnList" style="display:flex;flex-wrap:wrap;gap:6px;"></span>
     </div>
     <div id="simMap"></div>
     <div class="map-legend">
@@ -543,6 +550,7 @@ async function batchAction(id, action) {
   const method = action==='delete'?'DELETE':'POST';
   await apiFetch(`${API}/batches/${id}${action==='delete'?'':'/'+action}`, {method});
   loadBatches(); loadMetrics();
+  if(simMapObj) loadMapBatchButtons();
 }
 
 function showCreateBatchModal() { document.getElementById('createBatchModal').classList.add('show'); }
@@ -552,6 +560,16 @@ async function createBatch() {
   let waypoints = [];
   const wpText = document.getElementById('batchWaypoints').value.trim();
   if(wpText) { try { waypoints = JSON.parse(wpText); } catch(e) { alert('航点JSON格式错误'); return; } }
+
+  // Client-side duplicate name check
+  const inputName = document.getElementById('batchName').value.trim();
+  if(inputName) {
+    const existing = await apiFetch(API+'/batches');
+    if(existing.items && existing.items.some(b => b.name === inputName)) {
+      alert('批次名称 "' + inputName + '" 已存在，请使用不同的名称');
+      return;
+    }
+  }
 
   const body = {
     name: document.getElementById('batchName').value,
@@ -572,6 +590,7 @@ async function createBatch() {
   closeModal('createBatchModal');
   alert(`成功创建 ${d.count} 台模拟无人机`);
   loadBatches(); loadMetrics();
+  if(simMapObj) loadMapBatchButtons();
 }
 
 // ---- Instances ----
@@ -751,6 +770,8 @@ let mapMarkers = {};   // deviceID -> {marker, label, trail}
 let mapRoutes = {};    // deviceID -> polyline
 let mapWpMarkers = []; // waypoint markers
 let mapRefreshTimer = null;
+let mapBatchZones = {};  // batchID -> {circle, label}
+let cachedBatches = [];  // cached batch list for map buttons
 
 const DRONE_COLORS = {
   '巡航': '#22c55e', '作业': '#3b82f6', '悬停': '#3b82f6',
@@ -797,6 +818,7 @@ function initMap() {
   if (simMapObj) {
     simMapObj.invalidateSize();
     refreshMap();
+    loadMapBatchButtons();
     return;
   }
   simMapObj = L.map('simMap', {
@@ -812,6 +834,7 @@ function initMap() {
   }).addTo(simMapObj);
 
   refreshMap();
+  loadMapBatchButtons();
   // Start auto-refresh
   if (mapRefreshTimer) clearInterval(mapRefreshTimer);
   mapRefreshTimer = setInterval(() => {
@@ -963,6 +986,101 @@ function updateMapInfo(items) {
   html += Object.entries(phaseCount).map(([p,c]) => `${p}(${c})`).join(' · ');
   html += ` · 平均电量 ${(totalBat/n).toFixed(0)}%</div>`;
   document.getElementById('mapInfoPanel').innerHTML = html;
+}
+
+// ---- Batch No-Fly Zone Buttons & Circles ----
+const ZONE_COLORS = ['#ef4444','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#14b8a6','#f97316','#6366f1'];
+
+async function loadMapBatchButtons() {
+  const d = await apiFetch(API+'/batches');
+  const container = document.getElementById('mapBatchBtnList');
+  if(!d.items||d.items.length===0) {
+    container.innerHTML='<span style="font-size:12px;color:var(--text-dim)">暂无批次</span>';
+    clearBatchZones();
+    cachedBatches = [];
+    return;
+  }
+  cachedBatches = d.items;
+  container.innerHTML = d.items.map((b,i)=>{
+    const color = ZONE_COLORS[i % ZONE_COLORS.length];
+    return `<button class="btn btn-sm" style="background:${color};color:#fff;border:none;font-size:11px;padding:3px 10px;border-radius:12px;cursor:pointer;white-space:nowrap;" onclick="flyToBatch('${b.id}')" title="跳转到 ${b.name} (${b.center_lat.toFixed(4)}, ${b.center_lng.toFixed(4)})">
+      🚫 ${b.name}
+    </button>`;
+  }).join('');
+  drawBatchZones(d.items);
+}
+
+function flyToBatch(batchId) {
+  const batch = cachedBatches.find(b=>b.id===batchId);
+  if(!batch || !simMapObj) return;
+  const zoom = batch.spread_m > 2000 ? 13 : batch.spread_m > 500 ? 15 : 16;
+  simMapObj.flyTo([batch.center_lat, batch.center_lng], zoom, {duration: 1.2});
+  // Flash the zone circle
+  if(mapBatchZones[batchId] && mapBatchZones[batchId].circle) {
+    const circle = mapBatchZones[batchId].circle;
+    const origStyle = {fillOpacity: 0.12, opacity: 0.6};
+    circle.setStyle({fillOpacity: 0.4, opacity: 1});
+    setTimeout(()=> circle.setStyle(origStyle), 1500);
+  }
+}
+
+function drawBatchZones(batches) {
+  if(!simMapObj) return;
+  const showZones = document.getElementById('mapShowZones').checked;
+  // Remove stale zones
+  const activeIds = new Set(batches.map(b=>b.id));
+  Object.keys(mapBatchZones).forEach(id=>{
+    if(!activeIds.has(id)) {
+      if(mapBatchZones[id].circle) simMapObj.removeLayer(mapBatchZones[id].circle);
+      if(mapBatchZones[id].label) simMapObj.removeLayer(mapBatchZones[id].label);
+      delete mapBatchZones[id];
+    }
+  });
+  batches.forEach((b,i)=>{
+    const color = ZONE_COLORS[i % ZONE_COLORS.length];
+    const radius = b.spread_m || 500;
+    if(mapBatchZones[b.id]) {
+      // Update existing
+      mapBatchZones[b.id].circle.setLatLng([b.center_lat, b.center_lng]);
+      mapBatchZones[b.id].circle.setRadius(radius);
+      mapBatchZones[b.id].circle.setStyle({color:color, fillColor:color});
+      if(!showZones && simMapObj.hasLayer(mapBatchZones[b.id].circle)) {
+        simMapObj.removeLayer(mapBatchZones[b.id].circle);
+        simMapObj.removeLayer(mapBatchZones[b.id].label);
+      } else if(showZones && !simMapObj.hasLayer(mapBatchZones[b.id].circle)) {
+        mapBatchZones[b.id].circle.addTo(simMapObj);
+        mapBatchZones[b.id].label.addTo(simMapObj);
+      }
+    } else if(showZones) {
+      const circle = L.circle([b.center_lat, b.center_lng], {
+        radius: radius,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.12,
+        weight: 2,
+        opacity: 0.6,
+        dashArray: '8,6',
+      }).addTo(simMapObj);
+      circle.bindPopup(`<div style="font-size:13px;"><strong>🚫 ${b.name}</strong><br>禁飞区半径: ${radius}m<br>中心: ${b.center_lat.toFixed(5)}, ${b.center_lng.toFixed(5)}<br>无人机数: ${b.total_instances||b.count}</div>`);
+      const label = L.tooltip({permanent:true, direction:'center', className:'batch-zone-label'})
+        .setLatLng([b.center_lat, b.center_lng])
+        .setContent(`<span style="font-size:10px;color:${color};text-shadow:0 0 4px rgba(0,0,0,0.8);">🚫 ${b.name}</span>`)
+        .addTo(simMapObj);
+      mapBatchZones[b.id] = {circle, label};
+    }
+  });
+}
+
+function clearBatchZones() {
+  Object.keys(mapBatchZones).forEach(id=>{
+    if(mapBatchZones[id].circle) simMapObj.removeLayer(mapBatchZones[id].circle);
+    if(mapBatchZones[id].label) simMapObj.removeLayer(mapBatchZones[id].label);
+  });
+  mapBatchZones = {};
+}
+
+function toggleBatchZones() {
+  if(cachedBatches.length > 0) drawBatchZones(cachedBatches);
 }
 
 // ---- Stage-8 Analytics Dashboard ----
