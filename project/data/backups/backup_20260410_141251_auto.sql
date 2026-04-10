@@ -1,6 +1,6 @@
 -- CloudControl Database Backup
--- Generated at: 2026-04-09 20:46:47
--- Tables: 27
+-- Generated at: 2026-04-10 14:12:52
+-- Tables: 32
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -308,18 +308,19 @@ CREATE TABLE "backup_records" (
 );
 
 INSERT INTO `backup_records` (`id`, `backup_type`, `file_path`, `file_size`, `table_count`, `row_count`, `status`, `operator`, `remark`, `duration_ms`, `created_at`, `finished_at`) VALUES
-(1, 'manual', 'data\\backups\\backup_20260409_160127_manual.sql', 536010, 27, 1583, 'success', 'wangyugui123456', '手动备份', 26267, '2026-04-09 16:01:25', '2026-04-09 16:01:51'),
-(4, 'auto', 'data\\backups\\backup_20260409_162622_auto.sql', 542579, 27, 1618, 'success', 'system', '自动备份（启动后首次）', 30728, '2026-04-09 16:26:24', '2026-04-09 16:26:51'),
-(5, 'pre_restore', 'data\\backups\\backup_20260409_162658_pre_restore.sql', 544987, 27, 1631, 'success', 'system', '恢复前自动备份 (从备份 #1 恢复)', 27058, '2026-04-09 16:26:56', '2026-04-09 16:27:24'),
-(6, 'auto', 'data\\backups\\backup_20260409_164817_auto.sql', 541906, 27, 1615, 'success', 'system', '自动备份（启动后首次）', 31785, '2026-04-09 16:48:18', '2026-04-09 16:48:48'),
-(8, 'auto', 'data\\backups\\backup_20260409_182524_auto.sql', 546102, 27, 1638, 'success', 'system', '自动备份（启动后首次）', 24367, '2026-04-09 18:25:27', '2026-04-09 18:25:49'),
-(9, 'auto', 'data\\backups\\backup_20260409_195726_auto.sql', 558040, 27, 1704, 'success', 'system', '自动备份（启动后首次）', 22048, '2026-04-09 19:57:26', '2026-04-09 19:57:48'),
-(10, 'auto', 'data\\backups\\backup_20260409_200408_auto.sql', 562443, 27, 1715, 'success', 'system', '自动备份（启动后首次）', 31852, '2026-04-09 20:04:11', '2026-04-09 20:04:40'),
 (11, 'auto', 'data\\backups\\backup_20260409_201607_auto.sql', 570698, 27, 1728, 'success', 'system', '自动备份（启动后首次）', 22936, '2026-04-09 20:16:07', '2026-04-09 20:16:30'),
 (12, 'auto', 'data\\backups\\backup_20260409_202342_auto.sql', 577593, 27, 1740, 'success', 'system', '自动备份（启动后首次）', 15473, '2026-04-09 20:23:42', '2026-04-09 20:23:57'),
 (13, 'auto', 'data\\backups\\backup_20260409_202936_auto.sql', 579229, 27, 1750, 'success', 'system', '自动备份（启动后首次）', 16948, '2026-04-09 20:29:36', '2026-04-09 20:29:53'),
-(14, 'auto', 'data\\backups\\backup_20260409_204647_auto.sql', 0, 0, 0, 'running', 'system', '自动备份（启动后首次）', 0, '2026-04-09 20:46:47', NULL);
--- Rows: 11
+(14, 'auto', 'data\\backups\\backup_20260409_204647_auto.sql', 582611, 27, 1771, 'success', 'system', '自动备份（启动后首次）', 15781, '2026-04-09 20:46:47', '2026-04-09 20:47:02'),
+(15, 'auto', 'data\\backups\\backup_20260409_205743_auto.sql', 588262, 27, 1789, 'success', 'system', '自动备份（启动后首次）', 25287, '2026-04-09 20:57:43', '2026-04-09 20:58:09'),
+(16, 'auto', 'data\\backups\\backup_20260409_234421_auto.sql', 589863, 27, 1798, 'success', 'system', '自动备份（启动后首次）', 33066, '2026-04-09 23:44:23', '2026-04-09 23:44:52'),
+(17, 'auto', 'data\\backups\\backup_20260409_235022_auto.sql', 592728, 27, 1814, 'success', 'system', '自动备份（启动后首次）', 120646, '2026-04-09 23:50:24', '2026-04-09 23:52:22'),
+(18, 'pre_restore', 'data\\backups\\backup_20260409_235637_pre_restore.sql', 592761, 27, 1802, 'success', 'system', '恢复前自动备份 (从备份 #15 恢复)', 110187, '2026-04-09 23:56:36', '2026-04-09 23:58:27'),
+(19, 'auto', 'data\\backups\\backup_20260410_134828_auto.sql', 0, 0, 0, 'running', 'system', '自动备份（启动后首次）', 0, '2026-04-10 13:48:28', NULL),
+(20, 'auto', 'data\\backups\\backup_20260410_135131_auto.sql', 594857, 27, 1826, 'success', 'system', '自动备份（启动后首次）', 17268, '2026-04-10 13:51:30', '2026-04-10 13:51:48'),
+(21, 'auto', 'data\\backups\\backup_20260410_140208_auto.sql', 596266, 27, 1834, 'success', 'system', '自动备份（启动后首次）', 26163, '2026-04-10 14:02:07', '2026-04-10 14:02:33'),
+(22, 'auto', 'data\\backups\\backup_20260410_141251_auto.sql', 0, 0, 0, 'running', 'system', '自动备份（启动后首次）', 0, '2026-04-10 14:12:50', NULL);
+-- Rows: 12
 
 -- ----------------------------
 -- Table: battery_alerts
@@ -723,8 +724,9 @@ INSERT INTO `flight_missions` (`id`, `name`, `route`, `target`, `estimated_durat
 (22, '第二次任务', '河南省郑州市金水区丰庆路街道信息学院路瀚海泰苑 → 河南省郑州市金水区东风路街道河南省会教师生活园区河南省会教师生活园区B区', '投放', '6分钟', '待起飞', '待命', 0, '', '', '本次规划从瀚海泰苑起飞，沿东北方向至第一航点，随后向西南移动至接近禁飞区1的多边形顶点（34.807734820562494, 113.65108499861607），并在其外侧绕行，确保航线与禁飞区边界无交点。DROP_PAYLOAD动作在安全绕行后接近终点处执行，最后降落于河南省会教师生活园区B区。所有航点均距离禁飞区边界超过150米，路径段未穿越禁飞区，航点数量精简为5个，电量消耗远低于返航阈值，无需担忧返航风险。\n\n预计距离: 1.56km，耗时: 6分钟，电量消耗: 5.3%', 11, '[{"lat":34.811629,"lon":113.660627,"alt_m":80,"speed_mps":8,"action":"TAKEOFF"},{"lat":34.807734820562494,"lon":113.65108499861607,"alt_m":80,"speed_mps":8},{"lat":34.802458,"lon":113.650542,"alt_m":80,"speed_mps":8,"action":"LAND"}]', '2026-03-20 16:04:49', '2026-03-20 16:04:49'),
 (24, '第三次任务', '河南省郑州市金水区丰庆路街道天伦·水晶城 → 河南省郑州市金水区东风路街道东风路12号河南农业大学第三生活区', '投放', '6分钟', '飞行中', '起飞', 10, '2026-04-09 18:38:41', '', '', 0, '', '2026-03-20 18:44:01', '2026-04-09 18:38:41'),
 (25, '04/09 河南省郑州市中原区枫→河南省郑州市中原区沟', '河南省郑州市中原区枫杨街道郑州大学中心体育馆 → 河南省郑州市中原区沟赵乡郑州高新区格力工业园', '', '3分钟', '待起飞', '待命', 0, '', '', '直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.818427,113.524679)，总距离1036m，预计耗时130s。中间动作按等距插入。\n\n预计距离: 1.04km，耗时: 3分钟，电量消耗: 2.1%', 25, '[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.818427,"lon":113.524679,"alt_m":80,"speed_mps":8,"action":"LAND"}]', '2026-04-09 20:01:29', '2026-04-09 20:01:29'),
-(26, '第四次', '河南省郑州市中原区枫杨街道郑州大学中心体育馆 → 河南省郑州市中原区沟赵乡山茶南路郑州亿达科技新城', '', '5分钟', '已完成', '降落', 100, '2026-04-09 20:24:55', '2026-04-09 20:36:35', '直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.823124,113.524269)，总距离1258m，预计耗时157s。中间动作按等距插入。\n\n预计距离: 1.95km，耗时: 5分钟，电量消耗: 3.9%', 25, '[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.814158,"lon":113.526334,"alt_m":80},{"lat":34.823124,"lon":113.524269,"alt_m":80,"speed_mps":8,"action":"LAND"}]', '2026-04-09 20:19:45', '2026-04-09 20:36:35');
--- Rows: 5
+(26, '第四次', '河南省郑州市中原区枫杨街道郑州大学中心体育馆 → 河南省郑州市中原区沟赵乡山茶南路郑州亿达科技新城', '', '5分钟', '已完成', '降落', 100, '2026-04-09 20:24:55', '2026-04-09 20:36:35', '直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.823124,113.524269)，总距离1258m，预计耗时157s。中间动作按等距插入。\n\n预计距离: 1.95km，耗时: 5分钟，电量消耗: 3.9%', 25, '[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.814158,"lon":113.526334,"alt_m":80},{"lat":34.823124,"lon":113.524269,"alt_m":80,"speed_mps":8,"action":"LAND"}]', '2026-04-09 20:19:45', '2026-04-09 20:36:35'),
+(27, '第五次', '河南省郑州市中原区枫杨街道郑州大学中心体育馆 → 河南省郑州市中原区沟赵乡金盏街郑州高新区格力工业园', '拍照、录像、空气传感器、投放', '4分钟', '已完成', '降落', 100, '2026-04-09 20:51:38', '2026-04-09 20:52:25', '直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.821198,113.522036)，总距离1347m，预计耗时168s。中间动作按等距插入。\n\n预计距离: 1.81km，耗时: 4分钟，电量消耗: 3.6%\n\n【动作执行计划】\n1. 拍照（点选，3个执行点）\n2. 录像（间隔50m，预计18次）\n3. 空气传感器（间隔100m，预计19次）\n', 25, '[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.814158,"lon":113.526334,"alt_m":80},{"lat":34.821198,"lon":113.522036,"alt_m":80,"speed_mps":8,"action":"LAND"}]', '2026-04-09 20:51:23', '2026-04-09 20:52:25');
+-- Rows: 6
 
 -- ----------------------------
 -- Table: flight_plans
@@ -860,8 +862,9 @@ INSERT INTO `flight_plans` (`id`, `drone_id`, `request_json`, `result_json`, `so
 (111, 25, '{"start":{"lat":34.817077,"lon":113.53591,"alt_m":80},"goal":{"lat":34.817787,"lon":113.522395,"alt_m":80},"actions":[],"constraints":{"max_speed_mps":8,"max_alt_m":130,"battery_return_threshold_percent":20},"drone_id":25,"drone_name":"test03","map_context":"起点位于: 河南省郑州市中原区枫杨街道郑州大学中心体育馆\\n终点位于: 河南省郑州市中原区沟赵乡郑州高新区格力工业园\\n地面参考路线距离: 3044m\\n附近敏感区域: 郑州大学-体育学院(科教文化服务;学校;高等院校,距m); 郑州大学运动与体育学院(科教文化服务;学校;高等院校,距m); 郑州大学-创业学院(科教文化服务;学校;高等院校,距m); 郑州大学信息工程学院(科教文化服务;学校;高等院校,距m); 郑州大学新校区教育技术中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区高性能计算研究与发展中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区远程教育学院网络管理中心(科教文化服务;学校;高等院校,距m); 郑州大学国际教育学院(科教文化服务;学校;高等院校,距m); 郑州大学计算机与人工智能学院(科教文化服务;学校;高等院校,距m); 郑州大学中德学院(科教文化服务;学校;高等院校,距m)"}', '{"waypoints":[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.817787,"lon":113.522395,"alt_m":80,"speed_mps":8,"action":"LAND"}],"actions":[],"estimates":{"distance_m":1236.3,"time_s":154.5,"expected_battery_drop_percent":2.5},"warnings":[{"level":"info","message":"此为直线降级规划（未使用LLM），仅供参考"},{"level":"warning","message":"LLM调用失败(均衡方案)，已降级为直线规划: LLM request failed: Post \\"https://openapi.monica.im/v1/chat/completions\\": dial tcp4 209.95.56.60:443: i/o timeout"}],"explanation":"直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.817787,113.522395)，总距离1236m，预计耗时155s。中间动作按等距插入。"}', 'llm_multi_均衡方案', 'draft', 0, '2026-04-09 20:14:19', '2026-04-09 20:14:19'),
 (112, 25, '{"start":{"lat":34.817077,"lon":113.53591,"alt_m":80},"goal":{"lat":34.817787,"lon":113.522395,"alt_m":80},"actions":[],"constraints":{"max_speed_mps":8,"max_alt_m":130,"battery_return_threshold_percent":20},"drone_id":25,"drone_name":"test03","map_context":"起点位于: 河南省郑州市中原区枫杨街道郑州大学中心体育馆\\n终点位于: 河南省郑州市中原区沟赵乡郑州高新区格力工业园\\n地面参考路线距离: 3044m\\n附近敏感区域: 郑州大学-体育学院(科教文化服务;学校;高等院校,距m); 郑州大学运动与体育学院(科教文化服务;学校;高等院校,距m); 郑州大学-创业学院(科教文化服务;学校;高等院校,距m); 郑州大学信息工程学院(科教文化服务;学校;高等院校,距m); 郑州大学新校区教育技术中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区高性能计算研究与发展中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区远程教育学院网络管理中心(科教文化服务;学校;高等院校,距m); 郑州大学国际教育学院(科教文化服务;学校;高等院校,距m); 郑州大学计算机与人工智能学院(科教文化服务;学校;高等院校,距m); 郑州大学中德学院(科教文化服务;学校;高等院校,距m)"}', '{"waypoints":[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.817787,"lon":113.522395,"alt_m":80,"speed_mps":8,"action":"LAND"}],"actions":[],"estimates":{"distance_m":1236.3,"time_s":154.5,"expected_battery_drop_percent":2.5},"warnings":[{"level":"info","message":"此为直线降级规划（未使用LLM），仅供参考"},{"level":"warning","message":"LLM调用失败(保守方案)，已降级为直线规划: LLM request failed: Post \\"https://openapi.monica.im/v1/chat/completions\\": dial tcp4 209.95.56.60:443: i/o timeout"}],"explanation":"直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.817787,113.522395)，总距离1236m，预计耗时155s。中间动作按等距插入。"}', 'llm_multi_保守方案', 'draft', 0, '2026-04-09 20:14:19', '2026-04-09 20:14:19'),
 (113, 0, '{"start":{"lat":34.817077,"lon":113.53591,"alt_m":80},"goal":{"lat":34.823124,"lon":113.524269,"alt_m":80},"actions":[],"constraints":{"max_speed_mps":8,"max_alt_m":130,"battery_return_threshold_percent":20},"map_context":"起点位于: 河南省郑州市中原区枫杨街道郑州大学中心体育馆\\n终点位于: 河南省郑州市中原区沟赵乡山茶南路郑州亿达科技新城\\n地面参考路线距离: 2184m\\n附近敏感区域: 郑州大学-创业学院(科教文化服务;学校;高等院校,距m); 郑州大学-体育学院(科教文化服务;学校;高等院校,距m); 郑州大学运动与体育学院(科教文化服务;学校;高等院校,距m); 郑州大学新校区高性能计算研究与发展中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区教育技术中心(科教文化服务;学校;高等院校,距m); 郑州大学后勤集团新校区校园环境中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区远程教育学院网络管理中心(科教文化服务;学校;高等院校,距m); 郑州大学信息工程学院(科教文化服务;学校;高等院校,距m); 郑州大学外国语与国际关系学院(科教文化服务;学校;高等院校,距m); 郑州大学中德学院(科教文化服务;学校;高等院校,距m)"}', '{"waypoints":[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.823124,"lon":113.524269,"alt_m":80,"speed_mps":8,"action":"LAND"}],"actions":[],"estimates":{"distance_m":1257.5,"time_s":157.2,"expected_battery_drop_percent":2.5},"warnings":[{"level":"info","message":"此为直线降级规划（未使用LLM），仅供参考"},{"level":"warning","message":"LLM调用失败，已降级为直线规划: LLM request failed: Post \\"https://openapi.monica.im/v1/chat/completions\\": dial tcp4 199.96.59.95:443: i/o timeout"}],"explanation":"直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.823124,113.524269)，总距离1258m，预计耗时157s。中间动作按等距插入。"}', 'fallback', 'draft', 0, '2026-04-09 20:17:00', '2026-04-09 20:17:00'),
-(114, 0, '{"start":{"lat":34.817077,"lon":113.53591,"alt_m":80},"goal":{"lat":34.823124,"lon":113.524269,"alt_m":80},"actions":[],"constraints":{"max_speed_mps":8,"max_alt_m":130,"battery_return_threshold_percent":20,"no_fly_zones":[{"name":"禁飞区2","type":"polygon","polygon":[{"lat":34.82306820574498,"lon":113.52948870154177,"alt_m":0},{"lat":34.822997735964414,"lon":113.53660977247212,"alt_m":0},{"lat":34.81855801824457,"lon":113.53184809251266,"alt_m":0},{"lat":34.81905133203002,"lon":113.5269577185002,"alt_m":0},{"lat":34.81531616845062,"lon":113.52717220858851,"alt_m":0}],"alt_limit_m":-1}]},"map_context":"起点位于: 河南省郑州市中原区枫杨街道郑州大学中心体育馆\\n终点位于: 河南省郑州市中原区沟赵乡山茶南路郑州亿达科技新城\\n地面参考路线距离: 2184m\\n附近敏感区域: 郑州大学-创业学院(科教文化服务;学校;高等院校,距m); 郑州大学-体育学院(科教文化服务;学校;高等院校,距m); 郑州大学运动与体育学院(科教文化服务;学校;高等院校,距m); 郑州大学新校区高性能计算研究与发展中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区教育技术中心(科教文化服务;学校;高等院校,距m); 郑州大学后勤集团新校区校园环境中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区远程教育学院网络管理中心(科教文化服务;学校;高等院校,距m); 郑州大学信息工程学院(科教文化服务;学校;高等院校,距m); 郑州大学外国语与国际关系学院(科教文化服务;学校;高等院校,距m); 郑州大学中德学院(科教文化服务;学校;高等院校,距m)"}', '{"waypoints":[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.814158,"lon":113.526334,"alt_m":80},{"lat":34.823124,"lon":113.524269,"alt_m":80,"speed_mps":8,"action":"LAND"}],"actions":[],"estimates":{"distance_m":1947.1,"time_s":243.4,"expected_battery_drop_percent":3.9},"warnings":[{"level":"info","message":"此为直线降级规划（未使用LLM），仅供参考"},{"level":"warning","message":"LLM调用失败，已降级为直线规划: LLM request failed: Post \\"https://openapi.monica.im/v1/chat/completions\\": dial tcp4 199.96.59.95:443: i/o timeout"}],"explanation":"直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.823124,113.524269)，总距离1258m，预计耗时157s。中间动作按等距插入。"}', 'fallback', 'draft', 0, '2026-04-09 20:17:55', '2026-04-09 20:17:55');
--- Rows: 114
+(114, 0, '{"start":{"lat":34.817077,"lon":113.53591,"alt_m":80},"goal":{"lat":34.823124,"lon":113.524269,"alt_m":80},"actions":[],"constraints":{"max_speed_mps":8,"max_alt_m":130,"battery_return_threshold_percent":20,"no_fly_zones":[{"name":"禁飞区2","type":"polygon","polygon":[{"lat":34.82306820574498,"lon":113.52948870154177,"alt_m":0},{"lat":34.822997735964414,"lon":113.53660977247212,"alt_m":0},{"lat":34.81855801824457,"lon":113.53184809251266,"alt_m":0},{"lat":34.81905133203002,"lon":113.5269577185002,"alt_m":0},{"lat":34.81531616845062,"lon":113.52717220858851,"alt_m":0}],"alt_limit_m":-1}]},"map_context":"起点位于: 河南省郑州市中原区枫杨街道郑州大学中心体育馆\\n终点位于: 河南省郑州市中原区沟赵乡山茶南路郑州亿达科技新城\\n地面参考路线距离: 2184m\\n附近敏感区域: 郑州大学-创业学院(科教文化服务;学校;高等院校,距m); 郑州大学-体育学院(科教文化服务;学校;高等院校,距m); 郑州大学运动与体育学院(科教文化服务;学校;高等院校,距m); 郑州大学新校区高性能计算研究与发展中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区教育技术中心(科教文化服务;学校;高等院校,距m); 郑州大学后勤集团新校区校园环境中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区远程教育学院网络管理中心(科教文化服务;学校;高等院校,距m); 郑州大学信息工程学院(科教文化服务;学校;高等院校,距m); 郑州大学外国语与国际关系学院(科教文化服务;学校;高等院校,距m); 郑州大学中德学院(科教文化服务;学校;高等院校,距m)"}', '{"waypoints":[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.814158,"lon":113.526334,"alt_m":80},{"lat":34.823124,"lon":113.524269,"alt_m":80,"speed_mps":8,"action":"LAND"}],"actions":[],"estimates":{"distance_m":1947.1,"time_s":243.4,"expected_battery_drop_percent":3.9},"warnings":[{"level":"info","message":"此为直线降级规划（未使用LLM），仅供参考"},{"level":"warning","message":"LLM调用失败，已降级为直线规划: LLM request failed: Post \\"https://openapi.monica.im/v1/chat/completions\\": dial tcp4 199.96.59.95:443: i/o timeout"}],"explanation":"直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.823124,113.524269)，总距离1258m，预计耗时157s。中间动作按等距插入。"}', 'fallback', 'draft', 0, '2026-04-09 20:17:55', '2026-04-09 20:17:55'),
+(115, 0, '{"start":{"lat":34.817077,"lon":113.53591,"alt_m":80},"goal":{"lat":34.821198,"lon":113.522036,"alt_m":80},"actions":[],"constraints":{"max_speed_mps":8,"max_alt_m":130,"battery_return_threshold_percent":20,"no_fly_zones":[{"name":"禁飞区2","type":"polygon","polygon":[{"lat":34.82306820574498,"lon":113.52948870154177,"alt_m":0},{"lat":34.822997735964414,"lon":113.53660977247212,"alt_m":0},{"lat":34.81855801824457,"lon":113.53184809251266,"alt_m":0},{"lat":34.81905133203002,"lon":113.5269577185002,"alt_m":0},{"lat":34.81531616845062,"lon":113.52717220858851,"alt_m":0}],"alt_limit_m":-1}]},"map_context":"起点位于: 河南省郑州市中原区枫杨街道郑州大学中心体育馆\\n终点位于: 河南省郑州市中原区沟赵乡金盏街郑州高新区格力工业园\\n地面参考路线距离: 2262m\\n附近敏感区域: 郑州大学-创业学院(科教文化服务;学校;高等院校,距m); 郑州大学-体育学院(科教文化服务;学校;高等院校,距m); 郑州大学运动与体育学院(科教文化服务;学校;高等院校,距m); 郑州大学新校区高性能计算研究与发展中心(科教文化服务;学校;高等院校,距m); 郑州大学信息工程学院(科教文化服务;学校;高等院校,距m); 郑州大学新校区教育技术中心(科教文化服务;学校;高等院校,距m); 郑州大学新校区远程教育学院网络管理中心(科教文化服务;学校;高等院校,距m); 郑州大学外国语与国际关系学院(科教文化服务;学校;高等院校,距m); 郑州大学中德学院(科教文化服务;学校;高等院校,距m); 郑州大学计算机与人工智能学院(科教文化服务;学校;高等院校,距m)"}', '{"waypoints":[{"lat":34.817077,"lon":113.53591,"alt_m":80,"action":"TAKEOFF"},{"lat":34.814158,"lon":113.526334,"alt_m":80},{"lat":34.821198,"lon":113.522036,"alt_m":80,"speed_mps":8,"action":"LAND"}],"actions":[],"estimates":{"distance_m":1808.1,"time_s":226,"expected_battery_drop_percent":3.6},"warnings":[{"level":"info","message":"此为直线降级规划（未使用LLM），仅供参考"},{"level":"warning","message":"LLM调用失败，已降级为直线规划: LLM request failed: Post \\"https://openapi.monica.im/v1/chat/completions\\": dial tcp4 67.228.235.91:443: i/o timeout"}],"explanation":"直线飞行路线：从起点(34.817077,113.535910)直飞至终点(34.821198,113.522036)，总距离1347m，预计耗时168s。中间动作按等距插入。"}', 'fallback', 'draft', 0, '2026-04-09 20:47:16', '2026-04-09 20:47:16');
+-- Rows: 115
 
 -- ----------------------------
 -- Table: gps_devices
@@ -1771,8 +1774,14 @@ INSERT INTO `mission_logs` (`id`, `mission_id`, `phase`, `message`, `created_at`
 (61, 26, '巡航', '阶段变更: 巡航', '2026-04-09 20:35:58'),
 (62, 26, '执行任务', '阶段变更: 执行任务', '2026-04-09 20:36:08'),
 (63, 26, '返航', '阶段变更: 返航', '2026-04-09 20:36:18'),
-(64, 26, '降落', '阶段变更: 降落', '2026-04-09 20:36:36');
--- Rows: 13
+(64, 26, '降落', '阶段变更: 降落', '2026-04-09 20:36:36'),
+(65, 27, '创建', '任务已创建: 第五次', '2026-04-09 20:51:23'),
+(66, 27, '起飞', '阶段变更: 起飞', '2026-04-09 20:51:38'),
+(67, 27, '巡航', '阶段变更: 巡航', '2026-04-09 20:51:51'),
+(68, 27, '执行任务', '阶段变更: 执行任务', '2026-04-09 20:52:03'),
+(69, 27, '返航', '阶段变更: 返航', '2026-04-09 20:52:14'),
+(70, 27, '降落', '阶段变更: 降落', '2026-04-09 20:52:25');
+-- Rows: 19
 
 -- ----------------------------
 -- Table: no_fly_zones
@@ -2120,8 +2129,71 @@ INSERT INTO `notifications` (`id`, `type`, `title`, `message`, `source`, `link`,
 (296, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:41:10'),
 (297, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:41:10'),
 (298, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:41:11'),
-(299, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 20:46:49');
--- Rows: 299
+(299, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 20:46:49'),
+(300, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:47:17'),
+(301, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:47:17'),
+(302, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:47:18'),
+(303, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:47:18'),
+(304, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:47:19'),
+(305, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:47:19'),
+(306, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:47:20'),
+(307, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 20:52:47'),
+(308, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 20:57:44'),
+(309, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 20:57:45'),
+(310, 'backup', '数据恢复成功', '恢复成功！共执行 81 条语句，耗时 173012ms', 'backup-system', '', 0, '2026-04-10 00:00:16'),
+(311, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:52'),
+(312, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:53'),
+(313, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:54'),
+(314, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:55'),
+(315, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:56'),
+(316, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:57'),
+(317, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:58'),
+(318, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:09'),
+(319, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:10'),
+(320, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:10'),
+(321, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:11'),
+(322, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:11'),
+(323, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:39:12'),
+(324, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:12'),
+(325, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:12'),
+(326, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:39:13'),
+(327, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:55'),
+(328, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:55'),
+(329, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:56'),
+(330, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:56'),
+(331, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:57'),
+(332, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:58'),
+(333, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:58'),
+(334, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:48:00'),
+(335, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:48:00'),
+(336, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:02'),
+(337, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:03'),
+(338, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:51:03'),
+(339, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:03'),
+(340, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:51:04'),
+(341, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:04'),
+(342, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:05'),
+(343, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:05'),
+(344, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:06'),
+(345, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:01:39'),
+(346, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:01:39'),
+(347, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 14:01:40'),
+(348, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:01:40'),
+(349, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:01:40'),
+(350, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 14:01:40'),
+(351, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:01:41'),
+(352, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:01:41'),
+(353, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:01:42'),
+(354, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:12:23'),
+(355, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 14:12:23'),
+(356, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:12:23'),
+(357, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 14:12:24'),
+(358, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:12:24'),
+(359, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:12:24'),
+(360, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:12:25'),
+(361, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:12:26'),
+(362, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 14:12:27');
+-- Rows: 362
 
 -- ----------------------------
 -- Table: perf_reports
@@ -2262,6 +2334,27 @@ INSERT INTO `recordings` (`id`, `filename`, `mime`, `duration`, `size`, `user_id
 -- Rows: 1
 
 -- ----------------------------
+-- Table: rl_training_log
+-- ----------------------------
+DROP TABLE IF EXISTS `rl_training_log`;
+CREATE TABLE "rl_training_log" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "episode" int DEFAULT '0',
+  "avg_reward" double DEFAULT '0',
+  "route_efficiency" double DEFAULT '0',
+  "safety_score" double DEFAULT '0',
+  "energy_score" double DEFAULT '0',
+  "task_completion" double DEFAULT '0',
+  "anomaly_score" double DEFAULT '0',
+  "epsilon" double DEFAULT '0',
+  "created_at" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "idx_rl_training_created" ("created_at")
+);
+
+-- Rows: 0
+
+-- ----------------------------
 -- Table: sessions
 -- ----------------------------
 DROP TABLE IF EXISTS `sessions`;
@@ -2282,6 +2375,104 @@ CREATE TABLE "sessions" (
 INSERT INTO `sessions` (`id`, `user_id`, `token`, `expires_at`, `created_at`) VALUES
 (1, 10, '0d0f280c6eea9143e3d2434fc35c57205e551011bb085964de72916e9e06cf41-20260409200700', '2026-04-10 20:07:00', '2026-04-09 20:07:00');
 -- Rows: 1
+
+-- ----------------------------
+-- Table: sim_batches
+-- ----------------------------
+DROP TABLE IF EXISTS `sim_batches`;
+CREATE TABLE "sim_batches" (
+  "id" varchar(255) NOT NULL,
+  "name" varchar(255) NOT NULL DEFAULT '',
+  "count" int DEFAULT '0',
+  "model" varchar(255) DEFAULT '',
+  "center_lat" double DEFAULT '0',
+  "center_lng" double DEFAULT '0',
+  "spread_m" double DEFAULT '500',
+  "cruise_speed" double DEFAULT '15',
+  "max_alt" double DEFAULT '120',
+  "loop_route" int DEFAULT '0',
+  "waypoints_json" text,
+  "status" varchar(100) DEFAULT 'created',
+  "created_at" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "idx_sim_batches_status" ("status")
+);
+
+-- Rows: 0
+
+-- ----------------------------
+-- Table: sim_events
+-- ----------------------------
+DROP TABLE IF EXISTS `sim_events`;
+CREATE TABLE "sim_events" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "instance_id" varchar(255) NOT NULL DEFAULT '',
+  "event_type" varchar(255) NOT NULL DEFAULT '',
+  "level" varchar(100) DEFAULT '提示',
+  "message" text,
+  "detail_json" text,
+  "created_at" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "idx_sim_events_instance" ("instance_id"),
+  KEY "idx_sim_events_type" ("event_type"),
+  KEY "idx_sim_events_created" ("created_at")
+);
+
+-- Rows: 0
+
+-- ----------------------------
+-- Table: sim_instances
+-- ----------------------------
+DROP TABLE IF EXISTS `sim_instances`;
+CREATE TABLE "sim_instances" (
+  "id" varchar(255) NOT NULL,
+  "batch_id" varchar(255) DEFAULT '',
+  "name" varchar(255) NOT NULL DEFAULT '',
+  "model" varchar(255) DEFAULT '',
+  "state" varchar(100) DEFAULT 'created',
+  "flight_phase" varchar(100) DEFAULT '待飞',
+  "task_status" varchar(100) DEFAULT '未开始',
+  "lat" double DEFAULT '0',
+  "lng" double DEFAULT '0',
+  "alt" double DEFAULT '0',
+  "speed" double DEFAULT '0',
+  "heading" double DEFAULT '0',
+  "battery_level" int DEFAULT '100',
+  "battery_voltage" double DEFAULT '25.2',
+  "battery_temp" double DEFAULT '25',
+  "battery_health" int DEFAULT '100',
+  "total_flight_sec" double DEFAULT '0',
+  "config_json" text,
+  "created_at" datetime DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "idx_sim_instances_batch" ("batch_id"),
+  KEY "idx_sim_instances_state" ("state")
+);
+
+-- Rows: 0
+
+-- ----------------------------
+-- Table: sim_telemetry_log
+-- ----------------------------
+DROP TABLE IF EXISTS `sim_telemetry_log`;
+CREATE TABLE "sim_telemetry_log" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "instance_id" varchar(255) NOT NULL DEFAULT '',
+  "lat" double DEFAULT '0',
+  "lng" double DEFAULT '0',
+  "alt" double DEFAULT '0',
+  "speed" double DEFAULT '0',
+  "heading" double DEFAULT '0',
+  "battery_level" int DEFAULT '100',
+  "flight_phase" varchar(100) DEFAULT '',
+  "created_at" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "idx_sim_telemetry_instance" ("instance_id"),
+  KEY "idx_sim_telemetry_created" ("created_at")
+);
+
+-- Rows: 0
 
 -- ----------------------------
 -- Table: sync_status
@@ -2404,8 +2595,9 @@ INSERT INTO `users` (`id`, `username`, `password_hash`, `created_at`) VALUES
 (7, 'jytest1', '$2a$10$JQbWk/7ZM7x5J5QrjFZAQeQMJTB3AeHJ3A1ka6ACtbosP/rALmykW', '2026-02-15 00:30:04'),
 (8, '赵沁河工大', '$2a$10$R/16M9qtWquxBlYaGYTwQ.ZMIUY8zjT/kpDUGieIf7MZM3mE85r22', '2026-02-24 23:08:26'),
 (9, 'wangyugui123456', '$2a$10$sasNeINXDY.roTVXtq4WEuYfHCWNCnSRVf8PDkydAEwb9/H3lEIV.', '2026-04-07 21:52:50'),
-(10, 'ckk', '$2a$10$7D41fE123ZIp1eJjwerER.cnTmEiOY/U3nncr4T.JtVbQ32EKNTpO', '2026-04-09 20:06:51');
--- Rows: 10
+(10, 'ckk', '$2a$10$7D41fE123ZIp1eJjwerER.cnTmEiOY/U3nncr4T.JtVbQ32EKNTpO', '2026-04-09 20:06:51'),
+(11, 'zsz', '$2a$10$.4.TtxA3PsIsJ0i9nM28wewV0iynTnLYUYQ6UgeWpMCwkQY.le1Wm', '2026-04-10 14:13:20');
+-- Rows: 11
 
 -- ----------------------------
 -- Table: video_sources
@@ -2432,4 +2624,4 @@ INSERT INTO `video_sources` (`id`, `name`, `url`, `region`, `clarity`, `status`,
 -- Rows: 1
 
 SET FOREIGN_KEY_CHECKS = 1;
--- Backup complete: 27 tables, 1771 rows
+-- Backup complete: 32 tables, 1844 rows

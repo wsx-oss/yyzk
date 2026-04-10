@@ -36,17 +36,18 @@ func NewSimTelemetryPusher(database *db.DB, pool *taskpool.Pool) *SimTelemetryPu
 func (p *SimTelemetryPusher) OnTelemetry(snap simulation.TelemetrySnapshot) {
 	tick := atomic.AddInt64(&p.tickCount, 1)
 
-	// Capture snapshot copies for async closures
-	writeGPS := true
-	writeBattery := tick%5 == 0
-	writeLog := tick%p.dbWriteInterval == 0
+	// Throttle DB writes to reduce pressure on cloud MySQL
+	writeGPS := tick%3 == 0      // GPS update every 3s
+	writeBattery := tick%10 == 0 // battery record every 10s
+	writeLog := tick%10 == 0     // telemetry log every 10s
+	writeFlight := tick%3 == 0   // flight state update every 3s
 
-	// Dispatch DB-heavy work through the task pool
+	// Dispatch DB-heavy work through the task pool (non-blocking)
 	if p.pool != nil {
-		_ = p.pool.Submit(taskpool.Task{
+		_ = p.pool.TrySubmit(taskpool.Task{
 			Name:     fmt.Sprintf("sim:telem:%s", snap.DeviceID),
 			Group:    "simulation",
-			Priority: taskpool.PriorityRealtime,
+			Priority: taskpool.PriorityNormal,
 			Mode:     taskpool.ModeIO,
 			Fn: func(ctx context.Context) error {
 				if writeGPS {
@@ -55,7 +56,9 @@ func (p *SimTelemetryPusher) OnTelemetry(snap simulation.TelemetrySnapshot) {
 				if writeBattery {
 					p.pushBatteryUpdate(snap)
 				}
-				p.pushFlightUpdate(snap)
+				if writeFlight {
+					p.pushFlightUpdate(snap)
+				}
 				if writeLog {
 					p.db.Exec(`INSERT INTO sim_telemetry_log(instance_id, lat, lng, alt, speed, heading, battery_level, flight_phase) VALUES(?,?,?,?,?,?,?,?)`,
 						snap.DeviceID, snap.GPS.Latitude, snap.GPS.Longitude, snap.GPS.Altitude,
@@ -72,7 +75,9 @@ func (p *SimTelemetryPusher) OnTelemetry(snap simulation.TelemetrySnapshot) {
 		if writeBattery {
 			p.pushBatteryUpdate(snap)
 		}
-		p.pushFlightUpdate(snap)
+		if writeFlight {
+			p.pushFlightUpdate(snap)
+		}
 		if writeLog {
 			p.db.Exec(`INSERT INTO sim_telemetry_log(instance_id, lat, lng, alt, speed, heading, battery_level, flight_phase) VALUES(?,?,?,?,?,?,?,?)`,
 				snap.DeviceID, snap.GPS.Latitude, snap.GPS.Longitude, snap.GPS.Altitude,

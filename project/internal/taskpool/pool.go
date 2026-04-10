@@ -156,6 +156,32 @@ func (p *Pool) Submit(t Task) error {
 	}
 }
 
+// TrySubmit is a non-blocking Submit: returns ErrQueueFull immediately if
+// the queue is at capacity instead of blocking the caller.
+var ErrQueueFull = fmt.Errorf("task queue is full")
+
+func (p *Pool) TrySubmit(t Task) error {
+	select {
+	case <-p.ctx.Done():
+		return fmt.Errorf("pool is shut down")
+	default:
+	}
+	entry := taskEntry{task: t, submitted: time.Now()}
+
+	ch := p.ioCh
+	if t.Mode == ModeCPU {
+		ch = p.cpuCh
+	}
+	select {
+	case ch <- entry:
+		atomic.AddInt64(&p.submitted, 1)
+		p.addGroupSubmit(t.Group)
+		return nil
+	default:
+		return ErrQueueFull
+	}
+}
+
 // SubmitFunc is a convenience wrapper.
 func (p *Pool) SubmitFunc(name, group string, fn func(ctx context.Context) error) error {
 	return p.Submit(Task{Name: name, Group: group, Priority: PriorityNormal, Mode: ModeIO, Fn: fn})
@@ -333,21 +359,21 @@ func (p *Pool) Metrics() PoolMetrics {
 
 // PoolMetrics is the public metrics snapshot.
 type PoolMetrics struct {
-	IOWorkers     int                              `json:"io_workers"`
-	CPUWorkers    int                              `json:"cpu_workers"`
-	IOActive      int                              `json:"io_active"`
-	CPUActive     int                              `json:"cpu_active"`
-	IOQueueLen    int                              `json:"io_queue_len"`
-	CPUQueueLen   int                              `json:"cpu_queue_len"`
-	IOQueueCap    int                              `json:"io_queue_cap"`
-	CPUQueueCap   int                              `json:"cpu_queue_cap"`
-	Submitted     int64                            `json:"submitted"`
-	Completed     int64                            `json:"completed"`
-	Failed        int64                            `json:"failed"`
-	Recovered     int64                            `json:"recovered"`
-	Pending       int64                            `json:"pending"`
-	AvgDurationMs float64                          `json:"avg_duration_ms"`
-	Groups        map[string]GroupMetricsSnapshot  `json:"groups"`
+	IOWorkers     int                             `json:"io_workers"`
+	CPUWorkers    int                             `json:"cpu_workers"`
+	IOActive      int                             `json:"io_active"`
+	CPUActive     int                             `json:"cpu_active"`
+	IOQueueLen    int                             `json:"io_queue_len"`
+	CPUQueueLen   int                             `json:"cpu_queue_len"`
+	IOQueueCap    int                             `json:"io_queue_cap"`
+	CPUQueueCap   int                             `json:"cpu_queue_cap"`
+	Submitted     int64                           `json:"submitted"`
+	Completed     int64                           `json:"completed"`
+	Failed        int64                           `json:"failed"`
+	Recovered     int64                           `json:"recovered"`
+	Pending       int64                           `json:"pending"`
+	AvgDurationMs float64                         `json:"avg_duration_ms"`
+	Groups        map[string]GroupMetricsSnapshot `json:"groups"`
 }
 
 // GroupMetricsSnapshot is a per-group metrics snapshot.

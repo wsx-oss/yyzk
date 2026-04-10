@@ -619,8 +619,13 @@ func (e *Engine) RestoreFromSnapshots() (int, error) {
 		e.instances[snap.Config.ID] = inst
 		restored++
 
-		// Auto-restart instances that were running
+		// Auto-restart instances that were running.
+		// Reset state to Stopped first — Start() short-circuits if state is already Running.
 		if snap.State == StateRunning {
+			inst.mu.Lock()
+			inst.state = StateStopped
+			inst.task = TaskPaused
+			inst.mu.Unlock()
 			inst.Start(e.ctx)
 		}
 	}

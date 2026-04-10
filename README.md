@@ -383,7 +383,9 @@ project/
 │       └── common.js / common.css  # 公共工具函数和样式
 └── data/
     ├── backups/                    # 数据库备份文件存储
-    └── recordings/                 # 语音文件存储
+    ├── recordings/                 # 语音文件存储
+    ├── sim_snapshots.json          # 仿真实例快照（30s 周期持久化，7x24 恢复用）
+    └── rl_policy.json              # RL Q-Table 策略文件（每 1000 episodes 自动保存）
 ```
 
 ---
@@ -454,7 +456,24 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 ## 版本更新
 
-### v3.5.0 (最新)
+### v3.6.0 (最新)
+
+- MySQL 迁移完整性审计与修复
+  - 补全仿真 5 张表（`sim_batches` / `sim_instances` / `sim_events` / `sim_telemetry_log` / `rl_training_log`）及索引到 `migrate_mysql.go`
+  - 确认全部 32 张 MySQL 表与 SQLite 架构完全对齐（含 ALTER TABLE 新增列）
+  - 所有 SQL 查询经 `AdaptSQL` 兼容性审查通过
+- 仿真实例恢复致命 Bug 修复（`engine.go`）
+  - `RestoreFromSnapshots` 恢复状态为 Running 的实例时，`Start()` 因状态已是 Running 而跳过 goroutine 创建，导致实例“冻结”不 tick
+  - 修复：恢复后先重置为 Stopped 再调用 Start()
+- 任务池饱和修复（`pool.go` + `sim_integration.go`）
+  - 新增 `TrySubmit` 非阻塞提交，防止云 MySQL 高延迟时阻塞仿真 goroutine
+  - 仿真遥测 DB 写入频率降低（GPS/Flight 每 3s、Battery/Log 每 10s）
+  - 队列从持续满载 1024/1024 降至 0/1024
+- 电池仿真优化（`instance.go`）
+  - 改用 `float64` 精确追踪电量，修复整数截断导致的 1%/s 异常掉电
+  - 新增 idle 充电逻辑（模拟地面充电）+ 满电自动重启，实现 7×24 连续仿真
+
+### v3.5.0
 
 - 新增仿真模拟引擎完整模块（`simulation.html` + `internal/simulation/*`）
   - 支持批量创建/启动/停止/删除仿真批次与实例

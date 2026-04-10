@@ -17,6 +17,7 @@ type Instance struct {
 	task           TaskStatus
 	gps            GPSData
 	battery        BatteryData
+	batteryLevelF  float64 // precise battery level (avoids int truncation)
 	wpIdx          int     // current waypoint index
 	wpProg         float64 // progress within current segment [0,1]
 	loopCnt        int
@@ -61,6 +62,7 @@ func NewInstance(cfg InstanceConfig, onTelemetry func(TelemetrySnapshot), onStat
 			Heading:   0,
 			Accuracy:  1.5,
 		},
+		batteryLevelF: float64(batteryLevel),
 		battery: BatteryData{
 			Level:        batteryLevel,
 			Voltage:      4.2 * 6, // 6S LiPo
@@ -87,6 +89,7 @@ func RestoreInstance(snap InstanceSnapshot, onTelemetry func(TelemetrySnapshot),
 		phase:          snap.Phase,
 		task:           snap.TaskStatus,
 		gps:            snap.GPS,
+		batteryLevelF:  float64(snap.Battery.Level),
 		battery:        snap.Battery,
 		wpIdx:          snap.WaypointIdx,
 		wpProg:         snap.WaypointProg,
@@ -459,6 +462,33 @@ func (inst *Instance) updateAnomalies(now time.Time) {
 }
 
 func (inst *Instance) updateBattery(dt float64) {
+	// ---- Recharge when idle (simulate ground charging / battery swap for 7x24) ----
+	if inst.phase == PhaseIdle && inst.batteryLevelF < 100 {
+		// Fast recharge: ~120 seconds from 0→100 (simulate battery swap / fast-charge)
+		chargeRate := 100.0 / 120.0 // %/s
+		inst.batteryLevelF += chargeRate * dt
+		if inst.batteryLevelF > 100 {
+			inst.batteryLevelF = 100
+		}
+		inst.battery.Level = int(math.Round(inst.batteryLevelF))
+		inst.battery.Current = 5.0 // charging
+		inst.battery.Voltage = 21.0 + inst.batteryLevelF/100.0*4.2
+		inst.battery.Status = "充电中"
+		if inst.battery.Level >= 95 {
+			inst.battery.Status = "正常"
+		}
+		// Auto-restart flight when battery is full enough
+		if inst.batteryLevelF >= 95 && (inst.task == TaskCompleted || inst.task == TaskRunning || inst.task == TaskPaused) {
+			inst.phase = PhaseTakeoff
+			inst.task = TaskRunning
+			inst.wpIdx = 0
+			inst.wpProg = 0
+			inst.loopCnt++
+			inst.battery.ChargeCycles++
+		}
+		return
+	}
+
 	if inst.phase == PhaseIdle || inst.phase == PhaseLanding {
 		inst.battery.Current = -0.5 // idle discharge
 	} else if inst.phase == PhaseTakeoff {
@@ -473,14 +503,14 @@ func (inst *Instance) updateBattery(dt float64) {
 	// Assume 5000mAh battery, 6S = 22.2V nominal
 	// Full discharge at 18A takes ~16.7 minutes
 	discharge := (-inst.battery.Current * dt) / (5.0 * 3600) * 100
-	newLevel := float64(inst.battery.Level) - discharge
-	if newLevel < 0 {
-		newLevel = 0
+	inst.batteryLevelF -= discharge
+	if inst.batteryLevelF < 0 {
+		inst.batteryLevelF = 0
 	}
-	inst.battery.Level = int(newLevel)
+	inst.battery.Level = int(math.Round(inst.batteryLevelF))
 
 	// Voltage varies with level
-	inst.battery.Voltage = 21.0 + float64(inst.battery.Level)/100.0*4.2
+	inst.battery.Voltage = 21.0 + inst.batteryLevelF/100.0*4.2
 
 	// Temperature: slight fluctuation
 	baseTempDelta := 0.01 * (rand.Float64() - 0.5)
@@ -653,7 +683,8 @@ func (inst *Instance) updateFlight(dt float64) {
 				inst.wpIdx = 0
 				inst.wpProg = 0
 				// Simulate battery swap
-				inst.battery.Level = 95 + rand.Intn(6)
+				inst.batteryLevelF = float64(95 + rand.Intn(6))
+				inst.battery.Level = int(inst.batteryLevelF)
 				inst.battery.ChargeCycles++
 			}
 		}

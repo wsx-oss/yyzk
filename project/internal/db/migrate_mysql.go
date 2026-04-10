@@ -460,6 +460,105 @@ func migrateMySQL(db *sql.DB) error {
 		db.Exec(s) // ignore duplicate index errors
 	}
 
-	log.Println("[DB] MySQL migration completed")
+	// ---- Simulation / RL tables ----
+	simTables := []string{
+		`CREATE TABLE IF NOT EXISTS sim_batches (
+			id VARCHAR(255) PRIMARY KEY,
+			name VARCHAR(255) NOT NULL DEFAULT '',
+			count INT DEFAULT 0,
+			model VARCHAR(255) DEFAULT '',
+			center_lat DOUBLE DEFAULT 0,
+			center_lng DOUBLE DEFAULT 0,
+			spread_m DOUBLE DEFAULT 500,
+			cruise_speed DOUBLE DEFAULT 15,
+			max_alt DOUBLE DEFAULT 120,
+			loop_route INT DEFAULT 0,
+			waypoints_json TEXT,
+			status VARCHAR(100) DEFAULT 'created',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS sim_instances (
+			id VARCHAR(255) PRIMARY KEY,
+			batch_id VARCHAR(255) DEFAULT '',
+			name VARCHAR(255) NOT NULL DEFAULT '',
+			model VARCHAR(255) DEFAULT '',
+			state VARCHAR(100) DEFAULT 'created',
+			flight_phase VARCHAR(100) DEFAULT '待飞',
+			task_status VARCHAR(100) DEFAULT '未开始',
+			lat DOUBLE DEFAULT 0,
+			lng DOUBLE DEFAULT 0,
+			alt DOUBLE DEFAULT 0,
+			speed DOUBLE DEFAULT 0,
+			heading DOUBLE DEFAULT 0,
+			battery_level INT DEFAULT 100,
+			battery_voltage DOUBLE DEFAULT 25.2,
+			battery_temp DOUBLE DEFAULT 25,
+			battery_health INT DEFAULT 100,
+			total_flight_sec DOUBLE DEFAULT 0,
+			config_json TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS sim_events (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			instance_id VARCHAR(255) NOT NULL DEFAULT '',
+			event_type VARCHAR(255) NOT NULL DEFAULT '',
+			level VARCHAR(100) DEFAULT '提示',
+			message TEXT,
+			detail_json TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS sim_telemetry_log (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			instance_id VARCHAR(255) NOT NULL DEFAULT '',
+			lat DOUBLE DEFAULT 0,
+			lng DOUBLE DEFAULT 0,
+			alt DOUBLE DEFAULT 0,
+			speed DOUBLE DEFAULT 0,
+			heading DOUBLE DEFAULT 0,
+			battery_level INT DEFAULT 100,
+			flight_phase VARCHAR(100) DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS rl_training_log (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			episode INT DEFAULT 0,
+			avg_reward DOUBLE DEFAULT 0,
+			route_efficiency DOUBLE DEFAULT 0,
+			safety_score DOUBLE DEFAULT 0,
+			energy_score DOUBLE DEFAULT 0,
+			task_completion DOUBLE DEFAULT 0,
+			anomaly_score DOUBLE DEFAULT 0,
+			epsilon DOUBLE DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+	}
+	for _, s := range simTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("sim table: %w\nSQL: %s", err, s[:min(len(s), 120)])
+		}
+	}
+
+	// Simulation indexes
+	simIndexes := []string{
+		`CREATE INDEX idx_sim_batches_status ON sim_batches(status)`,
+		`CREATE INDEX idx_sim_instances_batch ON sim_instances(batch_id)`,
+		`CREATE INDEX idx_sim_instances_state ON sim_instances(state)`,
+		`CREATE INDEX idx_sim_events_instance ON sim_events(instance_id)`,
+		`CREATE INDEX idx_sim_events_type ON sim_events(event_type)`,
+		`CREATE INDEX idx_sim_events_created ON sim_events(created_at)`,
+		`CREATE INDEX idx_sim_telemetry_instance ON sim_telemetry_log(instance_id)`,
+		`CREATE INDEX idx_sim_telemetry_created ON sim_telemetry_log(created_at)`,
+		`CREATE INDEX idx_rl_training_created ON rl_training_log(created_at)`,
+	}
+	for _, s := range simIndexes {
+		db.Exec(s) // ignore duplicate index errors
+	}
+
+	log.Println("[DB] MySQL migration completed (including simulation tables)")
 	return nil
 }

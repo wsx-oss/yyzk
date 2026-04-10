@@ -1,5 +1,5 @@
 -- CloudControl Database Backup
--- Generated at: 2026-04-09 23:50:26
+-- Generated at: 2026-04-10 13:51:32
 -- Tables: 27
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -308,7 +308,6 @@ CREATE TABLE "backup_records" (
 );
 
 INSERT INTO `backup_records` (`id`, `backup_type`, `file_path`, `file_size`, `table_count`, `row_count`, `status`, `operator`, `remark`, `duration_ms`, `created_at`, `finished_at`) VALUES
-(6, 'auto', 'data\\backups\\backup_20260409_164817_auto.sql', 541906, 27, 1615, 'success', 'system', '自动备份（启动后首次）', 31785, '2026-04-09 16:48:18', '2026-04-09 16:48:48'),
 (8, 'auto', 'data\\backups\\backup_20260409_182524_auto.sql', 546102, 27, 1638, 'success', 'system', '自动备份（启动后首次）', 24367, '2026-04-09 18:25:27', '2026-04-09 18:25:49'),
 (9, 'auto', 'data\\backups\\backup_20260409_195726_auto.sql', 558040, 27, 1704, 'success', 'system', '自动备份（启动后首次）', 22048, '2026-04-09 19:57:26', '2026-04-09 19:57:48'),
 (10, 'auto', 'data\\backups\\backup_20260409_200408_auto.sql', 562443, 27, 1715, 'success', 'system', '自动备份（启动后首次）', 31852, '2026-04-09 20:04:11', '2026-04-09 20:04:40'),
@@ -318,8 +317,11 @@ INSERT INTO `backup_records` (`id`, `backup_type`, `file_path`, `file_size`, `ta
 (14, 'auto', 'data\\backups\\backup_20260409_204647_auto.sql', 582611, 27, 1771, 'success', 'system', '自动备份（启动后首次）', 15781, '2026-04-09 20:46:47', '2026-04-09 20:47:02'),
 (15, 'auto', 'data\\backups\\backup_20260409_205743_auto.sql', 588262, 27, 1789, 'success', 'system', '自动备份（启动后首次）', 25287, '2026-04-09 20:57:43', '2026-04-09 20:58:09'),
 (16, 'auto', 'data\\backups\\backup_20260409_234421_auto.sql', 589863, 27, 1798, 'success', 'system', '自动备份（启动后首次）', 33066, '2026-04-09 23:44:23', '2026-04-09 23:44:52'),
-(17, 'auto', 'data\\backups\\backup_20260409_235022_auto.sql', 0, 0, 0, 'running', 'system', '自动备份（启动后首次）', 0, '2026-04-09 23:50:24', NULL);
--- Rows: 11
+(17, 'auto', 'data\\backups\\backup_20260409_235022_auto.sql', 592728, 27, 1814, 'success', 'system', '自动备份（启动后首次）', 120646, '2026-04-09 23:50:24', '2026-04-09 23:52:22'),
+(18, 'pre_restore', 'data\\backups\\backup_20260409_235637_pre_restore.sql', 592761, 27, 1802, 'success', 'system', '恢复前自动备份 (从备份 #15 恢复)', 110187, '2026-04-09 23:56:36', '2026-04-09 23:58:27'),
+(19, 'auto', 'data\\backups\\backup_20260410_134828_auto.sql', 0, 0, 0, 'running', 'system', '自动备份（启动后首次）', 0, '2026-04-10 13:48:28', NULL),
+(20, 'auto', 'data\\backups\\backup_20260410_135131_auto.sql', 0, 0, 0, 'running', 'system', '自动备份（启动后首次）', 0, '2026-04-10 13:51:30', NULL);
+-- Rows: 13
 
 -- ----------------------------
 -- Table: battery_alerts
@@ -2139,32 +2141,42 @@ INSERT INTO `notifications` (`id`, `type`, `title`, `message`, `source`, `link`,
 (307, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 20:52:47'),
 (308, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 20:57:44'),
 (309, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 20:57:45'),
-(310, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:58:16'),
-(311, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:58:16'),
-(312, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:58:17'),
-(313, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:58:17'),
-(314, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:58:18'),
-(315, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:58:18'),
-(316, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 20:58:19'),
-(317, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 23:44:24'),
-(318, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 23:44:25'),
-(319, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:44:49'),
-(320, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:44:50'),
-(321, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:44:51'),
-(322, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:44:52'),
-(323, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:44:53'),
-(324, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:44:53'),
-(325, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:44:54'),
-(326, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 23:50:24'),
-(327, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-09 23:50:26'),
-(328, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:50:52'),
-(329, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:50:53'),
-(330, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:50:54'),
-(331, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:50:57'),
-(332, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:50:58'),
-(333, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:50:59'),
-(334, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-09 23:51:00');
--- Rows: 334
+(310, 'backup', '数据恢复成功', '恢复成功！共执行 81 条语句，耗时 173012ms', 'backup-system', '', 0, '2026-04-10 00:00:16'),
+(311, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:52'),
+(312, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:53'),
+(313, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:54'),
+(314, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:55'),
+(315, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:56'),
+(316, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:57'),
+(317, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 00:00:58'),
+(318, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:09'),
+(319, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:10'),
+(320, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:10'),
+(321, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:11'),
+(322, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:11'),
+(323, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:39:12'),
+(324, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:12'),
+(325, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:39:12'),
+(326, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:39:13'),
+(327, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:55'),
+(328, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:55'),
+(329, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:56'),
+(330, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:56'),
+(331, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:57'),
+(332, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:58'),
+(333, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:47:58'),
+(334, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:48:00'),
+(335, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:48:00'),
+(336, 'hardware', '🖥️ 硬件 zxt 离线', '硬件设备 zxt (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:02'),
+(337, 'hardware', '🖥️ 硬件 王晟璇 离线', '硬件设备 王晟璇 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:03'),
+(338, 'mission', '✅ 任务 第四次 已完成', '飞行任务 "第四次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:51:03'),
+(339, 'hardware', '🖥️ 硬件 金阳测试 离线', '硬件设备 金阳测试 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:03'),
+(340, 'mission', '✅ 任务 第五次 已完成', '飞行任务 "第五次" 已完成', 'AI巡检', '/app/modules/flight.html', 0, '2026-04-10 13:51:04'),
+(341, 'hardware', '🖥️ 硬件 本机 离线', '硬件设备 本机 (服务器) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:04'),
+(342, 'hardware', '🖥️ 硬件 drone-sim-01 离线', '硬件设备 drone-sim-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:05'),
+(343, 'hardware', '🖥️ 硬件 LAPTOP-QULPJ2AF 离线', '硬件设备 LAPTOP-QULPJ2AF (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:05'),
+(344, 'hardware', '🖥️ 硬件 test-drone-01 离线', '硬件设备 test-drone-01 (无人机) 已离线，请检查', 'AI巡检', '/app/modules/hardware.html', 0, '2026-04-10 13:51:06');
+-- Rows: 344
 
 -- ----------------------------
 -- Table: perf_reports
@@ -2475,4 +2487,4 @@ INSERT INTO `video_sources` (`id`, `name`, `url`, `region`, `clarity`, `status`,
 -- Rows: 1
 
 SET FOREIGN_KEY_CHECKS = 1;
--- Backup complete: 27 tables, 1814 rows
+-- Backup complete: 27 tables, 1826 rows
