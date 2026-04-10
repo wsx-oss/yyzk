@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仿真模拟引擎 - CloudControl</title>
+<link rel="stylesheet" href="common.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+:root { --primary: #6366f1; --primary-light: #818cf8; --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; --info: #3b82f6; --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --text-dim: #94a3b8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height:100vh; }
+.header { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); padding: 20px 30px; display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid var(--border); }
+.header h1 { font-size: 22px; font-weight: 600; }
+.header h1 span { color: var(--primary-light); }
+.header .metrics { display:flex; gap:20px; }
+.metric-badge { background: rgba(255,255,255,0.08); border-radius:8px; padding:8px 16px; text-align:center; }
+.metric-badge .val { font-size:20px; font-weight:700; color:var(--primary-light); }
+.metric-badge .label { font-size:11px; color:var(--text-dim); }
+.tabs { display:flex; gap:4px; padding:12px 30px 0; background: var(--card); border-bottom:1px solid var(--border); }
+.tab { padding:10px 20px; cursor:pointer; border-radius:8px 8px 0 0; color:var(--text-dim); font-size:14px; transition:all .2s; border:1px solid transparent; border-bottom:none; }
+.tab:hover { color:var(--text); background:rgba(255,255,255,0.05); }
+.tab.active { color:var(--primary-light); background:var(--bg); border-color:var(--border); font-weight:600; }
+.content { padding:20px 30px; }
+.panel { display:none; }
+.panel.active { display:block; }
+.toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+.btn { padding:8px 18px; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500; transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-primary:hover { background:var(--primary-light); }
+.btn-success { background:var(--success); color:#fff; }
+.btn-success:hover { opacity:.9; }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-danger:hover { opacity:.9; }
+.btn-warning { background:var(--warning); color:#000; }
+.btn-warning:hover { opacity:.9; }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text-dim); }
+.btn-outline:hover { border-color:var(--primary); color:var(--primary-light); }
+.btn-sm { padding:5px 12px; font-size:12px; }
+input, select, textarea { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:6px; font-size:13px; }
+input:focus, select:focus, textarea:focus { outline:none; border-color:var(--primary); }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:16px; }
+.card-title { font-size:15px; font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:rgba(255,255,255,0.05); padding:10px 12px; text-align:left; font-weight:600; color:var(--text-dim); border-bottom:1px solid var(--border); }
+td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.05); }
+tr:hover { background:rgba(255,255,255,0.03); }
+.badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+.badge-success { background:rgba(34,197,94,0.15); color:#22c55e; }
+.badge-warning { background:rgba(245,158,11,0.15); color:#f59e0b; }
+.badge-danger { background:rgba(239,68,68,0.15); color:#ef4444; }
+.badge-info { background:rgba(99,102,241,0.15); color:#818cf8; }
+.badge-gray { background:rgba(148,163,184,0.15); color:#94a3b8; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+.grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+.stat-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; text-align:center; }
+.stat-card .num { font-size:28px; font-weight:700; }
+.stat-card .lbl { font-size:12px; color:var(--text-dim); margin-top:4px; }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:12px; color:var(--text-dim); margin-bottom:4px; font-weight:500; }
+.form-group input, .form-group select, .form-group textarea { width:100%; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); display:none; justify-content:center; align-items:center; z-index:1000; }
+.modal-overlay.show { display:flex; }
+.modal { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; width:560px; max-height:80vh; overflow-y:auto; }
+.modal h3 { margin-bottom:16px; font-size:18px; }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+.progress-bar { background:rgba(255,255,255,0.1); border-radius:4px; height:6px; overflow:hidden; }
+.progress-bar .fill { height:100%; border-radius:4px; transition:width .3s; }
+.anomaly-tag { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:4px; font-size:11px; margin:2px; }
+.anomaly-tag.active { background:rgba(239,68,68,0.2); color:#ef4444; }
+.anomaly-tag.inactive { background:rgba(148,163,184,0.1); color:#94a3b8; text-decoration:line-through; }
+.empty-state { text-align:center; padding:60px; color:var(--text-dim); }
+.empty-state .icon { font-size:48px; margin-bottom:16px; }
+#simMap { width:100%; height:500px; border-radius:10px; border:1px solid var(--border); background:#1a1a2e; }
+.map-legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--text-dim); }
+.map-legend span { display:inline-flex; align-items:center; gap:4px; }
+.map-legend .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.mission-info { background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); border-radius:8px; padding:12px 16px; margin-bottom:12px; font-size:13px; }
+.mission-info strong { color:var(--primary-light); }
+.chart-card { min-height: 320px; }
+.chart-card canvas { width: 100% !important; height: 260px !important; }
+@media(max-width:900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } .form-row { grid-template-columns:1fr; } #simMap { height:350px; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🛩️ <span>仿真模拟引擎</span></h1>
+  <div class="metrics" id="headerMetrics">
+    <div class="metric-badge"><div class="val" id="metricTotal">0</div><div class="label">总实例</div></div>
+    <div class="metric-badge"><div class="val" id="metricRunning">0</div><div class="label">运行中</div></div>
+    <div class="metric-badge"><div class="val" id="metricBatches">0</div><div class="label">批次数</div></div>
+    <div class="metric-badge"><div class="val" id="metricUptime">0s</div><div class="label">运行时间</div></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('overview')">📊 总览</div>
+  <div class="tab" onclick="switchTab('batches')">📦 批次管理</div>
+  <div class="tab" onclick="switchTab('instances')">🛩️ 实例管理</div>
+  <div class="tab" onclick="switchTab('anomaly')">⚠️ 异常注入</div>
+  <div class="tab" onclick="switchTab('events')">📋 事件日志</div>
+  <div class="tab" onclick="switchTab('map')">🗺️ 仿真地图</div>
+  <div class="tab" onclick="switchTab('analytics')">📈 数据看板</div>
+  <div class="tab" onclick="switchTab('rl')">🧠 强化学习</div>
+</div>
+
+<div class="content">
+  <!-- Overview Panel -->
+  <div class="panel active" id="panel-overview">
+    <div class="grid-4" id="overviewStats"></div>
+    <div class="grid-2" style="margin-top:16px;">
+      <div class="card">
+        <div class="card-title">🟢 运行中实例</div>
+        <div id="runningList" style="max-height:400px;overflow-y:auto;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">⚡ 最近事件</div>
+        <div id="recentEvents" style="max-height:400px;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batches Panel -->
+  <div class="panel" id="panel-batches">
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="showCreateBatchModal()">+ 创建批次</button>
+      <button class="btn btn-outline" onclick="loadBatches()">🔄 刷新</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>批次名称</th><th>数量</th><th>型号</th><th>运行/停止/故障</th><th>循环</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody id="batchTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Instances Panel -->
+  <div class="panel" id="panel-instances">
+    <div class="toolbar">
+      <select id="filterBatch" onchange="loadInstances()" style="min-width:160px;">
+        <option value="">全部批次</option>
+      </select>
+      <select id="filterState" onchange="loadInstances()" style="min-width:120px;">
+        <option value="">全部状态</option>
+        <option value="running">运行中</option>
+        <option value="stopped">已停止</option>
+        <option value="created">已创建</option>
+        <option value="failed">故障</option>
+      </select>
+      <button class="btn btn-outline" onclick="loadInstances()">🔄 刷新</button>
+      <span id="instanceCount" style="color:var(--text-dim);font-size:13px;margin-left:auto;"></span>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>设备ID</th><th>名称</th><th>状态</th><th>飞行阶段</th><th>位置</th><th>电量</th><th>速度</th><th>异常</th><th>操作</th></tr></thead>
+        <tbody id="instanceTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Anomaly Panel -->
+  <div class="panel" id="panel-anomaly">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🎯 单台注入</div>
+        <div class="form-group">
+          <label>目标实例ID</label>
+          <input type="text" id="anomalyInstanceId" placeholder="SIM-xxx-001">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>异常类型</label>
+            <select id="anomalyType">
+              <option value="low_battery">低电量告警</option>
+              <option value="flight_deviation">飞行偏航</option>
+              <option value="comm_lost">通信失联</option>
+              <option value="temp_high">高温异常</option>
+              <option value="temp_low">低温异常</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>告警等级</label>
+            <select id="anomalyLevel">
+              <option value="提示">提示</option>
+              <option value="警告">警告</option>
+              <option value="紧急故障">紧急故障</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>持续时长（秒，0=永久）</label>
+          <input type="number" id="anomalyDuration" value="60" min="0">
+        </div>
+        <button class="btn btn-warning" onclick="injectSingleAnomaly()">⚡ 注入异常</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📦 批量注入</div>
+        <div class="form-group">
+          <label>目标批次ID</label>
+          <input type="text" id="batchAnomalyId" placeholder="batch_xxx">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>异常类型</label>
+            <select id="batchAnomalyType">
+              <option value="low_battery">低电量告警</option>
+              <option value="flight_deviation">飞行偏航</option>
+              <option value="comm_lost">通信失联</option>
+              <option value="temp_high">高温异常</option>
+              <option value="temp_low">低温异常</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>影响比例(%)</label>
+            <input type="number" id="batchAnomalyPercent" value="30" min="1" max="100">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>告警等级</label>
+            <select id="batchAnomalyLevel">
+              <option value="警告">警告</option>
+              <option value="提示">提示</option>
+              <option value="紧急故障">紧急故障</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>持续时长（秒）</label>
+            <input type="number" id="batchAnomalyDuration" value="120" min="0">
+          </div>
+        </div>
+        <button class="btn btn-warning" onclick="injectBatchAnomaly()">⚡ 批量注入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Events Panel -->
+  <div class="panel" id="panel-events">
+    <div class="toolbar">
+      <input type="text" id="eventFilterInstance" placeholder="实例ID筛选" style="width:200px;">
+      <select id="eventFilterType" style="min-width:140px;">
+        <option value="">全部类型</option>
+        <option value="low_battery">低电量</option>
+        <option value="flight_deviation">飞行偏航</option>
+        <option value="comm_lost">通信失联</option>
+        <option value="temp_high">高温异常</option>
+        <option value="state_change">状态变更</option>
+      </select>
+      <button class="btn btn-outline" onclick="loadEvents()">🔄 刷新</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>时间</th><th>实例ID</th><th>类型</th><th>等级</th><th>消息</th></tr></thead>
+        <tbody id="eventTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Map Panel -->
+  <div class="panel" id="panel-map">
+    <div class="toolbar">
+      <button class="btn btn-outline" onclick="refreshMap()">🔄 刷新地图</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
+        <input type="checkbox" id="mapAutoRefresh" checked> 自动刷新(2s)
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
+        <input type="checkbox" id="mapShowRoutes" checked> 显示航线
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
+        <input type="checkbox" id="mapShowLabels" checked> 显示标签
+      </label>
+      <span id="mapDroneCount" style="margin-left:auto;font-size:13px;color:var(--text-dim);"></span>
+    </div>
+    <div id="simMap"></div>
+    <div class="map-legend">
+      <span><span class="dot" style="background:#22c55e"></span> 巡航中</span>
+      <span><span class="dot" style="background:#3b82f6"></span> 作业/悬停</span>
+      <span><span class="dot" style="background:#f59e0b"></span> 返航/降落</span>
+      <span><span class="dot" style="background:#ef4444"></span> 异常告警</span>
+      <span><span class="dot" style="background:#94a3b8"></span> 待飞/起飞</span>
+      <span>◆ 航点  ── 航线  ▲ 无人机方向</span>
+    </div>
+    <div id="mapInfoPanel" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- Analytics Panel -->
+  <div class="panel" id="panel-analytics">
+    <div class="toolbar">
+      <button class="btn btn-outline" onclick="loadSimStats(true)">🔄 刷新看板</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
+        <input type="checkbox" id="analyticsAutoRefresh" checked> 自动刷新(5s)
+      </label>
+      <span id="analyticsTime" style="margin-left:auto;font-size:12px;color:var(--text-dim);"></span>
+    </div>
+
+    <div class="grid-4" id="analyticsStats"></div>
+
+    <div class="grid-2" style="margin-top:16px;">
+      <div class="card chart-card">
+        <div class="card-title">📊 运行趋势图（分钟）</div>
+        <canvas id="chartRunningTrend"></canvas>
+      </div>
+      <div class="card chart-card">
+        <div class="card-title">⚠️ 异常统计图（分钟）</div>
+        <canvas id="chartAnomalyTrend"></canvas>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:16px;">
+      <div class="card chart-card">
+        <div class="card-title">🔋 电池风险图（低电占比）</div>
+        <canvas id="chartBatteryRisk"></canvas>
+      </div>
+      <div class="card chart-card">
+        <div class="card-title">🧭 任务分类占比图</div>
+        <canvas id="chartMissionPie"></canvas>
+      </div>
+    </div>
+
+    <div class="card chart-card" style="margin-top:16px;">
+      <div class="card-title">🧠 策略学习曲线（奖励 + ε）</div>
+      <canvas id="chartRLCurve"></canvas>
+    </div>
+  </div>
+
+  <!-- RL Panel -->
+  <div class="panel" id="panel-rl">
+    <div class="toolbar">
+      <button class="btn btn-success" id="rlStartBtn" onclick="rlStart()">▶ 启动训练</button>
+      <button class="btn btn-danger" id="rlStopBtn" onclick="rlStop()">⏹ 停止训练</button>
+      <button class="btn btn-outline" onclick="loadRLStatus()">🔄 刷新</button>
+      <button class="btn btn-primary" onclick="exportRLPolicy()">📥 导出策略</button>
+    </div>
+    <div class="grid-4" id="rlStats"></div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">📈 训练评估历史（实时）</div>
+      <table>
+        <thead><tr><th>轮次</th><th>平均奖励</th><th>路线效率</th><th>安全评分</th><th>能源效率</th><th>任务完成</th><th>异常处置</th><th>时间</th></tr></thead>
+        <tbody id="rlEvalBody"></tbody>
+      </table>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">📜 历史训练记录（持久化）</div>
+      <table>
+        <thead><tr><th>轮次</th><th>平均奖励</th><th>路线效率</th><th>安全评分</th><th>能源效率</th><th>任务完成</th><th>异常处置</th><th>ε值</th><th>时间</th></tr></thead>
+        <tbody id="rlHistoryBody"></tbody>
+      </table>
+    </div>
+    <div class="card" style="margin-top:16px;" id="rlExportCard" hidden>
+      <div class="card-title">📥 策略导出详情</div>
+      <div id="rlExportContent"></div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">💡 强化学习训练说明</div>
+      <div style="font-size:13px;line-height:1.8;color:var(--text-dim);">
+        <p><strong>训练流程：</strong>启动训练后，RL智能体每2秒观察所有运行中无人机的状态（位置、速度、电量、异常等），选择动作（调整航向/速度/高度、跳航点、返航、悬停、紧急降落），<b>实际执行</b>到仿真环境中，然后观察下一状态并计算奖励。经验存入回放缓冲区，用Q-learning批量更新策略。</p>
+        <p><strong>状态空间：</strong>GPS位置(经纬度100m网格)、高度(10m)、速度(5m/s)、航向(8扇区)、电量(10%)、飞行阶段、异常类型、附近无人机数量、最小间距。</p>
+        <p><strong>奖励设计：</strong>路线效率20% + 安全避障20% + 能源管理15% + 任务完成15% + 异常处置20% + 编队内聚10%。奖励与<b>动作强相关</b>：低电量时返航+1.5分，忽略异常-1.0分等。</p>
+        <p><strong>实机部署：</strong>训练收敛后，导出Q表策略文件(JSON)。实机控制器读取策略，根据实时传感器数据离散化状态后查表获取最优动作，通过MAVLink/DJI SDK执行。适用于巡检/巡逻等重复性任务的自主决策优化。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Batch Modal -->
+<div class="modal-overlay" id="createBatchModal">
+  <div class="modal">
+    <h3>创建仿真批次</h3>
+    <div class="form-group">
+      <label>批次名称</label>
+      <input type="text" id="batchName" placeholder="如：巡检编队Alpha">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>任务类型</label>
+        <select id="batchMission" onchange="updateMissionDesc()">
+          <option value="patrol">🛡️ 区域巡逻</option>
+          <option value="inspection">🔍 电力/管道巡检</option>
+          <option value="delivery">📦 物流配送</option>
+          <option value="survey">🗺️ 区域测绘</option>
+          <option value="sar">🆘 搜索救援</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>无人机数量</label>
+        <input type="number" id="batchCount" value="10" min="1" max="500">
+      </div>
+    </div>
+    <div class="mission-info" id="missionDescBox">
+      <strong>区域巡逻：</strong>矩形覆盖区域，4角+中心共7个航点，含悬停观察和拍照。无人机将在指定区域自动生成巡逻航线。
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>机型</label>
+        <input type="text" id="batchModel" value="DJI Mavic 3" placeholder="型号">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>中心纬度</label>
+        <input type="number" id="batchCenterLat" value="34.748" step="0.0001">
+      </div>
+      <div class="form-group">
+        <label>中心经度</label>
+        <input type="number" id="batchCenterLng" value="113.655" step="0.0001">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>分散半径(米)</label>
+        <input type="number" id="batchSpread" value="500" min="10">
+      </div>
+      <div class="form-group">
+        <label>巡航速度(m/s)</label>
+        <input type="number" id="batchSpeed" value="15" min="1" max="30">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>最大高度(米)</label>
+        <input type="number" id="batchMaxAlt" value="120" min="10" max="500">
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end;gap:12px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="batchLoop" checked> 循环飞行
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="batchAutoStart" checked> 自动启动
+        </label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>航点（JSON，可选）</label>
+      <textarea id="batchWaypoints" rows="4" placeholder='[{"lat":34.749,"lng":113.656,"alt":50,"speed":10,"action":"fly","hold_sec":0}]'></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('createBatchModal')">取消</button>
+      <button class="btn btn-primary" onclick="createBatch()">创建</button>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+const API = '/api/sim';
+let refreshTimer = null;
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', t.textContent.includes({overview:'总览',batches:'批次',instances:'实例',anomaly:'异常',events:'事件',map:'地图',analytics:'看板',rl:'强化'}[name]||'')));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-'+name));
+  if(name==='batches') loadBatches();
+  if(name==='instances') loadInstances();
+  if(name==='events') loadEvents();
+  if(name==='map') initMap();
+  if(name==='analytics') loadSimStats(true);
+  if(name==='rl') loadRLStatus();
+}
+
+async function apiFetch(url, opts={}) {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = {'Content-Type':'application/json', ...(opts.headers||{})};
+    if(token) headers['Authorization'] = 'Bearer '+token;
+    const r = await fetch(url, {...opts, headers});
+    if(r.status===401) { window.top.location.href='/app/login.html'; return {error:'Unauthorized'}; }
+    return await r.json();
+  } catch(e) { console.error(e); return {error:e.message}; }
+}
+
+// ---- Metrics & Overview ----
+async function loadMetrics() {
+  const d = await apiFetch(API+'/metrics');
+  if(d.error) return;
+  document.getElementById('metricTotal').textContent = d.total_instances||0;
+  document.getElementById('metricRunning').textContent = d.running_instances||0;
+  document.getElementById('metricBatches').textContent = d.total_batches||0;
+  const up = d.uptime_sec||0;
+  document.getElementById('metricUptime').textContent = up>3600? Math.floor(up/3600)+'h' : up>60? Math.floor(up/60)+'m' : Math.floor(up)+'s';
+
+  document.getElementById('overviewStats').innerHTML = [
+    {n:d.total_instances||0, l:'总实例', c:'var(--primary-light)'},
+    {n:d.running_instances||0, l:'运行中', c:'var(--success)'},
+    {n:d.stopped_instances||0, l:'已停止', c:'var(--warning)'},
+    {n:d.failed_instances||0, l:'故障', c:'var(--danger)'},
+  ].map(s=>`<div class="stat-card"><div class="num" style="color:${s.c}">${s.n}</div><div class="lbl">${s.l}</div></div>`).join('');
+}
+
+async function loadOverview() {
+  await loadMetrics();
+  // Running instances
+  const d = await apiFetch(API+'/instances?state=running&page_size=20');
+  const list = document.getElementById('runningList');
+  if(!d.items||d.items.length===0) { list.innerHTML='<div class="empty-state">暂无运行中实例</div>'; }
+  else { list.innerHTML = d.items.map(i=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+    <div><span style="color:var(--primary-light);font-weight:600;">${i.name||i.id}</span> <span class="badge badge-success">${i.flight_phase}</span></div>
+    <div style="font-size:12px;color:var(--text-dim);">电量:${i.battery?.level||0}% 速度:${(i.gps?.speed||0).toFixed(1)}m/s</div>
+  </div>`).join(''); }
+
+  // Recent events
+  const ev = await apiFetch(API+'/events?page_size=10');
+  const evDiv = document.getElementById('recentEvents');
+  if(!ev.items||ev.items.length===0) { evDiv.innerHTML='<div class="empty-state">暂无事件</div>'; }
+  else { evDiv.innerHTML = ev.items.map(e=>`<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;">
+    <span class="badge ${e.level==='紧急故障'?'badge-danger':e.level==='警告'?'badge-warning':'badge-info'}">${e.level}</span>
+    <span style="color:var(--text-dim);margin:0 6px;">${e.created_at}</span>
+    ${e.message}
+  </div>`).join(''); }
+}
+
+// ---- Batches ----
+async function loadBatches() {
+  const d = await apiFetch(API+'/batches');
+  const tbody = document.getElementById('batchTableBody');
+  if(!d.items||d.items.length===0) { tbody.innerHTML='<tr><td colspan="7" class="empty-state">暂无批次，点击"创建批次"开始</td></tr>'; return; }
+  tbody.innerHTML = d.items.map(b=>`<tr>
+    <td><strong>${b.name}</strong><br><span style="font-size:11px;color:var(--text-dim)">${b.id}</span></td>
+    <td>${b.total_instances||b.count}</td>
+    <td>${b.model||'-'}</td>
+    <td><span style="color:var(--success)">${b.running||0}</span> / <span style="color:var(--warning)">${b.stopped||0}</span> / <span style="color:var(--danger)">${b.failed||0}</span></td>
+    <td>${b.loop_route?'是':'否'}</td>
+    <td style="font-size:12px">${b.created_at||''}</td>
+    <td>
+      <button class="btn btn-sm btn-success" onclick="batchAction('${b.id}','start')">启动</button>
+      <button class="btn btn-sm btn-warning" onclick="batchAction('${b.id}','stop')">停止</button>
+      <button class="btn btn-sm btn-danger" onclick="batchAction('${b.id}','delete')">删除</button>
+    </td>
+  </tr>`).join('');
+
+  // Update filter dropdown
+  const sel = document.getElementById('filterBatch');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">全部批次</option>' + d.items.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  sel.value = cur;
+}
+
+async function batchAction(id, action) {
+  if(action==='delete' && !confirm('确定删除该批次及所有实例？')) return;
+  const method = action==='delete'?'DELETE':'POST';
+  await apiFetch(`${API}/batches/${id}${action==='delete'?'':'/'+action}`, {method});
+  loadBatches(); loadMetrics();
+}
+
+function showCreateBatchModal() { document.getElementById('createBatchModal').classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+async function createBatch() {
+  let waypoints = [];
+  const wpText = document.getElementById('batchWaypoints').value.trim();
+  if(wpText) { try { waypoints = JSON.parse(wpText); } catch(e) { alert('航点JSON格式错误'); return; } }
+
+  const body = {
+    name: document.getElementById('batchName').value,
+    count: parseInt(document.getElementById('batchCount').value)||10,
+    model: document.getElementById('batchModel').value,
+    mission: document.getElementById('batchMission').value,
+    center_lat: parseFloat(document.getElementById('batchCenterLat').value)||34.748,
+    center_lng: parseFloat(document.getElementById('batchCenterLng').value)||113.655,
+    spread_m: parseFloat(document.getElementById('batchSpread').value)||500,
+    cruise_speed: parseFloat(document.getElementById('batchSpeed').value)||15,
+    max_alt: parseFloat(document.getElementById('batchMaxAlt').value)||120,
+    loop_route: document.getElementById('batchLoop').checked,
+    auto_start: document.getElementById('batchAutoStart').checked,
+    waypoints: waypoints,
+  };
+  const d = await apiFetch(API+'/batches', {method:'POST', body:JSON.stringify(body)});
+  if(d.error) { alert('创建失败: '+d.error); return; }
+  closeModal('createBatchModal');
+  alert(`成功创建 ${d.count} 台模拟无人机`);
+  loadBatches(); loadMetrics();
+}
+
+// ---- Instances ----
+async function loadInstances() {
+  const batchId = document.getElementById('filterBatch').value;
+  const state = document.getElementById('filterState').value;
+  let url = API+'/instances?page_size=100';
+  if(batchId) url += '&batch_id='+batchId;
+  if(state) url += '&state='+state;
+  const d = await apiFetch(url);
+  const tbody = document.getElementById('instanceTableBody');
+  document.getElementById('instanceCount').textContent = `共 ${d.total||0} 台`;
+  if(!d.items||d.items.length===0) { tbody.innerHTML='<tr><td colspan="9" class="empty-state">暂无实例</td></tr>'; return; }
+  tbody.innerHTML = d.items.map(i=>{
+    const stBadge = {running:'badge-success',stopped:'badge-warning',created:'badge-info',failed:'badge-danger'}[i.state]||'badge-gray';
+    const anomalies = (i.anomalies||[]).filter(a=>a.active).map(a=>`<span class="anomaly-tag active">${a.type}</span>`).join('');
+    return `<tr>
+      <td style="font-size:11px;font-family:monospace">${i.id}</td>
+      <td>${i.name}</td>
+      <td><span class="badge ${stBadge}">${i.state}</span></td>
+      <td>${i.flight_phase||'-'}</td>
+      <td style="font-size:11px">${(i.gps?.latitude||0).toFixed(4)}, ${(i.gps?.longitude||0).toFixed(4)}<br>高度:${(i.gps?.altitude||0).toFixed(1)}m</td>
+      <td><div style="display:flex;align-items:center;gap:6px;">
+        <div class="progress-bar" style="width:60px"><div class="fill" style="width:${i.battery?.level||0}%;background:${(i.battery?.level||0)>20?'var(--success)':'var(--danger)'}"></div></div>
+        <span style="font-size:12px">${i.battery?.level||0}%</span>
+      </div></td>
+      <td>${(i.gps?.speed||0).toFixed(1)}</td>
+      <td>${anomalies||'-'}</td>
+      <td>
+        ${i.state!=='running'?`<button class="btn btn-sm btn-success" onclick="instAction('${i.id}','start')">启动</button>`:''}
+        ${i.state==='running'?`<button class="btn btn-sm btn-warning" onclick="instAction('${i.id}','stop')">停止</button>`:''}
+        <button class="btn btn-sm btn-danger" onclick="instAction('${i.id}','delete')">删除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function instAction(id, action) {
+  if(action==='delete' && !confirm('确定删除此实例？')) return;
+  const method = action==='delete'?'DELETE':'POST';
+  await apiFetch(`${API}/instances/${id}${action==='delete'?'':'/'+action}`, {method});
+  loadInstances(); loadMetrics();
+}
+
+// ---- Anomaly Injection ----
+async function injectSingleAnomaly() {
+  const id = document.getElementById('anomalyInstanceId').value.trim();
+  if(!id) { alert('请输入实例ID'); return; }
+  const body = {
+    type: document.getElementById('anomalyType').value,
+    level: document.getElementById('anomalyLevel').value,
+    duration: parseInt(document.getElementById('anomalyDuration').value)||0,
+  };
+  const d = await apiFetch(`${API}/instances/${id}/anomaly`, {method:'POST', body:JSON.stringify(body)});
+  if(d.error) alert('注入失败: '+d.error);
+  else alert('异常已注入');
+}
+
+async function injectBatchAnomaly() {
+  const id = document.getElementById('batchAnomalyId').value.trim();
+  if(!id) { alert('请输入批次ID'); return; }
+  const body = {
+    type: document.getElementById('batchAnomalyType').value,
+    level: document.getElementById('batchAnomalyLevel').value,
+    duration: parseInt(document.getElementById('batchAnomalyDuration').value)||0,
+    percent: parseFloat(document.getElementById('batchAnomalyPercent').value)||30,
+  };
+  const d = await apiFetch(`${API}/batches/${id}/anomaly`, {method:'POST', body:JSON.stringify(body)});
+  if(d.error) alert('注入失败: '+d.error);
+  else alert(`成功注入 ${d.injected} 台`);
+}
+
+// ---- Events ----
+async function loadEvents() {
+  const instId = document.getElementById('eventFilterInstance').value.trim();
+  const evtType = document.getElementById('eventFilterType').value;
+  let url = API+'/events?page_size=50';
+  if(instId) url += '&instance_id='+instId;
+  if(evtType) url += '&event_type='+evtType;
+  const d = await apiFetch(url);
+  const tbody = document.getElementById('eventTableBody');
+  if(!d.items||d.items.length===0) { tbody.innerHTML='<tr><td colspan="5" class="empty-state">暂无事件</td></tr>'; return; }
+  tbody.innerHTML = d.items.map(e=>`<tr>
+    <td style="font-size:12px">${e.created_at}</td>
+    <td style="font-family:monospace;font-size:11px">${e.instance_id}</td>
+    <td>${e.event_type}</td>
+    <td><span class="badge ${e.level==='紧急故障'?'badge-danger':e.level==='警告'?'badge-warning':'badge-info'}">${e.level}</span></td>
+    <td>${e.message}</td>
+  </tr>`).join('');
+}
+
+// ---- RL Training ----
+async function loadRLStatus() {
+  const d = await apiFetch(API+'/rl/status');
+  document.getElementById('rlStartBtn').disabled = !!d.training;
+  document.getElementById('rlStopBtn').disabled = !d.training;
+  document.getElementById('rlStats').innerHTML = [
+    {n:d.training?'运行中':'已停止', l:'训练状态', c:d.training?'var(--success)':'var(--text-dim)'},
+    {n:d.episodes||0, l:'训练轮次', c:'var(--primary-light)'},
+    {n:(d.avg_reward||0).toFixed(3), l:'平均奖励', c:'var(--info)'},
+    {n:(d.best_reward||0).toFixed(3), l:'最佳奖励', c:'var(--success)'},
+  ].map(s=>`<div class="stat-card"><div class="num" style="color:${s.c};font-size:22px">${s.n}</div><div class="lbl">${s.l}</div></div>`).join('');
+
+  // Load eval results (in-memory)
+  const ev = await apiFetch(API+'/rl/eval');
+  const tbody = document.getElementById('rlEvalBody');
+  if(!ev.items||ev.items.length===0) { tbody.innerHTML='<tr><td colspan="8" class="empty-state">暂无评估数据</td></tr>'; }
+  else { tbody.innerHTML = ev.items.slice(-20).reverse().map(r=>`<tr>
+    <td>${r.episode}</td>
+    <td>${(r.avg_reward||0).toFixed(3)}</td>
+    <td>${(r.route_efficiency||0).toFixed(3)}</td>
+    <td>${(r.safety_score||0).toFixed(3)}</td>
+    <td>${(r.energy_score||0).toFixed(3)}</td>
+    <td>${(r.task_completion||0).toFixed(3)}</td>
+    <td>${(r.anomaly_score||0).toFixed(3)}</td>
+    <td style="font-size:12px">${r.timestamp||''}</td>
+  </tr>`).join(''); }
+
+  // Load persistent history from DB
+  const hist = await apiFetch(API+'/rl/history?limit=50');
+  const hbody = document.getElementById('rlHistoryBody');
+  if(!hist.items||hist.items.length===0) { hbody.innerHTML='<tr><td colspan="9" class="empty-state">暂无历史训练记录</td></tr>'; }
+  else { hbody.innerHTML = hist.items.map(r=>`<tr>
+    <td>${r.episode}</td>
+    <td>${(r.avg_reward||0).toFixed(3)}</td>
+    <td>${(r.route_efficiency||0).toFixed(3)}</td>
+    <td>${(r.safety_score||0).toFixed(3)}</td>
+    <td>${(r.energy_score||0).toFixed(3)}</td>
+    <td>${(r.task_completion||0).toFixed(3)}</td>
+    <td>${(r.anomaly_score||0).toFixed(3)}</td>
+    <td>${(r.epsilon||0).toFixed(4)}</td>
+    <td style="font-size:12px">${r.created_at||''}</td>
+  </tr>`).join(''); }
+}
+
+async function rlStart() {
+  await apiFetch(API+'/rl/start', {method:'POST', body:JSON.stringify({eval_interval:100})});
+  loadRLStatus();
+}
+async function rlStop() {
+  await apiFetch(API+'/rl/stop', {method:'POST'});
+  loadRLStatus();
+}
+async function exportRLPolicy() {
+  const d = await apiFetch(API+'/rl/export-policy');
+  if(d.error) { alert('导出失败: '+d.error); return; }
+  document.getElementById('rlExportCard').hidden = false;
+  let html = '<div style="font-size:13px;line-height:1.8;">';
+  html += `<p><strong>策略类型:</strong> ${d.policy_type} | <strong>训练轮次:</strong> ${d.training_episodes} | <strong>平均奖励:</strong> ${(d.avg_reward||0).toFixed(3)} | <strong>ε:</strong> ${(d.epsilon||0).toFixed(4)}</p>`;
+  html += '<p><strong>动作空间:</strong></p><table style="font-size:12px;margin-bottom:10px;">';
+  (d.action_space||[]).forEach(a => { html += `<tr><td style="padding:3px 8px;"><span class="badge badge-info">${a.id}</span></td><td style="padding:3px 8px;">${a.name}</td><td style="padding:3px 8px;color:var(--text-dim)">${a.desc}</td></tr>`; });
+  html += '</table>';
+  html += '<p><strong>学到的决策规则:</strong></p><table style="font-size:12px;margin-bottom:10px;">';
+  (d.learned_rules||[]).forEach(r => { html += `<tr><td style="padding:3px 8px;">${r.condition}</td><td style="padding:3px 8px;color:var(--success)">${r.recommended_action}</td><td style="padding:3px 8px;"><span class="badge ${r.confidence==='高'?'badge-success':'badge-warning'}">${r.confidence}</span></td></tr>`; });
+  html += '</table>';
+  html += `<p><strong>实机部署指南:</strong> ${d.deployment_guide}</p>`;
+  html += '</div>';
+  document.getElementById('rlExportContent').innerHTML = html;
+}
+
+// ---- Mission Type Descriptions ----
+function updateMissionDesc() {
+  const m = document.getElementById('batchMission').value;
+  const descs = {
+    patrol: '<strong>区域巡逻：</strong>矩形覆盖区域，4角+中心共7个航点，含悬停观察和拍照。无人机将在指定区域自动生成巡逻航线。',
+    inspection: '<strong>电力/管道巡检：</strong>从变电站A到变电站B，沿线路8个检查点逐一悬停拍照检测，模拟输电线路巡检。',
+    delivery: '<strong>物流配送：</strong>从仓库出发至目标配送点，完成货物投放后自动返航。含爬升、巡航、降落投递阶段。',
+    survey: '<strong>区域测绘：</strong>5×3弓字形航线覆盖扫描，每点正射影像采集，模拟正射测绘作业。',
+    sar: '<strong>搜索救援：</strong>从失联点为中心向外螺旋搜索，12个搜索点逐步扩大范围，每点悬停拍照扫描。',
+  };
+  document.getElementById('missionDescBox').innerHTML = descs[m] || '';
+}
+
+// ---- Simulation Map (Leaflet) ----
+let simMapObj = null;
+let mapMarkers = {};   // deviceID -> {marker, label, trail}
+let mapRoutes = {};    // deviceID -> polyline
+let mapWpMarkers = []; // waypoint markers
+let mapRefreshTimer = null;
+
+const DRONE_COLORS = {
+  '巡航': '#22c55e', '作业': '#3b82f6', '悬停': '#3b82f6',
+  '返航': '#f59e0b', '降落': '#f59e0b',
+  '待飞': '#94a3b8', '起飞': '#94a3b8',
+  'anomaly': '#ef4444',
+};
+
+function getDroneColor(phase, hasAnomaly) {
+  if (hasAnomaly) return DRONE_COLORS.anomaly;
+  return DRONE_COLORS[phase] || '#94a3b8';
+}
+
+function createDroneIcon(heading, color) {
+  const svg = `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <g transform="rotate(${heading||0},18,18)">
+      <!-- 四旋翼机身 -->
+      <rect x="15" y="12" width="6" height="12" rx="2" fill="${color}" stroke="#fff" stroke-width="0.8" opacity="0.95"/>
+      <!-- 机臂 -->
+      <line x1="18" y1="15" x2="7" y2="8" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+      <line x1="18" y1="15" x2="29" y2="8" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+      <line x1="18" y1="21" x2="7" y2="28" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+      <line x1="18" y1="21" x2="29" y2="28" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+      <!-- 4个螺旋桨 -->
+      <circle cx="7" cy="8" r="4.5" fill="${color}" opacity="0.3" stroke="${color}" stroke-width="0.8"/>
+      <circle cx="29" cy="8" r="4.5" fill="${color}" opacity="0.3" stroke="${color}" stroke-width="0.8"/>
+      <circle cx="7" cy="28" r="4.5" fill="${color}" opacity="0.3" stroke="${color}" stroke-width="0.8"/>
+      <circle cx="29" cy="28" r="4.5" fill="${color}" opacity="0.3" stroke="${color}" stroke-width="0.8"/>
+      <!-- 螺旋桨中心 -->
+      <circle cx="7" cy="8" r="1.5" fill="#fff" opacity="0.9"/>
+      <circle cx="29" cy="8" r="1.5" fill="#fff" opacity="0.9"/>
+      <circle cx="7" cy="28" r="1.5" fill="#fff" opacity="0.9"/>
+      <circle cx="29" cy="28" r="1.5" fill="#fff" opacity="0.9"/>
+      <!-- 机头方向指示 -->
+      <polygon points="18,10 15.5,14 20.5,14" fill="#fff" opacity="0.85"/>
+    </g>
+  </svg>`;
+  return L.divIcon({
+    html: svg, className: '', iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -18]
+  });
+}
+
+function initMap() {
+  if (simMapObj) {
+    simMapObj.invalidateSize();
+    refreshMap();
+    return;
+  }
+  simMapObj = L.map('simMap', {
+    center: [30.5728, 104.0668],
+    zoom: 15,
+    zoomControl: true,
+    attributionControl: false,
+  });
+  // Dark style tile layer
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd',
+  }).addTo(simMapObj);
+
+  refreshMap();
+  // Start auto-refresh
+  if (mapRefreshTimer) clearInterval(mapRefreshTimer);
+  mapRefreshTimer = setInterval(() => {
+    if (document.getElementById('mapAutoRefresh').checked && document.getElementById('panel-map').classList.contains('active')) {
+      refreshMap();
+    }
+  }, 2000);
+}
+
+async function refreshMap() {
+  if (!simMapObj) return;
+  const d = await apiFetch(API + '/positions');
+  if (d.error || !d.items) return;
+
+  const showRoutes = document.getElementById('mapShowRoutes').checked;
+  const showLabels = document.getElementById('mapShowLabels').checked;
+  document.getElementById('mapDroneCount').textContent = `在线无人机: ${d.count || 0}`;
+
+  const activeDroneIds = new Set();
+  const bounds = [];
+
+  d.items.forEach(drone => {
+    activeDroneIds.add(drone.id);
+    const latlng = [drone.lat, drone.lng];
+    bounds.push(latlng);
+    const color = getDroneColor(drone.phase, drone.anomaly);
+
+    // ---- Drone marker ----
+    if (mapMarkers[drone.id]) {
+      // Update existing marker
+      mapMarkers[drone.id].marker.setLatLng(latlng);
+      mapMarkers[drone.id].marker.setIcon(createDroneIcon(drone.heading, color));
+      mapMarkers[drone.id].marker.setPopupContent(dronePopup(drone));
+
+      // Update trail
+      const trail = mapMarkers[drone.id].trail;
+      const pts = trail.getLatLngs();
+      pts.push(latlng);
+      if (pts.length > 60) pts.splice(0, pts.length - 60); // keep last 60 points
+      trail.setLatLngs(pts);
+      trail.setStyle({color: color});
+
+      // Update label
+      if (mapMarkers[drone.id].label) {
+        if (showLabels) {
+          mapMarkers[drone.id].label.setLatLng(latlng);
+          mapMarkers[drone.id].label.setContent(droneLabel(drone));
+          if (!simMapObj.hasLayer(mapMarkers[drone.id].label)) mapMarkers[drone.id].label.addTo(simMapObj);
+        } else {
+          if (simMapObj.hasLayer(mapMarkers[drone.id].label)) simMapObj.removeLayer(mapMarkers[drone.id].label);
+        }
+      }
+    } else {
+      // Create new marker
+      const marker = L.marker(latlng, {icon: createDroneIcon(drone.heading, color)}).addTo(simMapObj);
+      marker.bindPopup(dronePopup(drone), {maxWidth: 300});
+
+      const trail = L.polyline([latlng], {color: color, weight: 2, opacity: 0.5, dashArray: '4,4'}).addTo(simMapObj);
+
+      let label = null;
+      if (showLabels) {
+        label = L.tooltip({permanent: true, direction: 'right', offset: [15, 0], className: 'drone-label'})
+          .setLatLng(latlng).setContent(droneLabel(drone)).addTo(simMapObj);
+      }
+
+      mapMarkers[drone.id] = {marker, trail, label};
+    }
+
+    // ---- Waypoint route ----
+    if (showRoutes && drone.waypoints && drone.waypoints.length > 0) {
+      if (mapRoutes[drone.id]) {
+        simMapObj.removeLayer(mapRoutes[drone.id]);
+      }
+      const routePts = drone.waypoints.map(wp => [wp.lat, wp.lng]);
+      mapRoutes[drone.id] = L.polyline(routePts, {color: color, weight: 1.5, opacity: 0.35, dashArray: '6,8'}).addTo(simMapObj);
+
+      // Waypoint dots (only for first drone to avoid clutter, or if few drones)
+      if (d.items.length <= 5) {
+        drone.waypoints.forEach(wp => {
+          const wpM = L.circleMarker([wp.lat, wp.lng], {radius: 4, color: color, fillColor: color, fillOpacity: 0.6, weight: 1});
+          wpM.bindTooltip(wp.name || wp.action || '航点', {direction: 'top'});
+          wpM.addTo(simMapObj);
+          mapWpMarkers.push(wpM);
+        });
+      }
+    } else if (!showRoutes && mapRoutes[drone.id]) {
+      simMapObj.removeLayer(mapRoutes[drone.id]);
+      delete mapRoutes[drone.id];
+    }
+  });
+
+  // Remove markers of drones that are no longer active
+  Object.keys(mapMarkers).forEach(id => {
+    if (!activeDroneIds.has(id)) {
+      simMapObj.removeLayer(mapMarkers[id].marker);
+      simMapObj.removeLayer(mapMarkers[id].trail);
+      if (mapMarkers[id].label) simMapObj.removeLayer(mapMarkers[id].label);
+      delete mapMarkers[id];
+    }
+  });
+
+  // Fit bounds on first load
+  if (bounds.length > 0 && !simMapObj._hasFitted) {
+    simMapObj.fitBounds(bounds, {padding: [40, 40], maxZoom: 16});
+    simMapObj._hasFitted = true;
+  }
+
+  // Update info panel with summary
+  updateMapInfo(d.items);
+}
+
+function dronePopup(d) {
+  return `<div style="font-size:13px;line-height:1.6;">
+    <strong>${d.id}</strong><br>
+    阶段: <b>${d.phase}</b> | 任务: ${d.task}<br>
+    高度: ${(d.alt||0).toFixed(1)}m | 速度: ${(d.speed||0).toFixed(1)}m/s<br>
+    航向: ${(d.heading||0).toFixed(0)}° | 电量: ${d.battery}%<br>
+    ${d.anomaly ? '<span style="color:#ef4444;font-weight:bold">⚠️ 异常告警</span>' : '<span style="color:#22c55e">✅ 正常</span>'}
+  </div>`;
+}
+
+function droneLabel(d) {
+  return `<span style="font-size:10px;color:#fff;background:rgba(0,0,0,0.6);padding:1px 4px;border-radius:3px;">${d.id.split('-').pop()} ${d.battery}%</span>`;
+}
+
+function updateMapInfo(items) {
+  if (!items || items.length === 0) {
+    document.getElementById('mapInfoPanel').innerHTML = '<div class="empty-state" style="padding:20px;">暂无运行中无人机，请先创建并启动批次</div>';
+    return;
+  }
+  const phaseCount = {};
+  let anomalyCount = 0, totalSpeed = 0, totalAlt = 0, totalBat = 0;
+  items.forEach(d => {
+    phaseCount[d.phase] = (phaseCount[d.phase]||0) + 1;
+    if (d.anomaly) anomalyCount++;
+    totalSpeed += d.speed||0;
+    totalAlt += d.alt||0;
+    totalBat += d.battery||0;
+  });
+  const n = items.length;
+  let html = '<div class="grid-4" style="gap:10px;">';
+  html += `<div class="stat-card" style="padding:10px"><div class="num" style="font-size:20px;color:var(--success)">${n}</div><div class="lbl">在线</div></div>`;
+  html += `<div class="stat-card" style="padding:10px"><div class="num" style="font-size:20px;color:var(--info)">${(totalSpeed/n).toFixed(1)} m/s</div><div class="lbl">平均速度</div></div>`;
+  html += `<div class="stat-card" style="padding:10px"><div class="num" style="font-size:20px;color:var(--primary-light)">${(totalAlt/n).toFixed(0)} m</div><div class="lbl">平均高度</div></div>`;
+  html += `<div class="stat-card" style="padding:10px"><div class="num" style="font-size:20px;color:${anomalyCount>0?'var(--danger)':'var(--success)'}">${anomalyCount}</div><div class="lbl">异常数</div></div>`;
+  html += '</div>';
+  // Phase breakdown
+  html += '<div style="margin-top:8px;font-size:12px;color:var(--text-dim);">飞行阶段分布: ';
+  html += Object.entries(phaseCount).map(([p,c]) => `${p}(${c})`).join(' · ');
+  html += ` · 平均电量 ${(totalBat/n).toFixed(0)}%</div>`;
+  document.getElementById('mapInfoPanel').innerHTML = html;
+}
+
+// ---- Stage-8 Analytics Dashboard ----
+let chartRunningTrend = null;
+let chartAnomalyTrend = null;
+let chartBatteryRisk = null;
+let chartMissionPie = null;
+let chartRLCurve = null;
+
+function destroyChart(ch) {
+  if (ch && typeof ch.destroy === 'function') ch.destroy();
+}
+
+async function loadSimStats(force=false) {
+  const panelActive = document.getElementById('panel-analytics').classList.contains('active');
+  if (!force && !panelActive) return;
+  const d = await apiFetch(API + '/stats');
+  if (d.error) return;
+
+  const live = d.live || {};
+  const dist = d.distribution || {};
+  const charts = d.charts || {};
+
+  const total = live.total_instances || 0;
+  const running = live.running_instances || 0;
+  const anomalies = live.anomaly_instances || 0;
+  const batteryRisk = live.battery_risk_count || 0;
+  const routeProgress = ((live.avg_route_progress || 0) * 100).toFixed(1) + '%';
+  const completed = live.completed_tasks || 0;
+
+  document.getElementById('analyticsStats').innerHTML = [
+    {n: total, l: '总模拟机', c: 'var(--primary-light)'},
+    {n: running, l: '在线运行', c: 'var(--success)'},
+    {n: anomalies, l: '异常实例', c: anomalies > 0 ? 'var(--danger)' : 'var(--success)'},
+    {n: batteryRisk, l: '电池风险', c: batteryRisk > 0 ? 'var(--warning)' : 'var(--success)'},
+    {n: routeProgress, l: '平均航线进度', c: 'var(--info)'},
+    {n: completed, l: '已完成任务', c: 'var(--success)'},
+  ].map(s => `<div class="stat-card"><div class="num" style="color:${s.c};font-size:24px;">${s.n}</div><div class="lbl">${s.l}</div></div>`).join('');
+
+  document.getElementById('analyticsTime').textContent = '更新时间: ' + new Date().toLocaleTimeString('zh-CN', {hour12:false});
+
+  const baseFont = {family: 'Segoe UI, sans-serif', size: 11};
+  const commonOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {labels: {color: '#94a3b8', font: baseFont}},
+    },
+    scales: {
+      x: {ticks: {color: '#94a3b8', font: baseFont}, grid: {color: 'rgba(148,163,184,0.12)'}},
+      y: {ticks: {color: '#94a3b8', font: baseFont}, grid: {color: 'rgba(148,163,184,0.12)'}},
+    },
+  };
+
+  // 1) Running trend
+  destroyChart(chartRunningTrend);
+  chartRunningTrend = new Chart(document.getElementById('chartRunningTrend'), {
+    type: 'line',
+    data: {
+      labels: (charts.running_trend?.labels || []).map(v => v.slice(11)),
+      datasets: [{
+        label: '运行实例数',
+        data: charts.running_trend?.values || [],
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.2)',
+        tension: 0.25,
+        fill: true,
+      }],
+    },
+    options: commonOpts,
+  });
+
+  // 2) Anomaly trend
+  destroyChart(chartAnomalyTrend);
+  chartAnomalyTrend = new Chart(document.getElementById('chartAnomalyTrend'), {
+    type: 'bar',
+    data: {
+      labels: (charts.anomaly_trend?.labels || []).map(v => v.slice(11)),
+      datasets: [{
+        label: '异常事件数',
+        data: charts.anomaly_trend?.values || [],
+        backgroundColor: 'rgba(239,68,68,0.6)',
+        borderColor: '#ef4444',
+        borderWidth: 1,
+      }],
+    },
+    options: commonOpts,
+  });
+
+  // 3) Battery risk trend
+  destroyChart(chartBatteryRisk);
+  chartBatteryRisk = new Chart(document.getElementById('chartBatteryRisk'), {
+    type: 'line',
+    data: {
+      labels: (charts.battery_risk_trend?.labels || []).map(v => v.slice(11)),
+      datasets: [{
+        label: '低电占比',
+        data: (charts.battery_risk_trend?.values || []).map(v => +(v * 100).toFixed(2)),
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.2)',
+        tension: 0.25,
+        fill: true,
+      }],
+    },
+    options: {
+      ...commonOpts,
+      scales: {
+        ...commonOpts.scales,
+        y: {
+          ...commonOpts.scales.y,
+          ticks: {
+            color: '#94a3b8',
+            callback: (v) => v + '%',
+          },
+          min: 0,
+          max: 100,
+        },
+      },
+    },
+  });
+
+  // 4) Mission distribution pie
+  destroyChart(chartMissionPie);
+  const missionMap = dist.mission || {};
+  const missionLabels = Object.keys(missionMap);
+  const missionValues = missionLabels.map(k => missionMap[k]);
+  chartMissionPie = new Chart(document.getElementById('chartMissionPie'), {
+    type: 'doughnut',
+    data: {
+      labels: missionLabels,
+      datasets: [{
+        data: missionValues,
+        backgroundColor: ['#6366f1', '#22c55e', '#f59e0b', '#3b82f6', '#ef4444', '#94a3b8'],
+        borderWidth: 1,
+        borderColor: '#0f172a',
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {position: 'bottom', labels: {color: '#94a3b8', font: baseFont}},
+      },
+    },
+  });
+
+  // 5) RL learning curve (reward + epsilon)
+  destroyChart(chartRLCurve);
+  chartRLCurve = new Chart(document.getElementById('chartRLCurve'), {
+    type: 'line',
+    data: {
+      labels: charts.rl_curve?.episodes || [],
+      datasets: [
+        {
+          label: '平均奖励',
+          data: charts.rl_curve?.rewards || [],
+          borderColor: '#818cf8',
+          backgroundColor: 'rgba(129,140,248,0.15)',
+          tension: 0.2,
+          yAxisID: 'yReward',
+        },
+        {
+          label: 'ε',
+          data: charts.rl_curve?.epsilons || [],
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,0.1)',
+          tension: 0.2,
+          yAxisID: 'yEpsilon',
+        },
+      ],
+    },
+    options: {
+      ...commonOpts,
+      scales: {
+        x: {ticks: {color: '#94a3b8', font: baseFont}, grid: {color: 'rgba(148,163,184,0.12)'}},
+        yReward: {
+          type: 'linear',
+          position: 'left',
+          ticks: {color: '#94a3b8'},
+          grid: {color: 'rgba(148,163,184,0.12)'},
+        },
+        yEpsilon: {
+          type: 'linear',
+          position: 'right',
+          min: 0,
+          max: 1,
+          ticks: {color: '#94a3b8'},
+          grid: {drawOnChartArea: false},
+        },
+      },
+    },
+  });
+}
+
+// ---- WebSocket for real-time updates ----
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/api/sim/stream`);
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if(msg.type === 'sim_telemetry' || msg.type === 'state_change' || msg.type === 'anomaly_event') {
+        // Refresh relevant data on next cycle
+      }
+    } catch(err) {}
+  };
+  ws.onclose = () => setTimeout(connectWS, 3000);
+  ws.onerror = () => ws.close();
+}
+
+// ---- Init ----
+loadOverview();
+loadBatches();
+connectWS();
+refreshTimer = setInterval(() => {
+  loadMetrics();
+  const activePanel = document.querySelector('.panel.active');
+  if(activePanel) {
+    if(activePanel.id === 'panel-overview') loadOverview();
+    if(activePanel.id === 'panel-instances') loadInstances();
+    if(activePanel.id === 'panel-analytics' && document.getElementById('analyticsAutoRefresh').checked) loadSimStats();
+    if(activePanel.id === 'panel-rl') loadRLStatus();
+  }
+}, 5000);
+</script>
+</body>
+</html>

@@ -48,6 +48,8 @@ func (a *AIAssistantAPI) knowledgeBase() string {
 14. 维护操作日志 (logs) - 操作日志查看
 15. 数据同步状态 (sync) - 多节点数据同步
 16. CoT思维链决策 (cot) - AI决策推理过程展示
+17. 仿真模拟引擎 (simulation) - 批量模拟无人机创建、启停、异常注入、实时监控
+18. 强化学习训练 (rl) - 无人机集群协同RL训练、策略评估
 
 【快捷指令】
 - /status - 查看系统整体状态
@@ -75,6 +77,7 @@ func (a *AIAssistantAPI) knowledgeBase() string {
 - [NAV:logs] - 跳转到日志页
 - [NAV:sync] - 跳转到数据同步页
 - [NAV:cot] - 跳转到CoT决策页
+- [NAV:simulation] - 跳转到仿真模拟页
 
 【回复要求】
 1. 使用中文回复，语言简洁友好
@@ -213,6 +216,36 @@ func (a *AIAssistantAPI) gatherContext(query string) string {
 			if len(hwInfo) > 0 {
 				parts = append(parts, "【硬件状态】\n"+strings.Join(hwInfo, "\n"))
 			}
+		}
+	}
+
+	// Simulation data context
+	if strings.Contains(lq, "仿真") || strings.Contains(lq, "模拟") || strings.Contains(lq, "sim") || strings.Contains(lq, "训练") || strings.Contains(lq, "rl") || strings.Contains(lq, "强化学习") {
+		if SimEngineRef != nil {
+			m := SimEngineRef.Metrics()
+			parts = append(parts, fmt.Sprintf("【仿真引擎】总实例:%d, 运行中:%d, 已停止:%d, 故障:%d, 批次数:%d, 运行时间:%.0f秒",
+				m.TotalInstances, m.RunningInstances, m.StoppedInstances, m.FailedInstances, m.TotalBatches, m.UptimeSec))
+
+			// Recent sim events
+			rows, err := a.db.Query("SELECT instance_id, event_type, level, message, created_at FROM sim_events ORDER BY datetime(created_at) DESC LIMIT 5")
+			if err == nil {
+				defer rows.Close()
+				var evtInfo []string
+				for rows.Next() {
+					var instID, evtType, level, msg, created string
+					if rows.Scan(&instID, &evtType, &level, &msg, &created) == nil {
+						evtInfo = append(evtInfo, fmt.Sprintf("[%s] %s: %s (%s)", level, instID, msg, created))
+					}
+				}
+				if len(evtInfo) > 0 {
+					parts = append(parts, "【仿真事件】\n"+strings.Join(evtInfo, "\n"))
+				}
+			}
+		}
+		if SimTrainerRef != nil {
+			metrics := SimTrainerRef.TrainingMetrics()
+			parts = append(parts, fmt.Sprintf("【RL训练】训练中:%v, 训练轮次:%v, 平均奖励:%.3f, 最佳奖励:%.3f",
+				metrics["training"], metrics["episodes"], metrics["avg_reward"], metrics["best_reward"]))
 		}
 	}
 

@@ -716,5 +716,93 @@ func migrateSQLite(db *sql.DB) error {
 		}
 	}
 
+	// Simulation tables
+	simTables := []string{
+		`CREATE TABLE IF NOT EXISTS sim_batches (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL DEFAULT '',
+			count INTEGER DEFAULT 0,
+			model TEXT DEFAULT '',
+			center_lat REAL DEFAULT 0,
+			center_lng REAL DEFAULT 0,
+			spread_m REAL DEFAULT 500,
+			cruise_speed REAL DEFAULT 15,
+			max_alt REAL DEFAULT 120,
+			loop_route INTEGER DEFAULT 0,
+			waypoints_json TEXT DEFAULT '[]',
+			status TEXT DEFAULT 'created',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sim_batches_status ON sim_batches(status)`,
+		`CREATE TABLE IF NOT EXISTS sim_instances (
+			id TEXT PRIMARY KEY,
+			batch_id TEXT DEFAULT '',
+			name TEXT NOT NULL DEFAULT '',
+			model TEXT DEFAULT '',
+			state TEXT DEFAULT 'created',
+			flight_phase TEXT DEFAULT '待飞',
+			task_status TEXT DEFAULT '未开始',
+			lat REAL DEFAULT 0,
+			lng REAL DEFAULT 0,
+			alt REAL DEFAULT 0,
+			speed REAL DEFAULT 0,
+			heading REAL DEFAULT 0,
+			battery_level INTEGER DEFAULT 100,
+			battery_voltage REAL DEFAULT 25.2,
+			battery_temp REAL DEFAULT 25,
+			battery_health INTEGER DEFAULT 100,
+			total_flight_sec REAL DEFAULT 0,
+			config_json TEXT DEFAULT '{}',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sim_instances_batch ON sim_instances(batch_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_sim_instances_state ON sim_instances(state)`,
+		`CREATE TABLE IF NOT EXISTS sim_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			instance_id TEXT NOT NULL DEFAULT '',
+			event_type TEXT NOT NULL DEFAULT '',
+			level TEXT DEFAULT '提示',
+			message TEXT DEFAULT '',
+			detail_json TEXT DEFAULT '{}',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sim_events_instance ON sim_events(instance_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_sim_events_type ON sim_events(event_type)`,
+		`CREATE INDEX IF NOT EXISTS idx_sim_events_created ON sim_events(created_at)`,
+		`CREATE TABLE IF NOT EXISTS sim_telemetry_log (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			instance_id TEXT NOT NULL DEFAULT '',
+			lat REAL DEFAULT 0,
+			lng REAL DEFAULT 0,
+			alt REAL DEFAULT 0,
+			speed REAL DEFAULT 0,
+			heading REAL DEFAULT 0,
+			battery_level INTEGER DEFAULT 100,
+			flight_phase TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sim_telemetry_instance ON sim_telemetry_log(instance_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_sim_telemetry_created ON sim_telemetry_log(created_at)`,
+		`CREATE TABLE IF NOT EXISTS rl_training_log (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			episode INTEGER DEFAULT 0,
+			avg_reward REAL DEFAULT 0,
+			route_efficiency REAL DEFAULT 0,
+			safety_score REAL DEFAULT 0,
+			energy_score REAL DEFAULT 0,
+			task_completion REAL DEFAULT 0,
+			anomaly_score REAL DEFAULT 0,
+			epsilon REAL DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_rl_training_created ON rl_training_log(created_at)`,
+	}
+	for _, s := range simTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("simulation table: %w", err)
+		}
+	}
+
 	return nil
 }

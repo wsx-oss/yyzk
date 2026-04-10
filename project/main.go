@@ -98,7 +98,7 @@ func main() {
 	handlers.RegisterAIAssistantRoutes(r, database)
 	backupAPI := handlers.RegisterBackupRoutes(r, database)
 
-	// ---- Unified task pool ----
+	// ---- Unified task pool (created early so simulation can use it) ----
 	pool := taskpool.New(taskpool.PoolConfig{
 		IOWorkers:      16,
 		CPUWorkers:     4,
@@ -107,6 +107,10 @@ func main() {
 	})
 	handlers.PoolRef = pool
 	handlers.RegisterTaskPoolRoutes(r, pool)
+
+	// ---- Simulation engine & RL trainer (uses pool for async DB writes) ----
+	simEngine, rlTrainer := handlers.InitSimEngine(database, pool)
+	handlers.RegisterSimulationRoutes(r, database, simEngine, rlTrainer)
 
 	// Stats caches & cached stats API
 	handlers.InitStatsCaches(database)
@@ -154,9 +158,11 @@ func main() {
 	<-quit
 	log.Printf("shutting down...")
 
-	// Graceful shutdown: flush batchers, stop caches, stop pool, then HTTP server
+	// Graceful shutdown: flush batchers, stop caches, stop sim engine, stop pool, then HTTP server
 	handlers.StopBatchers()
 	handlers.StopStatsCaches()
+	rlTrainer.StopTraining()
+	simEngine.Shutdown()
 	pool.Shutdown(5 * time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -195,7 +201,7 @@ func authMiddleware(token string) gin.HandlerFunc {
 		if p == "/api/healthz" || p == "/api/config" || p == "/api/metrics/stream" || p == "/api/vnc/ws" || p == "/api/ssh/ws" ||
 			p == "/api/sync/ping" || p == "/api/sync/export-data" || p == "/api/sync/import-data" ||
 			p == "/api/hardware/push" || p == "/api/gps/push" || p == "/api/battery/push" || p == "/api/flight/missions/push" ||
-			p == "/api/gps/stream" || p == "/api/battery/stream" || p == "/api/flight/stream" ||
+			p == "/api/gps/stream" || p == "/api/battery/stream" || p == "/api/flight/stream" || p == "/api/sim/stream" ||
 			p == "/" || strings.HasPrefix(p, "/app/") {
 			c.Next()
 			return

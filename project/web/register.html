@@ -8,7 +8,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: system-ui, "Segoe UI", Arial, Helvetica, sans-serif;
-      background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+      background: radial-gradient(ellipse at 80% 50%, #0c1929 0%, #0a0f1a 50%, #060b14 100%);
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -19,132 +19,202 @@
     body::before {
       content: '';
       position: absolute;
+      inset: 0;
       width: 200%;
       height: 200%;
-      background-image: 
-        linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px),
-        linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px);
-      background-size: 50px 50px;
-      animation: grid 20s linear infinite;
+      background-image:
+        linear-gradient(90deg, rgba(99,102,241,.06) 1px, transparent 1px),
+        linear-gradient(rgba(99,102,241,.06) 1px, transparent 1px);
+      background-size: 60px 60px;
+      animation: gridMove 25s linear infinite;
     }
-    @keyframes grid {
+    @keyframes gridMove {
       0% { transform: translate(0, 0); }
-      100% { transform: translate(50px, 50px); }
+      100% { transform: translate(60px, 60px); }
+    }
+    .glow-orb {
+      position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.3; pointer-events: none; z-index: 1;
+    }
+    .glow-orb.orb1 { width: 450px; height: 450px; background: #6366f1; bottom: -10%; right: -5%; animation: orbF 14s ease-in-out infinite; }
+    .glow-orb.orb2 { width: 350px; height: 350px; background: #0ea5e9; top: -8%; left: -5%; animation: orbF 17s ease-in-out infinite reverse; }
+    @keyframes orbF {
+      0%,100% { transform: translate(0,0) scale(1); }
+      50% { transform: translate(20px,-15px) scale(1.06); }
+    }
+    .floating-drone {
+      position: absolute; opacity: 0.1; z-index: 2; pointer-events: none;
+    }
+    .floating-drone svg { filter: drop-shadow(0 0 8px rgba(99,102,241,0.4)); }
+    .fd1 { top: 15%; right: 12%; animation: dd1 20s ease-in-out infinite; }
+    .fd2 { bottom: 20%; left: 10%; animation: dd2 22s ease-in-out infinite; }
+    @keyframes dd1 {
+      0%,100% { transform: translate(0,0) rotate(0deg); }
+      50% { transform: translate(-30px,20px) rotate(-5deg); }
+    }
+    @keyframes dd2 {
+      0%,100% { transform: translate(0,0) rotate(0deg); }
+      50% { transform: translate(25px,-25px) rotate(4deg); }
+    }
+    .particles { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+    .particle {
+      position: absolute; width: 3px; height: 3px; background: rgba(99,102,241,0.5); border-radius: 50%;
+      animation: pFloat linear infinite;
+    }
+    @keyframes pFloat {
+      0% { transform: translateY(100vh) scale(0); opacity: 0; }
+      10% { opacity: 1; } 90% { opacity: 1; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
     }
     .register-card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(99,102,241,0.08);
       padding: 48px 40px;
       width: 420px;
       max-width: 90%;
       position: relative;
       z-index: 10;
     }
+    .register-logo {
+      display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px;
+    }
+    .register-logo svg { filter: drop-shadow(0 0 10px rgba(99,102,241,0.5)); }
     .register-card h1 {
-      font-size: 20px;
-      color: #0f172a;
-      text-align: center;
-      margin-bottom: 32px;
-      font-weight: 600;
+      font-size: 22px; color: #e2e8f0; text-align: center; margin-bottom: 6px; font-weight: 700; letter-spacing: 1px;
     }
-    .form-group {
-      margin-bottom: 20px;
+    .register-subtitle {
+      text-align: center; font-size: 13px; color: #64748b; margin-bottom: 28px;
     }
-    .form-group label {
-      display: block;
-      font-size: 14px;
-      color: #475569;
-      margin-bottom: 8px;
-    }
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 8px; font-weight: 500; }
     .form-group input {
-      width: 100%;
-      padding: 12px 16px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: all 0.2s;
+      width: 100%; padding: 12px 16px; border: 1px solid rgba(99,102,241,0.25); border-radius: 8px;
+      font-size: 14px; background: rgba(15,23,42,0.6); color: #e2e8f0; transition: all 0.3s;
     }
-    .form-group input:focus {
-      outline: none;
-      border-color: #0ea5e9;
-      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
-    }
+    .form-group input::placeholder { color: #475569; }
+    .form-group input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); background: rgba(15,23,42,0.8); }
     .btn-register {
-      width: 100%;
-      padding: 12px;
-      background: #0ea5e9;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-top: 8px;
+      width: 100%; padding: 13px; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: all 0.3s; margin-top: 8px; letter-spacing: 0.5px; position: relative; overflow: hidden;
     }
-    .btn-register:hover {
-      background: #0284c7;
+    .btn-register::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+      transform: translateX(-100%); transition: transform 0.5s;
     }
-    .btn-register:active {
-      transform: scale(0.98);
-    }
-    .login-link {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 14px;
-      color: #64748b;
-    }
-    .login-link a {
-      color: #0ea5e9;
-      text-decoration: none;
-      font-weight: 500;
-    }
-    .login-link a:hover {
-      text-decoration: underline;
-    }
-    .error-msg, .success-msg {
-      padding: 10px;
-      border-radius: 6px;
-      font-size: 13px;
-      margin-bottom: 16px;
-      display: none;
-    }
-    .error-msg {
-      background: #fee;
-      color: #c00;
-    }
-    .success-msg {
-      background: #efe;
-      color: #060;
-    }
+    .btn-register:hover { box-shadow: 0 4px 20px rgba(99,102,241,0.4); transform: translateY(-1px); }
+    .btn-register:hover::before { transform: translateX(100%); }
+    .btn-register:active { transform: scale(0.98) translateY(0); }
+    .login-link { text-align: center; margin-top: 20px; font-size: 13px; color: #64748b; }
+    .login-link a { color: #818cf8; text-decoration: none; font-weight: 500; transition: color 0.2s; }
+    .login-link a:hover { color: #a5b4fc; text-decoration: underline; }
+    .error-msg, .success-msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+    .error-msg { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+    .success-msg { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+    .footer { position: absolute; bottom: 20px; text-align: center; width: 100%; font-size: 12px; color: #334155; z-index: 10; }
   </style>
 </head>
 <body>
+  <div class="glow-orb orb1"></div>
+  <div class="glow-orb orb2"></div>
+
+  <div class="floating-drone fd1">
+    <svg width="100" height="100" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <rect x="50" y="40" width="20" height="40" rx="6" fill="#818cf8" opacity="0.7"/>
+      <line x1="60" y1="48" x2="25" y2="22" stroke="#818cf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+      <line x1="60" y1="48" x2="95" y2="22" stroke="#818cf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+      <line x1="60" y1="72" x2="25" y2="98" stroke="#818cf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+      <line x1="60" y1="72" x2="95" y2="98" stroke="#818cf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+      <circle cx="25" cy="22" r="14" fill="#818cf8" opacity="0.15" stroke="#818cf8" stroke-width="1.5"/>
+      <circle cx="95" cy="22" r="14" fill="#818cf8" opacity="0.15" stroke="#818cf8" stroke-width="1.5"/>
+      <circle cx="25" cy="98" r="14" fill="#818cf8" opacity="0.15" stroke="#818cf8" stroke-width="1.5"/>
+      <circle cx="95" cy="98" r="14" fill="#818cf8" opacity="0.15" stroke="#818cf8" stroke-width="1.5"/>
+      <circle cx="25" cy="22" r="4" fill="#c7d2fe" opacity="0.6"/>
+      <circle cx="95" cy="22" r="4" fill="#c7d2fe" opacity="0.6"/>
+      <circle cx="25" cy="98" r="4" fill="#c7d2fe" opacity="0.6"/>
+      <circle cx="95" cy="98" r="4" fill="#c7d2fe" opacity="0.6"/>
+    </svg>
+  </div>
+  <div class="floating-drone fd2">
+    <svg width="80" height="80" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <rect x="50" y="40" width="20" height="40" rx="6" fill="#38bdf8" opacity="0.7"/>
+      <line x1="60" y1="48" x2="25" y2="22" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+      <line x1="60" y1="48" x2="95" y2="22" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+      <line x1="60" y1="72" x2="25" y2="98" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+      <line x1="60" y1="72" x2="95" y2="98" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+      <circle cx="25" cy="22" r="14" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1.5"/>
+      <circle cx="95" cy="22" r="14" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1.5"/>
+      <circle cx="25" cy="98" r="14" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1.5"/>
+      <circle cx="95" cy="98" r="14" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1.5"/>
+    </svg>
+  </div>
+
+  <div class="particles" id="particles"></div>
+
   <div class="register-card">
-    <h1>注册新账号</h1>
+    <div class="register-logo">
+      <svg width="40" height="40" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <rect x="50" y="40" width="20" height="40" rx="6" fill="#818cf8"/>
+        <line x1="60" y1="48" x2="28" y2="22" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="48" x2="92" y2="22" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="72" x2="28" y2="98" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="72" x2="92" y2="98" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="28" cy="22" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
+        <circle cx="92" cy="22" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
+        <circle cx="28" cy="98" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
+        <circle cx="92" cy="98" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
+        <circle cx="28" cy="22" r="4" fill="#e0e7ff"/>
+        <circle cx="92" cy="22" r="4" fill="#e0e7ff"/>
+        <circle cx="28" cy="98" r="4" fill="#e0e7ff"/>
+        <circle cx="92" cy="98" r="4" fill="#e0e7ff"/>
+      </svg>
+    </div>
+    <h1>创建账号</h1>
+    <div class="register-subtitle">加入 CloudControl 智能无人机管控平台</div>
     <div class="error-msg" id="errorMsg"></div>
     <div class="success-msg" id="successMsg"></div>
     <form id="registerForm">
       <div class="form-group">
         <label for="username">用户名</label>
-        <input type="text" id="username" name="username" required autocomplete="username" minlength="3" />
+        <input type="text" id="username" name="username" required autocomplete="username" minlength="3" placeholder="至少3个字符" />
       </div>
       <div class="form-group">
         <label for="password">密码</label>
-        <input type="password" id="password" name="password" required autocomplete="new-password" minlength="6" />
+        <input type="password" id="password" name="password" required autocomplete="new-password" minlength="6" placeholder="至少6个字符" />
       </div>
       <div class="form-group">
         <label for="password2">确认密码</label>
-        <input type="password" id="password2" name="password2" required autocomplete="new-password" minlength="6" />
+        <input type="password" id="password2" name="password2" required autocomplete="new-password" minlength="6" placeholder="再次输入密码" />
       </div>
-      <button type="submit" class="btn-register">注册</button>
+      <button type="submit" class="btn-register">注 册</button>
     </form>
     <div class="login-link">
-      已有账号？<a href="/app/login.html">登录</a>
+      已有账号？<a href="/app/login.html">立即登录</a>
     </div>
   </div>
 
+  <div class="footer">CloudControl &copy; 2025 — Intelligent Tool Remote Control System</div>
+
+  <script>
+    (function() {
+      const c = document.getElementById('particles');
+      for (let i = 0; i < 25; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.left = Math.random()*100+'%';
+        p.style.animationDuration = (8+Math.random()*12)+'s';
+        p.style.animationDelay = (Math.random()*10)+'s';
+        p.style.width = p.style.height = (2+Math.random()*3)+'px';
+        const colors = ['rgba(99,102,241,0.5)','rgba(14,165,233,0.4)','rgba(255,255,255,0.12)'];
+        p.style.background = colors[Math.floor(Math.random()*colors.length)];
+        c.appendChild(p);
+      }
+    })();
+  </script>
   <script>
     const form = document.getElementById('registerForm');
     const errorMsg = document.getElementById('errorMsg');

@@ -21,7 +21,7 @@
 - [快速开始](#快速开始)
 - [系统访问地址](#系统访问地址)
 - [环境变量配置](#环境变量配置)
-- [21大功能模块](#21大功能模块)
+- [22大功能模块](#22大功能模块)
 - [API接口文档](#api接口文档)
 - [项目结构](#项目结构)
 - [部署指南](#部署指南)
@@ -48,6 +48,31 @@ CloudControl 是一套面向企业级应用的综合性管控平台。
 - **实时监控**：CPU/内存/磁盘/网络监控、WebSocket 实时推送、阈值自动告警
 - **智能能力**：LLM 航线规划 + NFZ 纠偏 + 多候选方案、CoT 思维链 AI 分析、智能巡检与通知中心
 - **并发框架**：统一 Worker Pool（IO/CPU 双池）、优先级调度、超时控制、panic 恢复、DB 批写、WS 节流、统计缓存
+- **仿真与强化学习**：多实例无人机仿真引擎、任务模板（巡逻/巡检/配送/测绘/搜救）、碰撞规避、Leaflet 实时地图、RL 训练评估与策略导出
+
+---
+
+## 阶段实施状态（5-8）
+
+- **阶段 5（并发能力建设）**：已完成。`internal/taskpool/pool.go` 已提供统一并发执行模型（IO/CPU 双池、优先级、超时、恢复、指标）。
+- **阶段 6（并发应用落地）**：已完成。
+  - 模拟机遥测 DB 写入通过 TaskPool 异步执行（`SimTelemetryPusher.OnTelemetry` → IO pool）。
+  - LLM 航线规划通过 CPU pool 异步执行（`FlightPlanCreate` → `route_planning` 组）。
+  - 监控/告警/巡检后台并发化、统计缓存异步刷新、WebSocket 节流、DB 批写均已接入。
+  - 并发压测：`pool_test.go` 包含 9 个测试（5000 并发提交、混合 IO+CPU+Periodic 压力测试、benchmark），全部通过。
+- **阶段 7（模拟无人机群）**：已完成。支持多实例批次管理、异常注入、7x24 连续仿真、RL 训练评估。
+- **阶段 8（统计与可视化）**：已完成。`/api/sim/stats` 与 `simulation.html` 看板已联动，支持实时指标、趋势图、分布图、RL 曲线。
+
+### RL 对实机决策的价值说明
+
+- 当前 RL 模块可作为**实机航线规划/控制策略的先验决策器**：用于筛选策略方向、验证奖励设计、提前暴露风险动作。
+- 但当前仍属于 **sim-to-real 过渡阶段**，不建议直接无保护上机。
+- 实机部署前建议增加：
+
+  1. 真实飞控约束映射（速度/高度/转向边界与机型参数绑定）
+  2. 域随机化与参数辨识（风场、传感噪声、载重、电池衰减）
+  3. HIL/SIL 分层验证与安全包线（地理围栏、失联返航、动作熔断）
+  4. 人在回路审批（策略建议 -> 人工确认 -> 执行）
 
 ---
 
@@ -135,7 +160,7 @@ go run .
 
 1. 访问 `http://127.0.0.1:8080/` → 自动跳转注册页
 2. 创建账号并登录
-3. 左侧导航切换 17 大功能模块
+3. 左侧导航切换 22 大功能模块
 
 ---
 
@@ -189,7 +214,7 @@ go run .
 
 ---
 
-## 21大功能模块
+## 22大功能模块
 
 | # | 模块名称 | 功能说明 |
 |---|----------|----------|
@@ -214,6 +239,7 @@ go run .
 | 19 | AI 智能助手 | 右下角浮窗、多轮对话、快捷指令、知识库问答、模块跳转、数据查询 |
 | 20 | 消息通知中心 | 右上角铃铛、未读计数、类型筛选、AI 定时巡检、点击跳转、批量已读 |
 | 21 | 并发任务监控 | 统一 Worker Pool 指标、IO/CPU 池状态、任务组分布、完成/失败趋势图、自动刷新 |
+| 22 | 仿真模拟引擎 | 批次创建/启停/删除、异常注入、任务模板、碰撞规避、实时地图、RL 训练与策略导出 |
 
 ---
 
@@ -274,6 +300,16 @@ go run .
 | AI助手 | GET | `/api/ai-assistant/suggestions` | 获取快捷指令建议 |
 | 并发池 | GET | `/api/taskpool/metrics` | 任务池指标快照（workers/队列/任务组统计） |
 | 统计缓存 | GET | `/api/stats/cached` | 聚合统计缓存（6 类业务数据 + pool 指标） |
+| 仿真 | GET | `/api/sim/metrics` | 仿真引擎运行指标 |
+| 仿真 | POST | `/api/sim/batches` | 创建仿真批次（支持 mission 模板） |
+| 仿真 | GET | `/api/sim/instances` | 仿真实例列表 |
+| 仿真 | POST | `/api/sim/instances/:id/anomaly` | 单实例异常注入 |
+| 仿真 | WS | `/api/sim/stream` | 仿真实时事件流 |
+| 仿真 | GET | `/api/sim/stats` | 仿真统计看板数据（趋势/占比/学习曲线） |
+| 强化学习 | POST | `/api/sim/rl/start` | 启动 RL 训练 |
+| 强化学习 | GET | `/api/sim/rl/status` | 获取训练状态与指标 |
+| 强化学习 | GET | `/api/sim/rl/history` | 获取持久化训练历史 |
+| 强化学习 | GET | `/api/sim/rl/export-policy` | 导出策略摘要（实机部署参考） |
 
 ### 分页参数
 
@@ -317,23 +353,31 @@ project/
 │   │   ├── patrol.go               # AI 定时巡检（已接入 Pool 周期调度）
 │   │   ├── pool_integration.go     # 并发整合层（批写/节流/统计缓存/任务提交辅助）
 │   │   ├── taskpool_api.go         # 并发池指标 API（/api/taskpool/metrics）
+│   │   ├── simulation.go           # 仿真引擎 API（批次/实例/异常/RL）
+│   │   ├── sim_integration.go      # 仿真引擎与 DB/WS 集成
 │   │   └── wshub.go                # WebSocket 事件广播
 │   ├── llm/llm.go                  # LLM 大模型调用封装
 │   ├── amap/amap.go                # 高德地图 API 封装
 │   ├── middleware/                  # 中间件（认证、限流、日志）
 │   ├── monitor/monitor.go          # 系统指标采集
-│   └── syncengine/engine.go        # 数据同步引擎（18 张表）
+│   ├── syncengine/engine.go        # 数据同步引擎（18 张表）
+│   └── simulation/                 # 仿真与强化学习引擎
+│       ├── engine.go               # 多实例仿真引擎（批次管理+碰撞规避）
+│       ├── instance.go             # 单机仿真状态机与动作执行
+│       ├── rl.go                   # Q-learning 训练器与经验回放
+│       └── types.go                # 仿真核心数据结构与任务类型
 ├── web/
 │   ├── index.html                  # 系统首页
 │   ├── dashboard.html              # 仪表盘导航（含侧边栏滚动）
 │   ├── vnc.html / ssh.html         # VNC/SSH 客户端页面
-│   └── modules/                    # 20 个功能模块页面
+│   └── modules/                    # 22 个功能模块页面
 │       ├── drones.html / gps.html / battery.html / flight.html
 │       ├── noflyzone.html / cot.html / hardware.html / remote.html
 │       ├── video.html / monitor.html / alerts.html / logs.html
 │       ├── audio.html / updates.html / sync.html / performance.html
 │       ├── backup.html             # 备份与数据回滚管理
 │       ├── concurrency.html        # 并发任务监控仪表盘
+│       ├── simulation.html         # 仿真模拟引擎（地图 + RL）
 │       ├── ai-assistant.js         # 右下角 AI 智能助手浮窗
 │       ├── notification-bell.js    # 右上角消息通知铃铛
 │       └── common.js / common.css  # 公共工具函数和样式
@@ -410,7 +454,27 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 ## 版本更新
 
-### v3.4.0 (最新)
+### v3.5.0 (最新)
+
+- 新增仿真模拟引擎完整模块（`simulation.html` + `internal/simulation/*`）
+  - 支持批量创建/启动/停止/删除仿真批次与实例
+  - 支持异常注入（低电量/偏航/失联/温度异常）
+- 新增任务模板系统（巡逻/巡检/配送/测绘/搜救）
+  - 批次创建可按任务类型自动生成航点与任务描述
+  - 支持 mission 字段贯穿 Batch/Instance 配置
+- 新增防碰撞能力（`collisionAvoidanceLoop`）
+  - 运行中实例高频距离检测
+  - 自动航向/高度避让，降低近距离冲突风险
+- 新增仿真地图可视化（Leaflet）
+  - 实时显示无人机位置、航向、轨迹与航线
+  - 支持图例、状态统计、自动刷新
+- 强化学习训练链路增强（`internal/simulation/rl.go`）
+  - 动作真实作用到环境、真实 next state、动作相关奖励
+  - 训练批大小与平均奖励统计口径修正
+  - 训练历史持久化与前端展示
+- 新增 RL 策略导出接口：`/api/sim/rl/export-policy`
+
+### v3.4.0
 
 - 新增统一并发框架（`internal/taskpool/`）
   - Worker Pool 引擎：IO 16 线程 + CPU 4 线程、优先级队列、4 级优先级

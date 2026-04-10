@@ -209,6 +209,20 @@
         <a class="nav-sub-item" data-page="flight">航线规划</a>
         <a class="nav-sub-item" data-page="gps">GPS/位置信息</a>
       </div>
+      <div class="nav-group-header open" id="navSimAIGroup" onclick="toggleNavGroup(this)">
+        <span><span class="nav-group-icon"></span>仿真与智能决策</span>
+      </div>
+      <div class="nav-sub-list open" id="navSimAISub">
+        <a class="nav-sub-item" data-page="simulation">仿真模拟引擎</a>
+        <a class="nav-sub-item" data-page="cot">CoT 智能决策</a>
+      </div>
+      <div class="nav-group-header open" id="navOpsGroup" onclick="toggleNavGroup(this)">
+        <span><span class="nav-group-icon"></span>系统调度与运维</span>
+      </div>
+      <div class="nav-sub-list open" id="navOpsSub">
+        <a class="nav-sub-item" data-page="concurrency">并发任务监控</a>
+        <a class="nav-sub-item" data-page="backup">备份与数据回滚</a>
+      </div>
       <div class="nav-group-header open" id="navStatusGroup" onclick="toggleNavGroup(this)">
         <span><span class="nav-group-icon"></span>无人机状态监控</span>
       </div>
@@ -230,9 +244,6 @@
         <a class="nav-sub-item" data-page="logs">维护操作日志</a>
         <a class="nav-sub-item" data-page="sync">数据同步状态</a>
       </div>
-      <a class="nav-item" data-page="backup">备份与数据回滚</a>
-      <a class="nav-item" data-page="cot">CoT 智能决策</a>
-      <a class="nav-item" data-page="concurrency">并发任务监控</a>
       </div>
     </aside>
     <main class="main-content">

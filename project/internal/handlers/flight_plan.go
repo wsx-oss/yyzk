@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"smartcontrol/internal/amap"
 	"smartcontrol/internal/db"
 	"smartcontrol/internal/llm"
+	"smartcontrol/internal/taskpool"
 
 	"github.com/gin-gonic/gin"
 )
@@ -112,15 +114,30 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 	var planSource string
 	var reasoningError string
 
-	if client.Available() {
-		var err error
+	// callLLMPlan performs the actual LLM call (may be dispatched through pool)
+	callLLMPlan := func() {
+		if client.Available() {
+			var err error
 
-		if request.WithReasoning {
-			// 使用带思维链的规划
-			result, reasoningChain, err = client.GeneratePlanWithReasoning(request.PlanRequest)
-			if err != nil {
-				reasoningError = err.Error()
-				// 降级为普通规划
+			if request.WithReasoning {
+				result, reasoningChain, err = client.GeneratePlanWithReasoning(request.PlanRequest)
+				if err != nil {
+					reasoningError = err.Error()
+					result, err = client.GeneratePlan(request.PlanRequest)
+					if err != nil {
+						result = llm.GenerateFallbackPlan(request.PlanRequest)
+						result.Warnings = append(result.Warnings, llm.Warning{
+							Level:   "warning",
+							Message: "LLM调用失败，已降级为直线规划: " + err.Error(),
+						})
+						planSource = "fallback"
+					} else {
+						planSource = "llm"
+					}
+				} else {
+					planSource = "llm_with_reasoning"
+				}
+			} else {
 				result, err = client.GeneratePlan(request.PlanRequest)
 				if err != nil {
 					result = llm.GenerateFallbackPlan(request.PlanRequest)
@@ -132,26 +149,31 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 				} else {
 					planSource = "llm"
 				}
-			} else {
-				planSource = "llm_with_reasoning"
 			}
 		} else {
-			// 普通规划
-			result, err = client.GeneratePlan(request.PlanRequest)
-			if err != nil {
-				result = llm.GenerateFallbackPlan(request.PlanRequest)
-				result.Warnings = append(result.Warnings, llm.Warning{
-					Level:   "warning",
-					Message: "LLM调用失败，已降级为直线规划: " + err.Error(),
-				})
-				planSource = "fallback"
-			} else {
-				planSource = "llm"
-			}
+			result = llm.GenerateFallbackPlan(request.PlanRequest)
+			planSource = "fallback"
 		}
+	}
+
+	// Dispatch LLM call through the CPU pool if available, otherwise run inline
+	if PoolRef != nil {
+		done := make(chan struct{}, 1)
+		_ = PoolRef.Submit(taskpool.Task{
+			Name:     "flight:plan:llm",
+			Group:    "route_planning",
+			Priority: taskpool.PriorityHigh,
+			Mode:     taskpool.ModeCPU,
+			Timeout:  60 * time.Second,
+			Fn: func(ctx context.Context) error {
+				callLLMPlan()
+				close(done)
+				return nil
+			},
+		})
+		<-done
 	} else {
-		result = llm.GenerateFallbackPlan(request.PlanRequest)
-		planSource = "fallback"
+		callLLMPlan()
 	}
 
 	// Serialize for storage
