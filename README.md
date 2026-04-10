@@ -21,7 +21,7 @@
 - [快速开始](#快速开始)
 - [系统访问地址](#系统访问地址)
 - [环境变量配置](#环境变量配置)
-- [20大功能模块](#20大功能模块)
+- [21大功能模块](#21大功能模块)
 - [API接口文档](#api接口文档)
 - [项目结构](#项目结构)
 - [部署指南](#部署指南)
@@ -47,6 +47,7 @@ CloudControl 是一套面向企业级应用的综合性管控平台。
 - **安全防护**：CORS 跨域、SQL 注入防护、输入验证、Panic 自动恢复
 - **实时监控**：CPU/内存/磁盘/网络监控、WebSocket 实时推送、阈值自动告警
 - **智能能力**：LLM 航线规划 + NFZ 纠偏 + 多候选方案、CoT 思维链 AI 分析、智能巡检与通知中心
+- **并发框架**：统一 Worker Pool（IO/CPU 双池）、优先级调度、超时控制、panic 恢复、DB 批写、WS 节流、统计缓存
 
 ---
 
@@ -188,7 +189,7 @@ go run .
 
 ---
 
-## 20大功能模块
+## 21大功能模块
 
 | # | 模块名称 | 功能说明 |
 |---|----------|----------|
@@ -212,6 +213,7 @@ go run .
 | 18 | 备份与数据回滚 | 自动/手动备份、数据恢复与回滚、备份记录管理、恢复进度追踪、备份文件上传恢复 |
 | 19 | AI 智能助手 | 右下角浮窗、多轮对话、快捷指令、知识库问答、模块跳转、数据查询 |
 | 20 | 消息通知中心 | 右上角铃铛、未读计数、类型筛选、AI 定时巡检、点击跳转、批量已读 |
+| 21 | 并发任务监控 | 统一 Worker Pool 指标、IO/CPU 池状态、任务组分布、完成/失败趋势图、自动刷新 |
 
 ---
 
@@ -270,6 +272,8 @@ go run .
 | 通知 | POST | `/api/notifications/read-all` | 全部标记已读 |
 | AI助手 | POST | `/api/ai-assistant/chat` | AI 助手对话 |
 | AI助手 | GET | `/api/ai-assistant/suggestions` | 获取快捷指令建议 |
+| 并发池 | GET | `/api/taskpool/metrics` | 任务池指标快照（workers/队列/任务组统计） |
+| 统计缓存 | GET | `/api/stats/cached` | 聚合统计缓存（6 类业务数据 + pool 指标） |
 
 ### 分页参数
 
@@ -294,12 +298,15 @@ project/
 │   │   ├── db.go                   # 数据库连接、SQL 兼容层（AdaptSQL）、DB/Tx 包装器
 │   │   ├── migrate_mysql.go        # MySQL 建表 DDL
 │   │   └── migrate_sqlite.go       # SQLite 建表 DDL
-│   ├── handlers/                   # API 处理函数
+│   ├── taskpool/                    # 统一并发框架
+│   │   ├── pool.go                 # Worker Pool 引擎（IO/CPU 双池、优先级、超时、panic 恢复、周期调度、指标）
+│   │   └── batcher.go              # 辅助工具（WriteBatcher / Throttler / StatsCache）
+│   ├── handlers/                    # API 处理函数
 │   │   ├── api.go                  # 通用 API（设备、硬件、报警、日志、更新、同步等）
 │   │   ├── auth.go                 # 用户认证（注册/登录/登出/Token 验证）
 │   │   ├── drones.go               # 无人机管理
-│   │   ├── gps.go                  # GPS/位置信息
-│   │   ├── battery.go              # 电池监控
+│   │   ├── gps.go                  # GPS/位置信息（已接入批写 + WS 节流）
+│   │   ├── battery.go              # 电池监控（已接入批写 + WS 节流）
 │   │   ├── flight.go               # 飞行任务管理
 │   │   ├── flight_plan.go          # 智能航线规划（LLM + AMap）
 │   │   ├── noflyzone.go            # 禁飞区管理
@@ -307,7 +314,9 @@ project/
 │   │   ├── backup.go               # 备份与数据回滚（自动/手动/恢复/进度追踪）
 │   │   ├── ai_assistant.go         # AI 智能助手（多轮对话/知识库/快捷指令）
 │   │   ├── notification.go         # 消息通知中心
-│   │   ├── patrol.go               # AI 定时巡检（模拟机/日志/设备安全检查）
+│   │   ├── patrol.go               # AI 定时巡检（已接入 Pool 周期调度）
+│   │   ├── pool_integration.go     # 并发整合层（批写/节流/统计缓存/任务提交辅助）
+│   │   ├── taskpool_api.go         # 并发池指标 API（/api/taskpool/metrics）
 │   │   └── wshub.go                # WebSocket 事件广播
 │   ├── llm/llm.go                  # LLM 大模型调用封装
 │   ├── amap/amap.go                # 高德地图 API 封装
@@ -324,6 +333,7 @@ project/
 │       ├── video.html / monitor.html / alerts.html / logs.html
 │       ├── audio.html / updates.html / sync.html / performance.html
 │       ├── backup.html             # 备份与数据回滚管理
+│       ├── concurrency.html        # 并发任务监控仪表盘
 │       ├── ai-assistant.js         # 右下角 AI 智能助手浮窗
 │       ├── notification-bell.js    # 右上角消息通知铃铛
 │       └── common.js / common.css  # 公共工具函数和样式
@@ -400,7 +410,26 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 ## 版本更新
 
-### v3.3.0 (最新)
+### v3.4.0 (最新)
+
+- 新增统一并发框架（`internal/taskpool/`）
+  - Worker Pool 引擎：IO 16 线程 + CPU 4 线程、优先级队列、4 级优先级
+  - 每任务独立超时控制（默认 30s）+ panic recover + 故障计数
+  - 周期任务调度器（`SchedulePeriodic`）支持命名、替换、取消
+  - 全局 + 按组指标采集（提交/完成/失败/平均耗时/队列长度）
+- 新增辅助并发工具（`taskpool/batcher.go`）
+  - `WriteBatcher`：DB 高频写入批量化（GPS 50条/2s、电池 30条/3s）
+  - `Throttler`：WebSocket 推送节流（GPS 200ms、电池 500ms）
+  - `StatsCache`：6 类统计缓存异步刷新（10-15s）
+- 将后台任务接入 Pool 调度（替代原始 go func + ticker 模式）
+  - 阈值告警、离线检测、6 个 AI 巡检任务全部迁入 Pool
+- GPS/电池 handler 接入批量写入 + WS 节流
+- 新增并发监控前端页面（`concurrency.html`）
+  - 汇总卡片、Worker 池进度条、完成/失败趋势图、任务组环形图 + 详情表
+- 新增 API 端点：`/api/taskpool/metrics`、`/api/stats/cached`
+- 优雅关闭顺序：flush batchers → stop caches → shutdown pool → shutdown HTTP
+
+### v3.3.0
 
 - 飞行任务创建流程重构为两步向导（`flight.html`）
   - 第一步：航线规划（起终点、禁飞区、智能规划）
