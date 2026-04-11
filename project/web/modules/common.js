@@ -117,10 +117,10 @@ function createChart(canvas, config) {
 function showToast(message, type = "info") {
   const dark = document.documentElement.classList.contains('dark');
   const colors = dark ? {
-    success: { bg: 'rgba(39,195,70,0.15)', border: '#27c346', text: '#4cd964', icon: '✓' },
-    error:   { bg: 'rgba(247,105,101,0.15)', border: '#f76965', text: '#ff8784', icon: '✕' },
-    warning: { bg: 'rgba(255,154,46,0.15)', border: '#ff9a2e', text: '#ffb366', icon: '!' },
-    info:    { bg: 'rgba(60,126,255,0.15)', border: '#3c7eff', text: '#5b94ff', icon: 'ℹ' }
+    success: { bg: 'rgba(52,211,153,0.12)', border: '#34d399', text: '#5eead4', icon: '✓' },
+    error:   { bg: 'rgba(248,113,113,0.12)', border: '#f87171', text: '#fca5a5', icon: '✕' },
+    warning: { bg: 'rgba(251,191,36,0.12)', border: '#fbbf24', text: '#fcd34d', icon: '!' },
+    info:    { bg: 'rgba(60,140,255,0.12)', border: '#4e9fff', text: '#6db3ff', icon: 'ℹ' }
   } : {
     success: { bg: '#e8ffea', border: '#00b42a', text: '#00b42a', icon: '✓' },
     error:   { bg: '#ffece8', border: '#f53f3f', text: '#f53f3f', icon: '✕' },

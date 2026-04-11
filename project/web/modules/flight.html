@@ -30,6 +30,19 @@
     .phase-return { background: #fed7aa; color: #9a3412; }
     .phase-land { background: #d1fae5; color: #065f46; }
 
+    /* Dark mode overrides for flight status/phase badges */
+    html.dark .status-pending { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    html.dark .status-flying { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    html.dark .status-returning { background: rgba(251,191,36,0.12); color: #fcd34d; }
+    html.dark .status-completed { background: rgba(52,211,153,0.12); color: #6ee7b7; }
+    html.dark .phase-standby { background: rgba(100,140,200,0.1); color: rgba(160,185,225,0.7); }
+    html.dark .phase-takeoff { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    html.dark .phase-cruise { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    html.dark .phase-execute { background: rgba(251,191,36,0.12); color: #fcd34d; }
+    html.dark .phase-return { background: rgba(251,146,60,0.12); color: #fdba74; }
+    html.dark .phase-land { background: rgba(52,211,153,0.12); color: #6ee7b7; }
+    html.dark .mission-progress .progress-text { color: var(--cc-text-3); }
+
     /* Progress bar */
     .mission-progress { display: flex; align-items: center; gap: 8px; }
     .mission-progress .progress-bar { flex: 1; height: 10px; }
@@ -177,6 +190,9 @@
     .flight-status-cell { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
     .flight-status-cell .phase-badge { display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0; }
     .flight-status-cell .status-badge { display: inline-flex; align-items: center; justify-content: center; }
+    .flight-status-cell .status-badge::before { display: none; }
+    .flight-status-cell .phase-badge,
+    .flight-status-cell .status-badge { min-width: 56px; text-align: center; justify-content: center; }
 
     /* Real-time position card in detail modal */
     .realtime-card { margin-top: 18px; padding: 16px; background: linear-gradient(135deg, #f0f9ff, #f0fdf4); border-radius: 10px; border: 1px solid #e0f2fe; }
@@ -312,7 +328,7 @@
           <th>任务名称</th>
           <th>执行无人机</th>
           <th>任务目标</th>
-          <th>飞行状态</th>
+          <th style="text-align:center;">飞行状态</th>
           <th>当前位置</th>
           <th>进度</th>
           <th>创建时间</th>
