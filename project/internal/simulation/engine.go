@@ -766,6 +766,20 @@ func (e *Engine) GetAllTelemetry() []TelemetrySnapshot {
 	return result
 }
 
+// GetTelemetryForBatch returns current telemetry for running instances of a specific batch.
+func (e *Engine) GetTelemetryForBatch(batchID string) []TelemetrySnapshot {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	result := make([]TelemetrySnapshot, 0)
+	for _, inst := range e.instances {
+		if inst.State() == StateRunning && inst.config.BatchID == batchID {
+			result = append(result, inst.Telemetry())
+		}
+	}
+	return result
+}
+
 // collisionAvoidanceLoop runs a high-frequency check to prevent drone-drone collisions.
 // If two drones are within safeMinDist, it adjusts their headings and altitudes to diverge.
 func (e *Engine) collisionAvoidanceLoop() {

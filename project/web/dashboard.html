@@ -401,6 +401,13 @@
       background: var(--cc-bg-1);
     }
 
+    /* ===== Data Screen Fullscreen ===== */
+    body.ds-page-fullscreen .layout-navbar,
+    body.ds-page-fullscreen .layout-sidebar { display:none !important; }
+    body.ds-page-fullscreen .layout-content { margin-left:0 !important; padding-top:0 !important; }
+    body.ds-page-fullscreen .content-area { border-radius:0; }
+    body.ds-page-fullscreen iframe { border-radius:0; }
+
     /* ===== Animations ===== */
     @keyframes menuFadeIn {
       from { opacity: 0; transform: translateY(-4px); }
@@ -776,7 +783,7 @@
   <!-- ===== Content ===== -->
   <div class="layout-content" id="layoutContent">
     <div class="content-area">
-      <iframe id="contentFrame" src="/app/modules/drones.html"></iframe>
+      <iframe id="contentFrame" src="/app/modules/drones.html" allowfullscreen></iframe>
     </div>
   </div>
 
@@ -959,6 +966,17 @@
     iframe.addEventListener('load', function() {
       if (iframe.contentWindow) {
         iframe.contentWindow.postMessage({ type: 'cc-theme-change', dark: isDark() }, '*');
+      }
+    });
+
+    // Data screen fullscreen toggle from iframe — instant switch
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'ds-fullscreen') {
+        if (e.data.enter) {
+          document.body.classList.add('ds-page-fullscreen');
+        } else {
+          document.body.classList.remove('ds-page-fullscreen');
+        }
       }
     });
   </script>

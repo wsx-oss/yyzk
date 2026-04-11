@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="curve-utils.js"></script>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
 :root { --primary: var(--cc-primary, #165dff); --primary-light: var(--cc-primary-hover, #4080ff); --success: var(--cc-success, #00b42a); --warning: var(--cc-warning, #ff7d00); --danger: var(--cc-danger, #f53f3f); --info: var(--cc-info, #165dff); --bg: var(--cc-bg-1, #f7f8fa); --card: var(--cc-bg-2, #ffffff); --border: var(--cc-border, #e5e6eb); --text: var(--cc-text-1, #1d2129); --text-dim: var(--cc-text-3, #86909c); }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: var(--cc-font, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif); background: var(--bg); color: var(--text); min-height:100vh; }
@@ -125,6 +126,356 @@ tr:hover { background:var(--cc-primary-light, #e8f3ff); }
 .evt-time { font-size:11px; color:var(--text-dim); white-space:nowrap; }
 .evt-time .date { opacity:0.6; }
 @media(max-width:900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } .form-row { grid-template-columns:1fr; } #simMap { height:350px; } .event-scroll-container { max-height:300px; } }
+
+/* ============================================ */
+/*  DATA SCREEN — 科技感大屏样式                */
+/* ============================================ */
+#panel-datascreen { padding:0 !important; }
+#panel-datascreen .content { padding:0; }
+/* Fullscreen mode */
+body.ds-fullscreen { overflow:hidden !important; }
+body.ds-fullscreen .header,
+body.ds-fullscreen #mainTabs,
+body.ds-fullscreen .content > .panel:not(#panel-datascreen) { display:none !important; }
+body.ds-fullscreen .content { padding:0 !important; margin:0 !important; }
+body.ds-fullscreen #panel-datascreen { position:fixed; inset:0; z-index:9999; display:block !important; }
+body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:100vh; }
+.ds-container {
+  width:100%; height:calc(100vh - 100px); min-height:0;
+  background: radial-gradient(ellipse at 50% 0%, #0a1628 0%, #040b18 100%);
+  display:flex; flex-direction:column; overflow:hidden; position:relative; color:#e2e8f0;
+  font-family: 'Noto Sans SC', 'Segoe UI', sans-serif;
+}
+/* Animated grid background */
+.ds-container::before {
+  content:''; position:absolute; inset:0; z-index:0; opacity:0.05; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(5,232,254,0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(5,232,254,0.3) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ---- HEADER ---- */
+.ds-header {
+  position:relative; z-index:2; display:flex; align-items:center; justify-content:space-between; height:52px; padding:0 20px;
+  background:linear-gradient(180deg, rgba(5,30,61,0.95) 0%, rgba(4,11,24,0.85) 100%);
+  border-bottom:2px solid transparent;
+  border-image:linear-gradient(90deg, transparent 5%, rgba(5,232,254,0.6) 30%, rgba(5,232,254,0.8) 50%, rgba(5,232,254,0.6) 70%, transparent 95%) 1;
+}
+.ds-header-lf { position:relative; z-index:2; display:flex; align-items:center; }
+.ds-header-ri { position:relative; z-index:2; display:flex; align-items:center; gap:14px; white-space:nowrap; }
+.ds-header-ct {
+  position:absolute; left:0; right:0; top:0; bottom:0; z-index:1;
+  display:flex; align-items:center; justify-content:center; gap:0;
+  pointer-events:none;
+}
+.ds-header-ct > * { pointer-events:auto; }
+.ds-header-title {
+  font-family:'Orbitron','Noto Sans SC',sans-serif; font-size:24px; font-weight:900; letter-spacing:6px;
+  background:linear-gradient(90deg,#05e8fe 0%,#38bdf8 30%,#a5f3fc 50%,#38bdf8 70%,#05e8fe 100%);
+  background-size:200% 100%;
+  background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+  animation:dsTitleShimmer 4s linear infinite;
+  filter:drop-shadow(0 0 14px rgba(5,232,254,0.4)) drop-shadow(0 0 30px rgba(5,232,254,0.15));
+  position:relative;
+}
+.ds-header-title::after {
+  content:''; position:absolute; bottom:-2px; left:10%; right:10%;
+  height:2px;
+  background:linear-gradient(90deg, transparent, rgba(5,232,254,0.6), transparent);
+}
+@keyframes dsTitleShimmer { 0%{background-position:200% 50%;} 100%{background-position:-200% 50%;} }
+.ds-header-warning {
+  display:inline-flex; align-items:center; margin-left:18px; vertical-align:middle;
+  font-size:12px; font-weight:600; color:#22c55e; background:rgba(34,197,94,0.08);
+  padding:4px 16px; border-radius:20px;
+  border:1px solid rgba(34,197,94,0.25);
+  letter-spacing:1px; white-space:nowrap;
+  font-family:'Noto Sans SC',sans-serif;
+  text-shadow:0 0 8px rgba(34,197,94,0.25);
+  backdrop-filter:blur(4px);
+}
+.ds-header-btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:7px 22px; font-size:13px; font-weight:700; color:#29fcff;
+  cursor:pointer; border:1px solid rgba(41,252,255,0.35); border-radius:4px;
+  background:linear-gradient(180deg,rgba(5,60,100,0.5),rgba(4,11,24,0.7));
+  transition:all .25s; letter-spacing:2px;
+  font-family:'Noto Sans SC',sans-serif;
+  text-shadow:0 0 8px rgba(5,232,254,0.3);
+}
+.ds-header-btn:hover { background:rgba(5,232,254,0.18); border-color:#05e8fe; box-shadow:0 0 20px rgba(5,232,254,0.25),inset 0 0 12px rgba(5,232,254,0.08); transform:translateY(-1px); }
+.ds-header-time {
+  font-size:14px; color:#7ec7ff; white-space:nowrap; letter-spacing:1px;
+  font-family:'Orbitron','Noto Sans SC',sans-serif; font-weight:500;
+  text-shadow:0 0 6px rgba(126,199,255,0.3);
+}
+
+/* ---- MAIN 3-COLUMN LAYOUT ---- */
+.ds-main {
+  position:relative; z-index:1; flex:1; display:flex; padding:10px 16px 8px; gap:10px; overflow:hidden; min-height:0;
+}
+.ds-col { display:flex; flex-direction:column; gap:8px; }
+.ds-col-lf, .ds-col-rg { width:300px; min-width:260px; }
+.ds-col-ct { flex:1; display:flex; flex-direction:column; gap:8px; }
+
+/* ---- PANEL CARD ---- */
+.ds-panel {
+  position:relative; border:1px solid rgba(5,232,254,0.12); border-radius:8px; overflow:hidden;
+  background:linear-gradient(160deg,rgba(6,30,61,0.65) 0%,rgba(4,11,24,0.88) 100%);
+  backdrop-filter:blur(12px);
+  box-shadow:0 0 20px rgba(5,232,254,0.04), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+/* Corner decorations */
+.ds-panel::before, .ds-panel::after {
+  content:''; position:absolute; width:14px; height:14px; z-index:2; pointer-events:none;
+}
+.ds-panel::before {
+  top:-1px; left:-1px; border-top:2px solid #05e8fe; border-left:2px solid #05e8fe; border-radius:4px 0 0 0;
+  box-shadow:-2px -2px 8px rgba(5,232,254,0.15);
+}
+.ds-panel::after {
+  bottom:-1px; right:-1px; border-bottom:2px solid rgba(5,232,254,0.6); border-right:2px solid rgba(5,232,254,0.6); border-radius:0 0 4px 0;
+  box-shadow:2px 2px 8px rgba(5,232,254,0.1);
+}
+.ds-panel-title {
+  padding:6px 12px 3px; position:relative; z-index:1;
+  display:flex; align-items:center; gap:8px;
+}
+.ds-panel-title span {
+  font-size:15px; font-weight:700; letter-spacing:2px;
+  background:linear-gradient(90deg,#ffffff,#a5f3fc);
+  background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+  font-family:'Noto Sans SC',sans-serif;
+  text-shadow:none;
+  filter:drop-shadow(0 0 4px rgba(5,232,254,0.2));
+}
+.ds-title-line {
+  flex:1; height:1px; margin-top:2px;
+  background:linear-gradient(90deg,#05e8fe,rgba(5,232,254,0.3),transparent);
+}
+.ds-panel-body { padding:6px 12px 8px; position:relative; flex:1; min-height:0; overflow:hidden; }
+
+/* Panel height proportions — use flex to fill available space */
+.ds-col-lf, .ds-col-rg { overflow-y:auto; overflow-x:hidden; }
+.ds-col-lf::-webkit-scrollbar, .ds-col-rg::-webkit-scrollbar { width:4px; }
+.ds-col-lf::-webkit-scrollbar-thumb, .ds-col-rg::-webkit-scrollbar-thumb { background:rgba(5,232,254,0.2); border-radius:3px; }
+.ds-col-lf::-webkit-scrollbar-track, .ds-col-rg::-webkit-scrollbar-track { background:transparent; }
+.ds-panel-lt { flex:3.7; min-height:200px; }
+.ds-panel-lc { flex:3; min-height:200px; }
+.ds-panel-lb { flex:2.7; min-height:180px; }
+.ds-panel-rt { flex:3.7; min-height:200px; display:flex; flex-direction:column; }
+.ds-panel-rc { flex:3; min-height:200px; }
+.ds-panel-rb { flex:2.7; min-height:180px; }
+
+/* ---- MAP AREA ---- */
+.ds-map-area {
+  flex:1; position:relative; border:1px solid rgba(5,232,254,0.12); border-radius:8px; overflow:hidden;
+  background:rgba(4,11,24,0.6);
+  box-shadow:0 0 30px rgba(5,232,254,0.06);
+  min-height:0;
+}
+/* Batch jump buttons bar */
+.ds-batch-bar {
+  position:absolute; bottom:36px; left:14px; right:14px; z-index:999;
+  display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+}
+.ds-batch-bar .ds-batch-btn {
+  padding:3px 12px; font-size:11px; font-weight:600; color:#fff; border:none;
+  border-radius:14px; cursor:pointer; white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,0.3); transition:transform .15s, box-shadow .15s;
+  font-family:'Noto Sans SC',sans-serif;
+}
+.ds-batch-bar .ds-batch-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+.ds-map-area #simMap { width:100%; height:100%; border-radius:0; border:none; }
+.ds-map-overlay-title {
+  position:absolute; top:10px; left:14px; z-index:999; font-size:14px; color:#fff;
+  background:linear-gradient(90deg,rgba(5,232,254,0.3),rgba(5,232,254,0.05),transparent);
+  padding:5px 20px 5px 12px; border-radius:4px; letter-spacing:4px; font-weight:700;
+  border-left:3px solid #05e8fe;
+  font-family:'Noto Sans SC',sans-serif;
+  text-shadow:0 0 10px rgba(5,232,254,0.3), 0 1px 2px rgba(0,0,0,0.5);
+}
+.ds-map-toolbar {
+  position:absolute; top:10px; right:14px; z-index:999; display:flex; gap:12px; align-items:center;
+  background:rgba(4,11,24,0.6); padding:4px 12px; border-radius:4px;
+  border:1px solid rgba(5,232,254,0.1);
+}
+.ds-map-opt {
+  display:flex; align-items:center; gap:4px; font-size:11px; color:#7ec7ff; cursor:pointer;
+  font-weight:500; letter-spacing:0.5px;
+}
+.ds-map-opt input { width:13px; height:13px; accent-color:#05e8fe; }
+.ds-map-legend {
+  position:absolute; bottom:8px; left:14px; z-index:999; display:flex; gap:14px;
+  font-size:11px; color:rgba(255,255,255,0.65); font-weight:500;
+  background:rgba(4,11,24,0.5); padding:4px 12px; border-radius:4px;
+}
+.ds-map-legend .dot { width:8px; height:8px; border-radius:50%; display:inline-block; vertical-align:middle; margin-right:4px; }
+
+/* ---- CENTER BOTTOM CHART ---- */
+.ds-panel-cb { flex:0 0 200px; min-height:160px; }
+
+/* ---- REAL-TIME STAT COUNTERS ---- */
+.ds-total-row { position:relative; text-align:right; padding:4px 6px 0; }
+.ds-expect {
+  font-size:12px; color:rgba(255,255,255,0.5); letter-spacing:1px;
+}
+.ds-expect i {
+  font-style:normal; color:#ff8100; font-weight:900; font-size:14px;
+  text-shadow:0 0 6px rgba(255,129,0,0.3);
+}
+.ds-actual { display:flex; justify-content:flex-end; gap:3px; margin-top:6px; }
+.ds-digit {
+  display:flex; align-items:center; justify-content:center; width:34px; height:42px;
+  font-family:'Orbitron',monospace; font-size:24px; font-weight:700; color:#66ffff;
+  background:linear-gradient(180deg,rgba(5,232,254,0.12),rgba(5,30,61,0.5));
+  border:1px solid rgba(5,232,254,0.35); border-radius:4px;
+  text-shadow:0 0 10px rgba(102,255,255,0.4);
+  box-shadow:0 0 8px rgba(5,232,254,0.1);
+}
+.ds-digit:last-child {
+  font-family:'Noto Sans SC',sans-serif; font-size:13px; width:26px; color:#7ec7ff;
+  text-shadow:none;
+}
+/* Liquid fill animation */
+.ds-liquid-chart { display:flex; justify-content:center; align-items:center; flex:1; padding:4px 0; }
+.ds-liquid-ring {
+  width:130px; height:130px; border-radius:50%; position:relative;
+  border:2px solid #31d8d5; box-shadow:0 0 24px rgba(49,216,213,0.25), 0 0 60px rgba(49,216,213,0.08);
+  background: radial-gradient(circle, transparent 54%, rgba(49,216,213,0.08) 55%, transparent 70%);
+  animation:dsRingPulse 4s ease-in-out infinite;
+}
+@keyframes dsRingPulse { 0%,100%{box-shadow:0 0 24px rgba(49,216,213,0.25);} 50%{box-shadow:0 0 36px rgba(49,216,213,0.4);} }
+.ds-liquid-inner {
+  position:absolute; inset:6px; border-radius:50%; overflow:hidden;
+  background:radial-gradient(circle at 50% 50%, #0D2648 0%, #0D2648 80%, #228E7D 100%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.ds-liquid-pct {
+  font-family:'Orbitron',monospace; font-size:22px; font-weight:900; color:#fff; z-index:2; position:relative;
+  text-shadow:0 0 12px rgba(255,255,255,0.3);
+}
+.ds-liquid-label {
+  font-size:11px; color:rgba(255,255,255,0.7); z-index:2; position:relative;
+  letter-spacing:3px; font-weight:500;
+}
+.ds-liquid-wave {
+  position:absolute; bottom:0; left:-10%; width:120%; height:0%; transition:height 1s ease;
+  background:linear-gradient(180deg, rgba(53,250,182,0.6), rgba(40,209,247,0.2));
+  border-radius:40% 40% 0 0;
+  animation:dsWave 3s ease-in-out infinite;
+}
+@keyframes dsWave { 0%,100%{border-radius:42% 38% 0 0;} 50%{border-radius:38% 42% 0 0;} }
+
+/* ---- BATTERY BAR ---- */
+.ds-bat-header { display:flex; justify-content:space-around; margin-bottom:8px; }
+.ds-bat-item { text-align:center; }
+.ds-bat-item .num { font-family:'Orbitron',monospace; font-size:18px; font-weight:700; text-shadow:0 0 6px currentColor; }
+.ds-bat-item .lbl { font-size:10px; color:rgba(255,255,255,0.45); letter-spacing:0.5px; margin-top:2px; }
+.ds-bat-bar-wrap { flex:1; position:relative; min-height:0; }
+
+/* ---- RANKING ---- */
+.ds-ranking-header {
+  display:flex; height:26px; line-height:26px; margin-bottom:6px; padding:0 10px;
+  background:linear-gradient(90deg,rgba(5,232,254,0.12),transparent);
+  border-radius:4px; font-size:11px; font-weight:700; color:#7ec7ff;
+  letter-spacing:1px;
+}
+.ds-ranking-header span { flex:1; text-align:center; }
+.ds-ranking-header span:first-child { flex:0 0 36px; text-align:center; }
+.ds-ranking-header span:nth-child(2) { flex:1; text-align:left; padding-left:4px; }
+.ds-ranking-header span:last-child { flex:0 0 70px; text-align:right; }
+/* Right-top panel body: flex column so rank list fills remaining space */
+.ds-panel-rt .ds-panel-body { display:flex; flex-direction:column; }
+/* Scrollable ranking list with prominent draggable slider */
+.ds-rank-list {
+  list-style:none; margin:0; padding:0; overflow-y:scroll; flex:1; min-height:0; position:relative;
+  scrollbar-width:thin; scrollbar-color:rgba(5,232,254,0.6) rgba(5,232,254,0.08);
+}
+.ds-rank-list::-webkit-scrollbar { width:10px; }
+.ds-rank-list::-webkit-scrollbar-thumb {
+  background:linear-gradient(180deg,#05e8fe,#0a7fd4);
+  border-radius:5px; border:1px solid rgba(5,232,254,0.25);
+  box-shadow:0 0 6px rgba(5,232,254,0.35);
+}
+.ds-rank-list::-webkit-scrollbar-thumb:hover {
+  background:linear-gradient(180deg,#33f0ff,#1a9de8);
+  box-shadow:0 0 10px rgba(5,232,254,0.55);
+}
+.ds-rank-list::-webkit-scrollbar-thumb:active {
+  background:linear-gradient(180deg,#66f5ff,#2ab5ff);
+  box-shadow:0 0 14px rgba(5,232,254,0.7);
+}
+.ds-rank-list::-webkit-scrollbar-track {
+  background:rgba(5,232,254,0.08); border-radius:5px;
+  border:1px solid rgba(5,232,254,0.1);
+}
+.ds-rank-list-inner {
+  display:flex; flex-direction:column;
+}
+@keyframes dsRankScroll {
+  0% { transform:translateY(0); }
+  100% { transform:translateY(-50%); }
+}
+.ds-rank-item {
+  display:flex; align-items:center; padding:5px 10px; gap:8px;
+  border-bottom:1px solid rgba(5,232,254,0.04);
+  transition:background 0.2s;
+}
+.ds-rank-item:hover { background:rgba(5,232,254,0.06); }
+.ds-rank-idx {
+  flex:0 0 26px; height:26px; line-height:26px; text-align:center;
+  font-size:12px; font-weight:800; border-radius:6px;
+  font-family:'Orbitron',sans-serif;
+}
+.ds-rank-idx.top1 { background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#1a1a2e; box-shadow:0 0 10px rgba(251,191,36,0.3); }
+.ds-rank-idx.top2 { background:linear-gradient(135deg,#94a3b8,#64748b); color:#fff; }
+.ds-rank-idx.top3 { background:linear-gradient(135deg,#d97706,#b45309); color:#fff; }
+.ds-rank-idx.normal { background:rgba(5,232,254,0.08); color:#7ec7ff; }
+.ds-rank-name { flex:1; font-size:11px; color:#cbd5e1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:'Noto Sans SC',sans-serif; }
+.ds-rank-bar-wrap { flex:0 0 90px; height:14px; background:rgba(255,255,255,0.04); border-radius:7px; overflow:hidden; position:relative; }
+.ds-rank-bar {
+  height:100%; border-radius:7px; transition:width 0.8s ease;
+  position:relative; overflow:hidden;
+}
+.ds-rank-bar::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+  animation:dsBarShine 2s ease-in-out infinite;
+}
+@keyframes dsBarShine { 0%,100%{transform:translateX(-100%);} 50%{transform:translateX(100%);} }
+.ds-rank-pct { flex:0 0 40px; text-align:right; font-size:12px; font-weight:700; font-family:'Orbitron',sans-serif; }
+
+/* ---- BATCH FILTER BAR ---- */
+.ds-filter-bar {
+  position:relative; z-index:2; display:flex; align-items:center; gap:8px;
+  padding:4px 20px; height:32px;
+  background:linear-gradient(90deg, rgba(5,30,61,0.6) 0%, rgba(4,11,24,0.4) 100%);
+  border-bottom:1px solid rgba(5,232,254,0.1);
+  font-family:'Noto Sans SC',sans-serif;
+}
+.ds-filter-label {
+  font-size:11px; color:rgba(126,199,255,0.6); letter-spacing:1px; white-space:nowrap;
+}
+.ds-filter-btn {
+  padding:3px 14px; font-size:11px; font-weight:600; color:#7ec7ff;
+  background:rgba(5,232,254,0.06); border:1px solid rgba(5,232,254,0.15);
+  border-radius:14px; cursor:pointer; transition:all 0.2s; white-space:nowrap;
+  font-family:'Noto Sans SC',sans-serif; letter-spacing:0.5px;
+}
+.ds-filter-btn:hover { background:rgba(5,232,254,0.12); border-color:rgba(5,232,254,0.3); }
+.ds-filter-btn.active {
+  background:linear-gradient(135deg,rgba(5,232,254,0.2),rgba(56,189,248,0.15));
+  border-color:#05e8fe; color:#05e8fe;
+  box-shadow:0 0 10px rgba(5,232,254,0.15), inset 0 0 8px rgba(5,232,254,0.05);
+}
+
+/* ---- Responsive ---- */
+@media(max-width:1200px) {
+  .ds-col-lf, .ds-col-rg { width:240px; min-width:200px; }
+  .ds-header-title { font-size:20px; letter-spacing:4px; }
+}
 </style>
 </head>
 <body>
@@ -139,15 +490,14 @@ tr:hover { background:var(--cc-primary-light, #e8f3ff); }
   </div>
 </div>
 
-<div class="tabs">
+<div class="tabs" id="mainTabs">
   <div class="tab active" onclick="switchTab('overview')">📊 总览</div>
   <div class="tab" onclick="switchTab('batches')">📦 批次管理</div>
   <div class="tab" onclick="switchTab('instances')">🛩️ 实例管理</div>
+  <div class="tab" onclick="switchTab('rl')">🧠 强化学习</div>
+  <div class="tab" onclick="switchTab('datascreen')">&#x1F4CA; 数据大屏</div>
   <div class="tab" onclick="switchTab('anomaly')">⚠️ 异常注入</div>
   <div class="tab" onclick="switchTab('events')">📋 事件日志 <span class="anomaly-count-badge hidden" id="anomalyCountBadge">0</span></div>
-  <div class="tab" onclick="switchTab('map')">🗺️ 仿真地图</div>
-  <div class="tab" onclick="switchTab('analytics')">📈 数据看板</div>
-  <div class="tab" onclick="switchTab('rl')">🧠 强化学习</div>
 </div>
 
 <div class="content">
@@ -311,89 +661,143 @@ tr:hover { background:var(--cc-primary-light, #e8f3ff); }
     </div>
   </div>
 
-  <!-- Map Panel -->
-  <div class="panel" id="panel-map">
-    <div class="toolbar">
-      <button class="btn btn-outline" onclick="refreshMap()">🔄 刷新地图</button>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
-        <input type="checkbox" id="mapAutoRefresh" checked> 自动刷新(2s)
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
-        <input type="checkbox" id="mapShowRoutes" checked> 显示航线
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
-        <input type="checkbox" id="mapShowLabels" checked> 显示标签
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
-        <input type="checkbox" id="mapShowZones" onchange="toggleBatchZones()"> 显示批次范围
-      </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
-        <input type="checkbox" id="mapUseCurve" checked> 曲线轨迹
-      </label>
-      <span id="mapDroneCount" style="margin-left:auto;font-size:13px;color:var(--text-dim);"></span>
-    </div>
-    <div id="mapBatchButtons" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 12px;background:rgba(0,0,0,0.2);border-bottom:1px solid rgba(255,255,255,0.06);min-height:36px;align-items:center;">
-      <span style="font-size:12px;color:var(--text-dim);margin-right:4px;">🚫 批次禁飞区:</span>
-      <span id="mapBatchBtnList" style="display:flex;flex-wrap:wrap;gap:6px;"></span>
-    </div>
-    <div id="simMap"></div>
-    <div class="map-legend" id="mapLegend">
-      <span style="color:var(--text-dim);">各批次以不同颜色标识 ·</span>
-      <span><span class="dot" style="background:#ef4444;box-shadow:0 0 6px #ef4444;"></span> 异常告警</span>
-      <span>── 航迹  ▲ 机头方向</span>
-      <span id="mapBatchLegend"></span>
-    </div>
-    <div id="mapInfoPanel" style="margin-top:12px;"></div>
-  </div>
+  <!-- Data Screen Panel (merged map + analytics) -->
+  <div class="panel" id="panel-datascreen">
+    <!-- Hidden map controls for JS compatibility -->
+    <input type="checkbox" id="mapAutoRefresh" checked style="display:none;">
+    <input type="checkbox" id="mapShowRoutes" checked style="display:none;">
+    <input type="checkbox" id="mapShowLabels" checked style="display:none;">
+    <input type="checkbox" id="mapShowZones" style="display:none;">
+    <input type="checkbox" id="mapUseCurve" checked style="display:none;">
+    <input type="checkbox" id="analyticsAutoRefresh" checked style="display:none;">
 
-  <!-- Analytics Panel -->
-  <div class="panel" id="panel-analytics">
-    <div class="toolbar">
-      <button class="btn btn-outline" onclick="loadSimStats(true)">🔄 刷新看板</button>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
-        <input type="checkbox" id="analyticsAutoRefresh" checked> 自动刷新(5s)
-      </label>
-      <span id="analyticsTime" style="margin-left:auto;font-size:12px;color:var(--text-dim);"></span>
-    </div>
-
-    <div class="grid-4" id="analyticsStats"></div>
-
-    <div class="grid-2" style="margin-top:16px;">
-      <div class="card chart-card">
-        <div class="card-title">📊 运行趋势图（分钟）</div>
-        <canvas id="chartRunningTrend"></canvas>
+    <div class="ds-container">
+      <!-- ===== HEADER ===== -->
+      <div class="ds-header">
+        <div class="ds-header-lf">
+          <span class="ds-header-btn" onclick="switchTab('overview')">&#x2190; 返回总览</span>
+        </div>
+        <div class="ds-header-ct">
+          <div class="ds-header-title">无人机仿真可视化数据大屏</div>
+          <div class="ds-header-warning" id="dsWarningBar">&#x2714; 平台运行正常</div>
+        </div>
+        <div class="ds-header-ri">
+          <span class="ds-header-btn ds-header-btn-r" onclick="loadDataScreen(true)">&#x21BB; 刷新数据</span>
+          <span class="ds-header-time" id="dsHeaderTime"></span>
+        </div>
       </div>
-      <div class="card chart-card">
-        <div class="card-title">⚠️ 异常统计图（分钟）</div>
-        <canvas id="chartAnomalyTrend"></canvas>
-      </div>
-    </div>
 
-    <!-- Battery dedicated section (TODO-10) -->
-    <div class="card" style="margin-top:16px;padding:16px 20px 8px;">
-      <div class="card-title">🔋 模拟机电量专区</div>
-      <div class="grid-4" id="batteryStatCards" style="margin-bottom:14px;"></div>
-      <div class="grid-2" style="margin-bottom:4px;">
-        <div class="chart-card" style="padding:12px;"><div class="card-title" style="font-size:13px;">电量实时排行</div><div style="height:220px;position:relative;"><canvas id="chartBatteryRanking"></canvas></div></div>
-        <div class="chart-card" style="padding:12px;"><div class="card-title" style="font-size:13px;">电量分布</div><div style="height:220px;position:relative;"><canvas id="chartBatteryDist"></canvas></div></div>
+      <!-- ===== BATCH FILTER BAR ===== -->
+      <div class="ds-filter-bar" id="dsFilterBar">
+        <span class="ds-filter-label">数据筛选：</span>
+        <button class="ds-filter-btn active" data-batch="" onclick="selectDsBatch(this,'')">全部批次</button>
+        <span id="dsFilterBtns"></span>
       </div>
-    </div>
 
-    <div class="grid-2" style="margin-top:16px;">
-      <div class="card chart-card">
-        <div class="card-title">🔋 电池风险图（低电占比）</div>
-        <canvas id="chartBatteryRisk"></canvas>
-      </div>
-      <div class="card chart-card">
-        <div class="card-title">🧭 任务分类占比图</div>
-        <canvas id="chartMissionPie"></canvas>
-      </div>
-    </div>
+      <!-- ===== MAIN BODY: LEFT / CENTER / RIGHT ===== -->
+      <div class="ds-main">
+        <!-- LEFT COLUMN -->
+        <div class="ds-col ds-col-lf">
+          <!-- Real-time Stats -->
+          <div class="ds-panel ds-panel-lt">
+            <div class="ds-panel-title"><span>实时仿真统计</span><div class="ds-title-line"></div></div>
+            <div class="ds-panel-body">
+              <div class="ds-total-row" id="dsTotalRow">
+                <div class="ds-expect">总模拟机容量 <i>500</i> 台</div>
+                <div class="ds-actual" id="dsActualTotal"></div>
+              </div>
+              <div class="ds-liquid-chart">
+                <div class="ds-liquid-ring" id="dsLiquidRing">
+                  <div class="ds-liquid-inner" id="dsLiquidInner">
+                    <div class="ds-liquid-pct" id="dsLiquidPct">0%</div>
+                    <div class="ds-liquid-label">在线率</div>
+                    <div class="ds-liquid-wave" id="dsLiquidWave"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Battery Distribution -->
+          <div class="ds-panel ds-panel-lc">
+            <div class="ds-panel-title"><span>电量分布</span><div class="ds-title-line"></div></div>
+            <div class="ds-panel-body">
+              <div class="ds-bat-header" id="dsBatHeader"></div>
+              <div class="ds-bat-bar-wrap">
+                <canvas id="chartBatteryDist" style="width:100%;height:100%;"></canvas>
+              </div>
+            </div>
+          </div>
+          <!-- Mission Pie -->
+          <div class="ds-panel ds-panel-lb">
+            <div class="ds-panel-title"><span>任务分类占比</span><div class="ds-title-line"></div></div>
+            <div class="ds-panel-body">
+              <canvas id="chartMissionPie" style="width:100%;height:100%;"></canvas>
+            </div>
+          </div>
+        </div>
 
-    <div class="card chart-card" style="margin-top:16px;">
-      <div class="card-title">🧠 策略学习曲线（奖励 + ε）</div>
-      <canvas id="chartRLCurve"></canvas>
+        <!-- CENTER COLUMN -->
+        <div class="ds-col ds-col-ct">
+          <!-- Map area -->
+          <div class="ds-map-area">
+            <div class="ds-map-overlay-title">仿真实时态势地图</div>
+            <div class="ds-map-toolbar">
+              <label class="ds-map-opt"><input type="checkbox" id="dsMapShowRoutes" checked onchange="document.getElementById('mapShowRoutes').checked=this.checked;refreshMap();"> 航线</label>
+              <label class="ds-map-opt"><input type="checkbox" id="dsMapShowLabels" checked onchange="document.getElementById('mapShowLabels').checked=this.checked;refreshMap();"> 标签</label>
+              <label class="ds-map-opt"><input type="checkbox" id="dsMapCurve" checked onchange="document.getElementById('mapUseCurve').checked=this.checked;refreshMap();"> 曲线</label>
+              <span id="mapDroneCount" style="margin-left:auto;font-size:11px;color:#7ec7ff;"></span>
+            </div>
+            <div id="simMap"></div>
+            <div class="ds-batch-bar" id="dsBatchBar"></div>
+            <div class="ds-map-legend" id="mapLegend">
+              <span><span class="dot" style="background:#ef4444;box-shadow:0 0 6px #ef4444;"></span> 异常</span>
+              <span>── 航迹</span>
+              <span id="mapBatchLegend"></span>
+            </div>
+          </div>
+          <!-- Bottom chart: Running trend -->
+          <div class="ds-panel ds-panel-cb">
+            <div class="ds-panel-title"><span>运行趋势与异常统计（分钟级）</span><div class="ds-title-line"></div></div>
+            <div class="ds-panel-body" style="display:flex;gap:8px;">
+              <div style="flex:1;position:relative;"><canvas id="chartRunningTrend"></canvas></div>
+              <div style="flex:1;position:relative;"><canvas id="chartAnomalyTrend"></canvas></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="ds-col ds-col-rg">
+          <!-- Drone Ranking -->
+          <div class="ds-panel ds-panel-rt">
+            <div class="ds-panel-title"><span>电量实时排行</span><div class="ds-title-line"></div></div>
+            <div class="ds-panel-body">
+              <div class="ds-ranking-header"><span>#</span><span>设备</span><span>电量</span></div>
+              <ul class="ds-rank-list" id="dsRankList"></ul>
+            </div>
+          </div>
+          <!-- Battery Risk -->
+          <div class="ds-panel ds-panel-rc">
+            <div class="ds-panel-title"><span>电池风险趋势</span><div class="ds-title-line"></div></div>
+            <div class="ds-panel-body">
+              <canvas id="chartBatteryRisk" style="width:100%;height:100%;"></canvas>
+            </div>
+          </div>
+          <!-- RL Curve -->
+          <div class="ds-panel ds-panel-rb">
+            <div class="ds-panel-title"><span>策略学习曲线</span><div class="ds-title-line"></div></div>
+            <div class="ds-panel-body">
+              <canvas id="chartRLCurve" style="width:100%;height:100%;"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+    <!-- hidden elements for map batch buttons compat -->
+    <div id="mapBatchButtons" style="display:none;"><span id="mapBatchBtnList"></span></div>
+    <div id="mapInfoPanel" style="display:none;"></div>
+    <div id="analyticsStats" style="display:none;"></div>
+    <div id="batteryStatCards" style="display:none;"></div>
+    <span id="analyticsTime" style="display:none;"></span>
   </div>
 
   <!-- RL Panel -->
@@ -522,14 +926,135 @@ const API = '/api/sim';
 let refreshTimer = null;
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', t.textContent.includes({overview:'总览',batches:'批次',instances:'实例',anomaly:'异常',events:'事件',map:'地图',analytics:'看板',rl:'强化'}[name]||'')));
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', t.textContent.includes({overview:'总览',batches:'批次',instances:'实例',anomaly:'异常',events:'事件',datascreen:'大屏',rl:'强化'}[name]||'')));
+
+  if(name==='datascreen') {
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-'+name));
+    document.body.classList.add('ds-fullscreen');
+    try { window.parent.postMessage({type:'ds-fullscreen', enter:true}, '*'); } catch(e){}
+    loadDataScreen(true);
+    return;
+  }
+
+  // Exiting data screen
+  if(document.body.classList.contains('ds-fullscreen')) {
+    document.body.classList.remove('ds-fullscreen');
+    try { window.parent.postMessage({type:'ds-fullscreen', enter:false}, '*'); } catch(e){}
+  }
+
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-'+name));
+  afterSwitch(name);
+}
+
+function afterSwitch(name) {
   if(name==='batches') loadBatches();
   if(name==='instances') loadInstances();
   if(name==='events') loadEvents();
-  if(name==='map') initMap();
-  if(name==='analytics') loadSimStats(true);
   if(name==='rl') loadRLStatus();
+}
+
+// ---- Data screen batch filter ----
+let dsSelectedBatch = ''; // empty = all batches
+
+function selectDsBatch(btn, batchId) {
+  dsSelectedBatch = batchId;
+  // Update button active states
+  document.querySelectorAll('.ds-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Reload all charts with filter
+  loadSimStats(true);
+  // Fly map to batch zone if specific batch selected
+  if(batchId) flyToBatch(batchId);
+}
+
+function populateDsFilterBtns() {
+  const container = document.getElementById('dsFilterBtns');
+  if(!container || !cachedBatches || cachedBatches.length === 0) {
+    if(container) container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = cachedBatches.map((b, i) => {
+    const color = ZONE_COLORS[i % ZONE_COLORS.length];
+    const isActive = dsSelectedBatch === b.id ? ' active' : '';
+    return `<button class="ds-filter-btn${isActive}" data-batch="${b.id}" onclick="selectDsBatch(this,'${b.id}')" style="border-color:${isActive ? color : ''};${isActive ? 'color:'+color+';box-shadow:0 0 10px '+color+'33;' : ''}">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle;"></span>${b.name}
+    </button>`;
+  }).join('');
+  // Ensure "全部批次" active state is correct
+  const allBtn = document.querySelector('.ds-filter-btn[data-batch=""]');
+  if(allBtn) allBtn.classList.toggle('active', dsSelectedBatch === '');
+}
+
+function loadDataScreen(force) {
+  initMap();
+  loadSimStats(force);
+  updateDsHeader();
+  updateDsStats();
+  // Ensure map resizes to fill fullscreen container
+  setTimeout(() => {
+    if(simMapObj) simMapObj.invalidateSize();
+    loadMapBatchButtons();
+  }, 300);
+}
+
+// ESC key exits data screen fullscreen
+document.addEventListener('keydown', function(e) {
+  if(e.key === 'Escape' && document.body.classList.contains('ds-fullscreen')) {
+    switchTab('overview');
+  }
+});
+// Also listen for parent asking us to exit
+window.addEventListener('message', function(e) {
+  if(e.data && e.data.type === 'ds-exit-fullscreen') switchTab('overview');
+});
+
+
+function updateDsHeader() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const dateStr = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
+  const timeStr = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  const el = document.getElementById('dsHeaderTime');
+  if(el) el.innerHTML = '<span style="opacity:0.6;font-size:12px;">\u5F53\u524D\u65F6\u95F4\uff1a</span> '+dateStr+' <span style="color:#05e8fe;">'+timeStr+'</span>';
+}
+setInterval(updateDsHeader, 1000);
+
+async function updateDsStats() {
+  // When a specific batch is selected, loadSimStats already updates the DS stats panel
+  if(dsSelectedBatch) return;
+  const d = await apiFetch(API+'/metrics');
+  if(d.error) return;
+  const total = d.total_instances||0;
+  const running = d.running_instances||0;
+  const anomalies = d.failed_instances||0;
+
+  // Digital counter
+  const digits = String(total).padStart(5,'0').split('');
+  const el = document.getElementById('dsActualTotal');
+  if(el) el.innerHTML = digits.map(c=>`<div class="ds-digit">${c}</div>`).join('') + '<div class="ds-digit">台</div>';
+
+  // Liquid fill
+  const pct = total > 0 ? Math.round(running / total * 100) : 0;
+  const pctEl = document.getElementById('dsLiquidPct');
+  if(pctEl) pctEl.textContent = pct + '%';
+  const waveEl = document.getElementById('dsLiquidWave');
+  if(waveEl) waveEl.style.height = pct + '%';
+
+  // Warning bar
+  const warnBar = document.getElementById('dsWarningBar');
+  if(warnBar) {
+    if(anomalies > 0) {
+      warnBar.innerHTML = '\u26a0 <b>平台预警</b>\uff1a' + anomalies + ' 台故障实例';
+      warnBar.style.color = '#ef4444';
+      warnBar.style.borderColor = 'rgba(239,68,68,0.3)';
+      warnBar.style.background = 'rgba(239,68,68,0.12)';
+    } else {
+      warnBar.innerHTML = '\u2714 平台运行正常';
+      warnBar.style.color = '#22c55e';
+      warnBar.style.borderColor = 'rgba(34,197,94,0.2)';
+      warnBar.style.background = 'rgba(34,197,94,0.1)';
+    }
+  }
 }
 
 async function apiFetch(url, opts={}) {
@@ -1039,7 +1564,7 @@ function initMap() {
   // Start auto-refresh
   if (mapRefreshTimer) clearInterval(mapRefreshTimer);
   mapRefreshTimer = setInterval(() => {
-    if (document.getElementById('mapAutoRefresh').checked && document.getElementById('panel-map').classList.contains('active')) {
+    if (document.getElementById('mapAutoRefresh').checked && document.getElementById('panel-datascreen').classList.contains('active')) {
       refreshMap();
     }
   }, 2000);
@@ -1097,6 +1622,18 @@ async function refreshMap() {
       // Create new marker
       const marker = L.marker(latlng, {icon: createDroneIcon(drone.heading, color, hasAnomaly)}).addTo(simMapObj);
       marker.bindPopup(dronePopup(drone), {maxWidth: 300});
+      // Click drone marker → filter battery ranking to show same batch
+      marker.on('click', function() {
+        const batchKey = getBatchId(drone.id);
+        const matchBatch = cachedBatches.find(b => b.id === batchKey || batchKey.includes(b.id) || b.id.includes(batchKey));
+        if(matchBatch) {
+          dsSelectedBatch = matchBatch.id;
+          document.querySelectorAll('.ds-filter-btn').forEach(b => b.classList.remove('active'));
+          const btn = document.querySelector('.ds-filter-btn[data-batch="' + matchBatch.id + '"]');
+          if(btn) btn.classList.add('active');
+          loadSimStats(true);
+        }
+      });
 
       mapTrailPts[drone.id] = [latlng];
       const trail = L.polyline([latlng], {color: color, weight: 2, opacity: 0.5, dashArray: '4,4', renderer: mapCanvasRenderer}).addTo(simMapObj);
@@ -1234,20 +1771,32 @@ const ZONE_COLORS = ['#ef4444','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#14b8a6'
 async function loadMapBatchButtons() {
   const d = await apiFetch(API+'/batches');
   const container = document.getElementById('mapBatchBtnList');
+  const dsBar = document.getElementById('dsBatchBar');
   if(!d.items||d.items.length===0) {
     container.innerHTML='<span style="font-size:12px;color:var(--text-dim)">暂无批次</span>';
+    if(dsBar) dsBar.innerHTML='';
     clearBatchZones();
     cachedBatches = [];
     return;
   }
   cachedBatches = d.items;
-  container.innerHTML = d.items.map((b,i)=>{
+  const btns = d.items.map((b,i)=>{
     const color = ZONE_COLORS[i % ZONE_COLORS.length];
     return `<button class="btn btn-sm" style="background:${color};color:#fff;border:none;font-size:11px;padding:3px 10px;border-radius:12px;cursor:pointer;white-space:nowrap;" onclick="flyToBatch('${b.id}')" title="跳转到 ${b.name} (${b.center_lat.toFixed(4)}, ${b.center_lng.toFixed(4)})">
       🚫 ${b.name}
     </button>`;
   }).join('');
+  container.innerHTML = btns;
+  // Also render into the visible data screen batch bar
+  if(dsBar) {
+    dsBar.innerHTML = d.items.map((b,i)=>{
+      const color = ZONE_COLORS[i % ZONE_COLORS.length];
+      return `<button class="ds-batch-btn" style="background:${color};" onclick="flyToBatch('${b.id}')" title="跳转到 ${b.name}">📍 ${b.name}</button>`;
+    }).join('');
+  }
   drawBatchZones(d.items);
+  // Also populate the filter bar buttons
+  populateDsFilterBtns();
 }
 
 function flyToBatch(batchId) {
@@ -1329,7 +1878,6 @@ let chartAnomalyTrend = null;
 let chartBatteryRisk = null;
 let chartMissionPie = null;
 let chartRLCurve = null;
-let chartBatteryRanking = null;
 let chartBatteryDist = null;
 
 function destroyChart(ch) {
@@ -1337,9 +1885,10 @@ function destroyChart(ch) {
 }
 
 async function loadSimStats(force=false) {
-  const panelActive = document.getElementById('panel-analytics').classList.contains('active');
+  const panelActive = document.getElementById('panel-datascreen').classList.contains('active');
   if (!force && !panelActive) return;
-  const d = await apiFetch(API + '/stats');
+  const statsUrl = dsSelectedBatch ? API + '/stats?batch_id=' + encodeURIComponent(dsSelectedBatch) : API + '/stats';
+  const d = await apiFetch(statsUrl);
   if (d.error) return;
 
   const live = d.live || {};
@@ -1353,27 +1902,46 @@ async function loadSimStats(force=false) {
   const routeProgress = ((live.avg_route_progress || 0) * 100).toFixed(1) + '%';
   const completed = live.completed_tasks || 0;
 
-  document.getElementById('analyticsStats').innerHTML = [
-    {n: total, l: '总模拟机', c: 'var(--primary-light)'},
-    {n: running, l: '在线运行', c: 'var(--success)'},
-    {n: anomalies, l: '异常实例', c: anomalies > 0 ? 'var(--danger)' : 'var(--success)'},
-    {n: batteryRisk, l: '电池风险', c: batteryRisk > 0 ? 'var(--warning)' : 'var(--success)'},
-    {n: routeProgress, l: '平均航线进度', c: 'var(--info)'},
-    {n: completed, l: '已完成任务', c: 'var(--success)'},
-  ].map(s => `<div class="stat-card"><div class="num" style="color:${s.c};font-size:24px;">${s.n}</div><div class="lbl">${s.l}</div></div>`).join('');
+  // Update DS real-time stats panel (left-top) from batch-filtered data
+  const dsDigits = String(total).padStart(5,'0').split('');
+  const dsEl = document.getElementById('dsActualTotal');
+  if(dsEl) dsEl.innerHTML = dsDigits.map(c=>`<div class="ds-digit">${c}</div>`).join('') + '<div class="ds-digit">台</div>';
+  const dsPct = total > 0 ? Math.round(running / total * 100) : 0;
+  const dsPctEl = document.getElementById('dsLiquidPct');
+  if(dsPctEl) dsPctEl.textContent = dsPct + '%';
+  const dsWaveEl = document.getElementById('dsLiquidWave');
+  if(dsWaveEl) dsWaveEl.style.height = dsPct + '%';
+  const dsWarnBar = document.getElementById('dsWarningBar');
+  if(dsWarnBar) {
+    if(anomalies > 0) {
+      dsWarnBar.innerHTML = '\u26a0 <b>\u5e73\u53f0\u9884\u8b66</b>\uff1a' + anomalies + ' \u53f0\u5f02\u5e38\u5b9e\u4f8b';
+      dsWarnBar.style.color = '#ef4444';
+      dsWarnBar.style.borderColor = 'rgba(239,68,68,0.3)';
+      dsWarnBar.style.background = 'rgba(239,68,68,0.12)';
+    } else {
+      dsWarnBar.innerHTML = '\u2714 \u5e73\u53f0\u8fd0\u884c\u6b63\u5e38';
+      dsWarnBar.style.color = '#22c55e';
+      dsWarnBar.style.borderColor = 'rgba(34,197,94,0.2)';
+      dsWarnBar.style.background = 'rgba(34,197,94,0.1)';
+    }
+  }
 
-  document.getElementById('analyticsTime').textContent = '更新时间: ' + new Date().toLocaleTimeString('zh-CN', {hour12:false});
+  // analyticsStats is hidden; data now displayed via DS panels
+  const asEl = document.getElementById('analyticsStats');
+  if(asEl) asEl.innerHTML = '';
+  const atEl = document.getElementById('analyticsTime');
+  if(atEl) atEl.textContent = '';
 
   const baseFont = {family: 'Segoe UI, sans-serif', size: 11};
   const commonOpts = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {labels: {color: '#94a3b8', font: baseFont}},
+      legend: {labels: {color: '#7ec7ff', font: baseFont}},
     },
     scales: {
-      x: {ticks: {color: '#94a3b8', font: baseFont}, grid: {color: 'rgba(148,163,184,0.12)'}},
-      y: {ticks: {color: '#94a3b8', font: baseFont}, grid: {color: 'rgba(148,163,184,0.12)'}},
+      x: {ticks: {color: '#7ec7ff', font: baseFont}, grid: {color: 'rgba(5,232,254,0.08)'}},
+      y: {ticks: {color: '#7ec7ff', font: baseFont}, grid: {color: 'rgba(5,232,254,0.08)'}},
     },
   };
 
@@ -1420,84 +1988,41 @@ async function loadSimStats(force=false) {
   const batWarning = bat.warning || 0;
   const batDanger = bat.danger || 0;
 
-  // Battery stat cards
-  document.getElementById('batteryStatCards').innerHTML = [
-    {n: batAvg + '%', l: '平均电量', c: batAvg > 60 ? 'var(--success)' : batAvg > 20 ? 'var(--warning)' : 'var(--danger)'},
-    {n: batHealthy, l: '健康 (>60%)', c: 'var(--success)'},
-    {n: batWarning, l: '警告 (20-60%)', c: 'var(--warning)'},
-    {n: batDanger, l: '危险 (<20%)', c: 'var(--danger)'},
-  ].map(s => `<div class="stat-card"><div class="num" style="color:${s.c};font-size:22px;">${s.n}</div><div class="lbl">${s.l}</div></div>`).join('');
+  // Battery stat cards (hidden compat)
+  const batStatEl = document.getElementById('batteryStatCards');
+  if(batStatEl) batStatEl.innerHTML = '';
 
-  // Battery ranking bar chart (sorted ascending, low battery highlighted red)
-  destroyChart(chartBatteryRanking);
-  const sortedBat = batRanking.slice().sort((a,b) => a.level - b.level).slice(0, 20);
-  const rankLabels = sortedBat.map(b => b.name || b.id);
-  const rankValues = sortedBat.map(b => b.level);
-  const rankColors = sortedBat.map(b => {
-    if (b.level <= 20) return '#ef4444';
-    if (b.level <= 60) return '#f59e0b';
-    return '#22c55e';
-  });
-  chartBatteryRanking = new Chart(document.getElementById('chartBatteryRanking'), {
-    type: 'bar',
-    data: {
-      labels: rankLabels,
-      datasets: [{
-        label: '电量 %',
-        data: rankValues,
-        backgroundColor: rankColors,
-        borderRadius: 3,
-        barThickness: 12,
-      }],
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {display: false},
-        tooltip: {
-          callbacks: {
-            label: (ctx) => `电量: ${ctx.raw}%`,
-            afterLabel: (ctx) => ctx.raw <= 20 ? '⚠ 危险' : ctx.raw <= 60 ? '⚡ 警告' : '✅ 健康',
-          },
-        },
-      },
-      scales: {
-        x: {
-          min: 0, max: 100,
-          ticks: {color: '#94a3b8', font: baseFont, callback: v => v + '%'},
-          grid: {color: 'rgba(148,163,184,0.12)'},
-        },
-        y: {
-          ticks: {color: '#94a3b8', font: {size: 10}},
-          grid: {display: false},
-        },
-      },
-    },
-    plugins: [{
-      id: 'batteryThresholds',
-      afterDraw(chart) {
-        const {ctx, chartArea, scales} = chart;
-        const xScale = scales.x;
-        [20, 60].forEach((threshold, i) => {
-          const x = xScale.getPixelForValue(threshold);
-          ctx.save();
-          ctx.strokeStyle = i === 0 ? '#ef4444' : '#f59e0b';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 3]);
-          ctx.beginPath();
-          ctx.moveTo(x, chartArea.top);
-          ctx.lineTo(x, chartArea.bottom);
-          ctx.stroke();
-          ctx.fillStyle = i === 0 ? '#ef4444' : '#f59e0b';
-          ctx.font = '9px sans-serif';
-          ctx.fillText(i === 0 ? '20%危险' : '60%警告', x + 2, chartArea.top + 10);
-          ctx.restore();
-        });
-      },
-    }],
-  });
+  // Update data screen battery header
+  const dsBatHdr = document.getElementById('dsBatHeader');
+  if(dsBatHdr) {
+    dsBatHdr.innerHTML = [
+      {n: batAvg + '%', l: '平均电量', c: batAvg > 60 ? '#22c55e' : batAvg > 20 ? '#f59e0b' : '#ef4444'},
+      {n: batHealthy, l: '健康>60%', c: '#22c55e'},
+      {n: batWarning, l: '警告20-60%', c: '#f59e0b'},
+      {n: batDanger, l: '危险<20%', c: '#ef4444'},
+    ].map(s => `<div class="ds-bat-item"><div class="num" style="color:${s.c}">${s.n}</div><div class="lbl">${s.l}</div></div>`).join('');
+  }
+
+  // Battery ranking — scrollable list showing ALL drones
+  const sortedBat = batRanking.slice().sort((a,b) => a.level - b.level);
+  const rankListEl = document.getElementById('dsRankList');
+  if(rankListEl) {
+    const buildItems = (list) => list.map((b, i) => {
+      const lv = b.level;
+      const color = lv <= 20 ? '#ef4444' : lv <= 50 ? '#f59e0b' : '#22c55e';
+      const rank = i + 1;
+      const idxClass = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : 'normal';
+      const shortName = (b.name || b.id).replace(/^.*?-/, '').substring(0, 14);
+      return `<li class="ds-rank-item">
+        <div class="ds-rank-idx ${idxClass}">${rank}</div>
+        <div class="ds-rank-name" title="${b.name||b.id}">${shortName}</div>
+        <div class="ds-rank-bar-wrap"><div class="ds-rank-bar" style="width:${lv}%;background:linear-gradient(90deg,${color},${color}cc);"></div></div>
+        <div class="ds-rank-pct" style="color:${color}">${lv}%</div>
+      </li>`;
+    }).join('');
+    const items = buildItems(sortedBat);
+    rankListEl.innerHTML = `<div class="ds-rank-list-inner">${items}</div>`;
+  }
 
   // Battery distribution pie chart
   destroyChart(chartBatteryDist);
@@ -1516,7 +2041,7 @@ async function loadSimStats(force=false) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {position: 'bottom', labels: {color: '#94a3b8', font: baseFont, usePointStyle: true, pointStyle: 'circle'}},
+        legend: {position: 'bottom', labels: {color: '#7ec7ff', font: baseFont, usePointStyle: true, pointStyle: 'circle'}},
         tooltip: {
           callbacks: {
             label: (ctx) => {
@@ -1566,7 +2091,7 @@ async function loadSimStats(force=false) {
         ...commonOpts.scales,
         y: {
           ...commonOpts.scales.y,
-          ticks: { color: '#94a3b8', callback: (v) => v + '%' },
+          ticks: { color: '#7ec7ff', callback: (v) => v + '%' },
           min: 0, max: 100,
         },
       },
@@ -1608,14 +2133,14 @@ async function loadSimStats(force=false) {
         data: missionValues,
         backgroundColor: ['#6366f1', '#22c55e', '#f59e0b', '#3b82f6', '#ef4444', '#94a3b8'],
         borderWidth: 1,
-        borderColor: '#0f172a',
+        borderColor: 'rgba(4,11,24,0.8)',
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: {position: 'bottom', labels: {color: '#94a3b8', font: baseFont}},
+        legend: {position: 'bottom', labels: {color: '#7ec7ff', font: baseFont}},
       },
     },
   });
@@ -1648,19 +2173,19 @@ async function loadSimStats(force=false) {
     options: {
       ...commonOpts,
       scales: {
-        x: {ticks: {color: '#94a3b8', font: baseFont}, grid: {color: 'rgba(148,163,184,0.12)'}},
+        x: {ticks: {color: '#7ec7ff', font: baseFont}, grid: {color: 'rgba(5,232,254,0.08)'}},
         yReward: {
           type: 'linear',
           position: 'left',
-          ticks: {color: '#94a3b8'},
-          grid: {color: 'rgba(148,163,184,0.12)'},
+          ticks: {color: '#7ec7ff'},
+          grid: {color: 'rgba(5,232,254,0.08)'},
         },
         yEpsilon: {
           type: 'linear',
           position: 'right',
           min: 0,
           max: 1,
-          ticks: {color: '#94a3b8'},
+          ticks: {color: '#7ec7ff'},
           grid: {drawOnChartArea: false},
         },
       },
@@ -1693,7 +2218,7 @@ function handleHashNavigation() {
     const card = document.getElementById('rlExportCard');
     if (card) card.hidden = false;
   } else if (hash) {
-    const tabMap = { 'overview':'overview', 'batches':'batches', 'instances':'instances', 'anomaly':'anomaly', 'events':'events', 'map':'map', 'analytics':'analytics', 'rl':'rl' };
+    const tabMap = { 'overview':'overview', 'batches':'batches', 'instances':'instances', 'anomaly':'anomaly', 'events':'events', 'datascreen':'datascreen', 'map':'datascreen', 'analytics':'datascreen', 'rl':'rl' };
     if (tabMap[hash]) switchTab(tabMap[hash]);
   }
 }
@@ -1712,7 +2237,7 @@ refreshTimer = setInterval(() => {
   if(activePanel) {
     if(activePanel.id === 'panel-overview') loadOverview();
     if(activePanel.id === 'panel-instances') loadInstances();
-    if(activePanel.id === 'panel-analytics' && document.getElementById('analyticsAutoRefresh').checked) loadSimStats();
+    if(activePanel.id === 'panel-datascreen' && document.getElementById('analyticsAutoRefresh').checked) { loadSimStats(); updateDsStats(); }
     if(activePanel.id === 'panel-rl') loadRLStatus();
   }
 }, 5000);

@@ -856,9 +856,17 @@ func (s *SimAPI) RLExportPolicy(c *gin.Context) {
 // ==================== Simulation Statistics (Stage-8 Dashboard) ====================
 
 func (s *SimAPI) SimStats(c *gin.Context) {
+	// Optional batch filter
+	batchID := c.Query("batch_id")
+
 	// Live snapshots
-	instances := s.engine.ListInstances("")
-	telemetry := s.engine.GetAllTelemetry()
+	instances := s.engine.ListInstances(batchID)
+	var telemetry []simulation.TelemetrySnapshot
+	if batchID != "" {
+		telemetry = s.engine.GetTelemetryForBatch(batchID)
+	} else {
+		telemetry = s.engine.GetAllTelemetry()
+	}
 
 	totalInstances := len(instances)
 	runningInstances := 0
@@ -947,6 +955,14 @@ func (s *SimAPI) SimStats(c *gin.Context) {
 	}
 	avgRouteProgress := taskCompletionRate
 
+	// Build set of instance IDs for batch filtering in DB queries
+	batchInstanceIDs := map[string]struct{}{}
+	if batchID != "" {
+		for _, inst := range instances {
+			batchInstanceIDs[inst.Config.ID] = struct{}{}
+		}
+	}
+
 	// Time-series: running trend / battery risk trend from recent telemetry logs
 	type riskCounter struct {
 		total int
@@ -963,6 +979,12 @@ func (s *SimAPI) SimStats(c *gin.Context) {
 			var battery int
 			if rows1.Scan(&instID, &battery, &phase, &created) != nil {
 				continue
+			}
+			// Filter by batch if specified
+			if batchID != "" {
+				if _, ok := batchInstanceIDs[instID]; !ok {
+					continue
+				}
 			}
 			if len(created) < 16 {
 				continue
@@ -987,13 +1009,19 @@ func (s *SimAPI) SimStats(c *gin.Context) {
 
 	// Time-series: anomaly trend + alert type distribution from recent events
 	anomalyByMinute := map[string]int{}
-	rows2, err := s.db.Query(`SELECT event_type, created_at FROM sim_events ORDER BY datetime(created_at) DESC LIMIT 3000`)
+	rows2, err := s.db.Query(`SELECT event_type, created_at, instance_id FROM sim_events ORDER BY datetime(created_at) DESC LIMIT 3000`)
 	if err == nil {
 		defer rows2.Close()
 		for rows2.Next() {
-			var eventType, created string
-			if rows2.Scan(&eventType, &created) != nil {
+			var eventType, created, evtInstID string
+			if rows2.Scan(&eventType, &created, &evtInstID) != nil {
 				continue
+			}
+			// Filter by batch if specified
+			if batchID != "" {
+				if _, ok := batchInstanceIDs[evtInstID]; !ok {
+					continue
+				}
 			}
 			alertTypeDist[eventType]++
 			if len(created) < 16 {
