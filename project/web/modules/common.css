@@ -27,8 +27,11 @@
   --cc-shadow-1: 0 0 1px rgba(0,0,0,.3), 0 2px 6px rgba(0,0,0,.06);
   --cc-shadow-2: 0 4px 16px rgba(0,0,0,.08);
   --cc-shadow-3: 0 8px 32px rgba(0,0,0,.12);
-  --cc-radius: 8px;
-  --cc-radius-lg: 12px;
+  --cc-radius: 14px;
+  --cc-radius-lg: 18px;
+  --cc-radius-xl: 22px;
+  --cc-radius-sm: 10px;
+  --cc-radius-pill: 999px;
   --cc-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   --cc-transition: 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
 }
@@ -400,7 +403,7 @@ html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark 
   color: var(--cc-text-1);
 }
 html.dark p { color: var(--cc-text-2); }
-html.dark th { color: var(--cc-text-2) !important; background: var(--cc-bg-3) !important; }
+html.dark th { color: var(--cc-text-2) !important; background: rgba(255,255,255,0.04) !important; }
 html.dark td { color: var(--cc-text-1) !important; border-color: var(--cc-border) !important; }
 html.dark tr { border-color: var(--cc-border) !important; }
 html.dark tbody tr:hover { background: rgba(60,126,255,0.06) !important; }
@@ -438,12 +441,14 @@ body {
 
 /* ---------- Module Header ---------- */
 .module-header {
-  background: var(--cc-bg-2);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   padding: 20px 24px;
   margin-bottom: 16px;
-  border-radius: var(--cc-radius);
+  border-radius: var(--cc-radius-lg);
   box-shadow: var(--cc-shadow-1);
-  border: 1px solid var(--cc-border-light);
+  border: 1px solid rgba(0,0,0,0.06);
 }
 .module-title {
   font-size: 18px;
@@ -463,7 +468,7 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--cc-radius-sm);
   background: var(--cc-primary-light);
 }
 
@@ -488,7 +493,7 @@ body {
 .filter-group select {
   padding: 7px 12px;
   border: 1px solid var(--cc-border);
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 14px;
   background: var(--cc-bg-2);
   color: var(--cc-text-1);
@@ -509,7 +514,7 @@ body {
 .btn {
   padding: 7px 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--cc-radius-sm);
   font-size: 14px;
   cursor: pointer;
   transition: all var(--cc-transition);
@@ -581,12 +586,14 @@ body {
 
 /* ---------- Cards ---------- */
 .card {
-  background: var(--cc-bg-2);
-  border-radius: var(--cc-radius);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: var(--cc-radius-lg);
   padding: 20px;
   margin-bottom: 16px;
   box-shadow: var(--cc-shadow-1);
-  border: 1px solid var(--cc-border-light);
+  border: 1px solid rgba(0,0,0,0.06);
   transition: box-shadow var(--cc-transition);
 }
 .card:hover {
@@ -621,11 +628,13 @@ body {
   margin-bottom: 20px;
 }
 .stat-box {
-  background: var(--cc-bg-2);
+  background: rgba(255,255,255,0.68);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
   border-radius: var(--cc-radius);
   padding: 20px;
   text-align: center;
-  border: 1px solid var(--cc-border-light);
+  border: 1px solid rgba(0,0,0,0.06);
   box-shadow: var(--cc-shadow-1);
   transition: all var(--cc-transition);
   position: relative;
@@ -669,11 +678,13 @@ body {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  background: var(--cc-bg-2);
+  background: transparent;
   font-size: 14px;
+  border-radius: var(--cc-radius-sm);
+  overflow: hidden;
 }
 .data-table thead {
-  background: var(--cc-bg-3);
+  background: rgba(0,0,0,0.03);
 }
 .data-table th {
   padding: 10px 16px;
@@ -704,12 +715,15 @@ body {
 .status-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 2px 10px;
-  border-radius: 10px;
+  padding: 2px 12px;
+  border-radius: var(--cc-radius-pill);
   font-size: 12px;
   font-weight: 500;
   line-height: 20px;
+  text-align: center;
+  white-space: nowrap;
 }
 .status-badge::before {
   content: '';
@@ -766,7 +780,7 @@ body {
   background: var(--cc-primary-light);
   border-left: 3px solid var(--cc-primary);
   padding: 12px 16px;
-  border-radius: 0 var(--cc-radius) var(--cc-radius) 0;
+  border-radius: 0 var(--cc-radius-sm) var(--cc-radius-sm) 0;
   font-size: 13px;
   color: var(--cc-text-2);
   margin-top: 16px;
@@ -838,13 +852,16 @@ body {
   animation: modalBgFadeIn 0.2s ease-out;
 }
 .modal-box {
-  background: var(--cc-bg-2);
-  border-radius: var(--cc-radius-lg);
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-radius: var(--cc-radius-xl);
   padding: 24px;
   max-width: 95vw;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: var(--cc-shadow-3);
+  box-shadow: var(--cc-shadow-3), 0 0 0 0.5px rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.06);
   animation: modalSlideIn 0.25s ease-out;
 }
 .modal-title {
@@ -939,7 +956,7 @@ body {
   display: inline-flex;
   align-items: center;
   padding: 1px 8px;
-  border-radius: 3px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   line-height: 20px;
@@ -1037,6 +1054,33 @@ body {
   .stat-value { font-size: 22px; }
   .data-table { font-size: 12px; }
   .data-table th, .data-table td { padding: 8px 10px; }
+}
+
+/* ---------- Dark Glassmorphism Overrides ---------- */
+html.dark .module-header {
+  background: rgba(30,30,30,0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-color: rgba(255,255,255,0.06);
+}
+html.dark .card {
+  background: rgba(30,30,30,0.68);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-color: rgba(255,255,255,0.06);
+}
+html.dark .stat-box {
+  background: rgba(30,30,30,0.65);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-color: rgba(255,255,255,0.06) !important;
+}
+html.dark .modal-box {
+  background: rgba(30,30,30,0.85) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-color: rgba(255,255,255,0.08) !important;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.05) !important;
 }
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }

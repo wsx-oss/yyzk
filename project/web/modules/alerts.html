@@ -15,20 +15,25 @@
     .filter-row-2 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
     .action-buttons { justify-content: flex-end; margin-top: 12px; }
     .priority-high { background: #ffece8; color: #cb2634; }
+    .priority-high::before { background: #cb2634; }
     .priority-mid { background: #fff7e8; color: #d25f00; }
+    .priority-mid::before { background: #d25f00; }
     .priority-low { background: #e8f3ff; color: #0e42d2; }
+    .priority-low::before { background: #0e42d2; }
     .status-resolved { background: #e8ffea; color: #009a29; }
+    .status-resolved::before { background: #009a29; }
     .status-unresolved { background: #ffece8; color: #cb2634; }
+    .status-unresolved::before { background: #cb2634; }
 
     /* Modal */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
     .modal-overlay.active { display: flex; animation: modalBgFadeIn 0.2s ease-out; }
-    .modal-box { background: var(--cc-bg-2, #fff); border-radius: var(--cc-radius-lg, 12px); padding: 24px; width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.12); animation: modalSlideIn 0.25s ease-out; }
+    .modal-box { background: rgba(255,255,255,0.82); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); border-radius: var(--cc-radius-xl, 22px); padding: 24px; width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.06); animation: modalSlideIn 0.25s ease-out; }
     .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: var(--cc-text-1, #1d2129); }
     .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .modal-form .full-width { grid-column: 1 / -1; }
     .modal-form label { font-size: 13px; color: var(--cc-text-3, #86909c); font-weight: 500; margin-bottom: 4px; display: block; }
-    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 7px 12px; border: 1px solid var(--cc-border, #e5e6eb); border-radius: 4px; font-size: 14px; background: var(--cc-bg-2, #fff); transition: all 0.2s; }
+    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 7px 12px; border: 1px solid var(--cc-border, #e5e6eb); border-radius: 8px; font-size: 14px; background: var(--cc-bg-2, #fff); transition: all 0.2s; }
     .modal-form textarea { resize: vertical; min-height: 60px; }
     .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
@@ -43,7 +48,7 @@
     .hint-box { margin-top: 20px; margin-bottom: 20px; }
     .chart-section-title { font-weight: 600; margin-bottom: 12px; text-align: center; font-size: 14px; }
     .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #64748b; }
-    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; }
     .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
     .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
 
@@ -51,14 +56,14 @@
     .btn-ai { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; }
     .btn-ai:hover { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
     .cot-steps { max-height: 400px; overflow-y: auto; margin: 12px 0; }
-    .cot-step { border-left: 3px solid #6366f1; background: #f8fafc; padding: 12px 16px; margin-bottom: 10px; border-radius: 0 8px 8px 0; }
+    .cot-step { border-left: 3px solid #6366f1; background: #f8fafc; padding: 12px 16px; margin-bottom: 10px; border-radius: 0 12px 12px 0; }
     .cot-step-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .cot-step-num { background: #6366f1; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; margin-right: 6px; }
     .cot-step-type { font-size: 11px; font-weight: 500; color: #6366f1; text-transform: uppercase; }
     .cot-step-q { font-weight: 600; color: #0f172a; margin-bottom: 4px; font-size: 13px; }
     .cot-step-thought { color: #475569; font-size: 13px; line-height: 1.5; margin-bottom: 4px; }
-    .cot-step-answer { background: #e0e7ff; padding: 6px 10px; border-radius: 6px; color: #3730a3; font-size: 13px; font-weight: 500; }
-    .cot-final { background: linear-gradient(135deg, #f0f9ff, #ede9fe); border: 2px solid #6366f1; padding: 16px; border-radius: 10px; margin-top: 16px; }
+    .cot-step-answer { background: #e0e7ff; padding: 6px 10px; border-radius: 10px; color: #3730a3; font-size: 13px; font-weight: 500; }
+    .cot-final { background: linear-gradient(135deg, #f0f9ff, #ede9fe); border: 2px solid #6366f1; padding: 16px; border-radius: 14px; margin-top: 16px; }
     .cot-final-title { font-size: 15px; font-weight: 600; color: #3730a3; margin-bottom: 8px; }
     .cot-final-content { color: #0f172a; line-height: 1.6; font-size: 14px; white-space: pre-wrap; }
     .cot-confidence { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #e0e7ff; color: #4338ca; margin-left: 8px; }
@@ -141,8 +146,8 @@
         <tr>
           <th>报警时间</th>
           <th>报警类型</th>
-          <th>报警优先级</th>
-          <th>报警状态</th>
+          <th style="text-align:center">报警优先级</th>
+          <th style="text-align:center">报警状态</th>
           <th>关联设备</th>
           <th>报警描述</th>
           <th>操作</th>
@@ -396,12 +401,14 @@
         tdCat.textContent = it.category || '-';
 
         const tdPri = document.createElement('td');
+        tdPri.style.textAlign = 'center';
         const priBadge = document.createElement('span');
         priBadge.className = 'status-badge ' + getPriorityClass(it.priority);
         priBadge.textContent = it.priority || '中';
         tdPri.appendChild(priBadge);
 
         const tdStatus = document.createElement('td');
+        tdStatus.style.textAlign = 'center';
         const stBadge = document.createElement('span');
         stBadge.className = 'status-badge ' + getStatusClass(it.status);
         stBadge.textContent = it.status || '未解决';

@@ -20,10 +20,10 @@
 
     /* Pagination */
     .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 12px 0; font-size: 13px; color: #64748b; }
-    .pagination-bar button { padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+    .pagination-bar button { padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; cursor: pointer; font-size: 13px; transition: all 0.2s; }
     .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
     .pagination-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-action { padding: 4px 12px; font-size: 12px; border-radius: 4px; }
+    .btn-action { padding: 4px 12px; font-size: 12px; border-radius: 8px; }
     
     /* Task type badges */
     .task-type-badge {
@@ -70,7 +70,7 @@
       font-size: 14px; color: #1e293b; font-weight: 500;
     }
     .detail-info-grid .info-value code {
-      font-size: 12px; background: #e2e8f0; padding: 2px 8px; border-radius: 4px; color: #334155;
+      font-size: 12px; background: #e2e8f0; padding: 2px 8px; border-radius: 8px; color: #334155;
     }
     .detail-confidence-row {
       margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;
@@ -79,10 +79,10 @@
     .detail-confidence-row .conf-label { color: #64748b; font-weight: 500; }
     .detail-confidence-row .conf-value { font-size: 18px; font-weight: 700; color: #165dff; }
     .detail-confidence-bar {
-      flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;
+      flex: 1; height: 8px; background: #e2e8f0; border-radius: 8px; overflow: hidden;
     }
     .detail-confidence-bar .fill {
-      height: 100%; border-radius: 4px;
+      height: 100%; border-radius: 8px;
       background: linear-gradient(90deg, #ef4444 0%, #f59e0b 40%, #10b981 100%);
       transition: width 0.5s ease;
     }
@@ -141,7 +141,7 @@
     }
     .step-thought {
       font-size: 13px; color: #475569; line-height: 1.7;
-      background: #f8fafc; padding: 10px 14px; border-radius: 6px;
+      background: #f8fafc; padding: 10px 14px; border-radius: 10px;
       border-left: 3px solid #cbd5e1;
     }
     .step-answer {
@@ -189,7 +189,7 @@
     .cot-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .cot-form .full-width { grid-column: 1 / -1; }
     .cot-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
-    .cot-form select, .cot-form input, .cot-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .cot-form select, .cot-form input, .cot-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; background: #fff; }
     .cot-form textarea { resize: vertical; min-height: 80px; }
     .cot-form input:focus, .cot-form select:focus, .cot-form textarea:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     

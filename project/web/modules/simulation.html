@@ -28,7 +28,7 @@ body { font-family: var(--cc-font, -apple-system, BlinkMacSystemFont, "PingFang 
 .panel { display:none; }
 .panel.active { display:block; }
 .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
-.btn { padding:8px 18px; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500; transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
+.btn { padding:8px 18px; border:none; border-radius: 10px; cursor:pointer; font-size:13px; font-weight:500; transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
 .btn-primary { background:var(--primary); color:#fff; }
 .btn-primary:hover { opacity:.9; box-shadow: 0 2px 8px rgba(22,93,255,.35); }
 .btn-success { background:var(--success); color:#fff; }
@@ -40,7 +40,7 @@ body { font-family: var(--cc-font, -apple-system, BlinkMacSystemFont, "PingFang 
 .btn-outline { background:transparent; border:1px solid var(--border); color:var(--text-dim); }
 .btn-outline:hover { border-color:var(--primary); color:var(--primary); }
 .btn-sm { padding:5px 12px; font-size:12px; }
-input, select, textarea { background:var(--cc-bg-3, #f2f3f5); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:6px; font-size:13px; }
+input, select, textarea { background:var(--cc-bg-3, #f2f3f5); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius: 10px; font-size:13px; }
 input:focus, select:focus, textarea:focus { outline:none; border-color:var(--primary); box-shadow: 0 0 0 2px rgba(22,93,255,.1); }
 .card { background:var(--card); border:1px solid var(--cc-border-light, #f2f3f5); border-radius:var(--cc-radius, 10px); padding:20px; margin-bottom:16px; box-shadow: var(--cc-shadow-1, 0 0 1px rgba(0,0,0,.3)); transition: box-shadow .2s; }
 .card:hover { box-shadow: var(--cc-shadow-2, 0 4px 16px rgba(0,0,0,.08)); }
@@ -73,9 +73,9 @@ tr:hover { background:var(--cc-primary-light, #e8f3ff); }
 .modal { background:var(--card); border:1px solid var(--border); border-radius:var(--cc-radius-lg, 12px); padding:24px; width:560px; max-height:80vh; overflow-y:auto; box-shadow: var(--cc-shadow-3); }
 .modal h3 { margin-bottom:16px; font-size:18px; color:var(--text); }
 .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
-.progress-bar { background:var(--cc-bg-3, #f2f3f5); border-radius:4px; height:6px; overflow:hidden; }
-.progress-bar .fill { height:100%; border-radius:4px; transition:width .3s; }
-.anomaly-tag { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:4px; font-size:11px; margin:2px; }
+.progress-bar { background:var(--cc-bg-3, #f2f3f5); border-radius: 8px; height:6px; overflow:hidden; }
+.progress-bar .fill { height:100%; border-radius: 8px; transition:width .3s; }
+.anomaly-tag { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius: 8px; font-size:11px; margin:2px; }
 .anomaly-tag.active { background:rgba(239,68,68,0.2); color:#ef4444; }
 .anomaly-tag.inactive { background:rgba(148,163,184,0.1); color:#94a3b8; text-decoration:line-through; }
 .empty-state { text-align:center; padding:60px; color:var(--text-dim); }
@@ -85,7 +85,7 @@ tr:hover { background:var(--cc-primary-light, #e8f3ff); }
 .map-legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--text-dim); }
 .drone-label { background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; }
 .drone-label::before { display:none !important; }
-.dl-card { display:inline-flex;flex-direction:column;background:rgba(15,23,42,0.88);border-radius:6px;padding:3px 6px;border:1px solid rgba(255,255,255,0.12);min-width:56px;backdrop-filter:blur(4px); }
+.dl-card { display:inline-flex;flex-direction:column;background:rgba(15,23,42,0.88);border-radius: 10px;padding:3px 6px;border:1px solid rgba(255,255,255,0.12);min-width:56px;backdrop-filter:blur(4px); }
 .dl-top { display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#e2e8f0;gap:6px;font-weight:600; }
 .dl-bar { position:relative;height:4px;background:rgba(255,255,255,0.12);border-radius:2px;margin-top:2px;overflow:hidden; }
 .dl-fill { position:absolute;left:0;top:0;height:100%;border-radius:2px;transition:width 0.5s ease; }
@@ -108,7 +108,7 @@ tr:hover { background:var(--cc-primary-light, #e8f3ff); }
 .evt-type-icon { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; }
 .evt-type-icon .icon { font-size:14px; }
 /* Instance name highlight */
-.instance-name { color:var(--primary); font-weight:600; font-family:monospace; font-size:11px; background:var(--cc-primary-light, #e8f3ff); padding:2px 6px; border-radius:4px; }
+.instance-name { color:var(--primary); font-weight:600; font-family:monospace; font-size:11px; background:var(--cc-primary-light, #e8f3ff); padding:2px 6px; border-radius: 8px; }
 /* Auto-scroll container */
 .event-scroll-container { max-height:480px; overflow-y:auto; position:relative; scroll-behavior:smooth; }
 .event-scroll-container::-webkit-scrollbar { width:6px; }
@@ -1169,8 +1169,8 @@ function dronePopup(d) {
     高度: ${(d.alt||0).toFixed(1)}m | 速度: ${(d.speed||0).toFixed(1)}m/s<br>
     航向: ${(d.heading||0).toFixed(0)}° | 电量: <span style="color:${bColor};font-weight:600;">${d.battery}%</span><br>
     <div style="margin:4px 0;">任务进度:
-      <div style="display:inline-block;width:100px;height:8px;background:rgba(0,0,0,0.2);border-radius:4px;vertical-align:middle;overflow:hidden;">
-        <div style="height:100%;width:${pct}%;background:${pColor};border-radius:4px;"></div>
+      <div style="display:inline-block;width:100px;height:8px;background:rgba(0,0,0,0.2);border-radius: 8px;vertical-align:middle;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${pColor};border-radius: 8px;"></div>
       </div> <b>${pct}%</b>
     </div>
     ${d.anomaly ? '<span style="color:#ef4444;font-weight:bold">⚠️ 异常告警</span>' : '<span style="color:#22c55e">✅ 正常</span>'}

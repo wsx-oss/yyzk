@@ -70,14 +70,16 @@
       position: fixed;
       top: 0; left: 0; right: 0;
       height: var(--navbar-height);
-      background: var(--cc-bg-2);
-      border-bottom: 1px solid var(--cc-border);
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
       z-index: 100;
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 20px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      box-shadow: 0 0.5px 0 rgba(0,0,0,0.04);
     }
     .navbar-left {
       display: flex;
@@ -104,7 +106,7 @@
     .navbar-collapse-btn {
       width: 32px; height: 32px;
       border: 1px solid var(--cc-border);
-      border-radius: 6px;
+      border-radius: 8px;
       background: var(--cc-bg-2);
       cursor: pointer;
       display: flex;
@@ -120,12 +122,7 @@
       background: var(--cc-primary-light);
     }
     .navbar-breadcrumb {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: var(--cc-text-3);
-      margin-left: 8px;
+      display: none;
     }
     .navbar-breadcrumb span { color: var(--cc-text-4); }
     .navbar-breadcrumb .bc-current { color: var(--cc-text-1); font-weight: 500; }
@@ -205,12 +202,14 @@
       top: 100%;
       right: 0;
       margin-top: 8px;
-      background: var(--cc-bg-2);
-      border-radius: 8px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-      border: 1px solid var(--cc-border);
+      background: rgba(255,255,255,0.78);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-radius: var(--cc-radius-lg);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.05);
+      border: 1px solid rgba(0,0,0,0.06);
       min-width: 160px;
-      padding: 4px 0;
+      padding: 6px;
       z-index: 200;
       animation: menuFadeIn 0.15s ease-out;
     }
@@ -224,8 +223,9 @@
       align-items: center;
       gap: 8px;
       transition: all 0.15s;
+      border-radius: 8px;
     }
-    .user-menu-item:hover { background: var(--cc-bg-3); color: var(--cc-text-1); }
+    .user-menu-item:hover { background: rgba(0,0,0,0.04); color: var(--cc-text-1); }
     .user-menu-item.danger { color: #f53f3f; }
     .user-menu-item.danger:hover { background: #ffece8; }
     .user-menu-divider { height: 1px; background: var(--cc-border); margin: 4px 0; }
@@ -237,8 +237,10 @@
       left: 0;
       width: var(--sidebar-width);
       height: calc(100vh - var(--navbar-height));
-      background: var(--cc-sidebar-bg);
-      border-right: 1px solid var(--cc-sidebar-border);
+      background: rgba(255,255,255,0.65);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-right: 1px solid rgba(0,0,0,0.06);
       z-index: 99;
       transition: width 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
       display: flex;
@@ -288,7 +290,7 @@
       color: var(--cc-sidebar-text);
       text-decoration: none;
       font-size: 14px;
-      border-radius: 6px;
+      border-radius: 10px;
       transition: all 0.2s;
       cursor: pointer;
       white-space: nowrap;
@@ -302,6 +304,7 @@
       background: var(--cc-sidebar-active-bg);
       color: var(--cc-sidebar-active-text);
       font-weight: 500;
+      border-radius: 10px;
     }
     .nav-icon {
       flex-shrink: 0;
@@ -332,7 +335,7 @@
       padding: 10px 12px;
       color: var(--cc-sidebar-text);
       font-size: 14px;
-      border-radius: 6px;
+      border-radius: 10px;
       transition: all 0.2s;
       cursor: pointer;
       white-space: nowrap;
@@ -474,38 +477,26 @@
       margin: 0 4px;
       position: relative;
     }
-    /* Floating tooltip for collapsed sidebar items */
-    .layout-sidebar.collapsed .nav-item a::after,
-    .layout-sidebar.collapsed .nav-item-link::after,
-    .layout-sidebar.collapsed .nav-group-toggle::after {
-      content: attr(data-label);
-      position: absolute;
-      left: calc(var(--sidebar-collapsed-width) - 4px);
-      top: 50%;
-      transform: translateY(-50%);
-      background: var(--cc-text-1);
-      color: var(--cc-bg-2);
-      padding: 6px 12px;
-      border-radius: 6px;
+    /* Sidebar tooltip (JS-driven, appended to body) */
+    .sidebar-tooltip {
+      position: fixed;
+      background: rgba(30,30,30,0.88);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 10px;
       font-size: 13px;
       font-weight: 500;
       white-space: nowrap;
-      opacity: 0;
       pointer-events: none;
+      z-index: 9999;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(255,255,255,0.08);
+      opacity: 0;
       transition: opacity 0.15s ease;
-      z-index: 999;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
-    .layout-sidebar.collapsed .nav-item a:hover::after,
-    .layout-sidebar.collapsed .nav-item-link:hover::after,
-    .layout-sidebar.collapsed .nav-group-toggle:hover::after {
+    .sidebar-tooltip.visible {
       opacity: 1;
-    }
-    /* Hide tooltip arrow for empty data-label */
-    .layout-sidebar.collapsed .nav-item a:not([data-label])::after,
-    .layout-sidebar.collapsed .nav-item-link:not([data-label])::after,
-    .layout-sidebar.collapsed .nav-group-toggle:not([data-label])::after {
-      display: none;
     }
 
     /* ===== Sidebar footer ===== */
@@ -618,7 +609,10 @@
     html.dark .user-menu-item { color: var(--cc-text-2); }
     html.dark .user-menu-item:hover { background: var(--cc-bg-3); color: var(--cc-text-1); }
     html.dark .user-menu { background: var(--cc-bg-2); border-color: var(--cc-border); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
-    html.dark .layout-navbar { box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+    html.dark .layout-navbar { background: rgba(30,30,30,0.72); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border-bottom: 1px solid rgba(255,255,255,0.06); box-shadow: 0 0.5px 0 rgba(0,0,0,0.3); }
+    html.dark .layout-sidebar { background: rgba(30,30,30,0.65); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border-right: 1px solid rgba(255,255,255,0.06); }
+    html.dark .user-menu { background: rgba(40,40,40,0.82); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border-color: rgba(255,255,255,0.08); box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 0.5px rgba(255,255,255,0.05); }
+    html.dark .user-menu-item:hover { background: rgba(255,255,255,0.06); }
     html.dark .user-menu-item.danger { color: #f76965; }
     html.dark .user-menu-item.danger:hover { background: rgba(247,105,101,0.15); }
   </style>
@@ -835,6 +829,31 @@
         const children = toggle.nextElementSibling;
         if (children) children.classList.toggle('open');
       });
+    });
+
+    // ---- Sidebar collapsed tooltips (JS-driven) ----
+    const sidebarTooltip = document.createElement('div');
+    sidebarTooltip.className = 'sidebar-tooltip';
+    document.body.appendChild(sidebarTooltip);
+
+    function showSidebarTooltip(e) {
+      if (!sidebar.classList.contains('collapsed')) return;
+      const label = e.currentTarget.dataset.label;
+      if (!label) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      sidebarTooltip.textContent = label;
+      sidebarTooltip.style.left = (rect.right + 8) + 'px';
+      sidebarTooltip.style.top = (rect.top + rect.height / 2) + 'px';
+      sidebarTooltip.style.transform = 'translateY(-50%)';
+      sidebarTooltip.classList.add('visible');
+    }
+    function hideSidebarTooltip() {
+      sidebarTooltip.classList.remove('visible');
+    }
+
+    document.querySelectorAll('.nav-item a[data-label], .nav-item-link[data-label], .nav-group-toggle[data-label]').forEach(el => {
+      el.addEventListener('mouseenter', showSidebarTooltip);
+      el.addEventListener('mouseleave', hideSidebarTooltip);
     });
 
     // ---- Navigation ----

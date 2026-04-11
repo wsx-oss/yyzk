@@ -43,7 +43,7 @@
     .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .modal-form .full-width { grid-column: 1 / -1; }
     .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
-    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; background: #fff; }
     .modal-form textarea { resize: vertical; min-height: 60px; }
     .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
@@ -65,7 +65,7 @@
     .log-msg { color: #334155; }
 
     .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #64748b; }
-    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; }
     .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
     .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
 
@@ -74,7 +74,7 @@
     .plan-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .plan-form .full-width { grid-column: 1 / -1; }
     .plan-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
-    .plan-form input, .plan-form select { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .plan-form input, .plan-form select { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; background: #fff; }
     .plan-form input:focus, .plan-form select:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     .plan-actions-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
     .plan-action-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #e0e7ff; color: #3730a3; border-radius: 12px; font-size: 12px; }
@@ -90,7 +90,7 @@
     .plan-waypoints td { padding: 5px 10px; border-top: 1px solid #f1f5f9; }
     .plan-explanation { margin-top: 12px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 13px; color: #0c4a6e; line-height: 1.6; }
     .plan-warnings { margin-top: 10px; }
-    .plan-warning-item { padding: 6px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 4px; }
+    .plan-warning-item { padding: 6px 12px; border-radius: 10px; font-size: 12px; margin-bottom: 4px; }
     .plan-warning-info { background: #f0f9ff; color: #0369a1; }
     .plan-warning-warning { background: #fffbeb; color: #92400e; }
     .plan-warning-critical { background: #fef2f2; color: #991b1b; }
@@ -143,7 +143,7 @@
     .cot-step-type { font-size: 11px; font-weight: 500; color: #6366f1; text-transform: uppercase; }
     .cot-step-q { font-weight: 600; color: #0f172a; margin-bottom: 4px; font-size: 13px; }
     .cot-step-thought { color: #475569; font-size: 13px; line-height: 1.5; margin-bottom: 4px; }
-    .cot-step-answer { background: #e0e7ff; padding: 6px 10px; border-radius: 6px; color: #3730a3; font-size: 13px; font-weight: 500; }
+    .cot-step-answer { background: #e0e7ff; padding: 6px 10px; border-radius: 10px; color: #3730a3; font-size: 13px; font-weight: 500; }
     .cot-final { background: linear-gradient(135deg, #f0f9ff, #ede9fe); border: 2px solid #6366f1; padding: 16px; border-radius: 10px; margin-top: 12px; }
     .cot-final-title { font-size: 14px; font-weight: 600; color: #3730a3; margin-bottom: 8px; }
     .cot-final-content { color: #0f172a; line-height: 1.6; font-size: 13px; white-space: pre-wrap; }
@@ -196,11 +196,11 @@
     .action-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 10px; position: relative; }
     .action-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .action-card-title { font-size: 14px; font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 6px; }
-    .action-card-remove { cursor: pointer; color: #94a3b8; font-size: 18px; padding: 2px 6px; border-radius: 4px; }
+    .action-card-remove { cursor: pointer; color: #94a3b8; font-size: 18px; padding: 2px 6px; border-radius: 8px; }
     .action-card-remove:hover { color: #ef4444; background: #fee2e2; }
     .action-mode-tabs { display: flex; gap: 0; margin-bottom: 10px; }
     .action-mode-tab { flex: 1; padding: 7px 10px; text-align: center; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #64748b; transition: all .15s; }
-    .action-mode-tab:first-child { border-radius: 6px 0 0 6px; }
+    .action-mode-tab:first-child { border-radius: 10px 0 0 6px; }
     .action-mode-tab:last-child { border-radius: 0 6px 6px 0; }
     .action-mode-tab.active { background: var(--cc-primary, #165dff); color: #fff; border-color: var(--cc-primary, #165dff); }
     .action-points-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; min-height: 24px; }
@@ -209,7 +209,7 @@
     .action-point-tag .apt-remove:hover { color: #ef4444; }
     .action-interval-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
     .action-interval-row label { font-size: 12px; color: #64748b; white-space: nowrap; }
-    .action-interval-row input { width: 80px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+    .action-interval-row input { width: 80px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 13px; }
     .action-config-map { height: 220px; border-radius: 8px; margin-top: 8px; border: 2px solid #165dff; }
     .action-map-hint { font-size: 11px; color: #64748b; margin-top: 4px; text-align: center; }
     .action-summary { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-top: 12px; }
@@ -855,7 +855,7 @@
       container.innerHTML = allNoFlyZones.map(z => {
         const color = z.zone_type === '警告区域' ? '#c2410c' : '#991b1b';
         const bg = z.zone_type === '警告区域' ? '#fff7ed' : '#fee2e2';
-        return `<label style="display:flex;align-items:center;gap:5px;padding:4px 8px;background:${bg};border-radius:6px;cursor:pointer;font-size:12px;color:${color};">
+        return `<label style="display:flex;align-items:center;gap:5px;padding:4px 8px;background:${bg};border-radius: 10px;cursor:pointer;font-size:12px;color:${color};">
           <input type="checkbox" name="nfzSel" value="${z.id}" style="margin:0;" />
           ${esc(z.name)} (${z.shape_type === 'circle' ? '圆形' : '多边形'})${z.altitude_enabled ? ' 限高'+z.altitude_limit+'m' : ''}
         </label>`;
@@ -997,7 +997,7 @@
         }
         // Show candidates for selection
         candDiv.innerHTML = items.map((c, i) =>
-          `<div style="padding:4px 8px;margin:2px 0;background:#e0e7ff;border-radius:6px;cursor:pointer;font-size:12px;" onclick="pickCandidate('${which}',${i})" data-idx="${i}">
+          `<div style="padding:4px 8px;margin:2px 0;background:#e0e7ff;border-radius: 10px;cursor:pointer;font-size:12px;" onclick="pickCandidate('${which}',${i})" data-idx="${i}">
             <strong>${esc(c.formatted_address)}</strong> <span style="color:#64748b;">(${c.lat.toFixed(4)}, ${c.lon.toFixed(4)})</span>
           </div>`
         ).join('');
@@ -1027,8 +1027,8 @@
     function updatePickerMarker(which, lat, lon) {
       if (!tdtReady || !mPickerMap) return;
       const iconHtml = which === 'start'
-        ? '<div style="background:#10b981;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">起点</div>'
-        : '<div style="background:#ef4444;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">终点</div>';
+        ? '<div style="background:#10b981;color:#fff;padding:3px 8px;border-radius: 8px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">起点</div>'
+        : '<div style="background:#ef4444;color:#fff;padding:3px 8px;border-radius: 8px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">终点</div>';
       const icon = L.divIcon({ className: '', html: iconHtml, iconAnchor: [20, 10] });
       if (which === 'start') {
         if (mStartMarker) mStartMarker.setLatLng([lat, lon]);
@@ -1106,7 +1106,7 @@
         const isInterval = a.mode === 'interval';
         let html = '<div class="action-card" id="actionCard' + i + '">';
         html += '<div class="action-card-header"><div class="action-card-title">';
-        html += '<span style="background:#6366f1;color:#fff;padding:2px 8px;border-radius:6px;font-size:12px;">' + (i+1) + '</span> ' + esc(label);
+        html += '<span style="background:#6366f1;color:#fff;padding:2px 8px;border-radius: 10px;font-size:12px;">' + (i+1) + '</span> ' + esc(label);
         html += '</div><span class="action-card-remove" onclick="removeMissionAction(' + i + ')">&times;</span></div>';
         // Mode tabs
         html += '<div class="action-mode-tabs">';
@@ -1246,7 +1246,7 @@
         actionIntervalStartMarker = L.marker([snapped.lat, snapped.lon], {
           icon: L.divIcon({
             className: '',
-            html: '<div style="background:#10b981;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);">起始</div>',
+            html: '<div style="background:#10b981;color:#fff;padding:2px 8px;border-radius: 8px;font-size:11px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);">起始</div>',
             iconAnchor: [16, 12]
           })
         }).addTo(actionConfigMap);
@@ -1256,7 +1256,7 @@
         actionIntervalEndMarker = L.marker([snapped.lat, snapped.lon], {
           icon: L.divIcon({
             className: '',
-            html: '<div style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);">终止</div>',
+            html: '<div style="background:#ef4444;color:#fff;padding:2px 8px;border-radius: 8px;font-size:11px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);">终止</div>',
             iconAnchor: [16, 12]
           })
         }).addTo(actionConfigMap);
@@ -1823,7 +1823,7 @@
               const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#165dff','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
               waypoints.forEach((wp, i) => {
                 const color = actionColors[wp.action] || (i === 0 ? '#10b981' : (i === waypoints.length-1 ? '#ef4444' : '#6366f1'));
-                const html = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);">${i+1}.${esc(wp.action||'')}</div>`;
+                const html = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius: 8px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);">${i+1}.${esc(wp.action||'')}</div>`;
                 L.marker([wp.lat, wp.lon], { icon: L.divIcon({ className:'', html, iconAnchor:[20,8] }) }).addTo(mDetailRouteMap);
               });
               mDetailRouteMap.fitBounds(coords, { padding: [30, 30] });
@@ -2588,7 +2588,7 @@
             plan.waypoints.forEach(function(wp, wi) {
               if (!wp.action && wi !== 0 && wi !== plan.waypoints.length - 1) return;
               const color = actionColors[wp.action] || lineColor;
-              const labelHtml = `<div style="background:${color};color:#fff;padding:1px 5px;border-radius:4px;font-size:9px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3);">${wi+1}.${esc(wp.action||'')}</div>`;
+              const labelHtml = `<div style="background:${color};color:#fff;padding:1px 5px;border-radius: 8px;font-size:9px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3);">${wi+1}.${esc(wp.action||'')}</div>`;
               L.marker([wp.lat, wp.lon], {
                 icon: L.divIcon({ className: '', html: labelHtml, iconAnchor: [16, 8] })
               }).addTo(m);
@@ -2700,7 +2700,7 @@
         const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#165dff','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
         plan.waypoints.forEach((wp, i) => {
           const color = actionColors[wp.action] || '#6366f1';
-          const labelHtml = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:grab;">${i+1}. ${esc(wp.action||String(i+1))}</div>`;
+          const labelHtml = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius: 8px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:grab;">${i+1}. ${esc(wp.action||String(i+1))}</div>`;
           const marker = L.marker([wp.lat, wp.lon], {
             icon: L.divIcon({ className:'', html: labelHtml, iconAnchor:[20,8] }),
             draggable: true

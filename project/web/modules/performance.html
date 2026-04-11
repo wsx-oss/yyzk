@@ -25,7 +25,7 @@
     .detail-label { color: #64748b; font-weight: 500; text-align: right; }
     .detail-value { color: #0f172a; }
     .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #64748b; }
-    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .pagination-bar button { padding: 4px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; }
     .pagination-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
     .pagination-bar button:hover:not(:disabled) { background: #f1f5f9; }
   </style>
@@ -170,27 +170,27 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
         <div>
           <label style="font-size:13px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">模块名称 <span style="color:#ef4444;">*</span></label>
-          <input id="addModule" type="text" placeholder="请输入模块名称" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;" />
+          <input id="addModule" type="text" placeholder="请输入模块名称" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius: 10px;font-size:14px;" />
         </div>
         <div>
           <label style="font-size:13px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">用户ID</label>
-          <input id="addUserId" type="text" placeholder="请输入用户ID" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;" />
+          <input id="addUserId" type="text" placeholder="请输入用户ID" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius: 10px;font-size:14px;" />
         </div>
         <div>
           <label style="font-size:13px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">响应时间</label>
-          <input id="addRespTime" type="text" placeholder="如: 120ms" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;" />
+          <input id="addRespTime" type="text" placeholder="如: 120ms" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius: 10px;font-size:14px;" />
         </div>
         <div>
           <label style="font-size:13px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">吞吐量</label>
-          <input id="addThroughput" type="text" placeholder="如: 500 req/s" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;" />
+          <input id="addThroughput" type="text" placeholder="如: 500 req/s" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius: 10px;font-size:14px;" />
         </div>
         <div>
           <label style="font-size:13px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">错误率</label>
-          <input id="addErrorRate" type="text" placeholder="如: 0.5%" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;" />
+          <input id="addErrorRate" type="text" placeholder="如: 0.5%" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius: 10px;font-size:14px;" />
         </div>
         <div>
           <label style="font-size:13px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">分析类型</label>
-          <select id="addAnalysisType" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;">
+          <select id="addAnalysisType" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius: 10px;font-size:14px;">
             <option value="整体性能">整体性能</option>
             <option value="模块性能">模块性能</option>
             <option value="用户性能">用户性能</option>
@@ -198,7 +198,7 @@
         </div>
         <div style="grid-column:1/-1;">
           <label style="font-size:13px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">描述信息</label>
-          <textarea id="addDesc" placeholder="请输入描述信息" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;resize:vertical;min-height:60px;"></textarea>
+          <textarea id="addDesc" placeholder="请输入描述信息" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius: 10px;font-size:14px;resize:vertical;min-height:60px;"></textarea>
         </div>
       </div>
       <div class="modal-actions">
