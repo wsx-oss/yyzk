@@ -77,7 +77,7 @@
       display: flex; align-items: center; gap: 12px; font-size: 14px;
     }
     .detail-confidence-row .conf-label { color: #64748b; font-weight: 500; }
-    .detail-confidence-row .conf-value { font-size: 18px; font-weight: 700; color: #0ea5e9; }
+    .detail-confidence-row .conf-value { font-size: 18px; font-weight: 700; color: #165dff; }
     .detail-confidence-bar {
       flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;
     }
@@ -93,7 +93,7 @@
       display: flex; align-items: center; gap: 8px;
     }
     .chain-steps-title .steps-count {
-      font-size: 12px; background: #0ea5e9; color: #fff; padding: 2px 10px;
+      font-size: 12px; background: #165dff; color: #fff; padding: 2px 10px;
       border-radius: 10px; font-weight: 600;
     }
     .chain-steps {
@@ -103,7 +103,7 @@
     .chain-steps::-webkit-scrollbar { width: 5px; }
     .chain-steps::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     .chain-step {
-      background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #0ea5e9;
+      background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #165dff;
       padding: 18px 20px; margin-bottom: 14px; border-radius: 0 10px 10px 0;
       transition: box-shadow 0.2s;
     }
@@ -114,14 +114,14 @@
     }
     .chain-step-header-left { display: flex; align-items: center; gap: 10px; }
     .step-number {
-      background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff;
+      background: linear-gradient(135deg, #165dff, #6366f1); color: #fff;
       width: 28px; height: 28px; border-radius: 50%;
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 13px; font-weight: 700; flex-shrink: 0;
     }
     .step-type {
       font-size: 12px; font-weight: 600; color: #fff;
-      background: #0ea5e9; padding: 3px 10px; border-radius: 10px;
+      background: #165dff; padding: 3px 10px; border-radius: 10px;
       text-transform: uppercase; letter-spacing: 0.3px;
     }
     .step-confidence-tag {
@@ -153,7 +153,7 @@
     /* ====== Detail modal: final decision ====== */
     .final-decision {
       background: linear-gradient(135deg, #f0f9ff, #ecfdf5);
-      border: 2px solid #0ea5e9; padding: 22px 24px;
+      border: 2px solid #165dff; padding: 22px 24px;
       border-radius: 12px; margin-top: 4px;
       position: relative; overflow: hidden;
     }
@@ -178,7 +178,7 @@
       font-size: 13px; color: #64748b; cursor: pointer; font-weight: 500;
       display: flex; align-items: center; gap: 6px; user-select: none;
     }
-    .raw-text-toggle:hover { color: #0ea5e9; }
+    .raw-text-toggle:hover { color: #165dff; }
     .raw-text-pre {
       background: #1e293b; color: #e2e8f0; padding: 16px 20px;
       border-radius: 8px; font-size: 12px; line-height: 1.6;
@@ -191,7 +191,7 @@
     .cot-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
     .cot-form select, .cot-form input, .cot-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
     .cot-form textarea { resize: vertical; min-height: 80px; }
-    .cot-form input:focus, .cot-form select:focus, .cot-form textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .cot-form input:focus, .cot-form select:focus, .cot-form textarea:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     
     /* Context editor */
     .context-editor { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }

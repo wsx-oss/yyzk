@@ -62,8 +62,8 @@
     .filter-group input:focus,
     .filter-group select:focus {
       outline: none;
-      border-color: #0ea5e9;
-      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+      border-color: var(--cc-primary, #165dff);
+      box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.1);
     }
 
     /* Toggle switch */
@@ -113,7 +113,7 @@
     }
 
     .toggle-switch input:checked+.toggle-slider {
-      background: #0ea5e9;
+      background: #165dff;
     }
 
     .toggle-switch input:checked+.toggle-slider::before {
@@ -150,7 +150,7 @@
     .btn-edit {
       padding: 4px 12px;
       font-size: 12px;
-      background: #0ea5e9;
+      background: #165dff;
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -158,7 +158,7 @@
     }
 
     .btn-edit:hover {
-      background: #0284c7;
+      background: #0e42d2;
     }
 
     .btn-del {
@@ -300,8 +300,8 @@
     .form-group input:focus,
     .form-group select:focus {
       outline: none;
-      border-color: #0ea5e9;
-      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+      border-color: var(--cc-primary, #165dff);
+      box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.1);
     }
 
     .form-row-2 {
@@ -358,7 +358,7 @@
 
     .progress-bar-fill {
       height: 100%;
-      background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+      background: linear-gradient(90deg, #165dff, #38bdf8);
       border-radius: 6px;
       transition: width 0.5s;
       display: flex;
@@ -381,13 +381,13 @@
       padding: 16px 20px;
       background: #f8fafc;
       border-radius: 8px;
-      border-left: 4px solid #0ea5e9;
+      border-left: 4px solid #165dff;
     }
 
     .info-card .info-label {
       font-size: 13px;
       font-weight: 600;
-      color: #0ea5e9;
+      color: #165dff;
       margin-bottom: 4px;
     }
 
@@ -829,7 +829,7 @@
 
       const modeDist = stats.mode_distribution || {};
       const modeLabels = ['增量同步', '全量同步'];
-      const modeColors = ['#10b981', '#0ea5e9'];
+      const modeColors = ['#10b981', '#165dff'];
       const modeData = modeLabels.map(l => modeDist[l] || 0);
 
       if (modeChartInst) modeChartInst.destroy();

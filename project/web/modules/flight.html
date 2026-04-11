@@ -45,7 +45,7 @@
     .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
     .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
     .modal-form textarea { resize: vertical; min-height: 60px; }
-    .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
     /* Detail modal */
@@ -61,7 +61,7 @@
     .log-timeline { margin-top: 16px; }
     .log-item { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
     .log-time { color: #94a3b8; min-width: 140px; }
-    .log-phase { font-weight: 500; color: #0ea5e9; min-width: 60px; }
+    .log-phase { font-weight: 500; color: #165dff; min-width: 60px; }
     .log-msg { color: #334155; }
 
     .pagination-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #64748b; }
@@ -75,7 +75,7 @@
     .plan-form .full-width { grid-column: 1 / -1; }
     .plan-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
     .plan-form input, .plan-form select { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
-    .plan-form input:focus, .plan-form select:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .plan-form input:focus, .plan-form select:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     .plan-actions-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
     .plan-action-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #e0e7ff; color: #3730a3; border-radius: 12px; font-size: 12px; }
     .plan-action-tag .remove-action { cursor: pointer; font-size: 14px; color: #6366f1; margin-left: 2px; }
@@ -124,7 +124,7 @@
     .plan-est-value { font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 2px; }
     .plan-adopt-bar { display: flex; gap: 10px; margin-top: 16px; justify-content: center; }
     .plan-loading { text-align: center; padding: 40px; color: #64748b; }
-    .plan-loading .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: #0ea5e9; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+    .plan-loading .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: #165dff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .btn-llm { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; }
     .btn-llm:hover { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
@@ -164,7 +164,7 @@
     .loc-addr { color: #0f172a; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; display: block; }
     .loc-coords { color: #94a3b8; font-size: 11px; }
     .loc-meta { display: flex; gap: 8px; margin-top: 2px; font-size: 11px; color: #64748b; }
-    .loc-meta .loc-speed { color: #0ea5e9; }
+    .loc-meta .loc-speed { color: #165dff; }
     .loc-meta .loc-bat { font-weight: 600; }
     .loc-bat-ok { color: #10b981; }
     .loc-bat-low { color: #f59e0b; }
@@ -184,11 +184,11 @@
     .realtime-item { text-align: center; }
     .realtime-item .rt-label { font-size: 11px; color: #64748b; }
     .realtime-item .rt-value { font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 2px; }
-    .realtime-item .rt-value.rt-speed { color: #0ea5e9; }
+    .realtime-item .rt-value.rt-speed { color: #165dff; }
     .realtime-item .rt-value.rt-alt { color: #6366f1; }
     .realtime-item .rt-value.rt-bat { color: #10b981; }
     .realtime-addr { margin-top: 12px; padding: 10px; background: #fff; border-radius: 8px; font-size: 13px; color: #334155; text-align: center; }
-    .realtime-addr strong { color: #0ea5e9; }
+    .realtime-addr strong { color: #165dff; }
     .realtime-update { text-align: center; margin-top: 8px; font-size: 11px; color: #94a3b8; }
 
     /* Action config cards */
@@ -201,7 +201,7 @@
     .action-mode-tab { flex: 1; padding: 7px 10px; text-align: center; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #64748b; transition: all .15s; }
     .action-mode-tab:first-child { border-radius: 6px 0 0 6px; }
     .action-mode-tab:last-child { border-radius: 0 6px 6px 0; }
-    .action-mode-tab.active { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+    .action-mode-tab.active { background: var(--cc-primary, #165dff); color: #fff; border-color: var(--cc-primary, #165dff); }
     .action-points-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; min-height: 24px; }
     .action-point-tag { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; background: #dbeafe; color: #1e40af; border-radius: 10px; font-size: 11px; }
     .action-point-tag .apt-remove { cursor: pointer; font-size: 13px; margin-left: 2px; color: #3b82f6; }
@@ -209,7 +209,7 @@
     .action-interval-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
     .action-interval-row label { font-size: 12px; color: #64748b; white-space: nowrap; }
     .action-interval-row input { width: 80px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
-    .action-config-map { height: 220px; border-radius: 8px; margin-top: 8px; border: 2px solid #0ea5e9; }
+    .action-config-map { height: 220px; border-radius: 8px; margin-top: 8px; border: 2px solid #165dff; }
     .action-map-hint { font-size: 11px; color: #64748b; margin-top: 4px; text-align: center; }
     .action-summary { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-top: 12px; }
     .action-summary-title { font-size: 13px; font-weight: 600; color: #166534; margin-bottom: 8px; }
@@ -291,7 +291,7 @@
     </div>
     <div class="stat-box">
       <div class="stat-label">飞行中</div>
-      <div class="stat-value" id="statFlying" style="color:#0ea5e9;">0</div>
+      <div class="stat-value" id="statFlying" style="color:#165dff;">0</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">返航中</div>
@@ -359,7 +359,7 @@
       <div class="modal-title" id="missionModalTitle">创建飞行任务</div>
       <!-- Step indicator -->
       <div id="stepIndicator" style="display:flex;gap:0;margin-bottom:16px;">
-        <div id="stepInd1" style="flex:1;text-align:center;padding:8px 12px;background:#0ea5e9;color:#fff;border-radius:8px 0 0 8px;font-size:13px;font-weight:600;transition:all .2s;">① 航线规划</div>
+        <div id="stepInd1" style="flex:1;text-align:center;padding:8px 12px;background:#165dff;color:#fff;border-radius:8px 0 0 8px;font-size:13px;font-weight:600;transition:all .2s;">① 航线规划</div>
         <div id="stepInd2" style="flex:1;text-align:center;padding:8px 12px;background:#e2e8f0;color:#94a3b8;border-radius:0 8px 8px 0;font-size:13px;font-weight:600;transition:all .2s;">② 任务配置</div>
       </div>
       <!-- Step 1: Route Planning -->
@@ -569,7 +569,7 @@
           labels: ['待起飞', '飞行中', '返航中', '已完成'],
           datasets: [{
             data: [0, 0, 0, 0],
-            backgroundColor: ['#6366f1', '#0ea5e9', '#f59e0b', '#10b981']
+            backgroundColor: ['#6366f1', '#165dff', '#f59e0b', '#10b981']
           }]
         },
         options: {
@@ -584,7 +584,7 @@
           datasets: [{
             label: '任务数量',
             data: [0, 0, 0, 0, 0, 0],
-            backgroundColor: ['#94a3b8', '#6366f1', '#0ea5e9', '#f59e0b', '#f97316', '#10b981'],
+            backgroundColor: ['#94a3b8', '#6366f1', '#165dff', '#f59e0b', '#f97316', '#10b981'],
             barThickness: 24,
             borderRadius: 4
           }]
@@ -755,7 +755,7 @@
     function progressColor(v) {
       if (v >= 100) return '#10b981';
       if (v >= 60) return '#f59e0b';
-      return '#0ea5e9';
+      return '#165dff';
     }
 
     function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -1504,7 +1504,7 @@
     function showRouteStep() {
       $('#routeStep').style.display = '';
       $('#taskStep').style.display = 'none';
-      $('#stepInd1').style.background = '#0ea5e9';
+      $('#stepInd1').style.background = '#165dff';
       $('#stepInd1').style.color = '#fff';
       $('#stepInd2').style.background = '#e2e8f0';
       $('#stepInd2').style.color = '#94a3b8';
@@ -1515,7 +1515,7 @@
       $('#taskStep').style.display = '';
       $('#stepInd1').style.background = '#10b981';
       $('#stepInd1').style.color = '#fff';
-      $('#stepInd2').style.background = '#0ea5e9';
+      $('#stepInd2').style.background = '#165dff';
       $('#stepInd2').style.color = '#fff';
       var routeVal = $('#missionRoute').value.trim();
       $('#routeSummaryText').textContent = routeVal || '(手动填写)';
@@ -1754,7 +1754,7 @@
           const phases = ['待命', '起飞', '巡航', '执行任务', '返航', '降落'];
           const currentIdx = phases.indexOf(m.current_phase);
           pc.innerHTML = '<div style="margin-bottom:6px;"><strong style="font-size:13px;color:#475569;">飞行阶段（自动）：</strong>' +
-            '<span style="font-size:11px;color:#0ea5e9;margin-left:6px;">📡 设备在线，阶段由无人机自动上报</span></div>' +
+            '<span style="font-size:11px;color:#165dff;margin-left:6px;">📡 设备在线，阶段由无人机自动上报</span></div>' +
             phases.map((p, i) => {
               const isCurrent = p === m.current_phase;
               const isPast = i < currentIdx;
@@ -1819,7 +1819,7 @@
               addNoFlyZonesToMap(mDetailRouteMap, []);
               var detailDisplay = (typeof smoothRoute==='function' && coords.length>=3) ? smoothRoute(coords, {segPoints:12,tension:0.3}) : coords;
               L.polyline(detailDisplay, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mDetailRouteMap);
-              const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
+              const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#165dff','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
               waypoints.forEach((wp, i) => {
                 const color = actionColors[wp.action] || (i === 0 ? '#10b981' : (i === waypoints.length-1 ? '#ef4444' : '#6366f1'));
                 const html = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);">${i+1}.${esc(wp.action||'')}</div>`;
@@ -2583,7 +2583,7 @@
             const poly = L.polyline(displayCoords, { color: lineColor, weight: 3, opacity: 0.9 }).addTo(m);
 
             // Action waypoint markers (only for waypoints with actions)
-            const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
+            const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#165dff','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
             plan.waypoints.forEach(function(wp, wi) {
               if (!wp.action && wi !== 0 && wi !== plan.waypoints.length - 1) return;
               const color = actionColors[wp.action] || lineColor;
@@ -2696,7 +2696,7 @@
         mResultPathPolyline._rawCoords = coords; // keep raw for drag update
 
         // Draggable waypoint markers
-        const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
+        const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#165dff','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
         plan.waypoints.forEach((wp, i) => {
           const color = actionColors[wp.action] || '#6366f1';
           const labelHtml = `<div style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:grab;">${i+1}. ${esc(wp.action||String(i+1))}</div>`;

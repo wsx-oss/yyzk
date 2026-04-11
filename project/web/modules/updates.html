@@ -59,8 +59,8 @@
     .filter-group input:focus,
     .filter-group select:focus {
       outline: none;
-      border-color: #0ea5e9;
-      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+      border-color: var(--cc-primary, #165dff);
+      box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.1);
     }
 
     /* Toggle switch */
@@ -116,7 +116,7 @@
     }
 
     .toggle-switch input:checked+.toggle-slider {
-      background: #0ea5e9;
+      background: #165dff;
     }
 
     .toggle-switch input:checked+.toggle-slider::before {
@@ -142,7 +142,7 @@
     .btn-edit {
       padding: 4px 12px;
       font-size: 12px;
-      background: #0ea5e9;
+      background: #165dff;
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -150,7 +150,7 @@
     }
 
     .btn-edit:hover {
-      background: #0284c7;
+      background: #0e42d2;
     }
 
     .btn-del {
@@ -269,8 +269,8 @@
     .form-group select:focus,
     .form-group textarea:focus {
       outline: none;
-      border-color: #0ea5e9;
-      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+      border-color: var(--cc-primary, #165dff);
+      box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.1);
     }
 
     .form-row-2 {
@@ -634,7 +634,7 @@
     function renderCharts(stats) {
       const statusDist = stats.status_distribution || {};
       const statusLabels = ['待发布', '已发布', '已撤回'];
-      const statusColors = ['#0ea5e9', '#10b981', '#ef4444'];
+      const statusColors = ['#165dff', '#10b981', '#ef4444'];
       const statusData = statusLabels.map(l => statusDist[l] || 0);
 
       if (statusChartInst) statusChartInst.destroy();
@@ -655,7 +655,7 @@
 
       const typeDist = stats.type_distribution || {};
       const typeLabels = ['功能更新', '安全更新', '性能优化'];
-      const typeColors = ['#0ea5e9', '#10b981', '#a855f7'];
+      const typeColors = ['#165dff', '#10b981', '#a855f7'];
       const typeData = typeLabels.map(l => typeDist[l] || 0);
 
       if (typeChartInst) typeChartInst.destroy();

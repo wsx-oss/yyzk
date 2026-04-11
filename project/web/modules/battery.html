@@ -15,39 +15,41 @@
 
     /* Battery level bar */
     .bat-level-bar { display: flex; align-items: center; gap: 6px; }
-    .bat-level-track { width: 80px; height: 18px; background: #e2e8f0; border-radius: 4px; overflow: hidden; position: relative; }
+    .bat-level-track { width: 80px; height: 18px; background: var(--cc-bg-3, #f2f3f5); border-radius: 4px; overflow: hidden; position: relative; }
     .bat-level-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
     .bat-level-text { font-size: 13px; font-weight: 600; min-width: 36px; }
 
     /* Status badges */
-    .bat-status-normal { background: #d1fae5; color: #065f46; }
-    .bat-status-low { background: #fef3c7; color: #92400e; }
-    .bat-status-critical { background: #fee2e2; color: #991b1b; }
-    .bat-status-temp { background: #fce7f3; color: #9d174d; }
-    .bat-status-health { background: #e0e7ff; color: #3730a3; }
+    .bat-status-normal { background: var(--cc-success-light, #e8ffea); color: #009a29; }
+    .bat-status-low { background: var(--cc-warning-light, #fff7e8); color: #d25f00; }
+    .bat-status-critical { background: var(--cc-danger-light, #ffece8); color: #cb2634; }
+    .bat-status-temp { background: #ffe8f1; color: #cb2078; }
+    .bat-status-health { background: var(--cc-primary-light, #e8f3ff); color: #0e42d2; }
 
     /* Modal */
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
-    .modal-overlay.active { display: flex; }
-    .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 560px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+    .modal-overlay.active { display: flex; animation: modalBgFadeIn 0.2s ease-out; }
+    .modal-box { background: var(--cc-bg-2, #fff); border-radius: var(--cc-radius-lg, 12px); padding: 24px; width: 560px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.12); animation: modalSlideIn 0.25s ease-out; }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: var(--cc-text-1, #1d2129); }
     .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .modal-form .full-width { grid-column: 1 / -1; }
-    .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
-    .modal-form input, .modal-form select { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
-    .modal-form input:focus, .modal-form select:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-form label { font-size: 13px; color: var(--cc-text-3, #86909c); font-weight: 500; margin-bottom: 4px; display: block; }
+    .modal-form input, .modal-form select { width: 100%; padding: 7px 12px; border: 1px solid var(--cc-border, #e5e6eb); border-radius: 4px; font-size: 14px; background: var(--cc-bg-2, #fff); color: var(--cc-text-1, #1d2129); transition: all 0.2s; }
+    .modal-form input:focus, .modal-form select:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    @keyframes modalBgFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes modalSlideIn { from { opacity: 0; transform: translateY(-16px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
     /* Detail grid */
     .detail-grid { display: grid; grid-template-columns: 110px 1fr; gap: 10px 16px; font-size: 14px; }
-    .detail-label { color: #64748b; font-weight: 500; text-align: right; }
-    .detail-value { color: #0f172a; }
+    .detail-label { color: var(--cc-text-3, #86909c); font-weight: 400; text-align: right; }
+    .detail-value { color: var(--cc-text-1, #1d2129); font-weight: 500; }
 
     /* Tabs */
-    .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
-    .tab-item { padding: 10px 24px; cursor: pointer; font-size: 14px; font-weight: 500; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
-    .tab-item:hover { color: #0ea5e9; }
-    .tab-item.active { color: #0ea5e9; border-bottom-color: #0ea5e9; }
+    .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--cc-border, #e5e6eb); }
+    .tab-item { padding: 10px 24px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--cc-text-3, #86909c); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
+    .tab-item:hover { color: var(--cc-primary, #165dff); }
+    .tab-item.active { color: var(--cc-primary, #165dff); border-bottom-color: var(--cc-primary, #165dff); font-weight: 600; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -144,7 +146,7 @@
     </div>
     <div class="stat-box">
       <div class="stat-label">平均电量</div>
-      <div class="stat-value" id="statAvgLevel" style="color:#0ea5e9;">0%</div>
+      <div class="stat-value" id="statAvgLevel" style="color:#165dff;">0%</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">未处理报警</div>
@@ -273,7 +275,7 @@
         <div class="full-width">
           <label>无人机设备 *</label>
           <select id="reportDevice"><option value="0">请选择无人机</option></select>
-          <div id="reportDeviceHint" style="font-size:12px;color:#f59e0b;margin-top:4px;display:none;">暂无可选设备，请先到 <a href="javascript:void(0)" onclick="window.top.document.querySelector('[data-page=drones]').click()" style="color:#0ea5e9;text-decoration:underline;">无人机管理</a> 页面注册无人机</div>
+          <div id="reportDeviceHint" style="font-size:12px;color:#f59e0b;margin-top:4px;display:none;">暂无可选设备，请先到 <a href="javascript:void(0)" onclick="window.top.document.querySelector('[data-page=drones]').click()" style="color:#165dff;text-decoration:underline;">无人机管理</a> 页面注册无人机</div>
         </div>
         <div>
           <label>电量(%)</label>
@@ -385,7 +387,7 @@
             backgroundColor: function(ctx) {
               const chart = ctx.chart;
               const {ctx: c, chartArea} = chart;
-              if (!chartArea) return ['#0ea5e9', '#10b981'][ctx.dataIndex];
+              if (!chartArea) return ['#165dff', '#10b981'][ctx.dataIndex];
               const grad = c.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
               if (ctx.dataIndex === 0) {
                 grad.addColorStop(0, '#ef4444'); grad.addColorStop(0.3, '#f59e0b'); grad.addColorStop(1, '#22c55e');
@@ -478,7 +480,7 @@
     function levelColor(lv) {
       if (lv <= 10) return '#ef4444';
       if (lv <= 20) return '#f59e0b';
-      if (lv <= 50) return '#0ea5e9';
+      if (lv <= 50) return '#165dff';
       return '#10b981';
     }
 
@@ -694,7 +696,7 @@
           data: {
             labels: labels,
             datasets: [
-              { label: '电量(%)', data: levelData, borderColor: '#0ea5e9', backgroundColor: levelGrad, fill: true, tension: 0.3, pointRadius: 2, yAxisID: 'yPct' },
+              { label: '电量(%)', data: levelData, borderColor: '#165dff', backgroundColor: levelGrad, fill: true, tension: 0.3, pointRadius: 2, yAxisID: 'yPct' },
               { label: '健康度(%)', data: reversed.map(r => r.health), borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'yPct' },
               { label: '电压(V)', data: reversed.map(r => r.voltage), borderColor: '#8b5cf6', backgroundColor: 'transparent', tension: 0.3, pointRadius: 1, borderDash: [4,2], yAxisID: 'yVolt' },
               { label: '温度(°C)', data: reversed.map(r => r.temperature), borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'yTemp' },

@@ -5,321 +5,646 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CloudControl</title>
   <style>
+    :root {
+      --sidebar-width: 220px;
+      --sidebar-collapsed-width: 60px;
+      --navbar-height: 60px;
+      --cc-primary: #165dff;
+      --cc-primary-light: #e8f3ff;
+      --cc-bg-1: #f7f8fa;
+      --cc-bg-2: #ffffff;
+      --cc-bg-3: #f2f3f5;
+      --cc-border: #e5e6eb;
+      --cc-text-1: #1d2129;
+      --cc-text-2: #4e5969;
+      --cc-text-3: #86909c;
+      --cc-text-4: #c9cdd4;
+      --cc-sidebar-bg: #232324;
+      --cc-sidebar-active: rgba(22,93,255,0.15);
+      --cc-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: system-ui, "Segoe UI", Arial, Helvetica, sans-serif;
-      background: #f1f5f9;
+      font-family: var(--cc-font);
+      background: var(--cc-bg-1);
       overflow: hidden;
+      color: var(--cc-text-1);
+      -webkit-font-smoothing: antialiased;
     }
-    .container {
+
+    /* ===== Navbar (Fixed top) ===== */
+    .layout-navbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--navbar-height);
+      background: var(--cc-bg-2);
+      border-bottom: 1px solid var(--cc-border);
+      z-index: 100;
       display: flex;
-      height: 100vh;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
     }
-    .sidebar {
-      width: 220px;
-      background: #1e3a8a;
+    .navbar-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .navbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--cc-text-1);
+    }
+    .navbar-logo svg { flex-shrink: 0; }
+    .navbar-logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #165dff, #14c9c9);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .navbar-collapse-btn {
+      width: 32px; height: 32px;
+      border: 1px solid var(--cc-border);
+      border-radius: 6px;
+      background: var(--cc-bg-2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cc-text-3);
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+    .navbar-collapse-btn:hover {
+      border-color: var(--cc-primary);
+      color: var(--cc-primary);
+      background: var(--cc-primary-light);
+    }
+    .navbar-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--cc-text-3);
+      margin-left: 8px;
+    }
+    .navbar-breadcrumb span { color: var(--cc-text-4); }
+    .navbar-breadcrumb .bc-current { color: var(--cc-text-1); font-weight: 500; }
+    .navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+    }
+    .navbar-right li {
+      display: flex;
+      align-items: center;
+    }
+    .nav-btn {
+      width: 36px; height: 36px;
+      border: 1px solid var(--cc-border);
+      border-radius: 50%;
+      background: var(--cc-bg-2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cc-text-2);
+      font-size: 16px;
+      transition: all 0.2s;
+      position: relative;
+      margin: 0 4px;
+    }
+    .nav-btn:hover {
+      border-color: var(--cc-primary);
+      color: var(--cc-primary);
+      background: var(--cc-primary-light);
+    }
+    .nav-btn .badge {
+      position: absolute;
+      top: -2px; right: -2px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #f53f3f;
+      border: 2px solid var(--cc-bg-2);
+    }
+    .user-dropdown {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 4px 12px 4px 4px;
+      border-radius: 20px;
+      transition: background 0.2s;
+      margin-left: 8px;
+      position: relative;
+    }
+    .user-dropdown:hover { background: var(--cc-bg-3); }
+    .user-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #165dff, #14c9c9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .user-name {
+      font-size: 14px;
+      color: var(--cc-text-1);
+      font-weight: 500;
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .user-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background: var(--cc-bg-2);
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      border: 1px solid var(--cc-border);
+      min-width: 160px;
+      padding: 4px 0;
+      z-index: 200;
+      animation: menuFadeIn 0.15s ease-out;
+    }
+    .user-menu.show { display: block; }
+    .user-menu-item {
+      padding: 8px 16px;
+      font-size: 14px;
+      color: var(--cc-text-2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+    .user-menu-item:hover { background: var(--cc-bg-3); color: var(--cc-text-1); }
+    .user-menu-item.danger { color: #f53f3f; }
+    .user-menu-item.danger:hover { background: #ffece8; }
+    .user-menu-divider { height: 1px; background: var(--cc-border); margin: 4px 0; }
+
+    /* ===== Sidebar ===== */
+    .layout-sidebar {
+      position: fixed;
+      top: var(--navbar-height);
+      left: 0;
+      width: var(--sidebar-width);
+      height: calc(100vh - var(--navbar-height));
+      background: var(--cc-sidebar-bg);
+      z-index: 99;
+      transition: width 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
       display: flex;
       flex-direction: column;
-      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .layout-sidebar::after {
+      content: '';
+      position: absolute;
+      top: 0; right: -1px;
+      width: 1px;
+      height: 100%;
+      background: rgba(255,255,255,0.06);
+    }
+    .layout-sidebar.collapsed {
+      width: var(--sidebar-collapsed-width);
     }
     .sidebar-nav {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
+      padding: 8px 0;
       scrollbar-width: thin;
-      scrollbar-color: rgba(255,255,255,0.3) transparent;
+      scrollbar-color: rgba(255,255,255,0.15) transparent;
     }
-    .sidebar-nav::-webkit-scrollbar {
-      width: 5px;
-    }
-    .sidebar-nav::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    .sidebar-nav::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.3);
-      border-radius: 3px;
-    }
-    .sidebar-nav::-webkit-scrollbar-thumb:hover {
-      background: rgba(255,255,255,0.5);
-    }
-    .sidebar-header {
-      padding: 20px 16px;
-      background: #1e40af;
-      font-size: 16px;
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+    .nav-section-label {
+      padding: 20px 16px 8px;
+      font-size: 11px;
       font-weight: 600;
-      text-align: center;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.3);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .layout-sidebar.collapsed .nav-section-label {
+      opacity: 0;
+      height: 0;
+      padding: 0;
+      overflow: hidden;
     }
     .nav-item {
-      padding: 14px 16px;
-      color: rgba(255,255,255,0.9);
-      text-decoration: none;
+      padding: 0 8px;
+      margin: 2px 0;
+    }
+    .nav-item a, .nav-item-link {
       display: flex;
       align-items: center;
-      font-size: 15px;
+      gap: 10px;
+      padding: 10px 12px;
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      font-size: 14px;
+      border-radius: 6px;
       transition: all 0.2s;
       cursor: pointer;
-      border-left: 3px solid transparent;
+      white-space: nowrap;
+      overflow: hidden;
     }
-    .nav-item:hover {
-      background: rgba(255,255,255,0.1);
-      border-left-color: #60a5fa;
+    .nav-item a:hover, .nav-item-link:hover {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
     }
-    .nav-item.active {
-      background: rgba(255,255,255,0.15);
-      border-left-color: #fff;
+    .nav-item a.active, .nav-item-link.active {
+      background: var(--cc-sidebar-active);
+      color: var(--cc-primary);
       font-weight: 500;
     }
-    .nav-item::before {
-      content: '●';
-      margin-right: 8px;
-      font-size: 8px;
-    }
-    .nav-group-header {
-      padding: 14px 16px;
-      color: rgba(255,255,255,0.9);
+    .nav-icon {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      font-size: 15px;
-      cursor: pointer;
-      border-left: 3px solid transparent;
+      justify-content: center;
+      font-size: 16px;
+      opacity: 0.85;
+    }
+    .nav-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .layout-sidebar.collapsed .nav-text {
+      display: none;
+    }
+    .layout-sidebar.collapsed .nav-group-arrow {
+      display: none;
+    }
+
+    .nav-group-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+      border-radius: 6px;
       transition: all 0.2s;
+      cursor: pointer;
+      white-space: nowrap;
+      margin: 0 8px;
       user-select: none;
     }
-    .nav-group-header:hover {
-      background: rgba(255,255,255,0.1);
-      border-left-color: #60a5fa;
+    .nav-group-toggle:hover {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
     }
-    .nav-group-header.active {
-      background: rgba(255,255,255,0.15);
-      border-left-color: #fff;
-      font-weight: 500;
+    .nav-group-toggle.has-active {
+      color: rgba(255,255,255,0.95);
     }
-    .nav-group-header .nav-group-icon::before {
-      content: '▶';
-      font-size: 9px;
-      margin-right: 8px;
-      display: inline-block;
+    .nav-group-arrow {
+      margin-left: auto;
+      font-size: 10px;
       transition: transform 0.2s;
+      color: rgba(255,255,255,0.3);
     }
-    .nav-group-header.open .nav-group-icon::before {
+    .nav-group-toggle.open .nav-group-arrow {
       transform: rotate(90deg);
     }
-    .nav-sub-list {
-      display: none;
-      background: rgba(0,0,0,0.15);
+    .nav-group-children {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s cubic-bezier(0.34, 0.69, 0.1, 1);
     }
-    .nav-sub-list.open {
-      display: block;
+    .nav-group-children.open {
+      max-height: 500px;
     }
-    .nav-sub-item {
-      padding: 11px 16px 11px 32px;
-      color: rgba(255,255,255,0.8);
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      font-size: 14px;
-      transition: all 0.2s;
-      cursor: pointer;
-      border-left: 3px solid transparent;
+    .nav-group-children .nav-item a,
+    .nav-group-children .nav-item-link {
+      padding-left: 46px;
+      font-size: 13px;
     }
-    .nav-sub-item:hover {
-      background: rgba(255,255,255,0.08);
-      border-left-color: #60a5fa;
-      color: #fff;
+    .layout-sidebar.collapsed .nav-group-children {
+      max-height: 0 !important;
     }
-    .nav-sub-item.active {
-      background: rgba(255,255,255,0.12);
-      border-left-color: #60a5fa;
-      color: #fff;
-      font-weight: 500;
-    }
-    .nav-sub-item::before {
-      content: '–';
-      margin-right: 8px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.4);
-    }
-    .main-content {
-      flex: 1;
+
+    /* ===== Main Content ===== */
+    .layout-content {
+      margin-left: var(--sidebar-width);
+      padding-top: var(--navbar-height);
+      height: 100vh;
+      transition: margin-left 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      background: var(--cc-bg-1);
     }
-    .top-bar {
-      background: #0ea5e9;
-      color: #fff;
-      padding: 0 24px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .top-bar h1 {
-      font-size: 20px;
-      font-weight: 600;
-    }
-    .user-info {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      font-size: 15px;
-    }
-    .btn-logout {
-      background: rgba(255,255,255,0.2);
-      border: none;
-      color: #fff;
-      padding: 6px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: all 0.2s;
-    }
-    .btn-logout:hover {
-      background: rgba(255,255,255,0.3);
+    .layout-content.sidebar-collapsed {
+      margin-left: var(--sidebar-collapsed-width);
     }
     .content-area {
       flex: 1;
-      overflow-y: auto;
-      padding: 24px;
+      overflow: hidden;
+      padding: 0;
     }
     iframe {
       width: 100%;
       height: 100%;
       border: none;
-      background: #fff;
-      border-radius: 8px;
+      background: var(--cc-bg-1);
+    }
+
+    /* ===== Animations ===== */
+    @keyframes menuFadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== Tooltip on collapsed sidebar ===== */
+    .layout-sidebar.collapsed .nav-item a,
+    .layout-sidebar.collapsed .nav-item-link {
+      justify-content: center;
+      padding: 10px 0;
+    }
+    .layout-sidebar.collapsed .nav-group-toggle {
+      justify-content: center;
+      padding: 10px 0;
+      margin: 0 4px;
+    }
+
+    /* ===== Sidebar footer ===== */
+    .sidebar-footer {
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.3);
+      font-size: 11px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .layout-sidebar.collapsed .sidebar-footer {
+      padding: 12px 4px;
+      font-size: 10px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <aside class="sidebar">
-      <div class="sidebar-header">系统菜单</div>
-      <div class="sidebar-nav">
-      <a class="nav-item active" data-page="drones">无人机管理</a>
-      <div class="nav-group-header open" id="navFlightGroup" onclick="toggleNavGroup(this)">
-        <span><span class="nav-group-icon"></span>飞行任务管理</span>
+
+  <!-- ===== Top Navbar ===== -->
+  <header class="layout-navbar">
+    <div class="navbar-left">
+      <a class="navbar-logo" href="#">
+        <svg width="28" height="28" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+          <rect x="50" y="40" width="20" height="40" rx="6" fill="#165dff"/>
+          <line x1="60" y1="48" x2="28" y2="22" stroke="#165dff" stroke-width="5" stroke-linecap="round"/>
+          <line x1="60" y1="48" x2="92" y2="22" stroke="#165dff" stroke-width="5" stroke-linecap="round"/>
+          <line x1="60" y1="72" x2="28" y2="98" stroke="#14c9c9" stroke-width="5" stroke-linecap="round"/>
+          <line x1="60" y1="72" x2="92" y2="98" stroke="#14c9c9" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="28" cy="22" r="10" fill="#165dff" opacity="0.2" stroke="#165dff" stroke-width="2"/>
+          <circle cx="92" cy="22" r="10" fill="#165dff" opacity="0.2" stroke="#165dff" stroke-width="2"/>
+          <circle cx="28" cy="98" r="10" fill="#14c9c9" opacity="0.2" stroke="#14c9c9" stroke-width="2"/>
+          <circle cx="92" cy="98" r="10" fill="#14c9c9" opacity="0.2" stroke="#14c9c9" stroke-width="2"/>
+        </svg>
+        <span class="navbar-logo-text">CloudControl</span>
+      </a>
+      <button class="navbar-collapse-btn" id="sidebarToggle" title="折叠/展开菜单">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <div class="navbar-breadcrumb" id="breadcrumb">
+        <span>首页</span> <span>/</span> <span class="bc-current" id="bcCurrent">无人机管理</span>
       </div>
-      <div class="nav-sub-list open" id="navFlightSub">
-        <a class="nav-sub-item" data-page="noflyzone">禁飞区</a>
-        <a class="nav-sub-item" data-page="flight">航线规划</a>
-        <a class="nav-sub-item" data-page="gps">GPS/位置信息</a>
+    </div>
+    <ul class="navbar-right">
+      <li>
+        <button class="nav-btn" title="全屏" id="btnFullscreen">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </li>
+      <li>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <span class="user-name" id="username">用户</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="user-menu" id="userMenu">
+            <div class="user-menu-item" onclick="location.reload()">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1 8a7 7 0 0113.6-2.2M15 8A7 7 0 011.4 10.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              刷新页面
+            </div>
+            <div class="user-menu-divider"></div>
+            <div class="user-menu-item danger" id="btnLogout">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M6 14H3a1 1 0 01-1-1V3a1 1 0 011-1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              退出登录
+            </div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </header>
+
+  <!-- ===== Sidebar ===== -->
+  <aside class="layout-sidebar" id="sidebar">
+    <nav class="sidebar-nav">
+
+      <div class="nav-section-label">核心功能</div>
+      <div class="nav-item">
+        <a class="active" data-page="drones" data-label="无人机管理">
+          <span class="nav-icon">🛩</span>
+          <span class="nav-text">无人机管理</span>
+        </a>
       </div>
-      <div class="nav-group-header open" id="navSimAIGroup" onclick="toggleNavGroup(this)">
-        <span><span class="nav-group-icon"></span>仿真与智能决策</span>
-      </div>
-      <div class="nav-sub-list open" id="navSimAISub">
-        <a class="nav-sub-item" data-page="simulation">仿真模拟引擎</a>
-        <a class="nav-sub-item" data-page="cot">CoT 智能决策</a>
-      </div>
-      <div class="nav-group-header open" id="navOpsGroup" onclick="toggleNavGroup(this)">
-        <span><span class="nav-group-icon"></span>系统调度与运维</span>
-      </div>
-      <div class="nav-sub-list open" id="navOpsSub">
-        <a class="nav-sub-item" data-page="concurrency">并发任务监控</a>
-        <a class="nav-sub-item" data-page="backup">备份与数据回滚</a>
-      </div>
-      <div class="nav-group-header open" id="navStatusGroup" onclick="toggleNavGroup(this)">
-        <span><span class="nav-group-icon"></span>无人机状态监控</span>
-      </div>
-      <div class="nav-sub-list open" id="navStatusSub">
-        <a class="nav-sub-item" data-page="video">视频监控</a>
-        <a class="nav-sub-item" data-page="remote">远程桌面控制</a>
-        <a class="nav-sub-item" data-page="alerts">异常报警</a>
-        <a class="nav-sub-item" data-page="battery">电池监控</a>
-        <a class="nav-sub-item" data-page="hardware">硬件状态检测</a>
-      </div>
-      <div class="nav-group-header open" id="navLogsGroup" onclick="toggleNavGroup(this)">
-        <span><span class="nav-group-icon"></span>日志管理</span>
-      </div>
-      <div class="nav-sub-list open" id="navLogsSub">
-        <a class="nav-sub-item" data-page="monitor">系统状态监控</a>
-        <a class="nav-sub-item" data-page="audio">语音交互记录</a>
-        <a class="nav-sub-item" data-page="performance">性能分析报告</a>
-        <a class="nav-sub-item" data-page="updates">软件更新管理</a>
-        <a class="nav-sub-item" data-page="logs">维护操作日志</a>
-        <a class="nav-sub-item" data-page="sync">数据同步状态</a>
-      </div>
-      </div>
-    </aside>
-    <main class="main-content">
-      <div class="top-bar">
-        <h1>CloudControl</h1>
-        <div class="user-info">
-          <span id="username">-</span>
-          <button class="btn-logout" id="btnLogout">退出</button>
+
+      <div class="nav-section-label">飞行任务</div>
+      <div class="nav-group">
+        <div class="nav-group-toggle open" data-group="flight">
+          <span class="nav-icon">🗺</span>
+          <span class="nav-text">飞行任务管理</span>
+          <span class="nav-group-arrow">▶</span>
+        </div>
+        <div class="nav-group-children open">
+          <div class="nav-item"><a data-page="noflyzone" data-label="禁飞区"><span class="nav-icon">⛔</span><span class="nav-text">禁飞区</span></a></div>
+          <div class="nav-item"><a data-page="flight" data-label="航线规划"><span class="nav-icon">✈</span><span class="nav-text">航线规划</span></a></div>
+          <div class="nav-item"><a data-page="gps" data-label="GPS/位置信息"><span class="nav-icon">📡</span><span class="nav-text">GPS/位置信息</span></a></div>
         </div>
       </div>
-      <div class="content-area">
-        <iframe id="contentFrame" src="/app/modules/drones.html"></iframe>
+
+      <div class="nav-section-label">仿真 &amp; AI</div>
+      <div class="nav-group">
+        <div class="nav-group-toggle open" data-group="simai">
+          <span class="nav-icon">🧪</span>
+          <span class="nav-text">仿真与智能决策</span>
+          <span class="nav-group-arrow">▶</span>
+        </div>
+        <div class="nav-group-children open">
+          <div class="nav-item"><a data-page="simulation" data-label="仿真模拟引擎"><span class="nav-icon">🎮</span><span class="nav-text">仿真模拟引擎</span></a></div>
+          <div class="nav-item"><a data-page="cot" data-label="CoT 智能决策"><span class="nav-icon">🧠</span><span class="nav-text">CoT 智能决策</span></a></div>
+        </div>
       </div>
-    </main>
+
+      <div class="nav-section-label">系统运维</div>
+      <div class="nav-group">
+        <div class="nav-group-toggle open" data-group="ops">
+          <span class="nav-icon">⚙</span>
+          <span class="nav-text">系统调度与运维</span>
+          <span class="nav-group-arrow">▶</span>
+        </div>
+        <div class="nav-group-children open">
+          <div class="nav-item"><a data-page="concurrency" data-label="并发任务监控"><span class="nav-icon">📊</span><span class="nav-text">并发任务监控</span></a></div>
+          <div class="nav-item"><a data-page="backup" data-label="备份与数据回滚"><span class="nav-icon">💾</span><span class="nav-text">备份与数据回滚</span></a></div>
+        </div>
+      </div>
+
+      <div class="nav-section-label">状态监控</div>
+      <div class="nav-group">
+        <div class="nav-group-toggle open" data-group="status">
+          <span class="nav-icon">📺</span>
+          <span class="nav-text">无人机状态监控</span>
+          <span class="nav-group-arrow">▶</span>
+        </div>
+        <div class="nav-group-children open">
+          <div class="nav-item"><a data-page="video" data-label="视频监控"><span class="nav-icon">🎥</span><span class="nav-text">视频监控</span></a></div>
+          <div class="nav-item"><a data-page="remote" data-label="远程桌面控制"><span class="nav-icon">🖥</span><span class="nav-text">远程桌面控制</span></a></div>
+          <div class="nav-item"><a data-page="alerts" data-label="异常报警"><span class="nav-icon">🚨</span><span class="nav-text">异常报警</span></a></div>
+          <div class="nav-item"><a data-page="battery" data-label="电池监控"><span class="nav-icon">🔋</span><span class="nav-text">电池监控</span></a></div>
+          <div class="nav-item"><a data-page="hardware" data-label="硬件状态检测"><span class="nav-icon">🔧</span><span class="nav-text">硬件状态检测</span></a></div>
+        </div>
+      </div>
+
+      <div class="nav-section-label">日志管理</div>
+      <div class="nav-group">
+        <div class="nav-group-toggle open" data-group="logs">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">日志管理</span>
+          <span class="nav-group-arrow">▶</span>
+        </div>
+        <div class="nav-group-children open">
+          <div class="nav-item"><a data-page="monitor" data-label="系统状态监控"><span class="nav-icon">💻</span><span class="nav-text">系统状态监控</span></a></div>
+          <div class="nav-item"><a data-page="audio" data-label="语音交互记录"><span class="nav-icon">🎙</span><span class="nav-text">语音交互记录</span></a></div>
+          <div class="nav-item"><a data-page="performance" data-label="性能分析报告"><span class="nav-icon">📈</span><span class="nav-text">性能分析报告</span></a></div>
+          <div class="nav-item"><a data-page="updates" data-label="软件更新管理"><span class="nav-icon">🔄</span><span class="nav-text">软件更新管理</span></a></div>
+          <div class="nav-item"><a data-page="logs" data-label="维护操作日志"><span class="nav-icon">📝</span><span class="nav-text">维护操作日志</span></a></div>
+          <div class="nav-item"><a data-page="sync" data-label="数据同步状态"><span class="nav-icon">🔗</span><span class="nav-text">数据同步状态</span></a></div>
+        </div>
+      </div>
+    </nav>
+    <div class="sidebar-footer">v2.0 © CloudControl</div>
+  </aside>
+
+  <!-- ===== Content ===== -->
+  <div class="layout-content" id="layoutContent">
+    <div class="content-area">
+      <iframe id="contentFrame" src="/app/modules/drones.html"></iframe>
+    </div>
   </div>
 
   <script>
+    // ---- Auth guard ----
     const token = localStorage.getItem('token');
-    const username = localStorage.getItem('username');
-    
-    if (!token) {
-      window.location.href = '/app/login.html';
-    }
-    
-    document.getElementById('username').textContent = username || '用户';
-    
+    const storedUsername = localStorage.getItem('username');
+    if (!token) { window.location.href = '/app/login.html'; }
+
+    const usernameEl = document.getElementById('username');
+    const avatarEl = document.getElementById('userAvatar');
+    usernameEl.textContent = storedUsername || '用户';
+    avatarEl.textContent = (storedUsername || 'U').charAt(0).toUpperCase();
+
+    // ---- Logout ----
     document.getElementById('btnLogout').addEventListener('click', () => {
       localStorage.removeItem('token');
       localStorage.removeItem('username');
       window.location.href = '/app/login.html';
     });
-    
-    const iframe = document.getElementById('contentFrame');
 
-    function toggleNavGroup(header) {
-      header.classList.toggle('open');
-      const sub = header.nextElementSibling;
-      if (sub && sub.classList.contains('nav-sub-list')) {
-        sub.classList.toggle('open');
+    // ---- User dropdown ----
+    const userDropdown = document.getElementById('userDropdown');
+    const userMenu = document.getElementById('userMenu');
+    userDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userMenu.classList.toggle('show');
+    });
+    document.addEventListener('click', () => { userMenu.classList.remove('show'); });
+
+    // ---- Fullscreen ----
+    document.getElementById('btnFullscreen').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
       }
-    }
+    });
+
+    // ---- Sidebar collapse ----
+    const sidebar = document.getElementById('sidebar');
+    const layoutContent = document.getElementById('layoutContent');
+    document.getElementById('sidebarToggle').addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      layoutContent.classList.toggle('sidebar-collapsed');
+    });
+
+    // ---- Nav group toggle ----
+    document.querySelectorAll('.nav-group-toggle').forEach(toggle => {
+      toggle.addEventListener('click', () => {
+        toggle.classList.toggle('open');
+        const children = toggle.nextElementSibling;
+        if (children) children.classList.toggle('open');
+      });
+    });
+
+    // ---- Navigation ----
+    const iframe = document.getElementById('contentFrame');
+    const bcCurrent = document.getElementById('bcCurrent');
 
     function navigateTo(page) {
-      // Support hash fragments: e.g. 'simulation#rl-export'
       let hash = '';
       if (page.includes('#')) {
         const parts = page.split('#');
         page = parts[0];
         hash = '#' + parts[1];
       }
-      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-      document.querySelectorAll('.nav-sub-item').forEach(i => i.classList.remove('active'));
+      // Clear active
+      document.querySelectorAll('.nav-item a, .nav-item-link').forEach(i => i.classList.remove('active'));
+      // Set active
       const target = document.querySelector(`[data-page="${page}"]`);
       if (target) {
         target.classList.add('active');
-        // If sub-item, open the parent group
-        if (target.classList.contains('nav-sub-item')) {
-          const subList = target.closest('.nav-sub-list');
-          if (subList) {
-            subList.classList.add('open');
-            const header = subList.previousElementSibling;
-            if (header) header.classList.add('open');
-          }
+        // Open parent group
+        const group = target.closest('.nav-group-children');
+        if (group) {
+          group.classList.add('open');
+          const toggle = group.previousElementSibling;
+          if (toggle) toggle.classList.add('open');
         }
+        // Update breadcrumb
+        bcCurrent.textContent = target.dataset.label || page;
       }
       iframe.src = `/app/modules/${page}.html${hash}`;
     }
 
-    document.querySelectorAll('.nav-item').forEach(item => {
-      item.addEventListener('click', () => { navigateTo(item.dataset.page); });
-    });
-    document.querySelectorAll('.nav-sub-item').forEach(item => {
-      item.addEventListener('click', () => { navigateTo(item.dataset.page); });
+    document.querySelectorAll('.nav-item a[data-page], .nav-item-link[data-page]').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateTo(item.dataset.page);
+      });
     });
 
-    // Handle navigation from iframe (child page can call parent.navigateTo)
+    // Expose for iframe child pages
     window.navigateTo = navigateTo;
   </script>
 

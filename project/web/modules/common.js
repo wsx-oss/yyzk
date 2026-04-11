@@ -81,22 +81,60 @@ function createChart(canvas, config) {
   return new Chart(canvas, config);
 }
 
-// Show toast message (centered at top)
+// Show toast message (Arco-style notification at top)
 function showToast(message, type = "info") {
+  const colors = {
+    success: { bg: '#e8ffea', border: '#00b42a', text: '#00b42a', icon: '✓' },
+    error:   { bg: '#ffece8', border: '#f53f3f', text: '#f53f3f', icon: '✕' },
+    warning: { bg: '#fff7e8', border: '#ff7d00', text: '#ff7d00', icon: '!' },
+    info:    { bg: '#e8f3ff', border: '#165dff', text: '#165dff', icon: 'ℹ' }
+  };
+  const c = colors[type] || colors.info;
   const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
+  toast.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:${c.border};color:#fff;font-size:12px;font-weight:700;margin-right:8px;flex-shrink:0;">${c.icon}</span><span>${message}</span>`;
   toast.style.cssText = `
-    position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 9999;
-    background: ${type === "success" ? "#10b981" : type === "error" ? "#ef4444" : "#0ea5e9"};
-    color: white; padding: 12px 24px; border-radius: 8px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.2); font-size: 14px; font-weight: 500;
-    white-space: nowrap; pointer-events: none;
-    animation: toastFadeIn 0.3s ease-out;
+    position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:9999;
+    background:${c.bg};color:${c.text};padding:10px 20px;border-radius:8px;
+    border:1px solid ${c.border}20;
+    box-shadow:0 4px 16px rgba(0,0,0,0.1);font-size:14px;font-weight:500;
+    display:flex;align-items:center;white-space:nowrap;pointer-events:none;
+    animation:toastFadeIn 0.3s ease-out;
   `;
   document.body.appendChild(toast);
   setTimeout(() => {
     toast.style.animation = "toastFadeOut 0.3s ease-out";
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+// Animate stat value count-up (call after data loads)
+function animateStatValue(el, targetValue, duration = 800) {
+  const start = 0;
+  const startTime = performance.now();
+  const isFloat = String(targetValue).includes('.');
+  function tick(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+    const current = start + (targetValue - start) * eased;
+    el.textContent = isFloat ? current.toFixed(1) : Math.round(current);
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// Stagger animate child elements on load
+function staggerAnimateIn(parentSelector, childSelector, delay = 60) {
+  const parent = document.querySelector(parentSelector);
+  if (!parent) return;
+  const children = parent.querySelectorAll(childSelector);
+  children.forEach((child, i) => {
+    child.style.opacity = '0';
+    child.style.transform = 'translateY(12px)';
+    child.style.transition = `opacity 0.4s ease-out ${i * delay}ms, transform 0.4s ease-out ${i * delay}ms`;
+    requestAnimationFrame(() => {
+      child.style.opacity = '1';
+      child.style.transform = 'translateY(0)';
+    });
+  });
 }

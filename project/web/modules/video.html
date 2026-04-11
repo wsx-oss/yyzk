@@ -16,7 +16,7 @@
     .ctrl-full{background:#10b981;}
     .drone-select-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:20px;}
     .drone-video-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #e2e8f0;cursor:pointer;transition:all .2s;}
-    .drone-video-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);border-color:#0ea5e9;}
+    .drone-video-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);border-color:var(--cc-primary, #165dff);}
     .drone-video-card.active{border-color:#3b82f6;background:#eff6ff;}
     .drone-video-card.no-video{opacity:0.5;cursor:default;}
     .dvc-name{font-size:15px;font-weight:600;color:#1e293b;margin-bottom:4px;}
@@ -133,7 +133,7 @@
     function renderDroneGrid() {
       var grid = $('#droneGrid');
       if (!allDrones.length) {
-        grid.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:40px;grid-column:1/-1;">暂无已注册的无人机，请先到<a href="javascript:void(0)" onclick="window.top.document.querySelector(\'[data-page=drones]\').click()" style="color:#0ea5e9;text-decoration:underline;">无人机管理</a>页面注册</div>';
+        grid.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:40px;grid-column:1/-1;">暂无已注册的无人机，请先到<a href="javascript:void(0)" onclick="window.top.document.querySelector(\'[data-page=drones]\').click()" style="color:#165dff;text-decoration:underline;">无人机管理</a>页面注册</div>';
         return;
       }
       grid.innerHTML = allDrones.map(function(d) {

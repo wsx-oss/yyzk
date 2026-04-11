@@ -14,29 +14,31 @@
     .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
     .filter-row-2 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
     .action-buttons { justify-content: flex-end; margin-top: 12px; }
-    .priority-high { background: #fee2e2; color: #991b1b; }
-    .priority-mid { background: #fef3c7; color: #92400e; }
-    .priority-low { background: #dbeafe; color: #1e40af; }
-    .status-resolved { background: #d1fae5; color: #065f46; }
-    .status-unresolved { background: #fee2e2; color: #991b1b; }
+    .priority-high { background: #ffece8; color: #cb2634; }
+    .priority-mid { background: #fff7e8; color: #d25f00; }
+    .priority-low { background: #e8f3ff; color: #0e42d2; }
+    .status-resolved { background: #e8ffea; color: #009a29; }
+    .status-unresolved { background: #ffece8; color: #cb2634; }
 
     /* Modal */
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
-    .modal-overlay.active { display: flex; }
-    .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+    .modal-overlay.active { display: flex; animation: modalBgFadeIn 0.2s ease-out; }
+    .modal-box { background: var(--cc-bg-2, #fff); border-radius: var(--cc-radius-lg, 12px); padding: 24px; width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.12); animation: modalSlideIn 0.25s ease-out; }
+    .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: var(--cc-text-1, #1d2129); }
     .modal-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .modal-form .full-width { grid-column: 1 / -1; }
-    .modal-form label { font-size: 13px; color: #64748b; font-weight: 500; margin-bottom: 4px; display: block; }
-    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
+    .modal-form label { font-size: 13px; color: var(--cc-text-3, #86909c); font-weight: 500; margin-bottom: 4px; display: block; }
+    .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 7px 12px; border: 1px solid var(--cc-border, #e5e6eb); border-radius: 4px; font-size: 14px; background: var(--cc-bg-2, #fff); transition: all 0.2s; }
     .modal-form textarea { resize: vertical; min-height: 60px; }
-    .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.1); }
+    .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { outline: none; border-color: var(--cc-primary, #165dff); box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    @keyframes modalBgFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes modalSlideIn { from { opacity: 0; transform: translateY(-16px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
     /* Detail modal */
     .detail-grid { display: grid; grid-template-columns: 100px 1fr; gap: 10px 16px; font-size: 14px; }
-    .detail-label { color: #64748b; font-weight: 500; text-align: right; }
-    .detail-value { color: #0f172a; }
+    .detail-label { color: var(--cc-text-3, #86909c); font-weight: 400; text-align: right; }
+    .detail-value { color: var(--cc-text-1, #1d2129); font-weight: 500; }
 
     .hint-box { margin-top: 20px; margin-bottom: 20px; }
     .chart-section-title { font-weight: 600; margin-bottom: 12px; text-align: center; font-size: 14px; }

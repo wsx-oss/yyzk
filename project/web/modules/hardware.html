@@ -44,7 +44,7 @@
 
     .filter-group label {
       font-size: 12px;
-      color: #64748b;
+      color: var(--cc-text-3, #86909c);
       font-weight: 500;
       margin-bottom: 4px;
       display: block;
@@ -54,17 +54,18 @@
     .filter-group select {
       width: 100%;
       padding: 7px 10px;
-      border: 1px solid #cbd5e1;
-      border-radius: 5px;
+      border: 1px solid var(--cc-border, #e5e6eb);
+      border-radius: 4px;
       font-size: 13px;
-      background: #fff;
+      background: var(--cc-bg-2, #fff);
+      transition: all 0.2s;
     }
 
     .filter-group input:focus,
     .filter-group select:focus {
       outline: none;
-      border-color: #0ea5e9;
-      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+      border-color: var(--cc-primary, #165dff);
+      box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.1);
     }
 
     .range-input {
@@ -114,66 +115,72 @@
     }
 
     .status-dot.online {
-      background: #10b981;
+      background: #00b42a;
     }
 
     .status-dot.offline {
-      background: #ef4444;
+      background: #f53f3f;
     }
 
     .status-dot.warning {
-      background: #f59e0b;
+      background: #ff7d00;
     }
 
     .btn-detail {
       padding: 4px 12px;
       font-size: 12px;
-      background: #0ea5e9;
+      background: var(--cc-primary, #165dff);
       color: #fff;
       border: none;
       border-radius: 4px;
       cursor: pointer;
+      transition: all 0.2s;
     }
 
     .btn-detail:hover {
-      background: #0284c7;
+      background: #0e42d2;
+      box-shadow: 0 2px 8px rgba(22, 93, 255, 0.35);
     }
 
     .btn-del {
       padding: 4px 12px;
       font-size: 12px;
-      background: #ef4444;
+      background: var(--cc-danger, #f53f3f);
       color: #fff;
       border: none;
       border-radius: 4px;
       cursor: pointer;
       margin-left: 4px;
+      transition: all 0.2s;
     }
 
     .btn-del:hover {
-      background: #dc2626;
+      background: #cb2634;
+      box-shadow: 0 2px 8px rgba(245, 63, 63, 0.35);
     }
 
     .btn-refresh-one {
       padding: 4px 12px;
       font-size: 12px;
-      background: #10b981;
+      background: var(--cc-success, #00b42a);
       color: #fff;
       border: none;
       border-radius: 4px;
       cursor: pointer;
       margin-left: 4px;
+      transition: all 0.2s;
     }
 
     .btn-refresh-one:hover {
-      background: #059669;
+      background: #009a29;
+      box-shadow: 0 2px 8px rgba(0, 180, 42, 0.35);
     }
 
     .auto-refresh-wrap {
       display: inline-flex;
       align-items: center;
       margin-left: 10px;
-      background: #f1f5f9;
+      background: var(--cc-bg-3, #f2f3f5);
       border-radius: 6px;
       padding: 4px 10px;
       gap: 6px;
@@ -182,9 +189,6 @@
     .auto-refresh-wrap label {
       font-size: 12px;
       color: #475569;
-      font-weight: 500;
-      white-space: nowrap;
-      margin: 0;
     }
 
     .auto-refresh-wrap select {
@@ -199,19 +203,18 @@
     }
 
     .auto-refresh-wrap select:focus {
-      border-color: #0ea5e9;
+      border-color: var(--cc-primary, #165dff);
     }
 
     .auto-refresh-wrap .refresh-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #10b981;
+      background: var(--cc-success, #00b42a);
       animation: pulse-dot 2s infinite;
     }
 
     @keyframes pulse-dot {
-
       0%,
       100% {
         opacity: 1;
@@ -230,7 +233,8 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(4px);
       z-index: 1000;
       justify-content: center;
       align-items: center;
@@ -241,14 +245,27 @@
     }
 
     .modal {
-      background: #fff;
-      border-radius: 10px;
+      background: var(--cc-bg-2, #fff);
+      border-radius: var(--cc-radius-lg, 12px);
       padding: 0;
       width: 480px;
       max-width: 95vw;
       max-height: 90vh;
       overflow-y: auto;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      animation: modalSlideIn 0.25s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-16px) scale(0.96);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
     }
 
     .modal-header {
@@ -323,8 +340,8 @@
     .form-group select:focus,
     .form-group textarea:focus {
       outline: none;
-      border-color: #0ea5e9;
-      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+      border-color: var(--cc-primary, #165dff);
+      box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.1);
     }
 
     /* Detail modal */
@@ -749,7 +766,7 @@
       // Type distribution - Horizontal Bar
       const typeDist = stats.type_distribution || {};
       const typeLabels = ['无人机', '服务器', '路由器', '交换机', '存储设备'];
-      const typeColors = ['#3b82f6', '#0ea5e9', '#10b981', '#f59e0b', '#a855f7'];
+      const typeColors = ['#3b82f6', '#165dff', '#10b981', '#f59e0b', '#a855f7'];
       const typeData = typeLabels.map(l => typeDist[l] || 0);
 
       if (typeChartInstance) typeChartInstance.destroy();

@@ -8,25 +8,21 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     .toggle-wrap{display:inline-flex;align-items:center;gap:8px;font-size:14px;}
-    .toggle-switch{position:relative;width:40px;height:22px;cursor:pointer;}
-    .toggle-switch input{opacity:0;width:0;height:0;}
-    .toggle-slider{position:absolute;inset:0;background:#cbd5e1;border-radius:11px;transition:.3s;}
-    .toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.3s;}
-    .toggle-switch input:checked+.toggle-slider{background:#0ea5e9;}
-    .toggle-switch input:checked+.toggle-slider::before{transform:translateX(18px);}
-    .status-card{border:1px solid #e2e8f0;border-radius:10px;padding:20px;background:#fff;}
-    .status-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-weight:600;font-size:15px;}
-    .progress-label{font-size:13px;color:#334155;margin-bottom:4px;}
-    .progress-bar{height:18px;border-radius:9px;}
-    .progress-fill{height:100%;border-radius:9px;transition:width .8s;}
-    .progress-pct{font-size:12px;color:#64748b;margin-left:6px;}
-    .detail-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;}
+    .status-card{border:1px solid var(--cc-border-light, #f2f3f5);border-radius:var(--cc-radius, 8px);padding:20px;background:var(--cc-bg-2, #fff);box-shadow:var(--cc-shadow-1, 0 0 1px rgba(0,0,0,.3));transition:box-shadow 0.2s;}
+    .status-card:hover{box-shadow:var(--cc-shadow-2, 0 4px 16px rgba(0,0,0,.08));}
+    .status-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-weight:600;font-size:15px;color:var(--cc-text-1, #1d2129);}
+    .progress-label{font-size:13px;color:var(--cc-text-2, #4e5969);margin-bottom:4px;display:flex;justify-content:space-between;}
+    .progress-bar{height:10px;border-radius:5px;background:var(--cc-bg-3, #f2f3f5);}
+    .progress-fill{height:100%;border-radius:5px;transition:width .6s cubic-bezier(0.34,0.69,0.1,1);}
+    .progress-pct{font-size:12px;color:var(--cc-text-3, #86909c);font-weight:500;font-variant-numeric:tabular-nums;}
+    .detail-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
     .detail-overlay.active{display:flex;}
-    .detail-box{background:#fff;border-radius:12px;padding:28px;width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18);}
-    .detail-box h3{margin:0 0 16px;font-size:18px;}
-    .detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px;}
+    .detail-box{background:var(--cc-bg-2, #fff);border-radius:12px;padding:28px;width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.12);animation:modalSlideIn .25s ease-out;}
+    @keyframes modalSlideIn{from{opacity:0;transform:translateY(-16px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
+    .detail-box h3{margin:0 0 16px;font-size:18px;color:var(--cc-text-1, #1d2129);}
+    .detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--cc-border-light, #f2f3f5);font-size:14px;}
     .detail-row:last-child{border-bottom:none;}
-    .net-info{font-size:13px;color:#475569;line-height:1.8;}
+    .net-info{font-size:13px;color:var(--cc-text-2, #4e5969);line-height:1.8;}
   </style>
 </head>
 <body>
@@ -116,11 +112,11 @@
       <div style="font-size:14px;margin-bottom:6px;"><strong>设备名称：</strong><span id="devName">主服务器</span></div>
       <div style="font-size:14px;margin-bottom:14px;"><strong>设备IP：</strong><span id="devIP">-</span></div>
       <div class="progress-label">CPU使用率 <span id="cpuPct" class="progress-pct"></span></div>
-      <div class="progress-bar" style="margin-bottom:10px;"><div id="cpuBar" class="progress-fill" style="width:0%;background:#0ea5e9;"></div></div>
+      <div class="progress-bar" style="margin-bottom:10px;"><div id="cpuBar" class="progress-fill" style="width:0%;background:linear-gradient(90deg,#165dff,#6aa1ff);"></div></div>
       <div class="progress-label">内存使用率 <span id="memPct" class="progress-pct"></span></div>
-      <div class="progress-bar" style="margin-bottom:10px;"><div id="memBar" class="progress-fill" style="width:0%;background:#10b981;"></div></div>
+      <div class="progress-bar" style="margin-bottom:10px;"><div id="memBar" class="progress-fill" style="width:0%;background:linear-gradient(90deg,#00b42a,#7be188);"></div></div>
       <div class="progress-label">磁盘使用率 <span id="diskPct" class="progress-pct"></span></div>
-      <div class="progress-bar"><div id="diskBar" class="progress-fill" style="width:0%;background:#f59e0b;"></div></div>
+      <div class="progress-bar"><div id="diskBar" class="progress-fill" style="width:0%;background:linear-gradient(90deg,#ff7d00,#ffcf8b);"></div></div>
     </div>
 
     <!-- Network status card -->
@@ -132,7 +128,7 @@
       <div style="font-size:14px;margin-bottom:6px;"><strong>网络带宽：</strong><span id="netBandwidth">-</span></div>
       <div style="font-size:14px;margin-bottom:6px;"><strong>当前使用带宽：</strong><span id="netUsed">-</span></div>
       <div class="progress-label">带宽使用率 <span id="bwPct" class="progress-pct"></span></div>
-      <div class="progress-bar" style="margin-bottom:14px;"><div id="bwBar" class="progress-fill" style="width:0%;background:#0ea5e9;"></div></div>
+      <div class="progress-bar" style="margin-bottom:14px;"><div id="bwBar" class="progress-fill" style="width:0%;background:linear-gradient(90deg,#14c9c9,#86e8dd);"></div></div>
       <div class="net-info">
         <div>网络延迟：<span id="netLatency">-</span></div>
         <div>丢包率：<span id="netLoss">0%</span></div>
@@ -221,17 +217,17 @@
 
     const cpuChart = createChart($('#cpuChart'), {
       type: 'line',
-      data: { labels: chartLabels, datasets: [{ label: 'CPU %', data: cpuData, borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,.1)', tension: 0.4, fill: true, pointRadius: 2 }] },
+      data: { labels: chartLabels, datasets: [{ label: 'CPU %', data: cpuData, borderColor: '#165dff', backgroundColor: 'rgba(22,93,255,.08)', tension: 0.4, fill: true, pointRadius: 2, borderWidth: 2 }] },
       options: chartOpts
     });
     const memChart = createChart($('#memChart'), {
       type: 'line',
-      data: { labels: chartLabels, datasets: [{ label: 'Memory %', data: memData, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)', tension: 0.4, fill: true, pointRadius: 2 }] },
+      data: { labels: chartLabels, datasets: [{ label: 'Memory %', data: memData, borderColor: '#00b42a', backgroundColor: 'rgba(0,180,42,.08)', tension: 0.4, fill: true, pointRadius: 2, borderWidth: 2 }] },
       options: chartOpts
     });
     const diskChart = createChart($('#diskChart'), {
       type: 'line',
-      data: { labels: chartLabels, datasets: [{ label: 'Disk %', data: diskData, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.1)', tension: 0.4, fill: true, pointRadius: 2 }] },
+      data: { labels: chartLabels, datasets: [{ label: 'Disk %', data: diskData, borderColor: '#ff7d00', backgroundColor: 'rgba(255,125,0,.08)', tension: 0.4, fill: true, pointRadius: 2, borderWidth: 2 }] },
       options: chartOpts
     });
 
