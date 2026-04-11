@@ -2,6 +2,30 @@
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
 
+// ---- Tianditu Map Utilities ----
+let TIANDITU_KEY = '90aa13159977757fb5d9061bf4d8c22b';
+
+function tdtImgLayer() {
+  return L.tileLayer(
+    `https://t{s}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
+    { subdomains: ['0','1','2','3','4','5','6','7'], attribution: '© 天地图', maxZoom: 18 }
+  );
+}
+
+function tdtCiaLayer() {
+  return L.tileLayer(
+    `https://t{s}.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
+    { subdomains: ['0','1','2','3','4','5','6','7'], maxZoom: 18 }
+  );
+}
+
+// Fetch server-side config to override the default Tianditu key
+function loadTdtConfig() {
+  return fetch('/api/config').then(r => r.json()).then(cfg => {
+    if (cfg.tianditu_key) TIANDITU_KEY = cfg.tianditu_key;
+  }).catch(() => {});
+}
+
 // API helper with authentication
 async function api(path, options = {}) {
   const token = localStorage.getItem("token");

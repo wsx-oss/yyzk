@@ -1,41 +1,41 @@
 # CloudControl v4.0 优化 TODO
 
-> **文档创建时间**：2026-04-10  
-> **项目名称**：CloudControl — 企业级智能无人机管控平台  
-> **技术栈**：Go 1.24 + Gin + MySQL(Aiven) + Leaflet + WebSocket + Chart.js  
-> **前端架构**：`dashboard.html` 壳层 + iframe 加载 22 个模块页 + `ai-assistant.js` 浮窗 + `notification-bell.js` 铃铛  
-> **当前版本**：v3.6.0  
+> **文档创建时间**：2026-04-10
+> **项目名称**：CloudControl — 企业级智能无人机管控平台
+> **技术栈**：Go 1.24 + Gin + MySQL(Aiven) + Leaflet + WebSocket + Chart.js
+> **前端架构**：`dashboard.html` 壳层 + iframe 加载 22 个模块页 + `ai-assistant.js` 浮窗 + `notification-bell.js` 铃铛
+> **当前版本**：v3.6.0
 > **本轮目标**：5 大类 23 项优化，覆盖地图、界面、性能、业务、AI、视觉全链路
 
 ---
 
 ## 总览
 
-| 分类 | 编号 | 标题 | 优先级 |
-|------|------|------|--------|
-| 一、基础地图与界面 | 1 | 仿真地图 → 天地图 | P0 |
-| | 2 | AI 助手图标+位置优化 | P1 |
-| | 3 | 仿真模拟事件日志优化 | P1 |
-| | 4 | 导出→展示（自动跳转模拟器任务建设） | P1 |
-| 二、系统功能与性能 | 5 | CoT 思维链优化 | P1 |
-| | 6 | 离线状态下取消相关异常通知 | P1 |
-| | 7 | 并发任务·RPM 优化 | P2 |
-| | 8 | 前端整体性能优化 | P1 |
-| | 9 | 模拟器任务建设优化 | P0 |
-| | 10 | 模拟机电量+图表优化 | P1 |
-| 三、业务功能与视觉 | 11 | 轨迹弧度（曲线化）优化 | P2 |
-| | 12 | 视频监控模块位置调整 | P2 |
-| | 13 | Logo 优化 | P1 |
-| | 14 | 登录界面背景优化 | P1 |
-| | 15 | 项目命名 ★ | P0 |
-| 四、AI 能力与配置 | 16 | LLM API / Deepseek 适配 | P0 |
-| | 17 | PPT 首页 22U/背景图+无人机元素 | P2 |
-| | 18 | RAG 检索增强生成优化 | P1 |
-| | 19 | 用户默认头像使用项目 Logo | P2 |
-| 五、前端细节与系统 | 20 | 前端全面圆角化 | P1 |
-| | 21 | 毛玻璃/磨砂感视觉效果 | P1 |
-| | 22 | 域名优化 | P2 |
-| | 23 | 动态性优化 | P1 |
+| 分类               | 编号 | 标题                                 | 优先级 |
+| ------------------ | ---- | ------------------------------------ | ------ |
+| 一、基础地图与界面 | 1    | 仿真地图 → 天地图                   | P0     |
+|                    | 2    | AI 助手图标+位置优化                 | P1     |
+|                    | 3    | 仿真模拟事件日志优化                 | P1     |
+|                    | 4    | 导出→展示（自动跳转模拟器任务建设） | P1     |
+| 二、系统功能与性能 | 5    | CoT 思维链优化                       | P1     |
+|                    | 6    | 离线状态下取消相关异常通知           | P1     |
+|                    | 7    | 并发任务·RPM 优化                   | P2     |
+|                    | 8    | 前端整体性能优化                     | P1     |
+|                    | 9    | 模拟器任务建设优化                   | P0     |
+|                    | 10   | 模拟机电量+图表优化                  | P1     |
+| 三、业务功能与视觉 | 11   | 轨迹弧度（曲线化）优化               | P2     |
+|                    | 12   | 视频监控模块位置调整                 | P2     |
+|                    | 13   | Logo 优化                            | P1     |
+|                    | 14   | 登录界面背景优化                     | P1     |
+|                    | 15   | 项目命名 ★                          | P0     |
+| 四、AI 能力与配置  | 16   | LLM API / Deepseek 适配              | P0     |
+|                    | 17   | PPT 首页 22U/背景图+无人机元素       | P2     |
+|                    | 18   | RAG 检索增强生成优化                 | P1     |
+|                    | 19   | 用户默认头像使用项目 Logo            | P2     |
+| 五、前端细节与系统 | 20   | 前端全面圆角化                       | P1     |
+|                    | 21   | 毛玻璃/磨砂感视觉效果                | P1     |
+|                    | 22   | 域名优化                             | P2     |
+|                    | 23   | 动态性优化                           | P1     |
 
 ---
 
@@ -44,12 +44,14 @@
 ### TODO-01 ★ 仿真地图 → 天地图
 
 **现状**：
+
 - `simulation.html` 地图使用 CartoDB 暗色瓦片（`basemaps.cartocdn.com/dark_all`），中心为成都 `[30.5728, 104.0668]`
 - `gps.html` / `flight.html` / `noflyzone.html` 已接入天地图（`tdtImgLayer` + `tdtCiaLayer`），`.env` 已配 `TIANDITU_KEY`
 - 天地图 Key 在各页面内各自硬编码，未统一管理
 - 地图范围改为郑州大学 `[34.748, 113.655]`
 
 **任务清单**：
+
 - [ ] 替换 `simulation.html` 的 `L.tileLayer` 瓦片源为天地图影像底图（`img_w`）+ 标注图层（`cia_w`），复用 `gps.html` 中 `tdtImgLayer()` / `tdtCiaLayer()` 的 WMTS 模板
 - [ ] 在 `common.js` 中统一导出 `TIANDITU_KEY` 常量和 `tdtImgLayer()` / `tdtCiaLayer()` 工厂函数，消除各页面重复定义
 - [ ] 统一 `simulation.html` 默认中心点为郑州大学 `[34.748, 113.655]`
@@ -63,10 +65,12 @@
 ### TODO-02 AI 助手图标 + 位置优化
 
 **现状**：
+
 - `ai-assistant.js` 注入右下角 56×56px 圆形 FAB 按钮（`#ai-fab`），`bottom:28px; right:28px`
 - 图标为 emoji 文字（🤖），面板 `#ai-panel` 为 400×600px 白色弹窗   logo
 
 **任务清单**：
+
 - [ ] 替换 `#ai-fab` 图标为 SVG 矢量图标（推荐 Lucide `bot` / `sparkles`），提升清晰度和品质感
 - [ ] 增大按钮至 60×60px，增加呼吸脉冲动画（`@keyframes pulse`）吸引首次注意
 - [ ] 为 `#ai-panel` 弹窗加毛玻璃效果（`backdrop-filter: blur(16px); background: rgba(255,255,255,0.85)`），圆角增至 20px
@@ -79,13 +83,14 @@
 
 ### TODO-03 仿真模拟事件 日志优化
 
--  改为异常日志
-**现状**：
+- 改为异常日志
+  **现状**：
 - `simulation.html` 事件日志面板通过 WebSocket `/api/sim/stream` 实时接收所有事件（正常状态变更 + 异常事件）
 - 正常/异常日志混排，重要异常被淹没
 - 事件类型：状态变更(正常)、低电量/偏航/失联/温度异常/碰撞预警(异常)
 
 **任务清单**：
+
 - [ ] 新增日志筛选 Tab：`全部` | `异常`，默认选中「异常」，视觉上将"全部"/"正常"置灰或用删除线标记
 - [ ] 后端 `/api/sim/stream` 增加可选 query 参数 `?filter=anomaly`，只推送异常类型事件
 - [ ] 异常日志展示优化：
@@ -101,11 +106,13 @@
 ### TODO-04 导出 → 展示（自动跳转模拟器任务建设）
 
 **现状**：
+
 - `simulation.html` RL 面板的 `exportRLPolicy()` 导出后仅在当前页内 `#rlExportCard` 展示策略详情
 - `dashboard.html` 提供全局 `window.navigateTo(page)` 实现 iframe 模块切换
 - 无导出后跳转或策略应用到任务的联动逻辑
 
 **任务清单**：
+
 - [ ] 在 `#rlExportCard` 底部增加「应用策略到新批次」按钮
 - [ ] 点击后自动切换到「批次管理」Tab 并打开创建批次弹窗，预填策略相关参数（策略类型、训练轮次、推荐任务模板）
 - [ ] 导出成功后弹出 Toast：「策略已导出，可点击"应用到任务"创建仿真批次」
@@ -119,13 +126,15 @@
 ## 二、系统功能与性能优化（5-10 项）
 
 ### TODO-05 CoT（思维链）优化
+
 - 改名称
-**现状**：
+  **现状**：
 - `cot.html` 展示 CoT 推理记录，支持 4 种任务类型：`scheduling` / `fault_diagnosis` / `path_optimization` / `mission_planning`
 - 后端 `cot.go` 调用 LLM 生成 `ReasoningStep` 链，含置信度评分
 - 展示为纯列表 + 文本，缺少可视化推理路径
 
 **任务清单**：
+
 - [ ] **推理过程可视化**：将步骤列表升级为竖向时间线（Timeline UI），每步一张卡片：标题/输入/推理/输出，步骤间用连接线串联
 - [ ] **实时流式展示**：发起分析时采用 SSE 或长轮询逐步展示推理过程（打字机效果），提升交互感知
 - [ ] **结果联动跳转**：
@@ -142,11 +151,13 @@
 ### TODO-06 离线状态下取消相关异常通知
 
 **现状**：
+
 - `patrol.go` 定时巡检产生通知写入 `notifications` 表，`notification-bell.js` 展示
 - 离线时（网络断开/LLM 不可达/DB 超时），巡检可能产生大量"连接失败"通知，形成通知风暴
 - 无离线状态检测和降级机制
 
 **任务清单**：
+
 - [ ] **后端离线检测**：在 `patrol.go` 巡检逻辑前增加预检查：
   - MySQL 连接 ping 测试
   - LLM API 可达性测试（轻量 HEAD 请求）
@@ -165,11 +176,13 @@
 - 增加RPM优化
 
 **现状**：
+
 - `internal/taskpool/pool.go` 提供 IO(16 workers) + CPU(4 workers) 双池，`batcher.go` 提供 WriteBatcher / Throttler / StatsCache
 - 当前限流为 IP 级别 500 次/分钟（`middleware/`），无针对 LLM API 的独立 RPM 控制
 - LLM 调用集中在航线规划（`flight_plan.go`）、CoT 分析（`cot.go`）、AI 助手（`ai_assistant.go`）
 
 **任务清单**：
+
 - [ ] **LLM 请求速率控制**：在 `internal/llm/llm.go` 的 `Client` 中增加令牌桶限流器（`golang.org/x/time/rate`），按 `.env` 配置 `LLM_RPM`（默认 30 RPM）限制对大模型 API 的并发请求
 - [ ] **RPM 可视化**：在 `concurrency.html` 并发监控面板增加 LLM RPM 监控卡片，展示：当前分钟请求数 / 上限 / 排队数 / 平均延迟
 - [ ] **任务优先级细化**：航线规划（用户触发）优先级高于定时巡检（后台自动），确保用户操作不被后台任务阻塞
@@ -185,11 +198,13 @@
 - 参考两个网页
 
 **现状**：
+
 - 前端为多 HTML 页面 + iframe 架构，每个模块页独立加载 CSS/JS/Chart.js/Leaflet 等外部依赖
 - 外部 CDN 依赖：`chart.js`（~60KB）、`leaflet`（~40KB+CSS）、`unpkg/cdn.jsdelivr`
 - 无资源预加载、无懒加载、无公共资源复用机制
 
 **任务清单**：
+
 - [ ] **CDN 资源本地化**：将 Chart.js、Leaflet 等高频外部依赖下载到 `web/libs/` 目录，由后端 embed 提供，消除 CDN 依赖和网络延迟
 - [ ] **公共脚本合并**：将 `common.js` + `common.css` + 天地图工具函数合并为统一的公共 bundle，减少每个 iframe 重复请求
 - [ ] **图片/SVG 优化**：Logo、图标等资源统一使用 SVG 矢量格式，减小体积
@@ -207,11 +222,13 @@
 - 显示无人机的任务进度
 
 **现状**：
+
 - `simulation.html` 已支持批次创建（`BatchCreate`）、实例管理、任务模板（巡逻/巡检/配送/测绘/搜救）、异常注入、RL 训练
 - 创建批次通过弹窗表单完成：选择任务类型 → 填写数量/区域/参数 → 提交
 - 缺少从策略导出 → 任务创建 → 执行监控 → 结果评估的完整闭环流程
 
 **任务清单**：
+
 - [ ] **任务建设向导化**：将批次创建从单步弹窗升级为多步向导：
   1. 选择任务模板（巡逻/巡检/配送/测绘/搜救）+ 预览模板说明
   2. 配置任务参数（区域/数量/持续时间/异常注入策略）
@@ -232,11 +249,13 @@
 ### TODO-10 模拟机电量 + 图表优化
 
 **现状**：
+
 - `battery.html` 展示电池实时数据：电量/电压/温度/健康度，含 Chart.js 折线图趋势
 - `simulation/instance.go` 使用 `float64` 精确追踪模拟机电量，含 idle 充电逻辑
 - `simulation.html` 统计面板有电池风险数统计，但无专门的电量图表
 
 **任务清单**：
+
 - [ ] **模拟机电量独立面板**：在 `simulation.html` 统计 Tab 中增加电量专区：
   - 所有模拟机电量实时排行（横向条形图，低电量红色高亮）
   - 电量分布饼图（健康 >60% / 警告 20%-60% / 危险 <20%）
@@ -260,10 +279,12 @@
 ### TODO-11 轨迹弧度（非直线）优化
 
 **现状**：
+
 - `gps.html` 历史轨迹、`flight.html` 航线展示、`simulation.html` 飞行轨迹均使用 Leaflet `L.polyline` 直线连接各航点
 - 真实无人机飞行轨迹并非严格直线，直线展示缺乏真实感
 
 **任务清单**：
+
 - [ ] **贝塞尔曲线替代直线**：将 `L.polyline` 替换为贝塞尔曲线（Leaflet 插件 `leaflet-curve` 或自定义 `L.Curve`），在相邻航点间生成平滑弧线
 - [ ] **弧度算法**：根据两点距离和航向变化自动计算控制点偏移量：
   - 短距离（<500m）：小弧度
@@ -280,11 +301,13 @@
 ### TODO-12 视频监控/视频展示（放上面）
 
 **现状**：
+
 - `video.html` 在侧边栏「无人机状态监控」分组中，排在「远程桌面控制」后面
 - `dashboard.html` 中导航顺序为：视频监控 → 远程桌面 → 异常报警 → 电池监控 → 硬件状态
 - 视频监控作为高频使用的监控入口，位置偏下不够直觉
 
 **任务清单**：
+
 - [ ] **侧边栏导航调整**：将 `video` 从「无人机状态监控」子组中提升位置：
   - 方案 A：移至「无人机状态监控」分组的第一项（当前已是第一项）
   - 方案 B：独立成为顶级导航项，放在「无人机管理」正下方
@@ -300,11 +323,13 @@
 ### TODO-13 Logo 设计
 
 **现状**：
+
 - `dashboard.html` 顶部栏显示文字 `CloudControl`，侧边栏 header 显示「系统菜单」
 - `login.html` / `register.html` 登录页显示 `CloudControl` 文字 Logo
 - 无独立的 Logo 图片/SVG 文件
 
 **任务清单**：
+
 - [ ] **设计项目 Logo**：
   - 元素建议：云（Cloud）+ 无人机剪影 + 控制/信号图形
   - 风格：扁平/线性/渐变，与项目蓝紫色调（`#0ea5e9` ~ `#6366f1`）一致
@@ -323,11 +348,13 @@
 ### TODO-14 登录界面背景优化
 
 **现状**：
+
 - `login.html` 背景已有高级效果：暗色径向渐变 + 动态网格 + 3 个光晕球（`glow-orb`）浮动动画 + 粒子连线效果
 - 视觉质感已较高，但缺少无人机/科技感相关的具象元素
 - `register.html` 背景风格应与登录页保持一致
 
 **任务清单**：
+
 - [ ] **增加主题性背景元素**：
   - 添加无人机剪影 SVG 作为装饰元素（低透明度浮动，增强项目主题感）
   - 添加数据流/连接线粒子动画（模拟无人机通信链路）
@@ -344,10 +371,12 @@
 ### TODO-15 ★ 项目取名
 
 **现状**：
+
 - 当前项目名为 `CloudControl`，在代码、文档、页面标题中广泛使用
 - 用户标注星号为最高优先级需求
 
 **任务清单**：
+
 - [ ] **确定正式项目名称**：与团队讨论并敲定项目正式中英文名称
   - 候选方向参考：
     - `SkyPilot` — 天空领航者
@@ -375,11 +404,13 @@
 ### TODO-16 ★ LLM API / Deepseek 适配
 
 **现状**：
+
 - `internal/llm/llm.go` 封装了 OpenAI 兼容 API 调用，当前配置：`LLM_BASE_URL=https://openapi.monica.im/v1`，`LLM_MODEL=gpt-4.1`
 - API Key 通过 `.env` 的 `LLM_API_KEY` 配置
 - LLM 被航线规划（`flight_plan.go`）、CoT 分析（`cot.go`）、AI 助手（`ai_assistant.go`）三处调用
 
 **任务清单**：
+
 - [ ] **Deepseek 模型接入**：
   - `.env` 中支持配置 Deepseek API（`LLM_BASE_URL=https://api.deepseek.com/v1`，`LLM_MODEL=deepseek-chat` / `deepseek-reasoner`）
   - 验证 `llm.go` 的 OpenAI 兼容调用格式是否适配 Deepseek API（请求/响应格式差异）
@@ -404,11 +435,13 @@
 - PPT的制作
 
 **现状**：
+
 - 项目已有 `Cloudcontrol.pptx` 演示文件（约 15MB）
 - 项目包含 22 大功能模块（22U = 22 个 Unit），需要在 PPT 首页有效传达系统规模
 - 当前 PPT 首页需要适配 22U 场景展示
 
 **任务清单**：
+
 - [ ] **PPT 首页重设计**：
   - 首页布局：项目 Logo + 项目名（TODO-15） + 副标题"22U 企业级智能无人机管控平台"
   - 背景图：使用科技感暗色背景（与 `login.html` 风格一致），叠加低透明度城市鸟瞰/卫星图
@@ -427,11 +460,13 @@
 ### TODO-18 RAG 检索增强生成优化
 
 **现状**：
+
 - `ai_assistant.go` 的 AI 助手已有知识源接入：功能介绍文档、业务数据、告警记录、日志数据、模拟机统计
 - 当前知识注入方式为将数据拼接到 System Prompt 中（Prompt Stuffing），非真正的 RAG 架构
 - 项目 `功能介绍/` 目录有 19 个文档文件可作为知识库
 
 **任务清单**：
+
 - [ ] **知识库向量化**：
   - 将 `功能介绍/` 下所有文档切分为 chunk（每 chunk 500-800 字符，重叠 100 字符）
   - 使用 embedding 模型（Deepseek/OpenAI embedding API）将 chunk 向量化
@@ -455,11 +490,13 @@
 ### TODO-19 用户默认头像使用项目 Logo
 
 **现状**：
+
 - `dashboard.html` 顶部栏 `.user-info` 区域仅显示用户名文字 + 退出按钮，无头像图片
 - `login.html` / `register.html` 无用户头像相关逻辑
 - 用户表（`users`）无 `avatar` 字段
 
 **任务清单**：
+
 - [ ] **头像 UI 组件**：在 `dashboard.html` 顶部栏用户名左侧添加圆形头像容器（32×32px），默认显示项目 Logo 方形版（TODO-13 产出）
 - [ ] **头像 CSS**：`border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.3)`，悬停时放大/亮框效果
 - [ ] **后端支持**（可选扩展）：
@@ -478,11 +515,13 @@
 ### TODO-20 前端全面圆角化
 
 **现状**：
+
 - `common.css` 当前圆角值不统一：`.module-header` 8px、`.btn` 6px、`.card` 8px、`.stat-box` 8px、`.status-badge` 12px、`.progress-bar` 4px
 - 各模块页面内联 CSS 中圆角值更加分散（4px~16px 不等）
 - 整体视觉缺乏统一的圆润感
 
 **任务清单**：
+
 - [ ] **定义圆角设计规范**（CSS 变量）：
   ```css
   :root {
@@ -506,11 +545,13 @@
 ### TODO-21 毛玻璃 / 磨砂感视觉效果
 
 **现状**：
+
 - 当前 UI 以纯白/浅灰实色背景为主（`#fff` / `#f8fafc` / `#f1f5f9`），无毛玻璃效果
 - 仿真页（`simulation.html`）使用暗色实色背景（`#0f172a` / `#1e293b`）
 - `login.html` 背景有光晕动效，但卡片为实色
 
 **任务清单**：
+
 - [ ] **定义毛玻璃样式规范**：
   ```css
   .glass {
@@ -544,11 +585,13 @@
 ### TODO-22 域名优化
 
 **现状**：
+
 - 当前项目部署通过 `:8080` 端口直接访问（`http://127.0.0.1:8080/`）
 - MySQL 使用 Aiven 云数据库（`cloudcontrol-tolovelife-49cf.i.aivencloud.com:16898`）
 - 无自定义域名、无 HTTPS、无反向代理配置
 
 **任务清单**：
+
 - [ ] **域名注册与配置**：
   - 注册与项目名（TODO-15）匹配的域名（如 `skypilot.dev` / `aerog.cc` 等）
   - DNS 解析配置：A 记录指向服务器 IP / CNAME 指向云平台地址
@@ -569,11 +612,13 @@
 ### TODO-23 动态性优化
 
 **现状**：
+
 - 当前页面交互以静态刷新为主：点击按钮 → 请求 API → 重新渲染表格/卡片
 - 部分模块有 WebSocket 实时推送（GPS/电池/监控/仿真），但 UI 更新方式为直接替换 DOM
 - 缺乏过渡动画、微交互、状态变化反馈等动态体验
 
 **任务清单**：
+
 - [ ] **页面切换动画**：iframe 切换模块时增加淡入效果（`opacity 0→1 + translateY`，300ms），避免白屏闪烁
 - [ ] **卡片/列表动画**：
   - 卡片首次加载时使用交错入场动画（stagger animation，每张卡片延迟 50ms）
@@ -603,71 +648,74 @@
 > 按依赖关系和影响范围排列，建议从基础设施到上层视觉逐步推进。
 
 ### 第一批（基础设施 + 核心功能）— 建议最先完成
-| 顺序 | TODO | 理由 |
-|------|------|------|
-| 1 | **#15 项目取名** ★ | 所有 UI/文档/域名的前提 |
-| 2 | **#13 Logo 优化** | 依赖项目名确定 |
-| 3 | **#16 LLM / Deepseek 适配** ★ | AI 能力基础，影响 CoT/助手/规划 |
-| 4 | **#01 仿真地图→天地图** ★ | 地图统一，影响多模块 |
-| 5 | **#09 模拟器任务建设优化** ★ | 核心业务流程闭环 |
+
+| 顺序 | TODO                                 | 理由                            |
+| ---- | ------------------------------------ | ------------------------------- |
+| 1    | **#15 项目取名** ★            | 所有 UI/文档/域名的前提         |
+| 2    | **#13 Logo 优化**              | 依赖项目名确定                  |
+| 3    | **#16 LLM / Deepseek 适配** ★ | AI 能力基础，影响 CoT/助手/规划 |
+| 4    | **#01 仿真地图→天地图** ★    | 地图统一，影响多模块            |
+| 5    | **#09 模拟器任务建设优化** ★  | 核心业务流程闭环                |
 
 ### 第二批（功能增强 + 性能优化）
-| 顺序 | TODO | 理由 |
-|------|------|------|
-| 6 | #05 CoT 思维链优化 | 依赖 #16 LLM 基础 |
-| 7 | #06 离线通知屏蔽 | 通知稳定性保障 |
-| 8 | #07 并发 RPM 优化 | 依赖 #16 LLM 限流需求 |
-| 9 | #18 RAG 优化 | 依赖 #16 LLM + embedding |
-| 10 | #03 仿真日志优化 | 依赖 #09 仿真流程清晰 |
-| 11 | #04 导出→展示跳转 | 依赖 #09 任务建设完善 |
-| 12 | #10 电量+图表优化 | 独立可并行 |
-| 13 | #08 前端性能优化 | 基础设施，不影响功能 |
+
+| 顺序 | TODO               | 理由                     |
+| ---- | ------------------ | ------------------------ |
+| 6    | #05 CoT 思维链优化 | 依赖 #16 LLM 基础        |
+| 7    | #06 离线通知屏蔽   | 通知稳定性保障           |
+| 8    | #07 并发 RPM 优化  | 依赖 #16 LLM 限流需求    |
+| 9    | #18 RAG 优化       | 依赖 #16 LLM + embedding |
+| 10   | #03 仿真日志优化   | 依赖 #09 仿真流程清晰    |
+| 11   | #04 导出→展示跳转 | 依赖 #09 任务建设完善    |
+| 12   | #10 电量+图表优化  | 独立可并行               |
+| 13   | #08 前端性能优化   | 基础设施，不影响功能     |
 
 ### 第三批（视觉升级 + 体验打磨）
-| 顺序 | TODO | 理由 |
-|------|------|------|
-| 14 | #20 前端全面圆角 | CSS 变量基础 |
-| 15 | #21 毛玻璃效果 | 依赖 #20 圆角规范 |
-| 16 | #14 登录背景优化 | 依赖 #13 Logo + #21 毛玻璃 |
-| 17 | #23 动态性优化 | 依赖 #20/#21 视觉基础 |
-| 18 | #11 轨迹弧度化 | 独立可并行 |
-| 19 | #12 视频模块位置 | 独立可并行 |
-| 20 | #02 AI 助手图标优化 | 依赖 #21 毛玻璃 |
-| 21 | #19 默认头像→Logo | 依赖 #13 Logo 完成 |
-| 22 | #22 域名优化 | 依赖 #15 项目名 |
-| 23 | #17 PPT 首页优化 | 依赖 #13/#15，最后做 |
+
+| 顺序 | TODO                | 理由                       |
+| ---- | ------------------- | -------------------------- |
+| 14   | #20 前端全面圆角    | CSS 变量基础               |
+| 15   | #21 毛玻璃效果      | 依赖 #20 圆角规范          |
+| 16   | #14 登录背景优化    | 依赖 #13 Logo + #21 毛玻璃 |
+| 17   | #23 动态性优化      | 依赖 #20/#21 视觉基础      |
+| 18   | #11 轨迹弧度化      | 独立可并行                 |
+| 19   | #12 视频模块位置    | 独立可并行                 |
+| 20   | #02 AI 助手图标优化 | 依赖 #21 毛玻璃            |
+| 21   | #19 默认头像→Logo  | 依赖 #13 Logo 完成         |
+| 22   | #22 域名优化        | 依赖 #15 项目名            |
+| 23   | #17 PPT 首页优化    | 依赖 #13/#15，最后做       |
 
 ---
 
 ## 附录：涉及文件全景索引
 
-| 文件/目录 | 涉及 TODO 编号 |
-|-----------|---------------|
-| `project/web/modules/simulation.html` | #01 #03 #04 #09 #10 #11 |
-| `project/web/modules/common.css` | #20 #21 #23 |
-| `project/web/modules/common.js` | #01 #08 #23 |
-| `project/web/modules/ai-assistant.js` | #02 #19 #21 #23 |
-| `project/web/modules/notification-bell.js` | #06 #21 #23 |
-| `project/web/modules/cot.html` | #05 |
-| `project/web/modules/battery.html` | #10 |
-| `project/web/modules/gps.html` | #01 #11 |
-| `project/web/modules/flight.html` | #01 #11 |
-| `project/web/modules/video.html` | #12 |
-| `project/web/modules/concurrency.html` | #07 |
-| `project/web/dashboard.html` | #04 #08 #12 #13 #15 #19 #20 #21 #23 |
-| `project/web/login.html` | #13 #14 #15 #21 |
-| `project/web/register.html` | #13 #14 #15 #21 |
-| `project/internal/llm/llm.go` | #07 #16 |
-| `project/internal/handlers/cot.go` | #05 #16 |
-| `project/internal/handlers/ai_assistant.go` | #16 #18 |
-| `project/internal/handlers/simulation.go` | #03 #09 |
-| `project/internal/handlers/notification.go` | #06 |
-| `project/internal/handlers/patrol.go` | #06 |
-| `project/internal/taskpool/pool.go` | #07 |
-| `project/.env` | #01 #07 #16 #22 |
-| `README.md` | #15 |
-| `Cloudcontrol.pptx` | #17 |
-| `功能介绍/` | #18 |
+| 文件/目录                                     | 涉及 TODO 编号                      |
+| --------------------------------------------- | ----------------------------------- |
+| `project/web/modules/simulation.html`       | #01 #03 #04 #09 #10 #11             |
+| `project/web/modules/common.css`            | #20 #21 #23                         |
+| `project/web/modules/common.js`             | #01 #08 #23                         |
+| `project/web/modules/ai-assistant.js`       | #02 #19 #21 #23                     |
+| `project/web/modules/notification-bell.js`  | #06 #21 #23                         |
+| `project/web/modules/cot.html`              | #05                                 |
+| `project/web/modules/battery.html`          | #10                                 |
+| `project/web/modules/gps.html`              | #01 #11                             |
+| `project/web/modules/flight.html`           | #01 #11                             |
+| `project/web/modules/video.html`            | #12                                 |
+| `project/web/modules/concurrency.html`      | #07                                 |
+| `project/web/dashboard.html`                | #04 #08 #12 #13 #15 #19 #20 #21 #23 |
+| `project/web/login.html`                    | #13 #14 #15 #21                     |
+| `project/web/register.html`                 | #13 #14 #15 #21                     |
+| `project/internal/llm/llm.go`               | #07 #16                             |
+| `project/internal/handlers/cot.go`          | #05 #16                             |
+| `project/internal/handlers/ai_assistant.go` | #16 #18                             |
+| `project/internal/handlers/simulation.go`   | #03 #09                             |
+| `project/internal/handlers/notification.go` | #06                                 |
+| `project/internal/handlers/patrol.go`       | #06                                 |
+| `project/internal/taskpool/pool.go`         | #07                                 |
+| `project/.env`                              | #01 #07 #16 #22                     |
+| `README.md`                                 | #15                                 |
+| `Cloudcontrol.pptx`                         | #17                                 |
+| `功能介绍/`                                 | #18                                 |
 
 ---
 

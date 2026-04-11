@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.min.js"></script>
+  <script src="/app/modules/curve-utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     .module-title::before { content: "\1F4CD"; }
@@ -287,6 +288,11 @@
   <div class="modal-overlay" id="historyModal">
     <div class="modal-box" style="width:700px;">
       <div class="modal-title">历史轨迹</div>
+      <div style="display:flex;gap:12px;margin-bottom:8px;align-items:center;">
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:#64748b;cursor:pointer;">
+          <input type="checkbox" id="histCurveToggle" checked onchange="redrawHistoryTrail()"> 曲线轨迹
+        </label>
+      </div>
       <div id="historyMap" style="height:350px;border-radius:8px;"></div>
       <div id="historyList" style="max-height:150px;overflow-y:auto;margin-top:12px;font-size:13px;"></div>
       <div class="modal-actions">
@@ -307,24 +313,11 @@
     let allDevices = [];
     let activeFilterName = '';
     let activeFilterStatus = '';
-    let TIANDITU_KEY = '1d109683f4d84198e37a38c442d68311';
-
-    function tdtImgLayer() {
-      return L.tileLayer(
-        `https://t{s}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
-        { subdomains:['0','1','2','3','4','5','6','7'], attribution:'© 天地图', maxZoom:18 }
-      );
-    }
-    function tdtCiaLayer() {
-      return L.tileLayer(
-        `https://t{s}.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
-        { subdomains:['0','1','2','3','4','5','6','7'], maxZoom:18 }
-      );
-    }
+    // TIANDITU_KEY, tdtImgLayer(), tdtCiaLayer() are provided by common.js
 
     // ========== Map Init ==========
     function initMap() {
-      map = L.map('mapContainer').setView([34.748, 113.655], 14);
+      map = L.map('mapContainer').setView([34.7930, 113.6636], 15);
       tdtImgLayer().addTo(map);
       tdtCiaLayer().addTo(map);
       // MarkerCluster: handles overlapping markers — click cluster to spiderfy (fan out)
@@ -695,7 +688,7 @@
         $('#detailModal').classList.add('active');
         setTimeout(() => {
           if (detailMap) { detailMap.remove(); detailMap = null; }
-          detailMap = L.map('detailMap').setView([d.latitude || 34.748, d.longitude || 113.655], 14);
+          detailMap = L.map('detailMap').setView([d.latitude || 34.7930, d.longitude || 113.6636], 15);
           tdtImgLayer().addTo(detailMap);
           tdtCiaLayer().addTo(detailMap);
           if (d.latitude !== 0 || d.longitude !== 0) {
@@ -720,12 +713,15 @@
         $('#historyModal').classList.add('active');
         setTimeout(() => {
           if (historyMap) { historyMap.remove(); historyMap = null; }
-          historyMap = L.map('historyMap').setView([34.748, 113.655], 14);
+          historyMap = L.map('historyMap').setView([34.7930, 113.6636], 15);
           tdtImgLayer().addTo(historyMap);
           tdtCiaLayer().addTo(historyMap);
           if (items.length) {
             const coords = items.map(h => [h.latitude, h.longitude]).reverse();
-            L.polyline(coords, { color: '#0ea5e9', weight: 3 }).addTo(historyMap);
+            window._histRawCoords = coords;
+            const useCurve = document.getElementById('histCurveToggle').checked;
+            const displayCoords = (useCurve && coords.length >= 3) ? smoothTrail(coords, {segPoints: 5}) : coords;
+            window._histTrailLayer = L.polyline(displayCoords, { color: '#0ea5e9', weight: 3 }).addTo(historyMap);
             L.circleMarker(coords[0], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 1 }).addTo(historyMap).bindPopup('起点');
             L.circleMarker(coords[coords.length-1], { radius: 6, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).addTo(historyMap).bindPopup('最新位置');
             historyMap.fitBounds(coords, { padding: [30, 30] });
@@ -742,6 +738,13 @@
       } catch (e) { showToast('加载轨迹失败', 'error'); }
     }
     function closeHistoryModal() { $('#historyModal').classList.remove('active'); if (historyMap) { historyMap.remove(); historyMap = null; } }
+    function redrawHistoryTrail() {
+      if (!historyMap || !window._histRawCoords || !window._histTrailLayer) return;
+      const coords = window._histRawCoords;
+      const useCurve = document.getElementById('histCurveToggle').checked;
+      const displayCoords = (useCurve && coords.length >= 3) ? smoothTrail(coords, {segPoints: 5}) : coords;
+      window._histTrailLayer.setLatLngs(displayCoords);
+    }
 
     // ========== Ack Alert ==========
     async function ackAlert(id) {
@@ -810,9 +813,7 @@
     }
 
     // ========== Init ==========
-    fetch('/api/config').then(r=>r.json()).then(cfg=>{
-      if(cfg.tianditu_key) TIANDITU_KEY=cfg.tianditu_key;
-    }).catch(()=>{}).finally(()=>{
+    loadTdtConfig().finally(()=>{
       initMap(); initCharts(); loadDevices(); loadStats();
     });
   </script>

@@ -37,9 +37,10 @@ type RLState struct {
 	ClusterCenterY float64 `json:"cluster_center_y"`
 
 	// Environment
-	WindSpeed float64 `json:"wind_speed"`
-	WindDir   float64 `json:"wind_dir"`
-	TimeOfDay float64 `json:"time_of_day"` // 0-24
+	WindSpeed   float64 `json:"wind_speed"`
+	WindDir     float64 `json:"wind_dir"`
+	TimeOfDay   float64 `json:"time_of_day"`    // 0-24
+	InNoFlyZone int     `json:"in_no_fly_zone"` // 0 or 1
 }
 
 // RLAction represents the action space for drone control.
@@ -179,8 +180,9 @@ func (q *QTable) stateKey(s RLState) string {
 	} else if s.MinSeparation < 100 {
 		sepBin = 2 // medium
 	}
-	return fmt.Sprintf("%d_%d_%d_%d_%d_%d_%d_%d_%d_%d",
-		latBin, lngBin, altBin, spdBin, hdgBin, batBin, phaseBin, anomBin, nearBin, sepBin)
+	nfzBin := s.InNoFlyZone // 0 or 1
+	return fmt.Sprintf("%d_%d_%d_%d_%d_%d_%d_%d_%d_%d_%d",
+		latBin, lngBin, altBin, spdBin, hdgBin, batBin, phaseBin, anomBin, nearBin, sepBin, nfzBin)
 }
 
 // getValuesCopy returns a COPY of the Q-values for a state key (thread-safe).
@@ -669,6 +671,11 @@ func (t *RLTrainer) buildState(snap TelemetrySnapshot, all []TelemetrySnapshot) 
 	s.WindSpeed = 2 + rand.Float64()*5
 	s.WindDir = rand.Float64() * 360
 
+	// Geofence awareness
+	if snap.GeofenceViolation != "" {
+		s.InNoFlyZone = 1
+	}
+
 	return s
 }
 
@@ -708,7 +715,7 @@ func (t *RLTrainer) computeReward(snap TelemetrySnapshot, action int, prevState 
 		r.RouteEfficiency -= 0.1
 	}
 
-	// ---- 2. Safety: separation + action appropriateness ----
+	// ---- 2. Safety: separation + geofence + action appropriateness ----
 	minSep := 1000.0
 	for _, other := range all {
 		if other.DeviceID == snap.DeviceID {
@@ -721,11 +728,9 @@ func (t *RLTrainer) computeReward(snap TelemetrySnapshot, action int, prevState 
 	}
 	if minSep < 10 {
 		r.SafetyScore = -2.0
-		// Reward evasive actions when in collision danger
 		if action == ActionAdjustHeading || action == ActionAdjustAlt || action == ActionHover {
-			r.SafetyScore += 1.0 // partial credit for trying to avoid
+			r.SafetyScore += 1.0
 		}
-		// Penalize accelerating into danger
 		if action == ActionAdjustSpeed {
 			r.SafetyScore -= 0.5
 		}
@@ -736,6 +741,13 @@ func (t *RLTrainer) computeReward(snap TelemetrySnapshot, action int, prevState 
 		}
 	} else {
 		r.SafetyScore = 0.5
+	}
+	// Geofence violation: heavy penalty for being inside a no-fly zone
+	if snap.GeofenceViolation != "" {
+		r.SafetyScore -= 3.0
+		if action == ActionReturn || action == ActionAdjustHeading {
+			r.SafetyScore += 1.5 // reward corrective action
+		}
 	}
 
 	// ---- 3. Energy: action-aware battery management ----

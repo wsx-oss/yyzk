@@ -369,7 +369,7 @@
         <div class="full-width" style="background:#f8fafc;padding:12px;border-radius:8px;margin-top:4px;">
           <label style="font-weight:600;color:#0f172a;">起点（输入地址名称 或 经纬度坐标）</label>
           <div style="display:flex;gap:6px;margin-top:6px;">
-            <input id="mStartAddr" type="text" placeholder="例如：郑州大学主校区 / 34.748000,113.655000" style="flex:1;" />
+            <input id="mStartAddr" type="text" placeholder="例如：郑州大学主校区南门 / 34.793000,113.663600" style="flex:1;" />
             <button class="btn btn-secondary" type="button" onclick="resolveAddress('start')" style="white-space:nowrap;">解析</button>
           </div>
           <div id="mStartCandidates" style="margin-top:4px;"></div>
@@ -383,7 +383,7 @@
         <div class="full-width" style="background:#f8fafc;padding:12px;border-radius:8px;">
           <label style="font-weight:600;color:#0f172a;">终点（输入地址名称 或 经纬度坐标）</label>
           <div style="display:flex;gap:6px;margin-top:6px;">
-            <input id="mGoalAddr" type="text" placeholder="例如：郑州大学北校区 / 34.757000,113.660000" style="flex:1;" />
+            <input id="mGoalAddr" type="text" placeholder="例如：郑州大学主校区北门 / 34.802000,113.664000" style="flex:1;" />
             <button class="btn btn-secondary" type="button" onclick="resolveAddress('goal')" style="white-space:nowrap;">解析</button>
           </div>
           <div id="mGoalCandidates" style="margin-top:4px;"></div>
@@ -781,22 +781,9 @@
     }
 
     // ========== Tianditu + No-fly zone state ==========
-    let TIANDITU_KEY = '1d109683f4d84198e37a38c442d68311';
+    // TIANDITU_KEY, tdtImgLayer(), tdtCiaLayer() are provided by common.js
     let tdtReady = false;
     let allNoFlyZones = [];
-
-    function tdtImgLayer() {
-      return L.tileLayer(
-        `https://t{s}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
-        { subdomains:['0','1','2','3','4','5','6','7'], attribution:'© 天地图', maxZoom:18 }
-      );
-    }
-    function tdtCiaLayer() {
-      return L.tileLayer(
-        `https://t{s}.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
-        { subdomains:['0','1','2','3','4','5','6','7'], maxZoom:18 }
-      );
-    }
 
     function addNoFlyZonesToMap(targetMap, layers) {
       allNoFlyZones.forEach(z => {
@@ -936,7 +923,7 @@
       mPickerNFZLayers.forEach(l => { try { l.remove(); } catch(e) {} });
       mPickerNFZLayers = [];
       try {
-        mPickerMap = L.map('mPickerMap', { center: [34.748, 113.655], zoom: 14 });
+        mPickerMap = L.map('mPickerMap', { center: [34.7930, 113.6636], zoom: 15 });
         tdtImgLayer().addTo(mPickerMap);
         tdtCiaLayer().addTo(mPickerMap);
         addNoFlyZonesToMap(mPickerMap, mPickerNFZLayers);
@@ -1198,8 +1185,9 @@
       tdtImgLayer().addTo(actionConfigMap);
       tdtCiaLayer().addTo(actionConfigMap);
 
-      // Draw route polyline
-      actionConfigRoutePolyline = L.polyline(coords, { color: '#6366f1', weight: 4, opacity: 0.8 }).addTo(actionConfigMap);
+      // Draw route polyline (smooth curve when available)
+      var acDisplay = (typeof smoothRoute==='function' && coords.length>=3) ? smoothRoute(coords, {segPoints:12,tension:0.3}) : coords;
+      actionConfigRoutePolyline = L.polyline(acDisplay, { color: '#6366f1', weight: 4, opacity: 0.8 }).addTo(actionConfigMap);
       actionConfigMap.fitBounds(actionConfigRoutePolyline.getBounds(), { padding: [30, 30] });
 
       // Draw waypoint dots
@@ -1829,7 +1817,8 @@
               tdtImgLayer().addTo(mDetailRouteMap);
               tdtCiaLayer().addTo(mDetailRouteMap);
               addNoFlyZonesToMap(mDetailRouteMap, []);
-              L.polyline(coords, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mDetailRouteMap);
+              var detailDisplay = (typeof smoothRoute==='function' && coords.length>=3) ? smoothRoute(coords, {segPoints:12,tension:0.3}) : coords;
+              L.polyline(detailDisplay, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mDetailRouteMap);
               const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
               waypoints.forEach((wp, i) => {
                 const color = actionColors[wp.action] || (i === 0 ? '#10b981' : (i === waypoints.length-1 ? '#ef4444' : '#6366f1'));
@@ -2590,7 +2579,8 @@
             // Flight path polyline
             const coords = plan.waypoints.map(function(wp) { return [wp.lat, wp.lon]; });
             const lineColor = lineColors[idx] || '#6366f1';
-            const poly = L.polyline(coords, { color: lineColor, weight: 3, opacity: 0.9 }).addTo(m);
+            const displayCoords = (typeof smoothRoute==='function' && coords.length>=3) ? smoothRoute(coords, {segPoints:10,tension:0.3}) : coords;
+            const poly = L.polyline(displayCoords, { color: lineColor, weight: 3, opacity: 0.9 }).addTo(m);
 
             // Action waypoint markers (only for waypoints with actions)
             const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
@@ -2674,7 +2664,8 @@
     function redrawResultPath() {
       if (!mResultPathPolyline || !mLastPlan) return;
       const coords = mLastPlan.waypoints.map(wp => [wp.lat, wp.lon]);
-      mResultPathPolyline.setLatLngs(coords);
+      const display = (typeof smoothRoute==='function' && coords.length>=3) ? smoothRoute(coords, {segPoints:12,tension:0.3}) : coords;
+      mResultPathPolyline.setLatLngs(display);
     }
 
     function renderMResultMap(plan) {
@@ -2700,7 +2691,9 @@
 
         // Flight path polyline (kept as variable for live update)
         const coords = plan.waypoints.map(wp => [wp.lat, wp.lon]);
-        mResultPathPolyline = L.polyline(coords, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mResultMap);
+        var resDisplay = (typeof smoothRoute==='function' && coords.length>=3) ? smoothRoute(coords, {segPoints:12,tension:0.3}) : coords;
+        mResultPathPolyline = L.polyline(resDisplay, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mResultMap);
+        mResultPathPolyline._rawCoords = coords; // keep raw for drag update
 
         // Draggable waypoint markers
         const actionColors = { 'TAKEOFF':'#10b981','LAND':'#ef4444','CAPTURE_PHOTO':'#0ea5e9','RECORD_VIDEO':'#8b5cf6','LOITER':'#f59e0b','SCAN_AREA':'#06b6d4','INSPECT':'#3b82f6','SPRAY':'#22c55e','DROP_PAYLOAD':'#f97316','AIR_SENSOR':'#14b8a6' };
@@ -2757,7 +2750,8 @@
         // Reference polyline (dashed)
         if (mLastMapCtx && mLastMapCtx.ref_polyline && mLastMapCtx.ref_polyline.length > 1) {
           const refCoords = mLastMapCtx.ref_polyline.map(p => [p[1], p[0]]);
-          L.polyline(refCoords, { color: '#94a3b8', weight: 2, opacity: 0.5, dashArray: '6,4' }).addTo(mResultMap);
+          var refDisplay = (typeof smoothRoute==='function' && refCoords.length>=3) ? smoothRoute(refCoords, {segPoints:8,tension:0.4}) : refCoords;
+          L.polyline(refDisplay, { color: '#94a3b8', weight: 2, opacity: 0.5, dashArray: '6,4' }).addTo(mResultMap);
         }
 
         mResultMap.fitBounds(coords, { padding: [30, 30] });
@@ -2809,12 +2803,11 @@
       })
       .catch(function(e) { console.warn('Chart.js load failed:', e); });
 
-    // Phase 3: Load Leaflet, then load Tianditu key from config
+    // Phase 3: Load Leaflet + curve-utils, then load Tianditu key from config
     loadScript('https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js')
+      .then(function() { return loadScript('/app/modules/curve-utils.js'); })
       .then(function() {
-        return fetch('/api/config').then(r => r.json()).then(cfg => {
-          if (cfg.tianditu_key) TIANDITU_KEY = cfg.tianditu_key;
-        }).catch(() => {});
+        return loadTdtConfig();
       })
       .then(function() {
         tdtReady = true;

@@ -21,6 +21,8 @@ type AIAssistantAPI struct {
 
 // NewAIAssistantAPI creates a new AIAssistantAPI
 func NewAIAssistantAPI(db *db.DB) *AIAssistantAPI {
+	// Ensure the shared RAG engine is initialised
+	InitSharedRAG()
 	return &AIAssistantAPI{
 		db:  db,
 		llm: llm.NewClient(),
@@ -85,6 +87,7 @@ func (a *AIAssistantAPI) knowledgeBase() string {
 3. 当用户要求跳转时，在合适位置附加[NAV:xxx]标签
 4. 对告警和异常要给出分析建议
 5. 支持对电池状态、飞行规划、CoT决策结果的解读
+6. 当提供了【知识库参考】内容时，优先参考知识库中的信息来回答用户问题，确保回答准确且有据可查
 `
 }
 
@@ -481,8 +484,17 @@ func (a *AIAssistantAPI) Chat(c *gin.Context) {
 	// Gather context
 	context := a.gatherContext(msg)
 
-	// Build the user prompt with context
-	userPrompt := fmt.Sprintf("【平台实时数据】\n%s\n\n【用户问题】\n%s", context, msg)
+	// RAG: retrieve relevant knowledge base chunks
+	ragContext := RAGRetrieveContext(msg, 3)
+
+	// Build the user prompt with context + RAG knowledge
+	var promptParts []string
+	promptParts = append(promptParts, fmt.Sprintf("【平台实时数据】\n%s", context))
+	if ragContext != "" {
+		promptParts = append(promptParts, ragContext)
+	}
+	promptParts = append(promptParts, fmt.Sprintf("【用户问题】\n%s", msg))
+	userPrompt := strings.Join(promptParts, "\n\n")
 
 	// Get recent conversation history for continuity (last 6 messages)
 	var history []map[string]string
@@ -765,6 +777,44 @@ func (a *AIAssistantAPI) CoTExplain(c *gin.Context) {
 	c.JSON(200, gin.H{"explanation": fmt.Sprintf("CoT决策 [%s]\n任务: %s\n最终决策: %s\n\n包含 %d 个推理步骤。配置 LLM_API_KEY 后可获得详细解释。", taskType, taskID, finalDecision, len(steps))})
 }
 
+// RAGSearch exposes the RAG knowledge base retrieval as an API endpoint.
+// Users or the frontend can query the knowledge base directly.
+func (a *AIAssistantAPI) RAGSearch(c *gin.Context) {
+	query := strings.TrimSpace(c.Query("q"))
+	if query == "" {
+		c.JSON(400, gin.H{"error": "query parameter 'q' is required"})
+		return
+	}
+	topK := 5
+	if SharedRAG == nil || SharedRAG.ChunkCount() == 0 {
+		c.JSON(200, gin.H{"chunks": []gin.H{}, "total_chunks": 0})
+		return
+	}
+	chunks := SharedRAG.Retrieve(query, topK)
+	items := make([]gin.H, 0, len(chunks))
+	for _, ch := range chunks {
+		items = append(items, gin.H{
+			"source":  ch.Source,
+			"section": ch.Section,
+			"content": ch.Content,
+			"score":   ch.Score,
+		})
+	}
+	c.JSON(200, gin.H{"chunks": items, "total_chunks": SharedRAG.ChunkCount()})
+}
+
+// RAGStats returns basic statistics about the RAG knowledge base.
+func (a *AIAssistantAPI) RAGStats(c *gin.Context) {
+	count := 0
+	if SharedRAG != nil {
+		count = SharedRAG.ChunkCount()
+	}
+	c.JSON(200, gin.H{
+		"chunk_count": count,
+		"enabled":     count > 0,
+	})
+}
+
 // RegisterAIAssistantRoutes registers all AI assistant routes
 func RegisterAIAssistantRoutes(r *gin.Engine, db *db.DB) {
 	api := NewAIAssistantAPI(db)
@@ -776,5 +826,7 @@ func RegisterAIAssistantRoutes(r *gin.Engine, db *db.DB) {
 		g.POST("/query", api.DataQuery)
 		g.GET("/suggest", api.Suggest)
 		g.GET("/cot-explain/:id", api.CoTExplain)
+		g.GET("/rag/search", api.RAGSearch)
+		g.GET("/rag/stats", api.RAGStats)
 	}
 }

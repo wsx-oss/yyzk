@@ -34,6 +34,8 @@ type Instance struct {
 	onTelemetry func(TelemetrySnapshot)
 	// callback when instance state changes
 	onStateChange func(id string, state InstanceState)
+	// callback to check geofence (returns zone name if violation, empty if safe)
+	geofenceCheck func(lat, lng float64) string
 }
 
 // NewInstance creates a new simulation instance from config.
@@ -427,17 +429,24 @@ func (inst *Instance) tick(now time.Time) {
 	if inst.task == TaskCompleted {
 		routeProg = 1.0
 	}
+	// Check geofence violation
+	geoViolation := ""
+	if inst.geofenceCheck != nil {
+		geoViolation = inst.geofenceCheck(inst.gps.Latitude, inst.gps.Longitude)
+	}
+
 	snap := TelemetrySnapshot{
-		DeviceID:      inst.config.ID,
-		Timestamp:     now,
-		GPS:           inst.gps,
-		Battery:       inst.battery,
-		FlightPhase:   inst.phase,
-		TaskStatus:    inst.task,
-		Anomalies:     append([]AnomalyEvent{}, inst.anomalies...),
-		WaypointIdx:   inst.wpIdx,
-		WaypointTotal: wpTotal,
-		RouteProgress: routeProg,
+		DeviceID:          inst.config.ID,
+		Timestamp:         now,
+		GPS:               inst.gps,
+		Battery:           inst.battery,
+		FlightPhase:       inst.phase,
+		TaskStatus:        inst.task,
+		Anomalies:         append([]AnomalyEvent{}, inst.anomalies...),
+		WaypointIdx:       inst.wpIdx,
+		WaypointTotal:     wpTotal,
+		RouteProgress:     routeProg,
+		GeofenceViolation: geoViolation,
 	}
 	inst.totalFlightSec += dt
 	inst.mu.Unlock()
@@ -732,18 +741,20 @@ func (inst *Instance) applyTempAnomaly() {
 // flyToward moves the drone toward a target lat/lng/alt.
 func (inst *Instance) flyToward(lat, lng, alt, dt float64) {
 	speed := inst.config.CruiseSpeed
-	// Convert speed (m/s) to degree delta (rough approximation)
-	// 1 degree lat ≈ 111,000 meters
+	// Use cosLat-corrected distance (consistent with distTo)
+	cosLat := math.Cos(inst.gps.Latitude * math.Pi / 180)
 	dLat := lat - inst.gps.Latitude
 	dLng := lng - inst.gps.Longitude
-	dist := math.Sqrt(dLat*dLat+dLng*dLng) * 111000 // approximate meters
+	dLatM := dLat * 111000
+	dLngM := dLng * 111000 * cosLat
+	dist := math.Sqrt(dLatM*dLatM + dLngM*dLngM) // meters
 	if dist < 0.5 {
 		inst.gps.Latitude = lat
 		inst.gps.Longitude = lng
 		return
 	}
 
-	// Normalize direction
+	// Normalize direction and move
 	moveDist := speed * dt // meters to move this tick
 	if moveDist > dist {
 		moveDist = dist
@@ -763,8 +774,8 @@ func (inst *Instance) flyToward(lat, lng, alt, dt float64) {
 		}
 	}
 
-	// Heading (degrees from north)
-	inst.gps.Heading = math.Mod(math.Atan2(dLng, dLat)*180/math.Pi+360, 360)
+	// Heading (degrees from north, cosLat-corrected)
+	inst.gps.Heading = math.Mod(math.Atan2(dLngM, dLatM)*180/math.Pi+360, 360)
 
 	// GPS noise
 	inst.gps.Latitude += (rand.Float64() - 0.5) * 0.0000005

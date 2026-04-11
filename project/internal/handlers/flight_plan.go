@@ -54,6 +54,28 @@ func (a *API) FlightPlanCreate(c *gin.Context) {
 		log.Printf("[FlightPlan] CBR: injected similar historical cases into prompt")
 	}
 
+	// RAG: inject relevant drone domain knowledge (regulations, airspace, tech specs)
+	ragQuery := "无人机飞行规划 航线 高度限制 禁飞区 电量续航"
+	if ragCtx := RAGRetrieveContext(ragQuery, 3); ragCtx != "" {
+		if request.MapContextStr != "" {
+			request.MapContextStr += "\n\n" + ragCtx
+		} else {
+			request.MapContextStr = ragCtx
+		}
+		log.Printf("[FlightPlan] RAG: injected knowledge base context into prompt")
+	}
+
+	// RL: inject reinforcement learning policy hints to bias LLM planning
+	rlBridge := NewRLPolicyBridge()
+	if rlHints := rlBridge.GenerateFlightHints(); rlHints != "" {
+		if request.MapContextStr != "" {
+			request.MapContextStr += "\n" + rlHints
+		} else {
+			request.MapContextStr = rlHints
+		}
+		log.Printf("[FlightPlan] RL: injected policy hints into prompt")
+	}
+
 	// Gather real map data from AMap if available
 	amapClient := amap.NewClient()
 	var mapCtx *amap.MapContext

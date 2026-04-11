@@ -109,16 +109,17 @@ type BatteryData struct {
 
 // TelemetrySnapshot is a complete telemetry frame for one instant.
 type TelemetrySnapshot struct {
-	DeviceID      string         `json:"device_id"`
-	Timestamp     time.Time      `json:"timestamp"`
-	GPS           GPSData        `json:"gps"`
-	Battery       BatteryData    `json:"battery"`
-	FlightPhase   FlightPhase    `json:"flight_phase"`
-	TaskStatus    TaskStatus     `json:"task_status"`
-	Anomalies     []AnomalyEvent `json:"anomalies,omitempty"`
-	WaypointIdx   int            `json:"waypoint_idx"`
-	WaypointTotal int            `json:"waypoint_total"`
-	RouteProgress float64        `json:"route_progress"` // 0.0-1.0 overall route completion
+	DeviceID          string         `json:"device_id"`
+	Timestamp         time.Time      `json:"timestamp"`
+	GPS               GPSData        `json:"gps"`
+	Battery           BatteryData    `json:"battery"`
+	FlightPhase       FlightPhase    `json:"flight_phase"`
+	TaskStatus        TaskStatus     `json:"task_status"`
+	Anomalies         []AnomalyEvent `json:"anomalies,omitempty"`
+	WaypointIdx       int            `json:"waypoint_idx"`
+	WaypointTotal     int            `json:"waypoint_total"`
+	RouteProgress     float64        `json:"route_progress"`     // 0.0-1.0 overall route completion
+	GeofenceViolation string         `json:"geofence_violation"` // non-empty = inside no-fly zone
 }
 
 // AnomalyEvent represents an active anomaly on an instance.
@@ -213,6 +214,16 @@ type EngineMetrics struct {
 	GoroutineCount   int     `json:"goroutine_count"`
 	MemoryUsageMB    float64 `json:"memory_usage_mb"`
 	UptimeSec        float64 `json:"uptime_sec"`
+}
+
+// ---------- No-Fly Zone (Geofence) ----------
+
+// NoFlyZone represents a polygon no-fly zone for simulation geofence checking.
+type NoFlyZone struct {
+	Name     string       `json:"name"`
+	ZoneType string       `json:"zone_type"` // 禁飞区 / 限高区 / 限速区
+	AltLimit int          `json:"alt_limit"` // -1 = full restriction
+	Vertices [][2]float64 `json:"vertices"`  // [[lat,lng], ...] polygon vertices
 }
 
 // ---------- Resource Limiter ----------

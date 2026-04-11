@@ -33,6 +33,10 @@ type Engine struct {
 	startTime time.Time
 	dataDir   string
 
+	// No-fly zone geofence data
+	nfzMu      sync.RWMutex
+	noFlyZones []NoFlyZone
+
 	// Callbacks for integrating with the main application
 	onTelemetry   func(TelemetrySnapshot) // push telemetry to DB/WS
 	onStateChange func(string, InstanceState)
@@ -85,6 +89,54 @@ func NewEngine(cfg EngineConfig) *Engine {
 
 	log.Printf("[SimEngine] started: maxInstances=%d, maxGoroutines=%d", cfg.MaxInstances, cfg.MaxGoroutines)
 	return e
+}
+
+// SetNoFlyZones updates the engine's geofence data.
+func (e *Engine) SetNoFlyZones(zones []NoFlyZone) {
+	e.nfzMu.Lock()
+	defer e.nfzMu.Unlock()
+	e.noFlyZones = zones
+	log.Printf("[SimEngine] loaded %d no-fly zones for geofence", len(zones))
+}
+
+// GetNoFlyZones returns a copy of current no-fly zones.
+func (e *Engine) GetNoFlyZones() []NoFlyZone {
+	e.nfzMu.RLock()
+	defer e.nfzMu.RUnlock()
+	out := make([]NoFlyZone, len(e.noFlyZones))
+	copy(out, e.noFlyZones)
+	return out
+}
+
+// CheckGeofence returns the name of the violated no-fly zone, or empty string if safe.
+func (e *Engine) CheckGeofence(lat, lng float64) string {
+	e.nfzMu.RLock()
+	defer e.nfzMu.RUnlock()
+	for _, z := range e.noFlyZones {
+		if pointInPolygon(lat, lng, z.Vertices) {
+			return z.Name
+		}
+	}
+	return ""
+}
+
+// pointInPolygon uses the ray-casting algorithm to test if (lat,lng) is inside a polygon.
+func pointInPolygon(lat, lng float64, verts [][2]float64) bool {
+	n := len(verts)
+	if n < 3 {
+		return false
+	}
+	inside := false
+	j := n - 1
+	for i := 0; i < n; i++ {
+		yi, xi := verts[i][0], verts[i][1]
+		yj, xj := verts[j][0], verts[j][1]
+		if ((yi > lat) != (yj > lat)) && (lng < (xj-xi)*(lat-yi)/(yj-yi)+xi) {
+			inside = !inside
+		}
+		j = i
+	}
+	return inside
 }
 
 // Shutdown gracefully stops all instances and persists state.
@@ -181,16 +233,44 @@ func (e *Engine) CreateBatch(cfg BatchConfig) ([]string, error) {
 			deviceID := fmt.Sprintf("SIM-%s-%03d", cfg.ID, idx+1)
 			name := fmt.Sprintf("%s-无人机%03d", cfg.Name, idx+1)
 
-			// Offset shared waypoints per drone
+			// Build unique waypoints per drone:
+			// 1) Shift to drone's start position
+			// 2) Rotate pattern by a per-drone angle for route diversity
+			// 3) Add per-waypoint random jitter
+			rotAngle := 2 * math.Pi * float64(idx) / float64(cfg.Count) // unique rotation per drone
+			cosR := math.Cos(rotAngle)
+			sinR := math.Sin(rotAngle)
+			cosLat := math.Cos(cfg.CenterLat * math.Pi / 180)
 			wps := make([]Waypoint, len(cfg.Waypoints))
 			for j, wp := range cfg.Waypoints {
+				// Vector from batch center to waypoint (in degrees)
+				dLat := wp.Lat - cfg.CenterLat
+				dLng := wp.Lng - cfg.CenterLng
+				// Rotate around center (latitude-corrected)
+				rLat := dLat*cosR + dLng*cosLat*sinR
+				rLng := -dLat*sinR/cosLat + dLng*cosR
+				// Translate to drone's start position + add jitter (±30m)
+				jitter := 30.0 / 111000.0 // 30 meters in degrees
 				wps[j] = Waypoint{
-					Lat:     wp.Lat + (lat - cfg.CenterLat),
-					Lng:     wp.Lng + (lng - cfg.CenterLng),
-					Alt:     wp.Alt,
+					Lat:     lat + rLat + (rand.Float64()-0.5)*jitter,
+					Lng:     lng + rLng + (rand.Float64()-0.5)*jitter/cosLat,
+					Alt:     wp.Alt + (rand.Float64()-0.5)*6,
 					Speed:   wp.Speed,
 					Action:  wp.Action,
 					HoldSec: wp.HoldSec,
+					Name:    wp.Name,
+				}
+			}
+			// Stagger start: each drone begins at a different waypoint index
+			startWpIdx := 0
+			if len(wps) > 1 {
+				startWpIdx = idx % len(wps)
+				if startWpIdx > 0 {
+					rotated := make([]Waypoint, len(wps))
+					for j := range wps {
+						rotated[j] = wps[(j+startWpIdx)%len(wps)]
+					}
+					wps = rotated
 				}
 			}
 
@@ -325,6 +405,7 @@ func (e *Engine) CreateInstance(cfg InstanceConfig) error {
 	}
 
 	inst := NewInstance(cfg, e.onTelemetry, e.onStateChange)
+	inst.geofenceCheck = e.CheckGeofence
 
 	e.mu.Lock()
 	if _, exists := e.instances[cfg.ID]; exists {

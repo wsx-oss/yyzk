@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -142,8 +143,8 @@ func (s *SimAPI) BatchCreate(c *gin.Context) {
 	}
 	// Default center: Zhengzhou University main campus
 	if p.CenterLat == 0 && p.CenterLng == 0 {
-		p.CenterLat = 34.748
-		p.CenterLng = 113.655
+		p.CenterLat = 34.7930
+		p.CenterLng = 113.6636
 	}
 
 	batchCfg := simulation.BatchConfig{
@@ -791,17 +792,18 @@ func (s *SimAPI) LivePositions(c *gin.Context) {
 			}
 		}
 		items = append(items, gin.H{
-			"id":        t.DeviceID,
-			"lat":       t.GPS.Latitude,
-			"lng":       t.GPS.Longitude,
-			"alt":       t.GPS.Altitude,
-			"speed":     t.GPS.Speed,
-			"heading":   t.GPS.Heading,
-			"battery":   t.Battery.Level,
-			"phase":     t.FlightPhase,
-			"task":      t.TaskStatus,
-			"anomaly":   hasAnomaly,
-			"waypoints": waypoints,
+			"id":             t.DeviceID,
+			"lat":            t.GPS.Latitude,
+			"lng":            t.GPS.Longitude,
+			"alt":            t.GPS.Altitude,
+			"speed":          t.GPS.Speed,
+			"heading":        t.GPS.Heading,
+			"battery":        t.Battery.Level,
+			"phase":          t.FlightPhase,
+			"task":           t.TaskStatus,
+			"anomaly":        hasAnomaly,
+			"waypoints":      waypoints,
+			"route_progress": math.Round(t.RouteProgress*1000) / 1000,
 		})
 	}
 	c.JSON(200, gin.H{"items": items, "count": len(items)})

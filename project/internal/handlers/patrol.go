@@ -45,7 +45,11 @@ func patrolBatteryTask(database *db.DB) func(ctx context.Context) error {
 			FROM battery_records br
 			INNER JOIN (SELECT device_id, MAX(created_at) as mt FROM battery_records GROUP BY device_id) latest
 			ON br.device_id = latest.device_id AND br.created_at = latest.mt
-			WHERE br.level < 20 OR br.temperature > 50
+			INNER JOIN gps_devices g ON g.id = br.device_id
+			LEFT JOIN drones d ON d.linked_gps_device_id = g.id
+			WHERE (br.level < 20 OR br.temperature > 50)
+			  AND g.status = '在线'
+			  AND (d.id IS NULL OR d.status = 'online')
 		`)
 		if err != nil {
 			return err
@@ -84,8 +88,12 @@ func patrolBatteryTask(database *db.DB) func(ctx context.Context) error {
 }
 
 // patrolDronesTask returns a function that checks for drones going offline.
+// A 5-minute per-drone cooldown prevents repeated notifications when a drone
+// flickers between online and offline states.
 func patrolDronesTask(database *db.DB) func(ctx context.Context) error {
 	prevOnline := map[int]bool{}
+	notified := map[int]time.Time{}
+	cooldown := 5 * time.Minute
 	// Build initial state
 	rows, err := database.Query("SELECT id FROM drones WHERE status='online'")
 	if err == nil {
@@ -111,16 +119,21 @@ func patrolDronesTask(database *db.DB) func(ctx context.Context) error {
 				currentOnline[id] = true
 			}
 		}
+		now := time.Now()
 		for id := range prevOnline {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
 			if !currentOnline[id] {
+				if t, ok := notified[id]; ok && now.Sub(t) < cooldown {
+					continue
+				}
 				var name string
 				database.QueryRow("SELECT name FROM drones WHERE id=?", id).Scan(&name)
 				if name == "" {
 					name = fmt.Sprintf("ID:%d", id)
 				}
+				notified[id] = now
 				insertNotification(database, "drone",
 					fmt.Sprintf("🚁 无人机 %s 离线", name),
 					fmt.Sprintf("无人机 %s 已断开连接，请检查设备状态和网络连接", name),
@@ -133,9 +146,13 @@ func patrolDronesTask(database *db.DB) func(ctx context.Context) error {
 }
 
 // patrolAlertsTask returns a function that checks for new critical alerts.
+// A per-category cooldown prevents notification spam when the same alert
+// category fires repeatedly in quick succession.
 func patrolAlertsTask(database *db.DB) func(ctx context.Context) error {
 	var lastCheckID int
 	database.QueryRow("SELECT COALESCE(MAX(id),0) FROM alerts").Scan(&lastCheckID)
+	catNotified := map[string]time.Time{}
+	cooldown := 5 * time.Minute
 	return func(ctx context.Context) error {
 		rows, err := database.Query(
 			"SELECT id, category, severity, message FROM alerts WHERE id > ? AND severity = 'critical' AND acknowledged = 0",
@@ -145,6 +162,7 @@ func patrolAlertsTask(database *db.DB) func(ctx context.Context) error {
 			return err
 		}
 		defer rows.Close()
+		now := time.Now()
 		var maxID int
 		for rows.Next() {
 			if ctx.Err() != nil {
@@ -156,6 +174,10 @@ func patrolAlertsTask(database *db.DB) func(ctx context.Context) error {
 				if id > maxID {
 					maxID = id
 				}
+				if t, ok := catNotified[cat]; ok && now.Sub(t) < cooldown {
+					continue
+				}
+				catNotified[cat] = now
 				insertNotification(database, "alert",
 					fmt.Sprintf("🔴 严重告警: %s", cat),
 					msg,
@@ -216,13 +238,18 @@ func patrolHardwareTask(database *db.DB) func(ctx context.Context) error {
 }
 
 // patrolLogsTask returns a function that checks for error-level logs.
+// A 10-minute cooldown prevents rapid-fire log error notifications.
 func patrolLogsTask(database *db.DB) func(ctx context.Context) error {
 	var lastCheckID int
 	database.QueryRow("SELECT COALESCE(MAX(id),0) FROM logs").Scan(&lastCheckID)
+	var lastNotified time.Time
+	cooldown := 10 * time.Minute
 	return func(ctx context.Context) error {
 		var errorCnt int
 		database.QueryRow("SELECT COUNT(*) FROM logs WHERE id > ? AND (level='error' OR level='fatal')", lastCheckID).Scan(&errorCnt)
-		if errorCnt > 0 {
+		now := time.Now()
+		if errorCnt > 0 && now.Sub(lastNotified) >= cooldown {
+			lastNotified = now
 			insertNotification(database, "log",
 				fmt.Sprintf("📋 发现 %d 条错误日志", errorCnt),
 				fmt.Sprintf("后台新增 %d 条错误级别日志，请及时查看", errorCnt),

@@ -305,10 +305,65 @@ func InitSimEngine(database *db.DB, pool *taskpool.Pool) (*simulation.Engine, *s
 		log.Printf("[SimIntegration] load RL policy warning: %v", err)
 	}
 
+	// Load no-fly zones from DB for geofence-aware simulation
+	loadNoFlyZonesToEngine(database, engine)
+
 	SimEngineRef = engine
 	SimTrainerRef = trainer
 
 	return engine, trainer
+}
+
+// loadNoFlyZonesToEngine reads no-fly zones from DB and sets them on the engine.
+func loadNoFlyZonesToEngine(database *db.DB, engine *simulation.Engine) {
+	rows, err := database.Query(`SELECT name, zone_type, shape_json, altitude_limit FROM no_fly_zones`)
+	if err != nil {
+		log.Printf("[SimIntegration] load no-fly zones warning: %v", err)
+		return
+	}
+	defer rows.Close()
+	var zones []simulation.NoFlyZone
+	for rows.Next() {
+		var name, zoneType, shapeJSON string
+		var altLimit int
+		if err := rows.Scan(&name, &zoneType, &shapeJSON, &altLimit); err != nil {
+			continue
+		}
+		// Parse shape_json: array of [lat, lng] or [{lat, lng}]
+		verts := parseShapeJSON(shapeJSON)
+		if len(verts) < 3 {
+			continue
+		}
+		zones = append(zones, simulation.NoFlyZone{
+			Name:     name,
+			ZoneType: zoneType,
+			AltLimit: altLimit,
+			Vertices: verts,
+		})
+	}
+	engine.SetNoFlyZones(zones)
+}
+
+// parseShapeJSON parses various formats of polygon shape JSON into [][2]float64 {lat, lng}.
+func parseShapeJSON(raw string) [][2]float64 {
+	// Try format: [[lat, lng], ...] — array of arrays
+	var arrArr [][2]float64
+	if json.Unmarshal([]byte(raw), &arrArr) == nil && len(arrArr) > 0 {
+		return arrArr
+	}
+	// Try format: [{"lat":..., "lng":...}, ...] — array of objects
+	var objArr []struct {
+		Lat float64 `json:"lat"`
+		Lng float64 `json:"lng"`
+	}
+	if json.Unmarshal([]byte(raw), &objArr) == nil && len(objArr) > 0 {
+		result := make([][2]float64, len(objArr))
+		for i, o := range objArr {
+			result[i] = [2]float64{o.Lat, o.Lng}
+		}
+		return result
+	}
+	return nil
 }
 
 func estimateRemaining(level int) string {

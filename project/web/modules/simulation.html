@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="curve-utils.js"></script>
 <style>
 :root { --primary: #6366f1; --primary-light: #818cf8; --success: #22c55e; --warning: #f59e0b; --danger: #ef4444; --info: #3b82f6; --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --text-dim: #94a3b8; }
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -76,7 +77,15 @@ tr:hover { background:rgba(255,255,255,0.03); }
 .empty-state { text-align:center; padding:60px; color:var(--text-dim); }
 .empty-state .icon { font-size:48px; margin-bottom:16px; }
 #simMap { width:100%; height:500px; border-radius:10px; border:1px solid var(--border); background:#1a1a2e; }
+#simMap .tdt-cia-dark { filter: invert(1) hue-rotate(180deg) brightness(1.6) contrast(0.8); }
 .map-legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--text-dim); }
+.drone-label { background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; }
+.drone-label::before { display:none !important; }
+.dl-card { display:inline-flex;flex-direction:column;background:rgba(15,23,42,0.88);border-radius:6px;padding:3px 6px;border:1px solid rgba(255,255,255,0.12);min-width:56px;backdrop-filter:blur(4px); }
+.dl-top { display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#e2e8f0;gap:6px;font-weight:600; }
+.dl-bar { position:relative;height:4px;background:rgba(255,255,255,0.12);border-radius:2px;margin-top:2px;overflow:hidden; }
+.dl-fill { position:absolute;left:0;top:0;height:100%;border-radius:2px;transition:width 0.5s ease; }
+.dl-bot { font-size:8px;color:#94a3b8;text-align:right;margin-top:1px; }
 .map-legend span { display:inline-flex; align-items:center; gap:4px; }
 .map-legend .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
 .mission-info { background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); border-radius:8px; padding:12px 16px; margin-bottom:12px; font-size:13px; }
@@ -275,7 +284,10 @@ tr:hover { background:rgba(255,255,255,0.03); }
         <input type="checkbox" id="mapShowLabels" checked> 显示标签
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
-        <input type="checkbox" id="mapShowZones" checked onchange="toggleBatchZones()"> 显示禁飞区
+        <input type="checkbox" id="mapShowZones" onchange="toggleBatchZones()"> 显示批次范围
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;">
+        <input type="checkbox" id="mapUseCurve" checked> 曲线轨迹
       </label>
       <span id="mapDroneCount" style="margin-left:auto;font-size:13px;color:var(--text-dim);"></span>
     </div>
@@ -284,13 +296,11 @@ tr:hover { background:rgba(255,255,255,0.03); }
       <span id="mapBatchBtnList" style="display:flex;flex-wrap:wrap;gap:6px;"></span>
     </div>
     <div id="simMap"></div>
-    <div class="map-legend">
-      <span><span class="dot" style="background:#22c55e"></span> 巡航中</span>
-      <span><span class="dot" style="background:#3b82f6"></span> 作业/悬停</span>
-      <span><span class="dot" style="background:#f59e0b"></span> 返航/降落</span>
-      <span><span class="dot" style="background:#ef4444"></span> 异常告警</span>
-      <span><span class="dot" style="background:#94a3b8"></span> 待飞/起飞</span>
-      <span>◆ 航点  ── 航线  ▲ 无人机方向</span>
+    <div class="map-legend" id="mapLegend">
+      <span style="color:var(--text-dim);">各批次以不同颜色标识 ·</span>
+      <span><span class="dot" style="background:#ef4444;box-shadow:0 0 6px #ef4444;"></span> 异常告警</span>
+      <span>── 航迹  ▲ 机头方向</span>
+      <span id="mapBatchLegend"></span>
     </div>
     <div id="mapInfoPanel" style="margin-top:12px;"></div>
   </div>
@@ -341,7 +351,7 @@ tr:hover { background:rgba(255,255,255,0.03); }
       <button class="btn btn-success" id="rlStartBtn" onclick="rlStart()">▶ 启动训练</button>
       <button class="btn btn-danger" id="rlStopBtn" onclick="rlStop()">⏹ 停止训练</button>
       <button class="btn btn-outline" onclick="loadRLStatus()">🔄 刷新</button>
-      <button class="btn btn-primary" onclick="exportRLPolicy()">📥 导出策略</button>
+      <button class="btn btn-primary" onclick="exportRLPolicy()">� 展示策略</button>
     </div>
     <div class="grid-4" id="rlStats"></div>
     <div class="card" style="margin-top:16px;">
@@ -359,8 +369,11 @@ tr:hover { background:rgba(255,255,255,0.03); }
       </table>
     </div>
     <div class="card" style="margin-top:16px;" id="rlExportCard" hidden>
-      <div class="card-title">📥 策略导出详情</div>
+      <div class="card-title">� 策略详情</div>
       <div id="rlExportContent"></div>
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border); display:flex; gap:10px;">
+        <button class="btn btn-success" onclick="applyPolicyToBatch()">🚀 应用策略到新批次</button>
+      </div>
     </div>
     <div class="card" style="margin-top:16px;">
       <div class="card-title">💡 强化学习训练说明</div>
@@ -410,11 +423,11 @@ tr:hover { background:rgba(255,255,255,0.03); }
     <div class="form-row">
       <div class="form-group">
         <label>中心纬度</label>
-        <input type="number" id="batchCenterLat" value="34.748" step="0.0001">
+        <input type="number" id="batchCenterLat" value="34.7930" step="0.0001">
       </div>
       <div class="form-group">
         <label>中心经度</label>
-        <input type="number" id="batchCenterLng" value="113.655" step="0.0001">
+        <input type="number" id="batchCenterLng" value="113.6636" step="0.0001">
       </div>
     </div>
     <div class="form-row">
@@ -443,7 +456,7 @@ tr:hover { background:rgba(255,255,255,0.03); }
     </div>
     <div class="form-group">
       <label>航点（JSON，可选）</label>
-      <textarea id="batchWaypoints" rows="4" placeholder='[{"lat":34.749,"lng":113.656,"alt":50,"speed":10,"action":"fly","hold_sec":0}]'></textarea>
+      <textarea id="batchWaypoints" rows="4" placeholder='[{"lat":34.793,"lng":113.664,"alt":50,"speed":10,"action":"fly","hold_sec":0}]'></textarea>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('createBatchModal')">取消</button>
@@ -576,8 +589,8 @@ async function createBatch() {
     count: parseInt(document.getElementById('batchCount').value)||10,
     model: document.getElementById('batchModel').value,
     mission: document.getElementById('batchMission').value,
-    center_lat: parseFloat(document.getElementById('batchCenterLat').value)||34.748,
-    center_lng: parseFloat(document.getElementById('batchCenterLng').value)||113.655,
+    center_lat: parseFloat(document.getElementById('batchCenterLat').value)||34.7930,
+    center_lng: parseFloat(document.getElementById('batchCenterLng').value)||113.6636,
     spread_m: parseFloat(document.getElementById('batchSpread').value)||500,
     cruise_speed: parseFloat(document.getElementById('batchSpeed').value)||15,
     max_alt: parseFloat(document.getElementById('batchMaxAlt').value)||120,
@@ -734,9 +747,12 @@ async function rlStop() {
   await apiFetch(API+'/rl/stop', {method:'POST'});
   loadRLStatus();
 }
+let lastExportedPolicy = null;
+
 async function exportRLPolicy() {
   const d = await apiFetch(API+'/rl/export-policy');
   if(d.error) { alert('导出失败: '+d.error); return; }
+  lastExportedPolicy = d;
   document.getElementById('rlExportCard').hidden = false;
   let html = '<div style="font-size:13px;line-height:1.8;">';
   html += `<p><strong>策略类型:</strong> ${d.policy_type} | <strong>训练轮次:</strong> ${d.training_episodes} | <strong>平均奖励:</strong> ${(d.avg_reward||0).toFixed(3)} | <strong>ε:</strong> ${(d.epsilon||0).toFixed(4)}</p>`;
@@ -749,6 +765,26 @@ async function exportRLPolicy() {
   html += `<p><strong>实机部署指南:</strong> ${d.deployment_guide}</p>`;
   html += '</div>';
   document.getElementById('rlExportContent').innerHTML = html;
+  showToast('策略已展示，可点击「应用策略到新批次」创建仿真批次', 'success');
+  // Smooth scroll to the policy detail card
+  document.getElementById('rlExportCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function applyPolicyToBatch() {
+  // Switch to batches tab and open create batch modal with pre-filled policy info
+  switchTab('batches');
+  setTimeout(() => {
+    showCreateBatchModal();
+    // Pre-fill batch modal with policy-related parameters
+    if (lastExportedPolicy) {
+      const p = lastExportedPolicy;
+      const policyName = `RL策略批次_E${p.training_episodes||0}_R${(p.avg_reward||0).toFixed(2)}`;
+      document.getElementById('batchName').value = policyName;
+      // Recommend patrol mission for RL-trained policy
+      document.getElementById('batchMission').value = 'patrol';
+      updateMissionDesc();
+    }
+  }, 200);
 }
 
 // ---- Mission Type Descriptions ----
@@ -768,25 +804,46 @@ function updateMissionDesc() {
 let simMapObj = null;
 let mapMarkers = {};   // deviceID -> {marker, label, trail}
 let mapRoutes = {};    // deviceID -> polyline
+let mapTrailPts = {};  // deviceID -> raw [[lat,lng],...] for curve recalc
 let mapWpMarkers = []; // waypoint markers
+let mapCanvasRenderer = null;
 let mapRefreshTimer = null;
 let mapBatchZones = {};  // batchID -> {circle, label}
 let cachedBatches = [];  // cached batch list for map buttons
 
-const DRONE_COLORS = {
-  '巡航': '#22c55e', '作业': '#3b82f6', '悬停': '#3b82f6',
-  '返航': '#f59e0b', '降落': '#f59e0b',
-  '待飞': '#94a3b8', '起飞': '#94a3b8',
-  'anomaly': '#ef4444',
-};
+// ---- 批次颜色管理（同批次同色，不同批次不同色，高亮对比卫星地图） ----
+const BATCH_PALETTE = ['#00FF88','#FF6B35','#00D4FF','#FFE135','#FF44CC','#44FFAA','#FF8800','#AA66FF','#FF3366','#33CCFF'];
+let batchColorMap = {};
+let nextBatchColorIdx = 0;
 
-function getDroneColor(phase, hasAnomaly) {
-  if (hasAnomaly) return DRONE_COLORS.anomaly;
-  return DRONE_COLORS[phase] || '#94a3b8';
+function getBatchId(droneId) {
+  const m = droneId.match(/^SIM-(.+)-\d{3}$/);
+  return m ? m[1] : 'default';
 }
 
-function createDroneIcon(heading, color) {
+function getDroneColor(droneId) {
+  const bid = getBatchId(droneId);
+  if (!batchColorMap[bid]) {
+    batchColorMap[bid] = BATCH_PALETTE[nextBatchColorIdx % BATCH_PALETTE.length];
+    nextBatchColorIdx++;
+    updateBatchLegend();
+  }
+  return batchColorMap[bid];
+}
+
+function updateBatchLegend() {
+  const el = document.getElementById('mapBatchLegend');
+  if (!el) return;
+  el.innerHTML = Object.entries(batchColorMap).map(([bid, color]) => {
+    const shortId = bid.length > 8 ? bid.substring(0, 8) : bid;
+    return `<span style="display:inline-flex;align-items:center;gap:3px;margin-left:8px;"><span class="dot" style="background:${color}"></span>${shortId}</span>`;
+  }).join('');
+}
+
+function createDroneIcon(heading, color, hasAnomaly) {
+  const anomalyRing = hasAnomaly ? `<circle cx="18" cy="18" r="17" fill="none" stroke="#ef4444" stroke-width="2.5" opacity="0.9"><animate attributeName="opacity" values="0.9;0.3;0.9" dur="1s" repeatCount="indefinite"/></circle>` : '';
   const svg = `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    ${anomalyRing}
     <g transform="rotate(${heading||0},18,18)">
       <!-- 四旋翼机身 -->
       <rect x="15" y="12" width="6" height="12" rx="2" fill="${color}" stroke="#fff" stroke-width="0.8" opacity="0.95"/>
@@ -822,16 +879,19 @@ function initMap() {
     return;
   }
   simMapObj = L.map('simMap', {
-    center: [30.5728, 104.0668],
-    zoom: 15,
+    center: [34.7930, 113.6636],
+    zoom: 16,
     zoomControl: true,
     attributionControl: false,
   });
-  // Dark style tile layer
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    subdomains: 'abcd',
-  }).addTo(simMapObj);
+  // Tianditu satellite + annotation layers (dark-adapted)
+  tdtImgLayer().addTo(simMapObj);
+  const ciaLayer = tdtCiaLayer();
+  ciaLayer.addTo(simMapObj);
+  // Apply dark-mode filter to annotation layer for visual harmony
+  ciaLayer.getContainer().classList.add('tdt-cia-dark');
+  // Canvas renderer for performant curve polylines
+  mapCanvasRenderer = L.canvas({ padding: 0.5 });
 
   refreshMap();
   loadMapBatchButtons();
@@ -860,21 +920,26 @@ async function refreshMap() {
     activeDroneIds.add(drone.id);
     const latlng = [drone.lat, drone.lng];
     bounds.push(latlng);
-    const color = getDroneColor(drone.phase, drone.anomaly);
+    const color = getDroneColor(drone.id);
+    const hasAnomaly = !!drone.anomaly;
 
     // ---- Drone marker ----
     if (mapMarkers[drone.id]) {
       // Update existing marker
       mapMarkers[drone.id].marker.setLatLng(latlng);
-      mapMarkers[drone.id].marker.setIcon(createDroneIcon(drone.heading, color));
+      mapMarkers[drone.id].marker.setIcon(createDroneIcon(drone.heading, color, hasAnomaly));
       mapMarkers[drone.id].marker.setPopupContent(dronePopup(drone));
 
-      // Update trail
+      // Update trail (store raw pts, render smooth or straight)
+      if (!mapTrailPts[drone.id]) mapTrailPts[drone.id] = [];
+      mapTrailPts[drone.id].push(latlng);
+      if (mapTrailPts[drone.id].length > 60) mapTrailPts[drone.id].splice(0, mapTrailPts[drone.id].length - 60);
+      const useCurve = document.getElementById('mapUseCurve').checked;
       const trail = mapMarkers[drone.id].trail;
-      const pts = trail.getLatLngs();
-      pts.push(latlng);
-      if (pts.length > 60) pts.splice(0, pts.length - 60); // keep last 60 points
-      trail.setLatLngs(pts);
+      const renderPts = (useCurve && mapTrailPts[drone.id].length >= 3)
+        ? smoothTrail(mapTrailPts[drone.id], {segPoints: 4})
+        : mapTrailPts[drone.id];
+      trail.setLatLngs(renderPts);
       trail.setStyle({color: color});
 
       // Update label
@@ -889,10 +954,11 @@ async function refreshMap() {
       }
     } else {
       // Create new marker
-      const marker = L.marker(latlng, {icon: createDroneIcon(drone.heading, color)}).addTo(simMapObj);
+      const marker = L.marker(latlng, {icon: createDroneIcon(drone.heading, color, hasAnomaly)}).addTo(simMapObj);
       marker.bindPopup(dronePopup(drone), {maxWidth: 300});
 
-      const trail = L.polyline([latlng], {color: color, weight: 2, opacity: 0.5, dashArray: '4,4'}).addTo(simMapObj);
+      mapTrailPts[drone.id] = [latlng];
+      const trail = L.polyline([latlng], {color: color, weight: 2, opacity: 0.5, dashArray: '4,4', renderer: mapCanvasRenderer}).addTo(simMapObj);
 
       let label = null;
       if (showLabels) {
@@ -909,7 +975,11 @@ async function refreshMap() {
         simMapObj.removeLayer(mapRoutes[drone.id]);
       }
       const routePts = drone.waypoints.map(wp => [wp.lat, wp.lng]);
-      mapRoutes[drone.id] = L.polyline(routePts, {color: color, weight: 1.5, opacity: 0.35, dashArray: '6,8'}).addTo(simMapObj);
+      const useCurveRoute = document.getElementById('mapUseCurve').checked;
+      const displayRoutePts = (useCurveRoute && routePts.length >= 3)
+        ? smoothRoute(routePts, {segPoints: 12, tension: 0.3})
+        : routePts;
+      mapRoutes[drone.id] = L.polyline(displayRoutePts, {color: color, weight: 1.5, opacity: 0.35, dashArray: '6,8', renderer: mapCanvasRenderer}).addTo(simMapObj);
 
       // Waypoint dots (only for first drone to avoid clutter, or if few drones)
       if (d.items.length <= 5) {
@@ -933,6 +1003,7 @@ async function refreshMap() {
       simMapObj.removeLayer(mapMarkers[id].trail);
       if (mapMarkers[id].label) simMapObj.removeLayer(mapMarkers[id].label);
       delete mapMarkers[id];
+      delete mapTrailPts[id];
     }
   });
 
@@ -947,17 +1018,45 @@ async function refreshMap() {
 }
 
 function dronePopup(d) {
+  const prog = d.route_progress != null ? d.route_progress : 0;
+  const pct = Math.round(prog * 100);
+  const pColor = progressColor(prog);
+  const bColor = batteryColor(d.battery);
   return `<div style="font-size:13px;line-height:1.6;">
     <strong>${d.id}</strong><br>
     阶段: <b>${d.phase}</b> | 任务: ${d.task}<br>
     高度: ${(d.alt||0).toFixed(1)}m | 速度: ${(d.speed||0).toFixed(1)}m/s<br>
-    航向: ${(d.heading||0).toFixed(0)}° | 电量: ${d.battery}%<br>
+    航向: ${(d.heading||0).toFixed(0)}° | 电量: <span style="color:${bColor};font-weight:600;">${d.battery}%</span><br>
+    <div style="margin:4px 0;">任务进度:
+      <div style="display:inline-block;width:100px;height:8px;background:rgba(0,0,0,0.2);border-radius:4px;vertical-align:middle;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${pColor};border-radius:4px;"></div>
+      </div> <b>${pct}%</b>
+    </div>
     ${d.anomaly ? '<span style="color:#ef4444;font-weight:bold">⚠️ 异常告警</span>' : '<span style="color:#22c55e">✅ 正常</span>'}
   </div>`;
 }
 
+function progressColor(p) {
+  if (p >= 0.7) return '#22c55e';
+  if (p >= 0.3) return '#3b82f6';
+  return '#f59e0b';
+}
+function batteryColor(b) {
+  if (b <= 20) return '#ef4444';
+  if (b <= 50) return '#f59e0b';
+  return '#22c55e';
+}
 function droneLabel(d) {
-  return `<span style="font-size:10px;color:#fff;background:rgba(0,0,0,0.6);padding:1px 4px;border-radius:3px;">${d.id.split('-').pop()} ${d.battery}%</span>`;
+  const shortId = d.id.split('-').pop();
+  const prog = d.route_progress != null ? d.route_progress : 0;
+  const pct = Math.round(prog * 100);
+  const pColor = progressColor(prog);
+  const bColor = batteryColor(d.battery);
+  return `<div class="dl-card">
+    <div class="dl-top"><span>${shortId}</span><span style="color:${bColor};">⚡${d.battery}%</span></div>
+    <div class="dl-bar"><div class="dl-fill" style="width:${pct}%;background:${pColor};"></div></div>
+    <div class="dl-bot">任务 ${pct}%</div>
+  </div>`;
 }
 
 function updateMapInfo(items) {
@@ -1291,9 +1390,27 @@ function connectWS() {
   ws.onerror = () => ws.close();
 }
 
+// ---- URL Hash Navigation ----
+function handleHashNavigation() {
+  const hash = window.location.hash.replace('#', '');
+  if (hash === 'rl-export') {
+    switchTab('rl');
+    // Auto-expand export card if policy was previously exported
+    const card = document.getElementById('rlExportCard');
+    if (card) card.hidden = false;
+  } else if (hash) {
+    const tabMap = { 'overview':'overview', 'batches':'batches', 'instances':'instances', 'anomaly':'anomaly', 'events':'events', 'map':'map', 'analytics':'analytics', 'rl':'rl' };
+    if (tabMap[hash]) switchTab(tabMap[hash]);
+  }
+}
+window.addEventListener('hashchange', handleHashNavigation);
+
 // ---- Init ----
-loadOverview();
-loadBatches();
+loadTdtConfig().then(() => {
+  loadOverview();
+  loadBatches();
+  handleHashNavigation();
+});
 connectWS();
 refreshTimer = setInterval(() => {
   loadMetrics();

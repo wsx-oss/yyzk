@@ -287,6 +287,13 @@
     }
 
     function navigateTo(page) {
+      // Support hash fragments: e.g. 'simulation#rl-export'
+      let hash = '';
+      if (page.includes('#')) {
+        const parts = page.split('#');
+        page = parts[0];
+        hash = '#' + parts[1];
+      }
       document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
       document.querySelectorAll('.nav-sub-item').forEach(i => i.classList.remove('active'));
       const target = document.querySelector(`[data-page="${page}"]`);
@@ -302,7 +309,7 @@
           }
         }
       }
-      iframe.src = `/app/modules/${page}.html`;
+      iframe.src = `/app/modules/${page}.html${hash}`;
     }
 
     document.querySelectorAll('.nav-item').forEach(item => {
