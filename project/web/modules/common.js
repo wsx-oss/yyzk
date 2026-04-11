@@ -2,6 +2,38 @@
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
 
+// ---- Theme Sync (iframe ← parent dashboard) ----
+(function initThemeSync() {
+  function setChartDefaults(isDark) {
+    if (typeof Chart === 'undefined') return;
+    var textColor = isDark ? 'rgba(255,255,255,0.65)' : '#4e5969';
+    var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    var defaults = Chart.defaults;
+    defaults.color = textColor;
+    defaults.borderColor = gridColor;
+    if (defaults.scale) { defaults.scale.grid = defaults.scale.grid || {}; defaults.scale.grid.color = gridColor; }
+    if (defaults.plugins && defaults.plugins.legend && defaults.plugins.legend.labels) { defaults.plugins.legend.labels.color = textColor; }
+  }
+  function applyTheme(isDark) {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    setChartDefaults(isDark);
+  }
+  // Read persisted theme on load
+  applyTheme(localStorage.getItem('cc-theme') === 'dark');
+  // Also set defaults after Chart.js loads
+  window.addEventListener('load', function() { setChartDefaults(localStorage.getItem('cc-theme') === 'dark'); });
+  // Listen for theme change messages from parent
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'cc-theme-change') {
+      applyTheme(e.data.dark);
+    }
+  });
+})();
+
 // ---- Tianditu Map Utilities ----
 let TIANDITU_KEY = '90aa13159977757fb5d9061bf4d8c22b';
 
@@ -83,7 +115,13 @@ function createChart(canvas, config) {
 
 // Show toast message (Arco-style notification at top)
 function showToast(message, type = "info") {
-  const colors = {
+  const dark = document.documentElement.classList.contains('dark');
+  const colors = dark ? {
+    success: { bg: 'rgba(39,195,70,0.15)', border: '#27c346', text: '#4cd964', icon: '✓' },
+    error:   { bg: 'rgba(247,105,101,0.15)', border: '#f76965', text: '#ff8784', icon: '✕' },
+    warning: { bg: 'rgba(255,154,46,0.15)', border: '#ff9a2e', text: '#ffb366', icon: '!' },
+    info:    { bg: 'rgba(60,126,255,0.15)', border: '#3c7eff', text: '#5b94ff', icon: 'ℹ' }
+  } : {
     success: { bg: '#e8ffea', border: '#00b42a', text: '#00b42a', icon: '✓' },
     error:   { bg: '#ffece8', border: '#f53f3f', text: '#f53f3f', icon: '✕' },
     warning: { bg: '#fff7e8', border: '#ff7d00', text: '#ff7d00', icon: '!' },

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+<script>if(localStorage.getItem('cc-theme')==='dark')document.documentElement.classList.add('dark')</script>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,6 +12,7 @@
       --navbar-height: 60px;
       --cc-primary: #165dff;
       --cc-primary-light: #e8f3ff;
+      --cc-primary-hover: #0e42d2;
       --cc-bg-1: #f7f8fa;
       --cc-bg-2: #ffffff;
       --cc-bg-3: #f2f3f5;
@@ -19,9 +21,40 @@
       --cc-text-2: #4e5969;
       --cc-text-3: #86909c;
       --cc-text-4: #c9cdd4;
-      --cc-sidebar-bg: #232324;
-      --cc-sidebar-active: rgba(22,93,255,0.15);
+      --cc-sidebar-bg: #ffffff;
+      --cc-sidebar-border: #e5e6eb;
+      --cc-sidebar-text: #4e5969;
+      --cc-sidebar-text-hover: #1d2129;
+      --cc-sidebar-hover: #f2f3f5;
+      --cc-sidebar-active-bg: rgba(22,93,255,0.08);
+      --cc-sidebar-active-text: #165dff;
+      --cc-sidebar-section: #86909c;
+      --cc-sidebar-footer: #c9cdd4;
       --cc-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    }
+    /* ===== Dark Theme ===== */
+    html.dark {
+      --cc-primary: #3c7eff;
+      --cc-primary-light: rgba(60,126,255,0.15);
+      --cc-primary-hover: #5b94ff;
+      --cc-bg-1: #141414;
+      --cc-bg-2: #1e1e1e;
+      --cc-bg-3: #2a2a2a;
+      --cc-border: #353535;
+      --cc-text-1: rgba(255,255,255,0.85);
+      --cc-text-2: rgba(255,255,255,0.65);
+      --cc-text-3: rgba(255,255,255,0.45);
+      --cc-text-4: rgba(255,255,255,0.25);
+      --cc-sidebar-bg: #1e1e1e;
+      --cc-sidebar-border: #2a2a2a;
+      --cc-sidebar-text: rgba(255,255,255,0.65);
+      --cc-sidebar-text-hover: rgba(255,255,255,0.9);
+      --cc-sidebar-hover: rgba(255,255,255,0.06);
+      --cc-sidebar-active-bg: rgba(60,126,255,0.15);
+      --cc-sidebar-active-text: #5b94ff;
+      --cc-sidebar-section: rgba(255,255,255,0.3);
+      --cc-sidebar-footer: rgba(255,255,255,0.2);
+      color-scheme: dark;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -205,19 +238,12 @@
       width: var(--sidebar-width);
       height: calc(100vh - var(--navbar-height));
       background: var(--cc-sidebar-bg);
+      border-right: 1px solid var(--cc-sidebar-border);
       z-index: 99;
       transition: width 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
       display: flex;
       flex-direction: column;
       overflow: hidden;
-    }
-    .layout-sidebar::after {
-      content: '';
-      position: absolute;
-      top: 0; right: -1px;
-      width: 1px;
-      height: 100%;
-      background: rgba(255,255,255,0.06);
     }
     .layout-sidebar.collapsed {
       width: var(--sidebar-collapsed-width);
@@ -228,17 +254,17 @@
       overflow-x: hidden;
       padding: 8px 0;
       scrollbar-width: thin;
-      scrollbar-color: rgba(255,255,255,0.15) transparent;
+      scrollbar-color: var(--cc-text-4) transparent;
     }
     .sidebar-nav::-webkit-scrollbar { width: 4px; }
     .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
-    .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: var(--cc-text-4); border-radius: 2px; }
 
     .nav-section-label {
       padding: 20px 16px 8px;
       font-size: 11px;
       font-weight: 600;
-      color: rgba(255,255,255,0.3);
+      color: var(--cc-sidebar-section);
       text-transform: uppercase;
       letter-spacing: 1px;
       white-space: nowrap;
@@ -259,7 +285,7 @@
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
-      color: rgba(255,255,255,0.7);
+      color: var(--cc-sidebar-text);
       text-decoration: none;
       font-size: 14px;
       border-radius: 6px;
@@ -269,12 +295,12 @@
       overflow: hidden;
     }
     .nav-item a:hover, .nav-item-link:hover {
-      background: rgba(255,255,255,0.08);
-      color: #fff;
+      background: var(--cc-sidebar-hover);
+      color: var(--cc-sidebar-text-hover);
     }
     .nav-item a.active, .nav-item-link.active {
-      background: var(--cc-sidebar-active);
-      color: var(--cc-primary);
+      background: var(--cc-sidebar-active-bg);
+      color: var(--cc-sidebar-active-text);
       font-weight: 500;
     }
     .nav-icon {
@@ -304,7 +330,7 @@
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
-      color: rgba(255,255,255,0.7);
+      color: var(--cc-sidebar-text);
       font-size: 14px;
       border-radius: 6px;
       transition: all 0.2s;
@@ -314,17 +340,17 @@
       user-select: none;
     }
     .nav-group-toggle:hover {
-      background: rgba(255,255,255,0.08);
-      color: #fff;
+      background: var(--cc-sidebar-hover);
+      color: var(--cc-sidebar-text-hover);
     }
     .nav-group-toggle.has-active {
-      color: rgba(255,255,255,0.95);
+      color: var(--cc-sidebar-text-hover);
     }
     .nav-group-arrow {
       margin-left: auto;
       font-size: 10px;
       transition: transform 0.2s;
-      color: rgba(255,255,255,0.3);
+      color: var(--cc-sidebar-section);
     }
     .nav-group-toggle.open .nav-group-arrow {
       transform: rotate(90deg);
@@ -378,6 +404,63 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    /* ===== View Transition Theme Animation ===== */
+    ::view-transition-old(root) {
+      z-index: 1;
+    }
+    ::view-transition-new(root) {
+      z-index: 9999;
+    }
+    ::view-transition-old(*) {
+      animation: none;
+    }
+    ::view-transition-new(*) {
+      animation: themeClip 0.5s ease-in both;
+    }
+    html.dark::view-transition-old(*) {
+      animation: themeClip 0.5s ease-in reverse both;
+    }
+    html.dark::view-transition-new(*) {
+      animation: none;
+    }
+    html.dark::view-transition-old(root) {
+      z-index: 9999;
+    }
+    html.dark::view-transition-new(root) {
+      z-index: 1;
+    }
+    @keyframes themeClip {
+      from { clip-path: circle(0% at var(--x) var(--y)); }
+      to   { clip-path: circle(var(--r) at var(--x) var(--y)); }
+    }
+
+    /* ===== Theme toggle button ===== */
+    .theme-toggle-btn {
+      width: 36px; height: 36px;
+      border: 1px solid var(--cc-border);
+      border-radius: 50%;
+      background: var(--cc-bg-2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cc-text-2);
+      font-size: 18px;
+      transition: all 0.2s;
+      margin: 0 4px;
+    }
+    .theme-toggle-btn:hover {
+      border-color: var(--cc-primary);
+      color: var(--cc-primary);
+      background: var(--cc-primary-light);
+    }
+    .theme-toggle-btn svg {
+      transition: transform 0.3s ease;
+    }
+    .theme-toggle-btn:hover svg {
+      transform: rotate(30deg);
+    }
+
     /* ===== Tooltip on collapsed sidebar ===== */
     .layout-sidebar.collapsed .nav-item a,
     .layout-sidebar.collapsed .nav-item-link {
@@ -393,8 +476,8 @@
     /* ===== Sidebar footer ===== */
     .sidebar-footer {
       padding: 12px 16px;
-      border-top: 1px solid rgba(255,255,255,0.06);
-      color: rgba(255,255,255,0.3);
+      border-top: 1px solid var(--cc-sidebar-border);
+      color: var(--cc-sidebar-footer);
       font-size: 11px;
       text-align: center;
       white-space: nowrap;
@@ -404,6 +487,105 @@
       padding: 12px 4px;
       font-size: 10px;
     }
+
+    /* ===== Dark overrides for injected widgets ===== */
+    html.dark .ai-msg.assistant .ai-msg-bubble {
+      background: var(--cc-bg-3) !important;
+      color: var(--cc-text-1) !important;
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .ai-msg.user .ai-msg-avatar {
+      background: var(--cc-bg-3) !important;
+      color: var(--cc-text-2) !important;
+    }
+    html.dark .ai-suggestions,
+    html.dark .ai-quick-cmds,
+    html.dark .ai-input-area {
+      background: var(--cc-bg-2) !important;
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .ai-suggestions .sug-btn {
+      background: var(--cc-bg-3) !important;
+      color: var(--cc-text-2) !important;
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .ai-suggestions .sug-btn:hover {
+      background: var(--cc-border) !important;
+      color: var(--cc-text-1) !important;
+    }
+    html.dark .ai-quick-cmds .qcmd {
+      background: var(--cc-bg-3) !important;
+      color: var(--cc-text-2) !important;
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .ai-input-area input {
+      background: var(--cc-bg-3) !important;
+      color: var(--cc-text-1) !important;
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .ai-input-area input:focus {
+      border-color: #0ea5e9 !important;
+    }
+    html.dark #ai-panel {
+      background: var(--cc-bg-2) !important;
+      border-color: var(--cc-border) !important;
+    }
+    html.dark #notif-panel {
+      background: var(--cc-bg-2) !important;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4) !important;
+    }
+    html.dark .notif-header {
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .notif-header h3 {
+      color: var(--cc-text-1) !important;
+    }
+    html.dark .notif-header-actions button {
+      background: var(--cc-bg-3) !important;
+      border-color: var(--cc-border) !important;
+      color: var(--cc-text-2) !important;
+    }
+    html.dark .notif-header-actions button:hover {
+      background: var(--cc-border) !important;
+      color: var(--cc-text-1) !important;
+    }
+    html.dark .notif-filters {
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .notif-filters .nf-btn {
+      background: var(--cc-bg-3) !important;
+      color: var(--cc-text-2) !important;
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .notif-filters .nf-btn:hover {
+      background: var(--cc-border) !important;
+    }
+    html.dark .notif-filters .nf-btn.active {
+      background: #0ea5e9 !important;
+      color: #fff !important;
+      border-color: #0ea5e9 !important;
+    }
+    html.dark .notif-item {
+      border-color: var(--cc-border) !important;
+    }
+    html.dark .notif-item:hover {
+      background: var(--cc-bg-3) !important;
+    }
+    html.dark .notif-title {
+      color: var(--cc-text-1) !important;
+    }
+    html.dark .notif-body {
+      color: var(--cc-text-3) !important;
+    }
+    html.dark .notif-time {
+      color: var(--cc-text-4) !important;
+    }
+    html.dark .user-menu-item { color: var(--cc-text-2); }
+    html.dark .user-menu-item:hover { background: var(--cc-bg-3); color: var(--cc-text-1); }
+    html.dark .user-menu { background: var(--cc-bg-2); border-color: var(--cc-border); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+    html.dark .layout-navbar { box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+    html.dark .user-menu-item.danger { color: #f76965; }
+    html.dark .user-menu-item.danger:hover { background: rgba(247,105,101,0.15); }
   </style>
 </head>
 <body>
@@ -436,6 +618,19 @@
       <li>
         <button class="nav-btn" title="全屏" id="btnFullscreen">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </li>
+      <li>
+        <button class="theme-toggle-btn" title="切换主题" id="btnThemeToggle">
+          <!-- Sun icon (shown in dark mode) -->
+          <svg class="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:none;">
+            <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <!-- Moon icon (shown in light mode) -->
+          <svg class="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </button>
       </li>
       <li>
@@ -646,6 +841,70 @@
 
     // Expose for iframe child pages
     window.navigateTo = navigateTo;
+
+    // ---- Theme System ----
+    const isDark = () => document.documentElement.classList.contains('dark');
+    const sunIcon = document.querySelector('.theme-icon-sun');
+    const moonIcon = document.querySelector('.theme-icon-moon');
+
+    function updateThemeIcons() {
+      if (isDark()) {
+        sunIcon.style.display = '';
+        moonIcon.style.display = 'none';
+      } else {
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = '';
+      }
+    }
+
+    function applyThemeClass(dark) {
+      if (dark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      localStorage.setItem('cc-theme', dark ? 'dark' : 'light');
+      updateThemeIcons();
+      // Propagate to iframe
+      const frame = document.getElementById('contentFrame');
+      if (frame && frame.contentWindow) {
+        frame.contentWindow.postMessage({ type: 'cc-theme-change', dark: dark }, '*');
+      }
+    }
+
+    function toggleTheme() {
+      applyThemeClass(!isDark());
+    }
+
+    // View Transition API animation (reference project style)
+    document.getElementById('btnThemeToggle').addEventListener('click', function(e) {
+      const x = e.clientX;
+      const y = e.clientY;
+      const endRadius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+
+      document.documentElement.style.setProperty('--x', x + 'px');
+      document.documentElement.style.setProperty('--y', y + 'px');
+      document.documentElement.style.setProperty('--r', endRadius + 'px');
+
+      if (document.startViewTransition) {
+        document.startViewTransition(() => toggleTheme());
+      } else {
+        toggleTheme();
+      }
+    });
+
+    // Restore theme on load
+    if (localStorage.getItem('cc-theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+    updateThemeIcons();
+
+    // Sync theme to iframe on load
+    iframe.addEventListener('load', function() {
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'cc-theme-change', dark: isDark() }, '*');
+      }
+    });
   </script>
 
   <!-- Notification Bell Widget -->

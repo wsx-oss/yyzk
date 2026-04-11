@@ -33,6 +33,386 @@
   --cc-transition: 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
 }
 
+/* ---------- Dark Theme ---------- */
+html.dark {
+  --cc-bg-1: #141414;
+  --cc-bg-2: #1e1e1e;
+  --cc-bg-3: #2a2a2a;
+  --cc-bg-hover: #2a2a2a;
+  --cc-border: #353535;
+  --cc-border-light: #2a2a2a;
+  --cc-text-1: rgba(255,255,255,0.85);
+  --cc-text-2: rgba(255,255,255,0.65);
+  --cc-text-3: rgba(255,255,255,0.45);
+  --cc-text-4: rgba(255,255,255,0.25);
+  --cc-primary: #3c7eff;
+  --cc-primary-light: rgba(60,126,255,0.15);
+  --cc-primary-hover: #5b94ff;
+  --cc-success: #27c346;
+  --cc-success-light: rgba(39,195,70,0.15);
+  --cc-warning: #ff9a2e;
+  --cc-warning-light: rgba(255,154,46,0.15);
+  --cc-danger: #f76965;
+  --cc-danger-light: rgba(247,105,101,0.15);
+  --cc-info: #3c7eff;
+  --cc-shadow-1: 0 0 1px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.3);
+  --cc-shadow-2: 0 4px 16px rgba(0,0,0,.4);
+  --cc-shadow-3: 0 8px 32px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+
+html.dark body {
+  background: var(--cc-bg-1);
+  color: var(--cc-text-1);
+}
+
+html.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+html.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+/* Dark theme tag overrides */
+html.dark .cc-tag-blue    { background: rgba(60,126,255,0.15); color: #5b94ff; border-color: rgba(60,126,255,0.3); }
+html.dark .cc-tag-green   { background: rgba(39,195,70,0.15); color: #4cd964; border-color: rgba(39,195,70,0.3); }
+html.dark .cc-tag-orange  { background: rgba(255,154,46,0.15); color: #ffb366; border-color: rgba(255,154,46,0.3); }
+html.dark .cc-tag-red     { background: rgba(247,105,101,0.15); color: #ff8784; border-color: rgba(247,105,101,0.3); }
+html.dark .cc-tag-gray    { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.55); border-color: rgba(255,255,255,0.15); }
+
+/* Dark theme status badge overrides */
+html.dark .status-online  { background: rgba(39,195,70,0.15); color: #4cd964; }
+html.dark .status-offline { background: rgba(247,105,101,0.15); color: #ff8784; }
+html.dark .status-warning { background: rgba(255,154,46,0.15); color: #ffb366; }
+
+/* Dark danger button hover */
+html.dark .user-menu-item.danger:hover { background: rgba(247,105,101,0.15); }
+
+/* Dark modal overlay */
+html.dark .modal-overlay { background: rgba(0,0,0,0.65); }
+
+/* Dark hint box */
+html.dark .hint-box { background: rgba(60,126,255,0.1); border-left-color: var(--cc-primary); }
+html.dark .hint-box code { background: rgba(60,126,255,0.15); }
+
+/* Global dark overrides for hardcoded colors in module pages */
+html.dark .modal,
+html.dark .modal-box,
+html.dark .detail-box {
+  background: var(--cc-bg-2) !important;
+  color: var(--cc-text-1);
+  border-color: var(--cc-border);
+}
+html.dark .modal h3,
+html.dark .modal-title,
+html.dark .detail-box h3 {
+  color: var(--cc-text-1) !important;
+}
+html.dark .stat-box,
+html.dark .status-card,
+html.dark .drone-video-card {
+  background: var(--cc-bg-2) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-1);
+}
+html.dark .drone-video-card.active {
+  border-color: var(--cc-primary) !important;
+  background: rgba(60,126,255,0.1) !important;
+}
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background: var(--cc-bg-3) !important;
+  color: var(--cc-text-1) !important;
+  border-color: var(--cc-border) !important;
+}
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: var(--cc-primary) !important;
+  box-shadow: 0 0 0 2px rgba(60,126,255,0.2) !important;
+}
+html.dark input::placeholder { color: var(--cc-text-4) !important; }
+html.dark .form-g label,
+html.dark .modal-form label,
+html.dark .filter-group label {
+  color: var(--cc-text-3) !important;
+}
+html.dark .form-g input,
+html.dark .form-g select,
+html.dark .modal-form input,
+html.dark .modal-form select,
+html.dark .modal-form textarea {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .switch .slider,
+html.dark .toggle-slider {
+  background: var(--cc-text-4) !important;
+}
+html.dark .switch .slider::before,
+html.dark .toggle-slider::before {
+  background: var(--cc-bg-2) !important;
+}
+html.dark .pagination-bar button {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .pagination-bar button:hover:not(:disabled) {
+  background: var(--cc-bg-hover) !important;
+}
+html.dark .close-btn {
+  color: var(--cc-text-3) !important;
+}
+html.dark .detail-label,
+html.dark .stat-label {
+  color: var(--cc-text-3) !important;
+}
+html.dark .detail-value {
+  color: var(--cc-text-1) !important;
+}
+html.dark .stat-value {
+  color: var(--cc-text-1);
+}
+html.dark .chart-section-title {
+  color: var(--cc-text-1) !important;
+}
+html.dark .pagination-bar {
+  color: var(--cc-text-3) !important;
+}
+html.dark .draw-hint {
+  background: var(--cc-bg-2) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .desc-grid .desc-label { color: var(--cc-text-3) !important; }
+html.dark .desc-grid .desc-value { color: var(--cc-text-1) !important; }
+html.dark pre,
+html.dark code {
+  background: var(--cc-bg-3) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .btn-secondary {
+  background: var(--cc-bg-3) !important;
+  color: var(--cc-text-2) !important;
+  border-color: var(--cc-border) !important;
+}
+html.dark .btn-secondary:hover {
+  background: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+
+/* Dark overrides for module-specific card/info panel classes */
+html.dark .detail-info-card,
+html.dark .context-editor,
+html.dark .step-thought,
+html.dark .chain-step,
+html.dark .raw-text-area {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .detail-info-grid .info-label,
+html.dark .step-label,
+html.dark .raw-text-toggle,
+html.dark .conf-label,
+html.dark .detail-confidence-row .conf-label {
+  color: var(--cc-text-3) !important;
+}
+html.dark .detail-info-grid .info-value,
+html.dark .step-title,
+html.dark .step-number {
+  color: var(--cc-text-1) !important;
+}
+html.dark .step-tag {
+  background: var(--cc-bg-3) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .raw-text-section {
+  border-color: var(--cc-border) !important;
+}
+html.dark .cot-form label,
+html.dark .form-row label {
+  color: var(--cc-text-3) !important;
+}
+html.dark .cot-form select,
+html.dark .cot-form input,
+html.dark .cot-form textarea,
+html.dark .form-row input,
+html.dark .form-row select,
+html.dark .form-row textarea {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .form-group label {
+  color: var(--cc-text-2) !important;
+}
+html.dark .bar-bg,
+html.dark .bandwidth-bar .bar-bg {
+  background: var(--cc-bg-3) !important;
+}
+html.dark .overlay .modal,
+html.dark .detail-overlay .detail-box {
+  background: var(--cc-bg-2) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .modal-footer button,
+html.dark .modal-actions button {
+  color: inherit;
+}
+html.dark .section-title {
+  color: var(--cc-text-1) !important;
+}
+html.dark .status-card-header {
+  color: var(--cc-text-1) !important;
+}
+html.dark .progress-label {
+  color: var(--cc-text-2) !important;
+}
+html.dark .net-info {
+  color: var(--cc-text-2) !important;
+}
+html.dark .detail-row {
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+
+/* Dark overrides for flight/plan/CoT specific elements */
+html.dark .action-card,
+html.dark .plan-est-box,
+html.dark .plan-waypoints,
+html.dark .cot-step,
+html.dark .realtime-addr,
+html.dark .multi-plan-card {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+}
+html.dark .cot-inline-body {
+  background: var(--cc-bg-2) !important;
+}
+html.dark .cot-inline-header {
+  background: rgba(99,102,241,0.1) !important;
+}
+html.dark .cot-inline-header:hover {
+  background: rgba(99,102,241,0.15) !important;
+}
+html.dark .realtime-card {
+  background: rgba(60,126,255,0.06) !important;
+  border-color: var(--cc-border) !important;
+}
+html.dark .plan-explanation {
+  background: rgba(60,126,255,0.08) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .plan-map-context {
+  background: rgba(39,195,70,0.08) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .plan-result-title,
+html.dark .action-card-title,
+html.dark .realtime-card-title,
+html.dark .cot-step-q,
+html.dark .cot-final-content {
+  color: var(--cc-text-1) !important;
+}
+html.dark .plan-est-label,
+html.dark .plan-picker-hint,
+html.dark .plan-loading,
+html.dark .realtime-update,
+html.dark .rt-label,
+html.dark .log-time,
+html.dark .loc-coords,
+html.dark .loc-meta {
+  color: var(--cc-text-3) !important;
+}
+html.dark .plan-est-value,
+html.dark .multi-plan-stat .stat-val,
+html.dark .loc-addr {
+  color: var(--cc-text-1) !important;
+}
+html.dark .multi-plan-stat .stat-label {
+  color: var(--cc-text-3) !important;
+}
+html.dark .multi-plan-stat {
+  border-color: var(--cc-border) !important;
+}
+html.dark .log-item {
+  border-color: var(--cc-border) !important;
+}
+html.dark .log-msg,
+html.dark .cot-step-thought,
+html.dark .realtime-addr {
+  color: var(--cc-text-2) !important;
+}
+html.dark .plan-waypoints th {
+  background: var(--cc-bg-3) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .plan-waypoints td {
+  border-color: var(--cc-border) !important;
+}
+html.dark .phase-standby {
+  background: var(--cc-bg-3) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .plan-form label {
+  color: var(--cc-text-3) !important;
+}
+html.dark .plan-form input,
+html.dark .plan-form select {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .filter-group input,
+html.dark .filter-group select {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .filter-group label {
+  color: var(--cc-text-3) !important;
+}
+html.dark .plan-result {
+  border-color: var(--cc-border) !important;
+}
+html.dark .phase-control {
+  border-color: var(--cc-border) !important;
+}
+html.dark .plan-picker-map,
+html.dark .plan-result-map {
+  border-color: var(--cc-border) !important;
+}
+html.dark .cot-final {
+  background: rgba(99,102,241,0.08) !important;
+  border-color: #6366f1 !important;
+}
+html.dark .cot-inline-section {
+  border-color: rgba(99,102,241,0.5) !important;
+}
+
+/* Dark overrides for progress bar track */
+html.dark .progress-bar,
+html.dark .bat-level-track {
+  background: var(--cc-bg-3) !important;
+}
+
+/* Broad dark mode color normalization for hardcoded Tailwind-style slate colors */
+html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
+  color: var(--cc-text-1);
+}
+html.dark p { color: var(--cc-text-2); }
+html.dark th { color: var(--cc-text-2) !important; background: var(--cc-bg-3) !important; }
+html.dark td { color: var(--cc-text-1) !important; border-color: var(--cc-border) !important; }
+html.dark tr { border-color: var(--cc-border) !important; }
+html.dark tbody tr:hover { background: rgba(60,126,255,0.06) !important; }
+html.dark table { border-color: var(--cc-border) !important; }
+html.dark label { color: var(--cc-text-3); }
+html.dark legend { color: var(--cc-text-2); }
+html.dark a { color: var(--cc-primary); }
+html.dark hr { border-color: var(--cc-border); }
+html.dark button {
+  color: inherit;
+}
+
 /* ---------- Reset & Base ---------- */
 * {
   margin: 0;
