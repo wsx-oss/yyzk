@@ -42,12 +42,12 @@ html.dark {
   --cc-bg-2: #0e1525;
   --cc-bg-3: #151d30;
   --cc-bg-hover: #1a2540;
-  --cc-border: rgba(56,132,255,0.15);
-  --cc-border-light: rgba(56,132,255,0.08);
-  --cc-text-1: rgba(224,235,255,0.92);
-  --cc-text-2: rgba(160,185,225,0.72);
-  --cc-text-3: rgba(120,155,210,0.55);
-  --cc-text-4: rgba(80,120,180,0.35);
+  --cc-border: rgba(56,132,255,0.25);
+  --cc-border-light: rgba(56,132,255,0.15);
+  --cc-text-1: rgba(224,235,255,0.95);
+  --cc-text-2: rgba(185,205,240,0.85);
+  --cc-text-3: rgba(145,175,225,0.72);
+  --cc-text-4: rgba(110,145,200,0.50);
   --cc-primary: #4e9fff;
   --cc-primary-light: rgba(60,140,255,0.12);
   --cc-primary-hover: #6db3ff;
@@ -77,7 +77,7 @@ html.dark .cc-tag-blue    { background: rgba(60,140,255,0.12); color: #6db3ff; b
 html.dark .cc-tag-green   { background: rgba(52,211,153,0.12); color: #5eead4; border-color: rgba(52,211,153,0.25); }
 html.dark .cc-tag-orange  { background: rgba(251,191,36,0.12); color: #fcd34d; border-color: rgba(251,191,36,0.25); }
 html.dark .cc-tag-red     { background: rgba(248,113,113,0.12); color: #fca5a5; border-color: rgba(248,113,113,0.25); }
-html.dark .cc-tag-gray    { background: rgba(100,140,200,0.08); color: rgba(160,185,225,0.6); border-color: rgba(100,140,200,0.15); }
+html.dark .cc-tag-gray    { background: rgba(100,140,200,0.12); color: rgba(185,205,240,0.82); border-color: rgba(100,140,200,0.28); }
 
 /* Dark theme status badge overrides */
 html.dark .status-online  { background: rgba(52,211,153,0.12); color: #5eead4; }
@@ -353,8 +353,8 @@ html.dark .plan-waypoints td {
   border-color: var(--cc-border) !important;
 }
 html.dark .phase-standby {
-  background: rgba(60,100,180,0.1) !important;
-  color: rgba(160,185,225,0.7) !important;
+  background: rgba(60,100,180,0.14) !important;
+  color: rgba(185,205,240,0.85) !important;
 }
 html.dark .plan-form label {
   color: var(--cc-text-3) !important;
@@ -414,6 +414,173 @@ html.dark a { color: var(--cc-primary); }
 html.dark hr { border-color: var(--cc-border); }
 html.dark button {
   color: inherit;
+}
+
+/* ---- Dark: NFZ right panel & legend ---- */
+html.dark .nfz-right-panel {
+  background: rgba(14,21,37,0.97) !important;
+  box-shadow: var(--cc-shadow-2) !important;
+}
+html.dark .right-panel-title {
+  color: var(--cc-text-1) !important;
+}
+html.dark .map-search-input {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .map-search-input:focus {
+  border-color: var(--cc-primary) !important;
+}
+html.dark .nfz-legend {
+  border-top-color: var(--cc-border) !important;
+}
+html.dark .legend-row {
+  color: var(--cc-text-2) !important;
+}
+html.dark .btn-modal-cancel {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-2) !important;
+}
+html.dark .toggle-row {
+  color: var(--cc-text-2) !important;
+}
+html.dark .toggle-label {
+  color: var(--cc-text-2) !important;
+}
+
+/* ---- Dark: NFZ badges & action buttons ---- */
+html.dark .badge-noflyzone { background: rgba(248,113,113,0.15) !important; color: #fca5a5 !important; }
+html.dark .badge-warnzone  { background: rgba(251,146,60,0.15) !important; color: #fdba74 !important; }
+html.dark .badge-polygon   { background: rgba(99,102,241,0.15) !important; color: #a5b4fc !important; }
+html.dark .badge-circle    { background: rgba(52,211,153,0.15) !important; color: #6ee7b7 !important; }
+html.dark .btn-view-z { background: rgba(52,211,153,0.15) !important; color: #34d399 !important; }
+html.dark .btn-edit-z { background: rgba(251,191,36,0.15) !important; color: #fcd34d !important; }
+html.dark .btn-del-z  { background: rgba(248,113,113,0.15) !important; color: #fca5a5 !important; }
+
+/* ---- Dark: GPS map card ---- */
+html.dark .map-card {
+  background: var(--cc-bg-2) !important;
+  box-shadow: var(--cc-shadow-1) !important;
+}
+html.dark .map-card-header {
+  border-bottom-color: var(--cc-border) !important;
+}
+html.dark .map-card-title {
+  color: var(--cc-text-1) !important;
+}
+html.dark .map-legend {
+  color: var(--cc-text-3) !important;
+}
+html.dark .tab-bar {
+  border-bottom-color: var(--cc-border) !important;
+}
+html.dark .tab-item {
+  color: var(--cc-text-3) !important;
+}
+html.dark .tab-item:hover,
+html.dark .tab-item.active {
+  color: var(--cc-primary) !important;
+}
+
+/* ---- Dark: Backup upload area ---- */
+html.dark .upload-area {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+}
+html.dark .upload-area:hover {
+  background: rgba(60,140,255,0.08) !important;
+  border-color: var(--cc-primary) !important;
+}
+html.dark .upload-area.dragover {
+  background: rgba(60,140,255,0.15) !important;
+  border-color: var(--cc-primary) !important;
+}
+html.dark .upload-text {
+  color: var(--cc-text-2) !important;
+}
+html.dark .upload-hint {
+  color: var(--cc-text-4) !important;
+}
+html.dark .progress-phase {
+  color: var(--cc-text-2) !important;
+}
+html.dark .progress-stats {
+  color: var(--cc-text-3) !important;
+}
+html.dark .progress-bar-outer {
+  background: var(--cc-bg-3) !important;
+}
+
+/* Dark: Backup-specific badge colors */
+html.dark .status-success { background: rgba(52,211,153,0.15) !important; color: #34d399 !important; }
+html.dark .status-failed  { background: rgba(248,113,113,0.15) !important; color: #f87171 !important; }
+html.dark .status-running { background: rgba(59,130,246,0.15) !important; color: #93c5fd !important; }
+html.dark .type-auto        { background: rgba(139,92,246,0.15) !important; color: #a78bfa !important; }
+html.dark .type-manual      { background: rgba(59,130,246,0.15) !important; color: #93c5fd !important; }
+html.dark .type-pre_restore { background: rgba(251,191,36,0.15) !important; color: #fcd34d !important; }
+
+/* ---- Dark: Audio search form ---- */
+html.dark .search-form {
+  background: var(--cc-bg-2) !important;
+  box-shadow: var(--cc-shadow-1) !important;
+}
+html.dark .search-group label {
+  color: var(--cc-text-3) !important;
+}
+html.dark .search-group input,
+html.dark .search-group select {
+  background: var(--cc-bg-3) !important;
+  border-color: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .stats-section {
+  background: var(--cc-bg-2) !important;
+  box-shadow: var(--cc-shadow-1) !important;
+}
+html.dark .confirm-box {
+  background: var(--cc-bg-2) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .tag {
+  background: rgba(60,140,255,0.12) !important;
+  color: #6db3ff !important;
+}
+html.dark .confirm-overlay,
+html.dark .detail-overlay {
+  background: rgba(4,8,20,0.75) !important;
+}
+
+/* ---- Dark: Sync info cards ---- */
+html.dark .info-card {
+  background: var(--cc-bg-3) !important;
+  border-left-color: var(--cc-primary) !important;
+}
+html.dark .info-card .info-label {
+  color: var(--cc-primary) !important;
+}
+html.dark .info-card .info-value {
+  color: var(--cc-text-1) !important;
+}
+html.dark .modal-header {
+  border-bottom-color: var(--cc-border) !important;
+  color: var(--cc-text-1) !important;
+}
+html.dark .modal-footer {
+  border-top-color: var(--cc-border) !important;
+}
+html.dark .modal-close {
+  color: var(--cc-text-3) !important;
+}
+html.dark .modal-close:hover {
+  color: var(--cc-text-1) !important;
+}
+html.dark .progress-bar-wrap {
+  background: var(--cc-bg-3) !important;
+}
+html.dark .empty-state {
+  color: var(--cc-text-4) !important;
 }
 
 /* ---------- Reset & Base ---------- */
@@ -752,6 +919,16 @@ body {
 }
 .status-warning::before {
   background: var(--cc-warning);
+}
+
+/* Hide dot for badges that don't define a ::before color (backup type/status) */
+.status-badge.type-auto::before,
+.status-badge.type-manual::before,
+.status-badge.type-pre_restore::before,
+.status-badge.status-success::before,
+.status-badge.status-failed::before,
+.status-badge.status-running::before {
+  display: none;
 }
 
 /* ---------- Chart Container ---------- */

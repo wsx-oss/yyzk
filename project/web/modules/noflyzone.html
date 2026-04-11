@@ -571,7 +571,7 @@
       const shapeLabel=z.shape_type==='circle'?'圆形':'多边形';
       const badgeCls=z.zone_type==='警告区域'?'badge-warnzone':'badge-noflyzone';
       const shapeBadgeCls=z.shape_type==='circle'?'badge-circle':'badge-polygon';
-      const altStr=z.altitude_enabled?` <span style="font-size:12px;color:#64748b;">· 限高${z.altitude_limit}m</span>`:'';
+      const altStr=z.altitude_enabled?` <span style="font-size:12px;color:var(--cc-text-3);">· 限高${z.altitude_limit}m</span>`:'';
       const dt=z.created_at?z.created_at.replace('T',' ').substring(0,19):'';
       return `<div class="nfz-item" id="nfz-item-${z.id}" onclick="focusZone(${z.id})">
         <div class="nfz-item-name">${esc(z.name)}</div>

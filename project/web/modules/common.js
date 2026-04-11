@@ -6,8 +6,8 @@ const $$ = (q) => document.querySelectorAll(q);
 (function initThemeSync() {
   function setChartDefaults(isDark) {
     if (typeof Chart === 'undefined') return;
-    var textColor = isDark ? 'rgba(255,255,255,0.65)' : '#4e5969';
-    var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    var textColor = isDark ? 'rgba(255,255,255,0.85)' : '#4e5969';
+    var gridColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)';
     var defaults = Chart.defaults;
     defaults.color = textColor;
     defaults.borderColor = gridColor;
