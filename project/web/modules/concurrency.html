@@ -95,9 +95,42 @@
       padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;
     }
 
+    /* RPM Card */
+    .rpm-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid #334155; border-radius: 12px; padding: 20px;
+      color: #e2e8f0; margin-bottom: 24px;
+    }
+    .rpm-card h4 {
+      font-size: 14px; font-weight: 600; color: #e2e8f0; margin: 0 0 16px 0;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .rpm-card h4 .rpm-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+      animation: rpmPulse 2s ease-in-out infinite;
+    }
+    @keyframes rpmPulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    .rpm-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+    .rpm-stat { text-align: center; }
+    .rpm-stat .val { font-size: 24px; font-weight: 700; }
+    .rpm-stat .lbl { font-size: 11px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .rpm-stat .val.primary { color: #38bdf8; }
+    .rpm-stat .val.success { color: #22c55e; }
+    .rpm-stat .val.warning { color: #f59e0b; }
+    .rpm-stat .val.danger { color: #ef4444; }
+    .rpm-bar-container { margin-top: 8px; }
+    .rpm-bar-label { font-size: 12px; color: #94a3b8; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .rpm-bar-track { height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden; border: 1px solid #334155; }
+    .rpm-bar-fill {
+      height: 100%; border-radius: 5px; transition: width 0.5s ease;
+      background: linear-gradient(90deg, #22c55e, #38bdf8);
+    }
+    .rpm-bar-fill.high { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+
     @media (max-width: 768px) {
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
       .charts-row { grid-template-columns: 1fr; }
+      .rpm-stats { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
@@ -152,6 +185,26 @@
       <div class="pool-bar-label">CPU 队列</div>
       <div class="pool-bar-track"><div class="pool-bar-fill queue" id="barCPUQ" style="width:0%"></div></div>
       <div class="pool-bar-num" id="numCPUQ">0/0</div>
+    </div>
+  </div>
+
+  <!-- Backend HTTP RPM Monitor -->
+  <div class="section-title">🌐 后端请求速率 (RPM) <span class="badge" id="rpmBadge">0 RPM</span></div>
+  <div class="rpm-card">
+    <h4><span class="rpm-dot" id="rpmDot"></span>后端 API 请求监控</h4>
+    <div class="rpm-stats">
+      <div class="rpm-stat"><div class="val primary" id="rpmCurrent">0</div><div class="lbl">当前分钟</div></div>
+      <div class="rpm-stat"><div class="val success" id="rpmLimit">30</div><div class="lbl">上限 / 分钟</div></div>
+      <div class="rpm-stat"><div class="val warning" id="rpmQueued">0</div><div class="lbl">排队中</div></div>
+      <div class="rpm-stat"><div class="val danger" id="rpmLatency">0</div><div class="lbl">平均延迟(ms)</div></div>
+    </div>
+    <div class="rpm-bar-container">
+      <div class="rpm-bar-label"><span>速率使用率</span><span id="rpmPctLabel">0%</span></div>
+      <div class="rpm-bar-track"><div class="rpm-bar-fill" id="rpmBarFill" style="width:0%"></div></div>
+    </div>
+    <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:11px;color:#64748b;">
+      <span>总请求: <strong id="rpmTotal" style="color:#e2e8f0;">0</strong></span>
+      <span>失败: <strong id="rpmFailed" style="color:#ef4444;">0</strong></span>
     </div>
   </div>
 
@@ -243,6 +296,11 @@
       $('#vPending').textContent = m.pending || 0;
       $('#vAvgMs').textContent = (m.avg_duration_ms || 0).toFixed(1);
       $('#vRecovered').textContent = m.recovered || 0;
+
+      // Backend HTTP RPM metrics
+      if (m.http_rpm) {
+        renderRPM(m.http_rpm);
+      }
 
       // Worker bars
       const ioPct = m.io_workers > 0 ? Math.round((m.io_active / m.io_workers) * 100) : 0;
@@ -377,6 +435,31 @@
       if (ms > 0) {
         refreshTimer = setInterval(loadMetrics, ms);
       }
+    }
+
+    function renderRPM(rpm) {
+      const cur = rpm.current_minute_requests || 0;
+      const limit = rpm.rpm_limit || 500;
+      const queued = rpm.queued || 0;
+      const avgMs = (rpm.avg_latency_ms || 0).toFixed(0);
+      const total = rpm.total_requests || 0;
+      const failed = rpm.total_failed || 0;
+      const pct = limit > 0 ? Math.min(100, Math.round(cur / limit * 100)) : 0;
+
+      $('#rpmCurrent').textContent = cur;
+      $('#rpmLimit').textContent = limit;
+      $('#rpmQueued').textContent = queued;
+      $('#rpmLatency').textContent = avgMs;
+      $('#rpmTotal').textContent = total;
+      $('#rpmFailed').textContent = failed;
+      $('#rpmBadge').textContent = cur + ' / ' + limit + ' RPM';
+      $('#rpmPctLabel').textContent = pct + '%';
+      $('#rpmBarFill').style.width = pct + '%';
+      $('#rpmBarFill').className = 'rpm-bar-fill' + (pct > 80 ? ' high' : '');
+
+      // Pulse dot color: green if ok, red if near limit
+      const dot = $('#rpmDot');
+      dot.style.background = pct > 80 ? '#ef4444' : pct > 50 ? '#f59e0b' : '#22c55e';
     }
 
     // Init

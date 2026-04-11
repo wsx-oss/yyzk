@@ -4,23 +4,99 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"sync"
 	"time"
 
 	"smartcontrol/internal/db"
 	"smartcontrol/internal/taskpool"
 )
 
+// ---- System connectivity state ----
+var (
+	patrolOnline   = true
+	patrolOnlineMu sync.Mutex
+	patrolLastDown time.Time
+)
+
+// IsPatrolOnline returns current patrol connectivity state (exported for healthz).
+func IsPatrolOnline() bool {
+	patrolOnlineMu.Lock()
+	defer patrolOnlineMu.Unlock()
+	return patrolOnline
+}
+
+// checkSystemHealth tests DB reachability and optionally LLM API before patrol.
+// Returns true if the system is healthy enough for patrol tasks.
+func checkSystemHealth(database *db.DB) bool {
+	// 1. DB ping – most critical
+	var one int
+	if err := database.QueryRow("SELECT 1").Scan(&one); err != nil {
+		log.Printf("[Patrol] DB unreachable: %v", err)
+		return false
+	}
+	// 2. LLM API HEAD check (best-effort, non-blocking)
+	llmURL := os.Getenv("LLM_BASE_URL")
+	if llmURL == "" {
+		llmURL = "https://dashscope.aliyuncs.com"
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Head(llmURL)
+	if err != nil {
+		log.Printf("[Patrol] LLM API unreachable: %v (patrol continues with DB-only checks)", err)
+		// LLM down doesn't block DB-level patrol
+	}
+	if resp != nil {
+		resp.Body.Close()
+	}
+	return true
+}
+
+// wrapWithHealthCheck wraps a patrol task function with a connectivity pre-check.
+// When the system transitions from offline→online it inserts a recovery notification.
+func wrapWithHealthCheck(database *db.DB, fn func(ctx context.Context) error) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		healthy := checkSystemHealth(database)
+
+		patrolOnlineMu.Lock()
+		wasOnline := patrolOnline
+		patrolOnline = healthy
+		if !healthy && wasOnline {
+			patrolLastDown = time.Now()
+			log.Printf("[Patrol] System went OFFLINE – skipping patrol tasks")
+		}
+		if healthy && !wasOnline {
+			downDuration := time.Since(patrolLastDown)
+			log.Printf("[Patrol] System back ONLINE after %v", downDuration)
+			// Mark offline-period notifications as read (batch fold)
+			database.Exec(`UPDATE notifications SET is_read=1 WHERE is_read=0 AND datetime(created_at) >= datetime(?) AND source='AI巡检'`, patrolLastDown.Format("2006-01-02 15:04:05"))
+			// Insert recovery summary
+			insertNotification(database, "system",
+				"✅ 系统恢复在线",
+				fmt.Sprintf("系统在离线 %v 后恢复正常，离线期间通知已自动折叠", downDuration.Round(time.Second)),
+				"AI巡检", "")
+		}
+		patrolOnlineMu.Unlock()
+
+		if !healthy {
+			return nil // skip this round
+		}
+		return fn(ctx)
+	}
+}
+
 // StartPatrolInspection registers all patrol tasks as periodic jobs in the
 // given worker pool. Each patrol runs on its own schedule via the pool's
 // SchedulePeriodic mechanism instead of raw goroutines.
 func StartPatrolInspection(database *db.DB, pool *taskpool.Pool) {
-	pool.SchedulePeriodic("patrol:battery", "patrol", 30*time.Second, taskpool.PriorityNormal, patrolBatteryTask(database))
-	pool.SchedulePeriodic("patrol:drones", "patrol", 30*time.Second, taskpool.PriorityNormal, patrolDronesTask(database))
-	pool.SchedulePeriodic("patrol:alerts", "patrol", 60*time.Second, taskpool.PriorityNormal, patrolAlertsTask(database))
-	pool.SchedulePeriodic("patrol:hardware", "patrol", 60*time.Second, taskpool.PriorityLow, patrolHardwareTask(database))
-	pool.SchedulePeriodic("patrol:logs", "patrol", 120*time.Second, taskpool.PriorityLow, patrolLogsTask(database))
-	pool.SchedulePeriodic("patrol:missions", "patrol", 30*time.Second, taskpool.PriorityNormal, patrolMissionsTask(database))
-	log.Println("[Patrol] AI inspection tasks registered in pool")
+	pool.SchedulePeriodic("patrol:battery", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolBatteryTask(database)))
+	pool.SchedulePeriodic("patrol:drones", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolDronesTask(database)))
+	pool.SchedulePeriodic("patrol:alerts", "patrol", 60*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolAlertsTask(database)))
+	pool.SchedulePeriodic("patrol:hardware", "patrol", 60*time.Second, taskpool.PriorityLow, wrapWithHealthCheck(database, patrolHardwareTask(database)))
+	pool.SchedulePeriodic("patrol:logs", "patrol", 120*time.Second, taskpool.PriorityLow, wrapWithHealthCheck(database, patrolLogsTask(database)))
+	pool.SchedulePeriodic("patrol:missions", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolMissionsTask(database)))
+	log.Println("[Patrol] AI inspection tasks registered in pool (with health checks)")
 }
 
 // insertNotification is a helper to create a notification record

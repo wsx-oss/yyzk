@@ -92,7 +92,35 @@ tr:hover { background:rgba(255,255,255,0.03); }
 .mission-info strong { color:var(--primary-light); }
 .chart-card { min-height: 320px; }
 .chart-card canvas { width: 100% !important; height: 260px !important; }
-@media(max-width:900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } .form-row { grid-template-columns:1fr; } #simMap { height:350px; } }
+/* Anomaly count badge */
+.anomaly-count-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; border-radius:9px; background:var(--danger); color:#fff; font-size:10px; font-weight:700; padding:0 5px; margin-left:4px; animation:anomalyPulse 2s ease-in-out infinite; }
+.anomaly-count-badge.hidden { display:none; }
+@keyframes anomalyPulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+/* Severity colors */
+.severity-critical { background:rgba(239,68,68,0.18); color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
+.severity-warning { background:rgba(245,158,11,0.18); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); }
+.severity-info { background:rgba(234,179,8,0.18); color:#eab308; border:1px solid rgba(234,179,8,0.3); }
+/* Event type icon */
+.evt-type-icon { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:500; }
+.evt-type-icon .icon { font-size:14px; }
+/* Instance name highlight */
+.instance-name { color:var(--primary-light); font-weight:600; font-family:monospace; font-size:11px; background:rgba(99,102,241,0.1); padding:2px 6px; border-radius:4px; }
+/* Auto-scroll container */
+.event-scroll-container { max-height:480px; overflow-y:auto; position:relative; scroll-behavior:smooth; }
+.event-scroll-container::-webkit-scrollbar { width:6px; }
+.event-scroll-container::-webkit-scrollbar-track { background:rgba(255,255,255,0.03); }
+.event-scroll-container::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:3px; }
+/* Scroll lock button */
+.scroll-lock-btn { position:absolute; bottom:12px; right:12px; z-index:10; padding:6px 14px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--border); transition:all .2s; display:inline-flex; align-items:center; gap:4px; }
+.scroll-lock-btn.scrolling { background:rgba(34,197,94,0.15); color:var(--success); }
+.scroll-lock-btn.paused { background:rgba(245,158,11,0.15); color:var(--warning); }
+/* Event log entry animation */
+@keyframes eventFadeIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+.event-row-new { animation: eventFadeIn 0.3s ease-out; }
+/* Timestamp format */
+.evt-time { font-size:11px; color:var(--text-dim); white-space:nowrap; }
+.evt-time .date { opacity:0.6; }
+@media(max-width:900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } .form-row { grid-template-columns:1fr; } #simMap { height:350px; } .event-scroll-container { max-height:300px; } }
 </style>
 </head>
 <body>
@@ -112,7 +140,7 @@ tr:hover { background:rgba(255,255,255,0.03); }
   <div class="tab" onclick="switchTab('batches')">📦 批次管理</div>
   <div class="tab" onclick="switchTab('instances')">🛩️ 实例管理</div>
   <div class="tab" onclick="switchTab('anomaly')">⚠️ 异常注入</div>
-  <div class="tab" onclick="switchTab('events')">📋 事件日志</div>
+  <div class="tab" onclick="switchTab('events')">📋 事件日志 <span class="anomaly-count-badge hidden" id="anomalyCountBadge">0</span></div>
   <div class="tab" onclick="switchTab('map')">🗺️ 仿真地图</div>
   <div class="tab" onclick="switchTab('analytics')">📈 数据看板</div>
   <div class="tab" onclick="switchTab('rl')">🧠 强化学习</div>
@@ -250,23 +278,32 @@ tr:hover { background:rgba(255,255,255,0.03); }
 
   <!-- Events Panel -->
   <div class="panel" id="panel-events">
-    <div class="toolbar">
-      <input type="text" id="eventFilterInstance" placeholder="实例ID筛选" style="width:200px;">
-      <select id="eventFilterType" style="min-width:140px;">
-        <option value="">全部类型</option>
-        <option value="low_battery">低电量</option>
-        <option value="flight_deviation">飞行偏航</option>
-        <option value="comm_lost">通信失联</option>
-        <option value="temp_high">高温异常</option>
-        <option value="state_change">状态变更</option>
-      </select>
-      <button class="btn btn-outline" onclick="loadEvents()">🔄 刷新</button>
+    <div class="toolbar" style="justify-content:space-between;">
+      <div style="display:flex;gap:10px;align-items:center;">
+        <input type="text" id="eventFilterInstance" placeholder="实例ID筛选" style="width:180px;">
+        <select id="eventFilterType" onchange="loadEvents()" style="min-width:160px;">
+          <option value="anomaly" selected>🚨 仅异常</option>
+          <option value="">全部类型</option>
+          <option value="low_battery">🔋 低电量</option>
+          <option value="flight_deviation">↗️ 飞行偏航</option>
+          <option value="comm_lost">📡 通信失联</option>
+          <option value="temp_high">🌡️ 高温异常</option>
+          <option value="temp_low">❄️ 低温异常</option>
+        </select>
+        <button class="btn btn-outline" onclick="loadEvents()">🔄 刷新</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:12px;color:var(--text-dim);">实时异常: <strong id="eventAnomalyTotal" style="color:var(--danger);">0</strong></span>
+      </div>
     </div>
-    <div class="card">
-      <table>
-        <thead><tr><th>时间</th><th>实例ID</th><th>类型</th><th>等级</th><th>消息</th></tr></thead>
-        <tbody id="eventTableBody"></tbody>
-      </table>
+    <div class="card" style="position:relative;padding:0;">
+      <div class="event-scroll-container" id="eventScrollContainer">
+        <table>
+          <thead style="position:sticky;top:0;z-index:2;"><tr><th>时间</th><th>实例</th><th>异常类型</th><th>等级</th><th>消息</th></tr></thead>
+          <tbody id="eventTableBody"></tbody>
+        </table>
+      </div>
+      <button class="scroll-lock-btn scrolling" id="scrollLockBtn" onclick="toggleScrollLock()">▼ 自动滚动</button>
     </div>
   </div>
 
@@ -325,6 +362,16 @@ tr:hover { background:rgba(255,255,255,0.03); }
       <div class="card chart-card">
         <div class="card-title">⚠️ 异常统计图（分钟）</div>
         <canvas id="chartAnomalyTrend"></canvas>
+      </div>
+    </div>
+
+    <!-- Battery dedicated section (TODO-10) -->
+    <div class="card" style="margin-top:16px;padding:16px 20px 8px;">
+      <div class="card-title">🔋 模拟机电量专区</div>
+      <div class="grid-4" id="batteryStatCards" style="margin-bottom:14px;"></div>
+      <div class="grid-2" style="margin-bottom:4px;">
+        <div class="chart-card" style="padding:12px;"><div class="card-title" style="font-size:13px;">电量实时排行</div><div style="height:220px;position:relative;"><canvas id="chartBatteryRanking"></canvas></div></div>
+        <div class="chart-card" style="padding:12px;"><div class="card-title" style="font-size:13px;">电量分布</div><div style="height:220px;position:relative;"><canvas id="chartBatteryDist"></canvas></div></div>
       </div>
     </div>
 
@@ -677,22 +724,112 @@ async function injectBatchAnomaly() {
 }
 
 // ---- Events ----
+let anomalyCount = 0;
+let autoScroll = true;
+
+const ANOMALY_TYPE_META = {
+  'low_battery':        { icon:'🔋', label:'低电量',   severity:'warning' },
+  'flight_deviation':   { icon:'↗️', label:'飞行偏航', severity:'warning' },
+  'comm_lost':          { icon:'📡', label:'通信失联', severity:'critical' },
+  'temp_high':          { icon:'🌡️', label:'高温异常', severity:'info' },
+  'temp_low':           { icon:'❄️', label:'低温异常', severity:'info' },
+  'collision_warning':  { icon:'💥', label:'碰撞预警', severity:'critical' },
+};
+
+function getSeverityFromLevel(level) {
+  if(level==='紧急故障') return 'critical';
+  if(level==='警告') return 'warning';
+  return 'info';
+}
+
+function formatEventTime(ts) {
+  if(!ts) return '-';
+  const parts = ts.split(' ');
+  if(parts.length >= 2) return `<span class="evt-time"><span class="date">${parts[0]}</span> ${parts[1]}</span>`;
+  return `<span class="evt-time">${ts}</span>`;
+}
+
+function renderEventRow(e, isNew) {
+  const meta = ANOMALY_TYPE_META[e.event_type] || { icon:'❓', label:e.event_type, severity:'info' };
+  const sev = getSeverityFromLevel(e.level);
+  const sevClass = `severity-${sev}`;
+  const rowClass = isNew ? 'event-row-new' : '';
+  return `<tr class="${rowClass}">
+    <td>${formatEventTime(e.created_at)}</td>
+    <td><span class="instance-name">${e.instance_id||'-'}</span></td>
+    <td><span class="evt-type-icon"><span class="icon">${meta.icon}</span> ${meta.label}</span></td>
+    <td><span class="badge ${sevClass}">${e.level}</span></td>
+    <td style="font-size:12px">${e.message||''}</td>
+  </tr>`;
+}
+
 async function loadEvents() {
   const instId = document.getElementById('eventFilterInstance').value.trim();
   const evtType = document.getElementById('eventFilterType').value;
   let url = API+'/events?page_size=50';
   if(instId) url += '&instance_id='+instId;
-  if(evtType) url += '&event_type='+evtType;
+  if(evtType === 'anomaly') {
+    url += '&filter=anomaly';
+  } else if(evtType) {
+    url += '&event_type='+evtType;
+  }
   const d = await apiFetch(url);
   const tbody = document.getElementById('eventTableBody');
-  if(!d.items||d.items.length===0) { tbody.innerHTML='<tr><td colspan="5" class="empty-state">暂无事件</td></tr>'; return; }
-  tbody.innerHTML = d.items.map(e=>`<tr>
-    <td style="font-size:12px">${e.created_at}</td>
-    <td style="font-family:monospace;font-size:11px">${e.instance_id}</td>
-    <td>${e.event_type}</td>
-    <td><span class="badge ${e.level==='紧急故障'?'badge-danger':e.level==='警告'?'badge-warning':'badge-info'}">${e.level}</span></td>
-    <td>${e.message}</td>
-  </tr>`).join('');
+  if(!d.items||d.items.length===0) {
+    tbody.innerHTML='<tr><td colspan="5" class="empty-state">暂无事件</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.items.map(e => renderEventRow(e, false)).join('');
+  updateAnomalyCount(d.items.filter(e => e.event_type !== 'state_change').length);
+  if(autoScroll) scrollEventsToBottom();
+}
+
+function updateAnomalyCount(count) {
+  anomalyCount = count;
+  const badge = document.getElementById('anomalyCountBadge');
+  const total = document.getElementById('eventAnomalyTotal');
+  if(badge) { badge.textContent = count; badge.classList.toggle('hidden', count===0); }
+  if(total) total.textContent = count;
+}
+
+function scrollEventsToBottom() {
+  const container = document.getElementById('eventScrollContainer');
+  if(container) container.scrollTop = container.scrollHeight;
+}
+
+function toggleScrollLock() {
+  autoScroll = !autoScroll;
+  const btn = document.getElementById('scrollLockBtn');
+  if(autoScroll) {
+    btn.className = 'scroll-lock-btn scrolling';
+    btn.textContent = '▼ 自动滚动';
+    scrollEventsToBottom();
+  } else {
+    btn.className = 'scroll-lock-btn paused';
+    btn.textContent = '⏸ 已暂停';
+  }
+}
+
+function appendRealtimeEvent(data) {
+  const evt = {
+    created_at: new Date().toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).replace(/\//g,'-'),
+    instance_id: data.instance_id||'',
+    event_type: data.anomaly_type||data.event_type||'unknown',
+    level: data.level||'提示',
+    message: data.message||'',
+  };
+  const curFilter = document.getElementById('eventFilterType').value;
+  if(curFilter === 'anomaly' && evt.event_type==='state_change') return;
+  if(curFilter && curFilter !== 'anomaly' && evt.event_type !== curFilter) return;
+  const tbody = document.getElementById('eventTableBody');
+  const empty = tbody.querySelector('.empty-state');
+  if(empty) empty.closest('tr').remove();
+  tbody.insertAdjacentHTML('beforeend', renderEventRow(evt, true));
+  // Keep max 200 rows
+  while(tbody.children.length > 200) tbody.removeChild(tbody.firstChild);
+  anomalyCount++;
+  updateAnomalyCount(anomalyCount);
+  if(autoScroll) scrollEventsToBottom();
 }
 
 // ---- RL Training ----
@@ -1188,6 +1325,8 @@ let chartAnomalyTrend = null;
 let chartBatteryRisk = null;
 let chartMissionPie = null;
 let chartRLCurve = null;
+let chartBatteryRanking = null;
+let chartBatteryDist = null;
 
 function destroyChart(ch) {
   if (ch && typeof ch.destroy === 'function') ch.destroy();
@@ -1269,9 +1408,132 @@ async function loadSimStats(force=false) {
     options: commonOpts,
   });
 
-  // 3) Battery risk trend
+  // ---- Battery dedicated section (TODO-10) ----
+  const bat = d.battery || {};
+  const batRanking = bat.ranking || [];
+  const batAvg = bat.avg_level || live.avg_battery || 0;
+  const batHealthy = bat.healthy || 0;
+  const batWarning = bat.warning || 0;
+  const batDanger = bat.danger || 0;
+
+  // Battery stat cards
+  document.getElementById('batteryStatCards').innerHTML = [
+    {n: batAvg + '%', l: '平均电量', c: batAvg > 60 ? 'var(--success)' : batAvg > 20 ? 'var(--warning)' : 'var(--danger)'},
+    {n: batHealthy, l: '健康 (>60%)', c: 'var(--success)'},
+    {n: batWarning, l: '警告 (20-60%)', c: 'var(--warning)'},
+    {n: batDanger, l: '危险 (<20%)', c: 'var(--danger)'},
+  ].map(s => `<div class="stat-card"><div class="num" style="color:${s.c};font-size:22px;">${s.n}</div><div class="lbl">${s.l}</div></div>`).join('');
+
+  // Battery ranking bar chart (sorted ascending, low battery highlighted red)
+  destroyChart(chartBatteryRanking);
+  const sortedBat = batRanking.slice().sort((a,b) => a.level - b.level).slice(0, 20);
+  const rankLabels = sortedBat.map(b => b.name || b.id);
+  const rankValues = sortedBat.map(b => b.level);
+  const rankColors = sortedBat.map(b => {
+    if (b.level <= 20) return '#ef4444';
+    if (b.level <= 60) return '#f59e0b';
+    return '#22c55e';
+  });
+  chartBatteryRanking = new Chart(document.getElementById('chartBatteryRanking'), {
+    type: 'bar',
+    data: {
+      labels: rankLabels,
+      datasets: [{
+        label: '电量 %',
+        data: rankValues,
+        backgroundColor: rankColors,
+        borderRadius: 3,
+        barThickness: 12,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {display: false},
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `电量: ${ctx.raw}%`,
+            afterLabel: (ctx) => ctx.raw <= 20 ? '⚠ 危险' : ctx.raw <= 60 ? '⚡ 警告' : '✅ 健康',
+          },
+        },
+      },
+      scales: {
+        x: {
+          min: 0, max: 100,
+          ticks: {color: '#94a3b8', font: baseFont, callback: v => v + '%'},
+          grid: {color: 'rgba(148,163,184,0.12)'},
+        },
+        y: {
+          ticks: {color: '#94a3b8', font: {size: 10}},
+          grid: {display: false},
+        },
+      },
+    },
+    plugins: [{
+      id: 'batteryThresholds',
+      afterDraw(chart) {
+        const {ctx, chartArea, scales} = chart;
+        const xScale = scales.x;
+        [20, 60].forEach((threshold, i) => {
+          const x = xScale.getPixelForValue(threshold);
+          ctx.save();
+          ctx.strokeStyle = i === 0 ? '#ef4444' : '#f59e0b';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x, chartArea.top);
+          ctx.lineTo(x, chartArea.bottom);
+          ctx.stroke();
+          ctx.fillStyle = i === 0 ? '#ef4444' : '#f59e0b';
+          ctx.font = '9px sans-serif';
+          ctx.fillText(i === 0 ? '20%危险' : '60%警告', x + 2, chartArea.top + 10);
+          ctx.restore();
+        });
+      },
+    }],
+  });
+
+  // Battery distribution pie chart
+  destroyChart(chartBatteryDist);
+  chartBatteryDist = new Chart(document.getElementById('chartBatteryDist'), {
+    type: 'doughnut',
+    data: {
+      labels: ['健康 (>60%)', '警告 (20-60%)', '危险 (<20%)'],
+      datasets: [{
+        data: [batHealthy, batWarning, batDanger],
+        backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+        borderWidth: 2,
+        borderColor: '#0f172a',
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {position: 'bottom', labels: {color: '#94a3b8', font: baseFont, usePointStyle: true, pointStyle: 'circle'}},
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const total = ctx.dataset.data.reduce((a,b)=>a+b, 0);
+              const pct = total > 0 ? (ctx.raw / total * 100).toFixed(1) : 0;
+              return `${ctx.label}: ${ctx.raw} 台 (${pct}%)`;
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // 3) Battery risk trend (with gradient fill + threshold lines)
   destroyChart(chartBatteryRisk);
-  chartBatteryRisk = new Chart(document.getElementById('chartBatteryRisk'), {
+  const brCtx = document.getElementById('chartBatteryRisk').getContext('2d');
+  const brGrad = brCtx.createLinearGradient(0, 0, 0, 280);
+  brGrad.addColorStop(0, 'rgba(239,68,68,0.5)');
+  brGrad.addColorStop(0.5, 'rgba(245,158,11,0.3)');
+  brGrad.addColorStop(1, 'rgba(34,197,94,0.05)');
+  chartBatteryRisk = new Chart(brCtx, {
     type: 'line',
     data: {
       labels: (charts.battery_risk_trend?.labels || []).map(v => v.slice(11)),
@@ -1279,26 +1541,54 @@ async function loadSimStats(force=false) {
         label: '低电占比',
         data: (charts.battery_risk_trend?.values || []).map(v => +(v * 100).toFixed(2)),
         borderColor: '#f59e0b',
-        backgroundColor: 'rgba(245,158,11,0.2)',
+        backgroundColor: brGrad,
         tension: 0.25,
         fill: true,
+        pointRadius: 2,
+        pointHoverRadius: 5,
       }],
     },
     options: {
       ...commonOpts,
+      plugins: {
+        ...commonOpts.plugins,
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `低电占比: ${ctx.raw}%`,
+          },
+        },
+      },
       scales: {
         ...commonOpts.scales,
         y: {
           ...commonOpts.scales.y,
-          ticks: {
-            color: '#94a3b8',
-            callback: (v) => v + '%',
-          },
-          min: 0,
-          max: 100,
+          ticks: { color: '#94a3b8', callback: (v) => v + '%' },
+          min: 0, max: 100,
         },
       },
     },
+    plugins: [{
+      id: 'riskThresholds',
+      afterDraw(chart) {
+        const {ctx, chartArea, scales} = chart;
+        const yScale = scales.y;
+        [{val:20,color:'#ef4444',label:'20% 危险线'},{val:60,color:'#f59e0b',label:'60% 警告线'}].forEach(t => {
+          const y = yScale.getPixelForValue(t.val);
+          ctx.save();
+          ctx.strokeStyle = t.color;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5,3]);
+          ctx.beginPath();
+          ctx.moveTo(chartArea.left, y);
+          ctx.lineTo(chartArea.right, y);
+          ctx.stroke();
+          ctx.fillStyle = t.color;
+          ctx.font = '9px sans-serif';
+          ctx.fillText(t.label, chartArea.right - 60, y - 3);
+          ctx.restore();
+        });
+      },
+    }],
   });
 
   // 4) Mission distribution pie
@@ -1381,8 +1671,8 @@ function connectWS() {
   ws.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
-      if(msg.type === 'sim_telemetry' || msg.type === 'state_change' || msg.type === 'anomaly_event') {
-        // Refresh relevant data on next cycle
+      if(msg.type === 'anomaly_event' && msg.data) {
+        appendRealtimeEvent(msg.data);
       }
     } catch(err) {}
   };

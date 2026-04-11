@@ -75,6 +75,22 @@
     .cot-source { font-size: 11px; padding: 2px 8px; border-radius: 8px; }
     .cot-source-llm { background: #dcfce7; color: #166534; }
     .cot-source-fallback { background: #fef3c7; color: #92400e; }
+
+    /* Responsive optimization (TODO-10) */
+    @media (max-width: 768px) {
+      .filter-row { grid-template-columns: 1fr; gap: 8px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .history-chart-container { height: 220px; }
+      .modal-box { width: 95vw; padding: 16px; }
+      .modal-form { grid-template-columns: 1fr; }
+      .bat-level-track { width: 50px; }
+      .detail-grid { grid-template-columns: 80px 1fr; gap: 6px 10px; font-size: 13px; }
+    }
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .bat-header-btns { flex-direction: column; }
+      .tab-item { padding: 8px 14px; font-size: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -366,16 +382,34 @@
           labels: ['平均电量', '平均健康度'],
           datasets: [{
             data: [0, 0],
-            backgroundColor: ['#0ea5e9', '#10b981'],
+            backgroundColor: function(ctx) {
+              const chart = ctx.chart;
+              const {ctx: c, chartArea} = chart;
+              if (!chartArea) return ['#0ea5e9', '#10b981'][ctx.dataIndex];
+              const grad = c.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+              if (ctx.dataIndex === 0) {
+                grad.addColorStop(0, '#ef4444'); grad.addColorStop(0.3, '#f59e0b'); grad.addColorStop(1, '#22c55e');
+              } else {
+                grad.addColorStop(0, '#f59e0b'); grad.addColorStop(1, '#10b981');
+              }
+              return grad;
+            },
             borderRadius: 6,
             barThickness: 48
           }]
         },
         options: {
+          responsive: true,
           maintainAspectRatio: false,
           indexAxis: 'y',
-          scales: { x: { min: 0, max: 100, ticks: { callback: v => v + '%' } }, y: { grid: { display: false } } },
-          plugins: { legend: { display: false } }
+          scales: {
+            x: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
+            y: { grid: { display: false }, ticks: { font: { size: window.innerWidth < 768 ? 11 : 13 } } },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => ctx.label + ': ' + ctx.raw + '%' } },
+          },
         }
       });
     }
@@ -646,21 +680,83 @@
         });
 
         if (historyChart) { historyChart.destroy(); historyChart = null; }
-        historyChart = new Chart($('#historyChart'), {
+        const hCtx = $('#historyChart').getContext('2d');
+        const levelGrad = hCtx.createLinearGradient(0, 0, 0, 260);
+        levelGrad.addColorStop(0, 'rgba(14,165,233,0.25)');
+        levelGrad.addColorStop(1, 'rgba(14,165,233,0.02)');
+
+        // Mark alert points (low battery <= 20%)
+        const levelData = reversed.map(r => r.level);
+        const alertPoints = levelData.map(v => v <= 20 ? v : null);
+
+        historyChart = new Chart(hCtx, {
           type: 'line',
           data: {
             labels: labels,
             datasets: [
-              { label: '电量(%)', data: reversed.map(r => r.level), borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
-              { label: '温度(°C)', data: reversed.map(r => r.temperature), borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2 },
-              { label: '健康度(%)', data: reversed.map(r => r.health), borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2 }
+              { label: '电量(%)', data: levelData, borderColor: '#0ea5e9', backgroundColor: levelGrad, fill: true, tension: 0.3, pointRadius: 2, yAxisID: 'yPct' },
+              { label: '健康度(%)', data: reversed.map(r => r.health), borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'yPct' },
+              { label: '电压(V)', data: reversed.map(r => r.voltage), borderColor: '#8b5cf6', backgroundColor: 'transparent', tension: 0.3, pointRadius: 1, borderDash: [4,2], yAxisID: 'yVolt' },
+              { label: '温度(°C)', data: reversed.map(r => r.temperature), borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'yTemp' },
+              { label: '低电告警', data: alertPoints, borderColor: 'transparent', backgroundColor: '#ef4444', pointStyle: 'triangle', pointRadius: 6, pointHoverRadius: 8, showLine: false, yAxisID: 'yPct' },
             ]
           },
           options: {
+            responsive: true,
             maintainAspectRatio: false,
-            scales: { y: { min: 0, max: 100 } },
-            plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
-          }
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  font: { size: window.innerWidth < 768 ? 10 : 12 },
+                  padding: window.innerWidth < 768 ? 8 : 16,
+                  usePointStyle: true, pointStyle: 'circle',
+                  filter: (item) => item.text !== '低电告警' || alertPoints.some(v => v !== null),
+                },
+              },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    if (ctx.dataset.label === '低电告警') return '⚠ 低电告警: ' + ctx.raw + '%';
+                    const unit = ctx.dataset.label.includes('V') ? 'V' : ctx.dataset.label.includes('°C') ? '°C' : '%';
+                    return `${ctx.dataset.label}: ${typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : ctx.raw}${unit}`;
+                  },
+                },
+              },
+            },
+            scales: {
+              yPct:  { type: 'linear', position: 'left', min: 0, max: 100, title: { display: true, text: '%', color: '#94a3b8' }, ticks: { callback: v => v + '%' }, grid: { color: 'rgba(148,163,184,0.08)' } },
+              yTemp: { type: 'linear', position: 'right', min: 0, max: 80, title: { display: true, text: '°C', color: '#ef4444' }, ticks: { color: '#ef4444' }, grid: { drawOnChartArea: false } },
+              yVolt: { type: 'linear', position: 'right', min: 8, max: 26, display: false },
+              x: { ticks: { maxRotation: 45, font: { size: window.innerWidth < 768 ? 9 : 11 } } },
+            },
+          },
+          plugins: [{
+            id: 'healthZones',
+            beforeDraw(chart) {
+              const {ctx, chartArea, scales} = chart;
+              const yScale = scales.yPct;
+              if (!yScale) return;
+              const zones = [
+                {min:0, max:20, color:'rgba(239,68,68,0.06)', label:'危险'},
+                {min:20, max:50, color:'rgba(245,158,11,0.05)', label:'一般'},
+                {min:50, max:80, color:'rgba(59,130,246,0.04)', label:'良好'},
+                {min:80, max:100, color:'rgba(34,197,94,0.05)', label:'优秀'},
+              ];
+              zones.forEach(z => {
+                const yTop = yScale.getPixelForValue(z.max);
+                const yBot = yScale.getPixelForValue(z.min);
+                ctx.save();
+                ctx.fillStyle = z.color;
+                ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBot - yTop);
+                ctx.fillStyle = 'rgba(148,163,184,0.35)';
+                ctx.font = '9px sans-serif';
+                ctx.fillText(z.label, chartArea.left + 4, yTop + 11);
+                ctx.restore();
+              });
+            },
+          }],
         });
 
         $('#detailModal').classList.add('active');

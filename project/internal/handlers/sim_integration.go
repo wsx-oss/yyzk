@@ -249,7 +249,7 @@ func (p *SimTelemetryPusher) OnAnomaly(id string, event simulation.AnomalyEvent)
 	p.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`,
 		"仿真异常", severity, "[模拟]"+event.Message)
 
-	hub.Broadcast("sim", WSEvent{
+	anomalyWSEvent := WSEvent{
 		Type: "anomaly_event",
 		Data: map[string]interface{}{
 			"instance_id":  id,
@@ -257,7 +257,9 @@ func (p *SimTelemetryPusher) OnAnomaly(id string, event simulation.AnomalyEvent)
 			"level":        string(event.Level),
 			"message":      event.Message,
 		},
-	})
+	}
+	hub.Broadcast("sim", anomalyWSEvent)
+	hub.Broadcast("sim_anomaly", anomalyWSEvent)
 }
 
 // InitSimEngine creates and initializes the simulation engine with DB integration.

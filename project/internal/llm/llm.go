@@ -15,8 +15,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 // init automatically loads .env file from the working directory on startup
@@ -87,10 +92,10 @@ type Action struct {
 // NoFlyZone represents a no-fly area (polygon or circle)
 type NoFlyZone struct {
 	Name      string       `json:"name,omitempty"`
-	Type      string       `json:"type,omitempty"`    // "polygon" or "circle"
-	Center    *Coordinate  `json:"center,omitempty"` // circle centre
+	Type      string       `json:"type,omitempty"`     // "polygon" or "circle"
+	Center    *Coordinate  `json:"center,omitempty"`   // circle centre
 	RadiusM   float64      `json:"radius_m,omitempty"` // circle radius in metres
-	Polygon   []Coordinate `json:"polygon,omitempty"` // polygon vertices (also used as circle approximation)
+	Polygon   []Coordinate `json:"polygon,omitempty"`  // polygon vertices (also used as circle approximation)
 	AltLimitM float64      `json:"alt_limit_m,omitempty"`
 }
 
@@ -144,6 +149,107 @@ type Estimates struct {
 	ExpectedBatteryDrop float64 `json:"expected_battery_drop_percent"`
 }
 
+// ======================== RPM Metrics ========================
+
+// rpmTracker records per-minute request counts and latency for monitoring.
+type rpmTracker struct {
+	totalRequests  int64 // lifetime total
+	totalFailed    int64
+	totalLatencyNs int64
+	windowStart    int64 // unix second of current window start
+	windowCount    int64
+	mu             sync.Mutex
+}
+
+var globalRPM = &rpmTracker{windowStart: time.Now().Unix()}
+
+func (r *rpmTracker) record(latency time.Duration, failed bool) {
+	atomic.AddInt64(&r.totalRequests, 1)
+	atomic.AddInt64(&r.totalLatencyNs, int64(latency))
+	if failed {
+		atomic.AddInt64(&r.totalFailed, 1)
+	}
+	now := time.Now().Unix()
+	r.mu.Lock()
+	if now-atomic.LoadInt64(&r.windowStart) >= 60 {
+		atomic.StoreInt64(&r.windowCount, 1)
+		atomic.StoreInt64(&r.windowStart, now)
+	} else {
+		atomic.AddInt64(&r.windowCount, 1)
+	}
+	r.mu.Unlock()
+}
+
+// RPMSnapshot holds point-in-time RPM metrics.
+type RPMSnapshot struct {
+	CurrentMinute int64   `json:"current_minute_requests"`
+	RPMLimit      int     `json:"rpm_limit"`
+	TotalRequests int64   `json:"total_requests"`
+	TotalFailed   int64   `json:"total_failed"`
+	AvgLatencyMs  float64 `json:"avg_latency_ms"`
+	QueuedCount   int     `json:"queued"`
+}
+
+// RPMMetrics returns a snapshot of LLM request rate metrics.
+func RPMMetrics() RPMSnapshot {
+	total := atomic.LoadInt64(&globalRPM.totalRequests)
+	failed := atomic.LoadInt64(&globalRPM.totalFailed)
+	latNs := atomic.LoadInt64(&globalRPM.totalLatencyNs)
+	now := time.Now().Unix()
+
+	globalRPM.mu.Lock()
+	curMin := atomic.LoadInt64(&globalRPM.windowCount)
+	if now-atomic.LoadInt64(&globalRPM.windowStart) >= 60 {
+		curMin = 0
+	}
+	globalRPM.mu.Unlock()
+
+	var avgMs float64
+	if total > 0 {
+		avgMs = float64(latNs) / float64(total) / 1e6
+	}
+
+	limitVal := 30
+	if v := os.Getenv("LLM_RPM"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limitVal = n
+		}
+	}
+
+	// Queued = waiting on rate limiter (estimated from Tokens)
+	queued := 0
+	if globalLimiter != nil {
+		if toks := globalLimiter.Tokens(); toks < 1 {
+			queued = 1 // at least one request is waiting
+		}
+	}
+
+	return RPMSnapshot{
+		CurrentMinute: curMin,
+		RPMLimit:      limitVal,
+		TotalRequests: total,
+		TotalFailed:   failed,
+		AvgLatencyMs:  avgMs,
+		QueuedCount:   queued,
+	}
+}
+
+// ======================== Rate Limiter ========================
+
+var globalLimiter *rate.Limiter
+
+func init() {
+	rpm := 30
+	if v := os.Getenv("LLM_RPM"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			rpm = n
+		}
+	}
+	// rate.Limit = events per second, burst = allow 2 concurrent
+	globalLimiter = rate.NewLimiter(rate.Limit(float64(rpm)/60.0), 2)
+	log.Printf("[LLM] RPM limiter initialized: %d RPM (%.2f req/s, burst 2)", rpm, float64(rpm)/60.0)
+}
+
 // ======================== LLM Client ========================
 
 // Client wraps calls to an OpenAI-compatible chat completions API
@@ -167,11 +273,18 @@ func NewClient() *Client {
 		model = "qwen-plus"
 	}
 
+	timeout := 60 * time.Second
+	if v := os.Getenv("LLM_TIMEOUT_SEC"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			timeout = time.Duration(n) * time.Second
+		}
+	}
+
 	return &Client{
 		APIKey:  apiKey,
 		BaseURL: strings.TrimRight(baseURL, "/"),
 		Model:   model,
-		Timeout: 60 * time.Second,
+		Timeout: timeout,
 	}
 }
 
@@ -216,6 +329,21 @@ func (c *Client) callWithTemp(systemPrompt, userPrompt string, temperature float
 		return "", errors.New("LLM API key not configured (set LLM_API_KEY environment variable)")
 	}
 
+	// Wait for RPM rate limiter
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
+	defer cancel()
+	if err := globalLimiter.Wait(ctx); err != nil {
+		return "", fmt.Errorf("RPM rate limit exceeded: %w", err)
+	}
+
+	start := time.Now()
+	result, err := c.doCallWithTemp(systemPrompt, userPrompt, temperature)
+	globalRPM.record(time.Since(start), err != nil)
+	return result, err
+}
+
+// doCallWithTemp is the actual HTTP call implementation.
+func (c *Client) doCallWithTemp(systemPrompt, userPrompt string, temperature float64) (string, error) {
 	reqBody := chatRequest{
 		Model: c.Model,
 		Messages: []chatMessage{

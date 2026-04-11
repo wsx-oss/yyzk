@@ -133,6 +133,15 @@
       padding: 40px 20px; text-align: center; color: #94a3b8; font-size: 13px;
     }
     .notif-empty-icon { font-size: 36px; margin-bottom: 8px; }
+
+    #notif-offline-badge {
+      display: none; align-items: center; gap: 4px;
+      background: #ef4444; color: #fff; font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 8px; white-space: nowrap;
+      animation: offlinePulse 2s ease-in-out infinite;
+    }
+    #notif-offline-badge.show { display: inline-flex; }
+    @keyframes offlinePulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
   `;
   document.head.appendChild(style);
 
@@ -140,6 +149,7 @@
   const root = document.createElement('div');
   root.id = 'notif-bell-root';
   root.innerHTML = `
+    <span id="notif-offline-badge">⚡ 离线</span>
     <button id="notif-bell-btn" title="消息通知">
       🔔
       <span class="bell-badge hidden" id="bellBadge">0</span>
@@ -364,7 +374,59 @@
     return res.json();
   }
 
-  // Initial load + periodic refresh
+  // ===================== Offline detection =====================
+  const offlineBadge = document.getElementById('notif-offline-badge');
+  let isSystemOnline = navigator.onLine;
+  let pollTimer = null;
+  let consecutiveFailures = 0;
+
+  function setOnlineState(online) {
+    if (isSystemOnline === online) return;
+    isSystemOnline = online;
+    offlineBadge.classList.toggle('show', !online);
+    if (online) {
+      consecutiveFailures = 0;
+      updateBadge();
+      if (isOpen) loadNotifications();
+      startPolling();
+    } else {
+      stopPolling();
+    }
+  }
+
+  window.addEventListener('online', () => setOnlineState(true));
+  window.addEventListener('offline', () => setOnlineState(false));
+
+  // Wrap updateBadge to detect fetch failures
+  const origUpdateBadge = updateBadge;
+  updateBadge = function() {
+    notifAPI('/notifications/unread-count', 'GET')
+      .then(data => {
+        consecutiveFailures = 0;
+        if (!isSystemOnline) setOnlineState(true);
+        const cnt = data.count || 0;
+        bellBadge.textContent = cnt > 99 ? '99+' : cnt;
+        bellBadge.classList.toggle('hidden', cnt === 0);
+        if (cnt > 0) {
+          bellBtn.classList.add('ring-anim');
+          setTimeout(() => bellBtn.classList.remove('ring-anim'), 700);
+        }
+      })
+      .catch(() => {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 3) setOnlineState(false);
+      });
+  };
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(updateBadge, 15000);
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // Initial load + start polling
   updateBadge();
-  setInterval(updateBadge, 15000);
+  startPolling();
 })();

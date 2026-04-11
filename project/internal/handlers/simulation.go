@@ -547,6 +547,7 @@ func (s *SimAPI) ClearInstanceAnomalies(c *gin.Context) {
 func (s *SimAPI) EventList(c *gin.Context) {
 	instanceID := strings.TrimSpace(c.Query("instance_id"))
 	eventType := strings.TrimSpace(c.Query("event_type"))
+	filter := strings.TrimSpace(c.Query("filter"))
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
 	if page < 1 {
@@ -565,6 +566,9 @@ func (s *SimAPI) EventList(c *gin.Context) {
 	if eventType != "" {
 		where = append(where, "event_type = ?")
 		args = append(args, eventType)
+	}
+	if filter == "anomaly" {
+		where = append(where, "event_type != 'state_change'")
 	}
 	wc := strings.Join(where, " AND ")
 
@@ -704,13 +708,18 @@ func (s *SimAPI) RLTrainingHistory(c *gin.Context) {
 // ==================== WebSocket Stream ====================
 
 func (s *SimAPI) SimStream(c *gin.Context) {
+	filter := c.Query("filter")
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
-	hub.Subscribe("sim", ws)
+	topic := "sim"
+	if filter == "anomaly" {
+		topic = "sim_anomaly"
+	}
+	hub.Subscribe(topic, ws)
 	defer func() {
-		hub.Unsubscribe("sim", ws)
+		hub.Unsubscribe(topic, ws)
 		ws.Close()
 	}()
 	for {
@@ -878,10 +887,30 @@ func (s *SimAPI) SimStats(c *gin.Context) {
 
 	// Use real-time telemetry for battery risk, anomaly count, and route progress
 	var totalRouteProgress float64
+	batteryHealthy := 0 // >60%
+	batteryWarning := 0 // 20%-60%
+	batteryDanger := 0  // <20%
+	totalBattery := 0
+	batterySum := 0
+
+	type batteryItem struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Level int    `json:"level"`
+	}
+	batteryRanking := make([]batteryItem, 0, len(telemetry))
+
 	for _, t := range telemetry {
 		if t.Battery.Level <= 20 {
 			batteryRiskCount++
+			batteryDanger++
+		} else if t.Battery.Level <= 60 {
+			batteryWarning++
+		} else {
+			batteryHealthy++
 		}
+		totalBattery++
+		batterySum += t.Battery.Level
 		totalRouteProgress += t.RouteProgress
 		for _, a := range t.Anomalies {
 			if a.Active {
@@ -889,6 +918,23 @@ func (s *SimAPI) SimStats(c *gin.Context) {
 				break
 			}
 		}
+		// Find instance name for battery ranking
+		instName := t.DeviceID
+		for _, inst := range instances {
+			if inst.Config.ID == t.DeviceID {
+				instName = inst.Config.Name
+				break
+			}
+		}
+		batteryRanking = append(batteryRanking, batteryItem{
+			ID:    t.DeviceID,
+			Name:  instName,
+			Level: t.Battery.Level,
+		})
+	}
+	avgBattery := 0
+	if totalBattery > 0 {
+		avgBattery = batterySum / totalBattery
 	}
 
 	// Task completion rate: use average route progress from running drones (continuous 0-1)
@@ -1043,11 +1089,19 @@ func (s *SimAPI) SimStats(c *gin.Context) {
 			"task_completion_rate": taskCompletionRate,
 			"avg_route_progress":   avgRouteProgress,
 			"completed_tasks":      completedTasks,
+			"avg_battery":          avgBattery,
 		},
 		"distribution": gin.H{
 			"mission":     missionDist,
 			"task_status": taskStatusDist,
 			"alert_type":  alertTypeDist,
+		},
+		"battery": gin.H{
+			"ranking":   batteryRanking,
+			"healthy":   batteryHealthy,
+			"warning":   batteryWarning,
+			"danger":    batteryDanger,
+			"avg_level": avgBattery,
 		},
 		"charts": gin.H{
 			"running_trend": gin.H{

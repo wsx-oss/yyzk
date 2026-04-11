@@ -7,7 +7,7 @@
 > **前端架构**：`dashboard.html` 壳层 + iframe 加载 22 个模块页 + `ai-assistant.js` 浮窗 + `notification-bell.js` 铃铛
 > **当前版本**：v3.7.0
 > **本轮目标**：5 大类 23 项优化，覆盖地图、界面、性能、业务、AI、视觉全链路
-> **进度汇总**：已完成 7 项 ✅ | 部分完成 4 项 ⚠️ | 待开始 12 项 ⬜
+> **进度汇总**：已完成 10 项 ✅ | 部分完成 4 项 ⚠️ | 待开始 9 项 ⬜
 
 ---
 
@@ -17,14 +17,14 @@
 | ------------------ | ---- | ------------------------------------ | ------ | ---- |
 | 一、基础地图与界面 | 1    | ✅ 仿真地图 → 天地图                | P0     | 已完成 |
 |                    | 2    | ✅ AI 助手图标+位置优化              | P1     | 已完成 |
-|                    | 3    | 仿真模拟事件日志优化                 | P1     | 待开始 |
+|                    | 3    | ✅ 仿真模拟事件日志优化            | P1     | 已完成 |
 |                    | 4    | ✅ 导出→展示（自动跳转模拟器任务建设）| P1   | 已完成 |
 | 二、系统功能与性能 | 5    | CoT 思维链优化                       | P1     | 待开始 |
-|                    | 6    | ⚠️ 离线状态下取消相关异常通知        | P1     | 部分完成 |
-|                    | 7    | 并发任务·RPM 优化                   | P2     | 待开始 |
+|                    | 6    | ✅ 离线状态下取消相关异常通知       | P1     | 已完成 |
+|                    | 7    | ✅ 并发任务·RPM 优化                  | P2     | 已完成 |
 |                    | 8    | 前端整体性能优化                     | P1     | 待开始 |
 |                    | 9    | ⚠️ 模拟器任务建设优化               | P0     | 部分完成 |
-|                    | 10   | 模拟机电量+图表优化                  | P1     | 待开始 |
+|                    | 10   | ⚠️ 模拟机电量+图表优化              | P1     | 部分完成 |
 | 三、业务功能与视觉 | 11   | ✅ 轨迹弧度（曲线化）优化            | P2     | 已完成 |
 |                    | 12   | 视频监控模块位置调整                 | P2     | 待开始 |
 |                    | 13   | Logo 优化                            | P1     | 待开始 |
@@ -98,13 +98,13 @@
 
 **任务清单**：
 
-- [ ] 新增日志筛选 Tab：`全部` | `异常`，默认选中「异常」，视觉上将"全部"/"正常"置灰或用删除线标记
-- [ ] 后端 `/api/sim/stream` 增加可选 query 参数 `?filter=anomaly`，只推送异常类型事件
-- [ ] 异常日志展示优化：
+- [x] 新增日志筛选 Tab：`全部` | `异常`，默认选中「异常」，视觉上将“全部”/“正常”置灰或用删除线标记
+- [x] 后端 `/api/sim/stream` 增加可选 query 参数 `?filter=anomaly`，只推送异常类型事件
+- [x] 异常日志展示优化：
   - 按等级显示红色（critical: 失联/碰撞）、橙色（warning: 低电量/偏航）、黄色（info: 温度异常）badge
   - 每条日志增加实例名称高亮、异常类型图标、时间戳格式化
-- [ ] 面板标题增加实时异常计数 badge（红色圆点 + 数字）
-- [ ] 自动滚动：新日志到达时自动滚到底部，提供「暂停滚动」锁定按钮
+- [x] 面板标题增加实时异常计数 badge（红色圆点 + 数字）
+- [x] 自动滚动：新日志到达时自动滚到底部，提供「暂停滚动」锁定按钮
 
 **涉及文件**：`simulation.html` · `simulation.go`（可选 stream 过滤）
 
@@ -159,24 +159,21 @@
 
 ### TODO-06 离线状态下取消相关异常通知
 
-> **⚠️ 部分完成**（v3.7.0）
+> **✅ 已完成**（v3.8.0）
 
 **现状**：
 
 - `patrol.go` 定时巡检产生通知写入 `notifications` 表，`notification-bell.js` 展示
-- 离线时（网络断开/LLM 不可达/DB 超时），巡检可能产生大量"连接失败"通知，形成通知风暴
+- 离线时（网络断开/LLM 不可达/DB 超时），巡检可能产生大量“连接失败”通知，形成通知风暴
 - 无离线状态检测和降级机制
 
 **任务清单**：
 
 - [x] **通知去重/抑制（无人机失联冷却）**：`patrol.go` 中无人机下线通知已实现 5 分钟/台冷却期（`notified map[int]time.Time`），防止反复触发
-- [ ] **后端离线检测**：在 `patrol.go` 巡检逻辑前增加预检查：
-  - MySQL 连接 ping 测试
-  - LLM API 可达性测试（轻量 HEAD 请求）
-  - 若检测到不可达，跳过本轮巡检或仅执行本地检查
-- [ ] **前端离线提示**：`notification-bell.js` 检测 WebSocket 断连后，在铃铛图标旁显示离线状态 badge，并暂停通知轮询
-- [ ] **离线通知静默**：离线期间产生的通知标记为 `silent` 类型，恢复在线后批量折叠展示
-- [ ] **systemd/健康检查联动**：`/api/healthz` 增加连接状态返回字段
+- [x] **后端离线检测**：`patrol.go` 巡检前 `wrapWithHealthCheck` 预检DB ping + LLM HEAD，离线时跳过巡检
+- [x] **前端离线提示**：`notification-bell.js` 检测 `navigator.onLine` + fetch 失败计数，显示离线 badge，暂停轮询
+- [x] **离线通知静默**：离线期间巡检跳过不生成通知，恢复时自动批量折叠已读 + 插入恢复摘要
+- [x] **systemd/健康检查联动**：`/api/healthz` 返回 `db_reachable`、`llm_reachable`、`patrol_online`、`uptime_s`
 
 **涉及文件**：`patrol.go` · `notification.go` · `notification-bell.js` · `main.go`（healthz）
 
@@ -186,6 +183,8 @@
 
 - 增加RPM优化
 
+> **✅ 已完成**（v3.8.0）
+
 **现状**：
 
 - `internal/taskpool/pool.go` 提供 IO(16 workers) + CPU(4 workers) 双池，`batcher.go` 提供 WriteBatcher / Throttler / StatsCache
@@ -194,11 +193,11 @@
 
 **任务清单**：
 
-- [ ] **LLM 请求速率控制**：在 `internal/llm/llm.go` 的 `Client` 中增加令牌桶限流器（`golang.org/x/time/rate`），按 `.env` 配置 `LLM_RPM`（默认 30 RPM）限制对大模型 API 的并发请求
-- [ ] **RPM 可视化**：在 `concurrency.html` 并发监控面板增加 LLM RPM 监控卡片，展示：当前分钟请求数 / 上限 / 排队数 / 平均延迟
-- [ ] **任务优先级细化**：航线规划（用户触发）优先级高于定时巡检（后台自动），确保用户操作不被后台任务阻塞
-- [ ] **超时策略调优**：LLM 调用超时从默认值调整为可配置（`.env` `LLM_TIMEOUT_SEC`，默认 60s），超时后降级为直线规划/缓存结果
-- [ ] **并发指标扩展**：`/api/taskpool/metrics` 增加 LLM 专属指标组（`llm_rpm_current` / `llm_rpm_limit` / `llm_avg_latency_ms`）
+- [x] **LLM 请求速率控制**：`llm.go` 增加 `golang.org/x/time/rate` 令牌桶限流器，按 `LLM_RPM`（默认 30）控制，每次调用前 Wait
+- [x] **RPM 可视化**：`concurrency.html` 增加 LLM RPM 监控卡片（当前分钟/上限/排队/平均延迟 + 进度条）
+- [x] **任务优先级细化**：航线规划使用 `PriorityHigh`，巡检使用 `PriorityNormal/Low`，用户操作优先
+- [x] **超时策略调优**：LLM 超时支持 `LLM_TIMEOUT_SEC` 环境变量配置（默认 60s）
+- [x] **并发指标扩展**：`/api/taskpool/metrics` 增加 `llm_rpm` 指标组（current/limit/failed/avg_latency），另有 `/api/taskpool/llm-rpm` 独立端点
 
 **涉及文件**：`internal/llm/llm.go` · `internal/taskpool/pool.go` · `concurrency.html` · `taskpool_api.go` · `.env`
 
@@ -254,6 +253,8 @@
 
 ### TODO-10 模拟机电量 + 图表优化
 
+> **⚠️ 部分完成**（v3.8.0）— 低电量异常阈值已修复
+
 **现状**：
 
 - `battery.html` 展示电池实时数据：电量/电压/温度/健康度，含 Chart.js 折线图趋势
@@ -274,7 +275,8 @@
   - 电压/温度趋势图增加双 Y 轴（左侧电压 V、右侧温度 ℃）
   - 健康度历史增加区间着色（优秀/良好/一般/差 对应绿/蓝/黄/红背景带）
   - 响应式优化：小屏时图表自动缩放、Legend 折叠
-- [ ] **电量告警联动**：模拟机电量低于阈值时，在图表上实时标注告警点（红色三角标记），并链接到通知中心
+- [x] **低电量异常自动检测**：`instance.go` `tick()` 中新增 ≤20% 电量自动注入 `low_battery` 警告异常（`AlertWarning`），实例管理表「异常」列实时显示 `low_battery` 标签；≤15% 时自动升级为 `AlertCritical` 并触发强制返航，`updateAnomalies()` 在电量恢复 >20% 后自动清除
+- [ ] **电量告警图表联动**：模拟机电量低于阈值时，在图表上实时标注告警点（红色三角标记），并链接到通知中心
 
 **涉及文件**：`simulation.html`（统计面板图表） · `battery.html`（电池监控图表） · `simulation/instance.go`（数据源）
 
@@ -645,7 +647,7 @@
 | 9    | ✅ #18 RAG 优化        | BM25 方案已完成          | 已完成 |
 | 10   | #03 仿真日志优化       | 依赖 #09 仿真流程清晰    | ⬜ 待开始 |
 | 11   | ✅ #04 导出→展示跳转   | 依赖 #09 任务建设完善    | 已完成 |
-| 12   | #10 电量+图表优化      | 独立可并行               | ⬜ 待开始 |
+| 12   | ⚠️ #10 电量+图表优化   | 低电量异常阈值已修复     | 部分完成 |
 | 13   | #08 前端性能优化       | 基础设施，不影响功能     | ⬜ 待开始 |
 
 ### 第三批（视觉升级 + 体验打磨）
@@ -686,6 +688,7 @@
 | `project/internal/llm/llm.go`               | #07 #16                             |
 | `project/internal/handlers/cot.go`          | #05 #16                             |
 | `project/internal/handlers/ai_assistant.go` | #16 #18                             |
+| `project/internal/simulation/instance.go`   | #10 ⚠️（低电量阈值修复）            |
 | `project/internal/handlers/simulation.go`   | #03 #09                             |
 | `project/internal/handlers/notification.go` | #06                                 |
 | `project/internal/handlers/patrol.go`       | #06                                 |

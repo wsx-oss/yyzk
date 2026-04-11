@@ -78,7 +78,40 @@ func main() {
 	rateLimiter := middleware.NewRateLimiter(500, 1*time.Minute)
 	r.Use(rateLimiter.Middleware())
 
-	r.GET("/api/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+	startTime := time.Now()
+	r.GET("/api/healthz", func(c *gin.Context) {
+		// DB check
+		dbOK := true
+		var one int
+		if err := database.QueryRow("SELECT 1").Scan(&one); err != nil {
+			dbOK = false
+		}
+
+		// LLM API check (lightweight HEAD, 3s timeout)
+		llmOK := false
+		llmURL := getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com")
+		hc := &http.Client{Timeout: 3 * time.Second}
+		if resp, err := hc.Head(llmURL); err == nil {
+			resp.Body.Close()
+			llmOK = true
+		}
+
+		// Patrol state
+		patrolOK := handlers.IsPatrolOnline()
+
+		overall := "ok"
+		if !dbOK {
+			overall = "degraded"
+		}
+
+		c.JSON(200, gin.H{
+			"status":        overall,
+			"uptime_s":      int(time.Since(startTime).Seconds()),
+			"db_reachable":  dbOK,
+			"llm_reachable": llmOK,
+			"patrol_online": patrolOK,
+		})
+	})
 
 	// security & limits
 	if err := r.SetTrustedProxies(strings.Split(trusted, ",")); err != nil {

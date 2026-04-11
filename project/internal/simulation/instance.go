@@ -386,10 +386,8 @@ func (inst *Instance) tick(now time.Time) {
 	// Update battery
 	inst.updateBattery(dt)
 
-	// Check low battery forced return
-	if inst.battery.Level <= 15 && inst.phase != PhaseReturn && inst.phase != PhaseLanding && inst.phase != PhaseIdle {
-		inst.phase = PhaseReturn
-		// Add low battery anomaly if not already present
+	// Check low battery warning (≤20%)
+	if inst.battery.Level <= 20 && inst.phase != PhaseIdle {
 		hasLowBat := false
 		for _, a := range inst.anomalies {
 			if a.Type == AnomalyLowBattery && a.Active {
@@ -397,6 +395,33 @@ func (inst *Instance) tick(now time.Time) {
 			}
 		}
 		if !hasLowBat {
+			inst.anomalies = append(inst.anomalies, AnomalyEvent{
+				Type:      AnomalyLowBattery,
+				Level:     AlertWarning,
+				Message:   inst.config.Name + " 电量低于20%",
+				StartTime: now,
+				Duration:  0,
+				Active:    true,
+			})
+		}
+	}
+
+	// Check low battery forced return (≤15%)
+	if inst.battery.Level <= 15 && inst.phase != PhaseReturn && inst.phase != PhaseLanding && inst.phase != PhaseIdle {
+		inst.phase = PhaseReturn
+		// Upgrade existing low battery warning to critical
+		upgraded := false
+		for i := range inst.anomalies {
+			if inst.anomalies[i].Type == AnomalyLowBattery && inst.anomalies[i].Active {
+				if inst.anomalies[i].Level != AlertCritical {
+					inst.anomalies[i].Level = AlertCritical
+					inst.anomalies[i].Message = inst.config.Name + " 电量过低，强制返航"
+					inst.anomalies[i].StartTime = now
+				}
+				upgraded = true
+			}
+		}
+		if !upgraded {
 			inst.anomalies = append(inst.anomalies, AnomalyEvent{
 				Type:      AnomalyLowBattery,
 				Level:     AlertCritical,
@@ -462,6 +487,10 @@ func (inst *Instance) updateAnomalies(now time.Time) {
 	for i := range inst.anomalies {
 		a := &inst.anomalies[i]
 		if a.Active && a.Duration > 0 && now.Sub(a.StartTime) > a.Duration {
+			a.Active = false
+		}
+		// Auto-clear low_battery anomaly when battery has recovered above 20%
+		if a.Active && a.Type == AnomalyLowBattery && inst.battery.Level > 20 {
 			a.Active = false
 		}
 		// Keep all anomalies (active or historical)
