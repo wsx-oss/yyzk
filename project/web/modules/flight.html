@@ -22,7 +22,7 @@
     .status-completed { background: #d1fae5; color: #065f46; }
 
     /* Phase badges */
-    .phase-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .phase-badge { display: inline-flex; align-items: center; justify-content: center; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; line-height: 1.4; vertical-align: middle; }
     .phase-standby { background: #f1f5f9; color: #475569; }
     .phase-takeoff { background: #dbeafe; color: #1e40af; }
     .phase-cruise { background: #e0e7ff; color: #4338ca; }
@@ -174,8 +174,9 @@
     .loc-time { color: #cbd5e1; font-size: 10px; display: block; }
 
     /* Combined status column */
-    .flight-status-cell { text-align: center; }
-    .flight-status-cell .phase-badge { display: block; margin-bottom: 3px; }
+    .flight-status-cell { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+    .flight-status-cell .phase-badge { display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0; }
+    .flight-status-cell .status-badge { display: inline-flex; align-items: center; justify-content: center; }
 
     /* Real-time position card in detail modal */
     .realtime-card { margin-top: 18px; padding: 16px; background: linear-gradient(135deg, #f0f9ff, #f0fdf4); border-radius: 10px; border: 1px solid #e0f2fe; }

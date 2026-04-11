@@ -130,6 +130,21 @@
     </div>
   </div>
 
+  <!-- Stats Charts -->
+  <div class="card">
+    <div class="card-title">设备统计</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;">
+      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">设备状态分布</div>
+        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">围栏状态分布</div>
+        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="fenceChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Map -->
   <div class="map-card">
     <div class="map-card-header">
@@ -204,21 +219,6 @@
           <span id="alertPageIndicator">1/1</span>
           <button id="alertBtnNext" onclick="changeAlertPage(1)" disabled>下一页 &gt;</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Stats Charts -->
-  <div class="card">
-    <div class="card-title">设备统计</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;">
-      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
-        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">设备状态分布</div>
-        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="statusChart"></canvas></div>
-      </div>
-      <div style="height:320px;display:flex;flex-direction:column;align-items:center;width:100%;">
-        <div style="font-weight:600;margin-bottom:12px;text-align:center;width:100%;">围栏状态分布</div>
-        <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="fenceChart"></canvas></div>
       </div>
     </div>
   </div>

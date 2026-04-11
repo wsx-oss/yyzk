@@ -466,11 +466,46 @@
     .layout-sidebar.collapsed .nav-item-link {
       justify-content: center;
       padding: 10px 0;
+      position: relative;
     }
     .layout-sidebar.collapsed .nav-group-toggle {
       justify-content: center;
       padding: 10px 0;
       margin: 0 4px;
+      position: relative;
+    }
+    /* Floating tooltip for collapsed sidebar items */
+    .layout-sidebar.collapsed .nav-item a::after,
+    .layout-sidebar.collapsed .nav-item-link::after,
+    .layout-sidebar.collapsed .nav-group-toggle::after {
+      content: attr(data-label);
+      position: absolute;
+      left: calc(var(--sidebar-collapsed-width) - 4px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--cc-text-1);
+      color: var(--cc-bg-2);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 999;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .layout-sidebar.collapsed .nav-item a:hover::after,
+    .layout-sidebar.collapsed .nav-item-link:hover::after,
+    .layout-sidebar.collapsed .nav-group-toggle:hover::after {
+      opacity: 1;
+    }
+    /* Hide tooltip arrow for empty data-label */
+    .layout-sidebar.collapsed .nav-item a:not([data-label])::after,
+    .layout-sidebar.collapsed .nav-item-link:not([data-label])::after,
+    .layout-sidebar.collapsed .nav-group-toggle:not([data-label])::after {
+      display: none;
     }
 
     /* ===== Sidebar footer ===== */
@@ -611,7 +646,7 @@
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
       <div class="navbar-breadcrumb" id="breadcrumb">
-        <span>首页</span> <span>/</span> <span class="bc-current" id="bcCurrent">无人机管理</span>
+        <span class="bc-current" id="bcCurrent">无人机管理</span>
       </div>
     </div>
     <ul class="navbar-right">
@@ -668,7 +703,7 @@
 
       <div class="nav-section-label">飞行任务</div>
       <div class="nav-group">
-        <div class="nav-group-toggle open" data-group="flight">
+        <div class="nav-group-toggle open" data-group="flight" data-label="飞行任务管理">
           <span class="nav-icon">🗺</span>
           <span class="nav-text">飞行任务管理</span>
           <span class="nav-group-arrow">▶</span>
@@ -682,7 +717,7 @@
 
       <div class="nav-section-label">仿真 &amp; AI</div>
       <div class="nav-group">
-        <div class="nav-group-toggle open" data-group="simai">
+        <div class="nav-group-toggle open" data-group="simai" data-label="仿真与智能决策">
           <span class="nav-icon">🧪</span>
           <span class="nav-text">仿真与智能决策</span>
           <span class="nav-group-arrow">▶</span>
@@ -695,7 +730,7 @@
 
       <div class="nav-section-label">系统运维</div>
       <div class="nav-group">
-        <div class="nav-group-toggle open" data-group="ops">
+        <div class="nav-group-toggle open" data-group="ops" data-label="系统调度与运维">
           <span class="nav-icon">⚙</span>
           <span class="nav-text">系统调度与运维</span>
           <span class="nav-group-arrow">▶</span>
@@ -708,7 +743,7 @@
 
       <div class="nav-section-label">状态监控</div>
       <div class="nav-group">
-        <div class="nav-group-toggle open" data-group="status">
+        <div class="nav-group-toggle open" data-group="status" data-label="无人机状态监控">
           <span class="nav-icon">📺</span>
           <span class="nav-text">无人机状态监控</span>
           <span class="nav-group-arrow">▶</span>
@@ -724,7 +759,7 @@
 
       <div class="nav-section-label">日志管理</div>
       <div class="nav-group">
-        <div class="nav-group-toggle open" data-group="logs">
+        <div class="nav-group-toggle open" data-group="logs" data-label="日志管理">
           <span class="nav-icon">📋</span>
           <span class="nav-text">日志管理</span>
           <span class="nav-group-arrow">▶</span>
