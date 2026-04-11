@@ -180,7 +180,7 @@ Agent 推送 GPS 数据时通过 `POST /api/gps/push` 接口，使用 `agent_id`
 
 点击 **"查看轨迹"** 按钮，弹出历史轨迹弹窗，展示：
 
-- 地图上以蓝色折线绘制设备移动轨迹
+- 地图上以蓝色曲线绘制设备移动轨迹（默认启用 Catmull-Rom 样条平滑，可通过「曲线轨迹」开关切换为直线）
 - 起点标记为绿色圆点，最新位置标记为红色圆点
 - 下方列表显示每个轨迹点的时间、坐标、速度
 
@@ -287,7 +287,7 @@ Agent 推送 GPS 数据时通过 `POST /api/gps/push` 接口，使用 `agent_id`
 - 使用 Tab 标签页切换设备列表和围栏报警记录
 - 使用模态弹窗实现添加/编辑设备、推送位置、查看详情、查看轨迹等交互
 - 设备详情弹窗中嵌入独立地图，展示设备位置和围栏范围
-- 历史轨迹弹窗中以折线绘制移动路径，标注起点和最新位置
+- 历史轨迹弹窗中支持曲线/直线切换（`curve-utils.js` 提供 Catmull-Rom 平滑），标注起点和最新位置
 - 电子围栏使用 Toggle Switch 开关控件，启用后动态显示围栏参数输入框
 - 围栏距离计算使用 Haversine 公式（后端实现）
 - 搜索筛选通过后端 API 参数传递执行，支持 2 种条件组合筛选（名称、状态）
@@ -314,7 +314,8 @@ Agent 推送 GPS 数据时通过 `POST /api/gps/push` 接口，使用 `agent_id`
 
 | 文件路径                              | 说明                                                                                                                        |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `project/web/modules/gps.html`      | 前端页面（HTML + CSS + JavaScript + Leaflet 地图）                                                                          |
+| `project/web/modules/gps.html`      | 前端页面（HTML + CSS + JavaScript + Leaflet 地图 + 曲线轨迹）                                                              |
+| `project/web/modules/curve-utils.js` | 贝塞尔曲线/Catmull-Rom 轨迹平滑工具库                                                                                       |
 | `project/web/modules/common.js`     | 公共工具函数（API 请求、图表创建、消息提示）                                                                                |
 | `project/web/modules/common.css`    | 公共样式                                                                                                                    |
 | `project/internal/handlers/gps.go`  | 后端 API 处理（GpsDevicesList、GpsDevicesCreate、GpsDevicesGet、GpsDevicesUpdate、GpsDevicesDelete、GpsDevicesPush、GpsPushByAgent、GpsDevicesHistory、GpsFenceAlerts、GpsFenceAlertAck、GpsStats） |

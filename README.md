@@ -48,7 +48,7 @@ CloudControl 是一套面向企业级应用的综合性管控平台。
 - **实时监控**：CPU/内存/磁盘/网络监控、WebSocket 实时推送、阈值自动告警
 - **智能能力**：LLM 航线规划 + NFZ 纠偏 + 多候选方案、CoT 思维链 AI 分析、智能巡检与通知中心
 - **并发框架**：统一 Worker Pool（IO/CPU 双池）、优先级调度、超时控制、panic 恢复、DB 批写、WS 节流、统计缓存
-- **仿真与强化学习**：多实例无人机仿真引擎、任务模板（巡逻/巡检/配送/测绘/搜救）、碰撞规避、Leaflet 实时地图、RL 训练评估与策略导出
+- **仿真与强化学习**：多实例无人机仿真引擎、任务模板（巡逻/巡检/配送/测绘/搜救）、碰撞规避、禁飞区地理围栏检测、Leaflet 实时地图（贝塞尔曲线轨迹）、RL 训练评估与策略导出
 
 ---
 
@@ -239,7 +239,7 @@ go run .
 | 19 | AI 智能助手 | 右下角浮窗、多轮对话、快捷指令、知识库问答、模块跳转、数据查询 |
 | 20 | 消息通知中心 | 右上角铃铛、未读计数、类型筛选、AI 定时巡检、点击跳转、批量已读 |
 | 21 | 并发任务监控 | 统一 Worker Pool 指标、IO/CPU 池状态、任务组分布、完成/失败趋势图、自动刷新 |
-| 22 | 仿真模拟引擎 | 批次创建/启停/删除、异常注入、任务模板、碰撞规避、实时地图、RL 训练与策略导出 |
+| 22 | 仿真模拟引擎 | 批次创建/启停/删除、异常注入、任务模板、碰撞规避、禁飞区围栏检测、贝塞尔曲线轨迹、实时地图、RL 训练与策略导出 |
 
 ---
 
@@ -378,6 +378,7 @@ project/
 │       ├── backup.html             # 备份与数据回滚管理
 │       ├── concurrency.html        # 并发任务监控仪表盘
 │       ├── simulation.html         # 仿真模拟引擎（地图 + RL）
+│       ├── curve-utils.js          # 贝塞尔/Catmull-Rom 曲线轨迹工具库
 │       ├── ai-assistant.js         # 右下角 AI 智能助手浮窗
 │       ├── notification-bell.js    # 右上角消息通知铃铛
 │       └── common.js / common.css  # 公共工具函数和样式
@@ -456,7 +457,21 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 ## 版本更新
 
-### v3.6.0 (最新)
+### v3.7.0 (最新)
+
+- 仿真引擎禁飞区地理围栏集成
+  - `engine.go` 新增 `SetNoFlyZones()` / `CheckGeofence()` / `pointInPolygon()`（ray-casting 点在多边形内检测）
+  - `instance.go` 每 tick 自动检测禁飞区违规，填入 `TelemetrySnapshot.GeofenceViolation`
+  - `rl.go` RL 状态空间新增 `InNoFlyZone` 维度（11 维），奖励函数增加 -3.0 禁飞区惩罚 + 纠正动作奖励
+  - `sim_integration.go` 启动时自动从 `no_fly_zones` 表加载禁飞区多边形数据
+- 贝塞尔曲线轨迹优化（TODO-11）
+  - 新增 `curve-utils.js` 工具库：`smoothRoute`（三次贝塞尔）、`smoothTrail`（Catmull-Rom 样条）、`animatePolyline`（渐进动画）
+  - `simulation.html`：实时轨迹 Catmull-Rom 平滑 + 航线贝塞尔曲线化 + Canvas 渲染器 + 「曲线轨迹」开关
+  - `gps.html`：历史轨迹 Catmull-Rom 平滑 + 「曲线轨迹」开关 + `redrawHistoryTrail()`
+  - `flight.html`：5 处航线展示全部贝塞尔曲线化 + 拖拽航点实时重绘
+  - 弧度自适应算法：短距(<100m)小弧度 → 中距(500-2000m)中弧度 → 长距(>2km)大弧度，急转弯自动加大曲率
+
+### v3.6.0
 
 - MySQL 迁移完整性审计与修复
   - 补全仿真 5 张表（`sim_batches` / `sim_instances` / `sim_events` / `sim_telemetry_log` / `rl_training_log`）及索引到 `migrate_mysql.go`

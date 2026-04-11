@@ -133,12 +133,15 @@
     "battery_risk_count": 11,
     "task_completion_rate": 0.42,
     "avg_route_progress": 0.42,
-    "completed_tasks": 36
+    "completed_tasks": 36,
+    "collision_warnings": 5,
+    "geofence_violations": 3
   },
   "distribution": {
     "mission": {"patrol": 35, "inspection": 28, "delivery": 20, "survey": 22, "sar": 15},
     "task_status": {"执行中": 80, "已完成": 50},
-    "alert_type": {"low_battery": 41, "flight_deviation": 18}
+    "alert_type": {"low_battery": 41, "flight_deviation": 18, "geofence_violation": 3},
+    "anomaly_distribution": {"low_battery": 0.2, "deviation": 0.1, "comm_lost": 0.05, "temp": 0.05, "geofence_violation": 0.1}
   },
   "charts": {
     "running_trend": {"labels": ["2026-04-10 12:30"], "values": [95]},
