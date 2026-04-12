@@ -1024,12 +1024,22 @@ func (s *SimAPI) SimStats(c *gin.Context) {
 				}
 			}
 			alertTypeDist[eventType]++
+			if eventType == "state_change" {
+				continue
+			}
 			if len(created) < 16 {
 				continue
 			}
 			minuteKey := created[:16]
 			anomalyByMinute[minuteKey]++
 		}
+	}
+
+	// Backfill current minute with live active anomaly count so the big-screen
+	// anomaly series responds even when anomalies are active but no new event row is written.
+	nowMinuteKey := time.Now().Format("2006-01-02 15:04")
+	if anomalyCount > anomalyByMinute[nowMinuteKey] {
+		anomalyByMinute[nowMinuteKey] = anomalyCount
 	}
 
 	// RL curve from persisted history

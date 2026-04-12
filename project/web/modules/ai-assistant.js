@@ -9,6 +9,7 @@
   // SVG icons used in the widget
   const SVG_SPARKLES = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="15" y="13" width="6" height="10" rx="2" fill="currentColor" opacity="0.85"/><line x1="18" y1="15" x2="8" y2="8" stroke="currentColor" stroke-width="1.8"/><line x1="18" y1="15" x2="28" y2="8" stroke="currentColor" stroke-width="1.8"/><line x1="18" y1="21" x2="8" y2="28" stroke="currentColor" stroke-width="1.8"/><line x1="18" y1="21" x2="28" y2="28" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="4" fill="currentColor" opacity="0.25" stroke="currentColor"/><circle cx="28" cy="8" r="4" fill="currentColor" opacity="0.25" stroke="currentColor"/><circle cx="8" cy="28" r="4" fill="currentColor" opacity="0.25" stroke="currentColor"/><circle cx="28" cy="28" r="4" fill="currentColor" opacity="0.25" stroke="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor" opacity="0.9"/><circle cx="28" cy="8" r="1.5" fill="currentColor" opacity="0.9"/><circle cx="8" cy="28" r="1.5" fill="currentColor" opacity="0.9"/><circle cx="28" cy="28" r="1.5" fill="currentColor" opacity="0.9"/><polygon points="18,11 16,14 20,14" fill="currentColor" opacity="0.8"/></svg>`;
   const SVG_BOT_AVATAR = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="2" y="8" width="20" height="12" rx="2"/><path d="M6 12h.01"/><path d="M18 12h.01"/><path d="M9 16h6"/></svg>`;
+  const USER_AVATAR = '<img src="/app/logo.jpg" alt="默认头像" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
 
   const style = document.createElement('style');
   style.textContent = `
@@ -102,6 +103,7 @@
     }
     .ai-msg.assistant .ai-msg-avatar { background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; }
     .ai-msg.user .ai-msg-avatar { background: #e2e8f0; color: #475569; }
+    .ai-msg.user .ai-msg-avatar { overflow: hidden; border: 1px solid #cbd5e1; }
     .ai-msg-bubble {
       max-width: 80%; padding: 10px 14px; border-radius: 12px;
       font-size: 13px; line-height: 1.6; word-break: break-word;
@@ -401,7 +403,7 @@
   function appendMessage(role, content) {
     const div = document.createElement('div');
     div.className = 'ai-msg ' + role;
-    const avatar = role === 'assistant' ? SVG_BOT_AVATAR : '👤';
+    const avatar = role === 'assistant' ? SVG_BOT_AVATAR : USER_AVATAR;
     // Process [NAV:xxx] tags into clickable links
     const processedContent = processNavLinks(escapeHtml(content));
     div.innerHTML = `

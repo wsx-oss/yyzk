@@ -81,7 +81,13 @@
     .register-logo {
       display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px;
     }
-    .register-logo svg { filter: drop-shadow(0 0 10px rgba(99,102,241,0.5)); }
+    .register-logo img {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      object-fit: cover;
+      filter: drop-shadow(0 0 10px rgba(99,102,241,0.5));
+    }
     .register-card h1 {
       font-size: 22px; color: #e2e8f0; text-align: center; margin-bottom: 6px; font-weight: 700; letter-spacing: 1px;
     }
@@ -157,21 +163,7 @@
 
   <div class="register-card">
     <div class="register-logo">
-      <svg width="40" height="40" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-        <rect x="50" y="40" width="20" height="40" rx="6" fill="#818cf8"/>
-        <line x1="60" y1="48" x2="28" y2="22" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
-        <line x1="60" y1="48" x2="92" y2="22" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
-        <line x1="60" y1="72" x2="28" y2="98" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
-        <line x1="60" y1="72" x2="92" y2="98" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
-        <circle cx="28" cy="22" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-        <circle cx="92" cy="22" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-        <circle cx="28" cy="98" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-        <circle cx="92" cy="98" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-        <circle cx="28" cy="22" r="4" fill="#e0e7ff"/>
-        <circle cx="92" cy="22" r="4" fill="#e0e7ff"/>
-        <circle cx="28" cy="98" r="4" fill="#e0e7ff"/>
-        <circle cx="92" cy="98" r="4" fill="#e0e7ff"/>
-      </svg>
+      <img src="/app/logo.jpg" alt="项目Logo" />
     </div>
     <h1>创建账号</h1>
     <div class="register-subtitle">加入 云翼智控 智能无人机管控平台</div>

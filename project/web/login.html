@@ -116,7 +116,13 @@
       gap: 12px;
       margin-bottom: 10px;
     }
-    .login-logo svg { filter: drop-shadow(0 0 10px rgba(99,102,241,0.5)); }
+    .login-logo img {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      object-fit: cover;
+      filter: drop-shadow(0 0 10px rgba(99,102,241,0.5));
+    }
     .login-card h1 {
       font-size: 22px;
       color: #e2e8f0;
@@ -295,22 +301,7 @@
   <!-- 登录卡片 -->
   <div class="login-card">
     <div class="login-logo">
-      <svg width="44" height="44" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-        <rect x="50" y="40" width="20" height="40" rx="6" fill="#818cf8"/>
-        <line x1="60" y1="48" x2="28" y2="22" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
-        <line x1="60" y1="48" x2="92" y2="22" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
-        <line x1="60" y1="72" x2="28" y2="98" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
-        <line x1="60" y1="72" x2="92" y2="98" stroke="#818cf8" stroke-width="5" stroke-linecap="round"/>
-        <circle cx="28" cy="22" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-        <circle cx="92" cy="22" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-        <circle cx="28" cy="98" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-        <circle cx="92" cy="98" r="12" fill="#818cf8" opacity="0.25" stroke="#818cf8" stroke-width="2"/>
-        <circle cx="28" cy="22" r="4" fill="#e0e7ff"/>
-        <circle cx="92" cy="22" r="4" fill="#e0e7ff"/>
-        <circle cx="28" cy="98" r="4" fill="#e0e7ff"/>
-        <circle cx="92" cy="98" r="4" fill="#e0e7ff"/>
-        <polygon points="60,32 54,42 66,42" fill="#e0e7ff" opacity="0.8"/>
-      </svg>
+      <img src="/app/logo.jpg" alt="项目Logo" />
     </div>
     <h1>云翼智控</h1>
     <div class="login-subtitle">智能工具人机交互与远程控制系统</div>
@@ -326,7 +317,7 @@
       </div>
       <button type="submit" class="btn-login">登 录</button>
     </form>
-    <div class="register-link">
+    <div class="register-link" id="registerLink">
       还没有账号？<a href="/app/register.html">立即注册</a>
     </div>
   </div>
@@ -389,6 +380,18 @@
     if (localStorage.getItem('token')) {
       window.location.href = '/app/dashboard.html';
     }
+
+    // 根据后端配置决定是否显示注册入口
+    (async function() {
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        if (cfg.enable_register === false) {
+          const el = document.getElementById('registerLink');
+          if (el) el.style.display = 'none';
+        }
+      } catch(e) {}
+    })();
   </script>
 </body>
 </html>

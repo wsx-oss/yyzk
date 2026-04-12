@@ -235,6 +235,48 @@ function animateStatValue(el, targetValue, duration = 800) {
   requestAnimationFrame(tick);
 }
 
+// ---- Auto-inject close button into all modals ----
+(function initModalCloseButtons() {
+  const CLOSE_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  function injectCloseBtn(overlay) {
+    const box = overlay.querySelector('.modal-box') || overlay.querySelector('.modal');
+    if (!box || box.querySelector('.modal-close-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'modal-close-btn';
+    btn.title = '关闭';
+    btn.innerHTML = CLOSE_SVG;
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      overlay.classList.remove('active');
+      overlay.classList.remove('show');
+    });
+    box.insertBefore(btn, box.firstChild);
+  }
+
+  // Inject into existing modals on DOM ready
+  function scanAll() {
+    document.querySelectorAll('.modal-overlay').forEach(injectCloseBtn);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scanAll);
+  } else {
+    scanAll();
+  }
+
+  // Watch for dynamically added modals
+  var mo = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(n) {
+        if (n.nodeType !== 1) return;
+        if (n.classList && n.classList.contains('modal-overlay')) injectCloseBtn(n);
+        if (n.querySelectorAll) n.querySelectorAll('.modal-overlay').forEach(injectCloseBtn);
+      });
+    });
+  });
+  mo.observe(document.body || document.documentElement, { childList: true, subtree: true });
+})();
+
 // Stagger animate child elements on load
 function staggerAnimateIn(parentSelector, childSelector, delay = 60) {
   const parent = document.querySelector(parentSelector);

@@ -179,5 +179,9 @@ func (a *API) AppConfig(c *gin.Context) {
 	if key == "" {
 		key = "1d109683f4d84198e37a38c442d68311"
 	}
-	c.JSON(200, gin.H{"tianditu_key": key})
+	enableRegister := true
+	if v := os.Getenv("ENABLE_REGISTER"); v == "false" || v == "0" {
+		enableRegister = false
+	}
+	c.JSON(200, gin.H{"tianditu_key": key, "enable_register": enableRegister})
 }
