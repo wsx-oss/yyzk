@@ -36,11 +36,12 @@
 CloudControl 是一套面向企业级应用的综合性管控平台。
 
 **技术栈**：
-- **后端**：Go + Gin，位于 `project/`，数据库已从 SQLite 迁移至 **MySQL**（Aiven 云数据库），通过环境变量 `SC_DB_DRIVER` 切换驱动，内置 SQL 方言自动适配层（`AdaptSQL`），共 32 张业务表
+- **后端**：Go + Gin，位于 `project/`，数据库已从 SQLite 迁移至 **MySQL**（Aiven 云数据库），通过环境变量 `SC_DB_DRIVER` 切换驱动，内置 SQL 方言自动适配层（`AdaptSQL`），共 34 张业务表
 - **前端**：静态页面位于 `project/web/`，由后端内嵌静态资源并通过 `/app` 提供访问
 - **时区**：统一为 **Asia/Shanghai (UTC+8)**，Go 后端 `time.Local` 与 MySQL 会话时区均已配置
 - **Redis**：已集成 `go-redis/v9` 客户端库，通过 `.env` 配置连接（`REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB`）。用于 **会话缓存**（Token 验证快速路径）、**分布式限流**（替代进程内令牌桶）、**统计缓存同步**（6 类业务统计写入 Redis）、**通知未读数缓存**。Redis 不可用时自动降级为纯内存模式，不影响系统正常运行
-- **RAG 知识库**：内置 BM25 关键词检索引擎（`internal/rag/rag.go`），自动加载 `knowledge_base/` 目录下 20 篇领域文档，为 AI 助手提供检索增强生成能力
+- **RAG 知识库**：内置 BM25 关键词检索引擎（`internal/rag/rag.go`），知识库文档存储于数据库 `knowledge_docs` 表（首次运行自动从 `knowledge_base/` 目录导入 20 篇领域文档），为 AI 助手提供检索增强生成能力
+- **全量数据库存储**：所有业务数据（备份 SQL、语音录音、仿真快照、RL 策略、知识库文档）均持久化至数据库，不再依赖本地文件系统，支持云端部署与多实例水平扩展
 
 ### 核心特性
 
@@ -51,6 +52,7 @@ CloudControl 是一套面向企业级应用的综合性管控平台。
 - **智能能力**：LLM 航线规划 + NFZ 纠偏 + 多候选方案、CoT 思维链 AI 分析、智能巡检与通知中心、RAG 检索增强生成（BM25 + 20 篇知识库文档）
 - **并发框架**：统一 Worker Pool（IO/CPU 双池）、优先级调度、超时控制、panic 恢复、DB 批写、WS 节流、统计缓存
 - **仿真与强化学习**：多实例无人机仿真引擎、任务模板（巡逻/巡检/配送/测绘/搜救）、碰撞规避、禁飞区地理围栏检测、Leaflet 实时地图（贝塞尔曲线轨迹）、RL 训练评估与策略导出
+- **全量 DB 持久化**：备份 SQL 内容、语音二进制、仿真快照、RL 策略、知识库文档全部存储于数据库，消除本地文件依赖
 
 ---
 
@@ -261,7 +263,7 @@ go run .
 | 15 | 性能分析报告 | 响应时间/吞吐量/错误率、四种图表 |
 | 16 | AI决策记录 | CoT 思维链推理历史、多场景分析归档 |
 | 17 | 无人机连接与部署 | hw-agent 地面站部署、MAVLink 中继、Push 模式 |
-| 18 | 备份与数据回滚 | 自动/手动备份、数据恢复与回滚、备份记录管理、恢复进度追踪、备份文件上传恢复 |
+| 18 | 备份与数据回滚 | 自动/手动备份（SQL 内容存储于数据库）、数据恢复与回滚、备份记录管理、恢复进度追踪、备份文件上传恢复 |
 | 19 | AI 智能助手 | 右下角浮窗、多轮对话、快捷指令、知识库问答、模块跳转、数据查询 |
 | 20 | 消息通知中心 | 右上角铃铛、未读计数、类型筛选、AI 定时巡检、点击跳转、批量已读 |
 | 21 | 并发任务监控 | 统一 Worker Pool 指标、IO/CPU 池状态、任务组分布、完成/失败趋势图、自动刷新 |
@@ -315,8 +317,8 @@ go run .
 | 备份 | POST | `/api/backup/restore/:id` | 从指定备份恢复数据 |
 | 备份 | POST | `/api/backup/restore-upload` | 上传 SQL 文件恢复数据 |
 | 备份 | GET | `/api/backup/restore-progress` | 恢复进度查询（轮询） |
-| 备份 | DELETE | `/api/backup/:id` | 删除备份记录及文件 |
-| 备份 | GET | `/api/backup/download/:id` | 下载备份文件 |
+| 备份 | DELETE | `/api/backup/:id` | 删除备份记录 |
+| 备份 | GET | `/api/backup/download/:id` | 下载备份 SQL 内容 |
 | 备份 | POST | `/api/backup/auto-toggle` | 开关自动备份 |
 | 备份 | POST | `/api/backup/cleanup` | 清理旧备份（保留最近 N 份） |
 | 通知 | GET | `/api/notifications` | 通知列表（支持类型筛选） |
@@ -364,7 +366,7 @@ project/
 │   │   └── redis.go                # Redis 客户端封装（连接池、KV/JSON/Hash 操作、健康检查、优雅降级）
 │   ├── db/
 │   │   ├── db.go                   # 数据库连接、SQL 兼容层（AdaptSQL）、DB/Tx 包装器
-│   │   ├── migrate_mysql.go        # MySQL 建表 DDL（32 张表）
+│   │   ├── migrate_mysql.go        # MySQL 建表 DDL（34 张表，含 knowledge_docs / data_store）
 │   │   └── migrate_sqlite.go       # SQLite 建表 DDL
 │   ├── taskpool/                    # 统一并发框架
 │   │   ├── pool.go                 # Worker Pool 引擎（IO/CPU 双池、优先级、超时、panic 恢复、周期调度、LLM RPM 限流、指标）
@@ -379,21 +381,21 @@ project/
 │   │   ├── flight_plan.go          # 智能航线规划（LLM + AMap）
 │   │   ├── noflyzone.go            # 禁飞区管理
 │   │   ├── cot.go                  # 思维链 AI 分析
-│   │   ├── backup.go               # 备份与数据回滚（自动/手动/恢复/进度追踪）
+│   │   ├── backup.go               # 备份与数据回滚（自动/手动/恢复/进度追踪，SQL 内容存储于 DB）
 │   │   ├── ai_assistant.go         # AI 智能助手（多轮对话/知识库/快捷指令/RAG 集成）
 │   │   ├── notification.go         # 消息通知中心
 │   │   ├── patrol.go               # AI 定时巡检（含离线健康检查 + 通知冷却抑制）
 │   │   ├── pool_integration.go     # 并发整合层（批写/节流/统计缓存/任务提交辅助）
 │   │   ├── taskpool_api.go         # 并发池指标 API（/api/taskpool/metrics + /api/taskpool/llm-rpm）
 │   │   ├── rag_endpoints.go        # RAG 知识库查询 API（/api/ai/rag/*）
-│   │   ├── rag_integration.go      # RAG 与 AI 助手集成层
+│   │   ├── rag_integration.go      # RAG 与 AI 助手集成层（从 knowledge_docs 表加载知识库）
 │   │   ├── simulation.go           # 仿真引擎 API（批次/实例/异常/RL）
-│   │   ├── sim_integration.go      # 仿真引擎与 DB/WS 集成
+│   │   ├── sim_integration.go      # 仿真引擎与 DB/WS 集成（快照/策略通过 data_store 表持久化）
 │   │   └── wshub.go                # WebSocket 事件广播
 │   ├── llm/
 │   │   ├── llm.go                  # LLM 大模型调用封装（含 RPM 令牌桶限流）
 │   │   └── reasoning.go            # LLM 推理链解析
-│   ├── rag/rag.go                  # RAG 检索引擎（BM25 关键词检索 + 倒排索引）
+│   ├── rag/rag.go                  # RAG 检索引擎（BM25 关键词检索 + 倒排索引 + 批量加载 LoadTexts）
 │   ├── cot/cot.go                  # CoT 思维链推理模块
 │   ├── amap/amap.go                # 高德地图 API 封装
 │   ├── middleware/                  # 中间件（认证、限流、日志）
@@ -401,9 +403,9 @@ project/
 │   ├── syncengine/engine.go        # 数据同步引擎（18 张表）
 │   ├── utils/                       # 通用工具函数
 │   └── simulation/                 # 仿真与强化学习引擎
-│       ├── engine.go               # 多实例仿真引擎（批次管理+碰撞规避+禁飞区围栏）
+│       ├── engine.go               # 多实例仿真引擎（批次管理+碰撞规避+禁飞区围栏+DB快照回调）
 │       ├── instance.go             # 单机仿真状态机与动作执行（含低电量自动检测）
-│       ├── rl.go                   # Q-learning 训练器与经验回放（11 维状态空间）
+│       ├── rl.go                   # Q-learning 训练器与经验回放（11 维状态空间+DB策略回调）
 │       └── types.go                # 仿真核心数据结构与任务类型
 ├── web/
 │   ├── index.html                  # 系统首页
@@ -421,7 +423,7 @@ project/
 │       ├── ai-assistant.js         # 右下角 AI 智能助手浮窗
 │       ├── notification-bell.js    # 右上角消息通知铃铛
 │       └── common.js / common.css  # 公共工具函数和样式
-├── knowledge_base/                    # RAG 知识库文档（20 篇 .md）
+├── knowledge_base/                    # RAG 知识库种子文档（20 篇 .md，首次运行自动导入 DB）
 │   ├── platform_overview.md           # 平台总览
 │   ├── drone_operations.md            # 无人机操作指南
 │   ├── flight_planning.md             # 航线规划知识
@@ -430,11 +432,8 @@ project/
 │   ├── rl_policy_guide.md             # 强化学习策略指南
 │   ├── emergency_procedures.md        # 应急处理流程
 │   └── ...                            # 其余 13 篇领域文档
-└── data/
-    ├── backups/                    # 数据库备份文件存储
-    ├── recordings/                 # 语音文件存储
-    ├── sim_snapshots.json          # 仿真实例快照（30s 周期持久化，7x24 恢复用）
-    └── rl_policy.json              # RL Q-Table 策略文件（每 1000 episodes 自动保存）
+└── data/                              # （历史目录，数据已全量迁移至数据库）
+    └── README                         # 所有数据现已存储于 DB（knowledge_docs / data_store / backup_records / recordings）
 ```
 
 ---
@@ -450,7 +449,7 @@ go build -o sc.exe .     # Windows
 go build -o sc .          # Linux
 ```
 
-部署时保留：可执行文件 + `.env` + `data/`（静态页面已 embed 打入二进制）。
+部署时保留：可执行文件 + `.env`（静态页面已 embed 打入二进制，所有数据存储于数据库）。
 
 ### Linux systemd
 
@@ -505,7 +504,22 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 ## 版本更新
 
-### v3.9.0 (最新)
+### v4.0.0 (最新)
+
+- **全量数据迁移至数据库**：消除对本地 `knowledge_base/` 和 `data/` 目录的运行时依赖
+  - 新增 `knowledge_docs` 表：RAG 知识库文档存储于 DB，首次运行自动从 `knowledge_base/` 目录种子导入，后续从 DB 加载
+  - 新增 `data_store` 表：通用键值存储，用于仿真快照（`sim_snapshots`）和 RL 策略（`rl_policy`）持久化
+  - `backup_records` 新增 `sql_content LONGTEXT` 列：备份 SQL 内容直接存储于数据库，不再生成本地文件
+  - `recordings` 新增 `file_data LONGBLOB` 列：语音录音二进制直接存储于数据库，上传/下载/删除全部走 DB
+  - `InitSharedRAG(db)` 签名变更：接受数据库实例参数，支持 DB 加载 + 文件系统种子
+  - 仿真引擎新增 `SaveSnapshotFunc` / `LoadSnapshotFunc` 回调：快照持久化由文件切换为 DB
+  - RL 训练器新增 `SavePolicyFunc` / `LoadPolicyFunc` 回调：策略持久化由文件切换为 DB
+  - 备份模块移除 `backupDir` 字段和所有文件 I/O，`dumpToFile` → `dumpToString`
+  - 录音模块移除 `saveUploadedFile` 辅助函数，上传直写 DB BLOB
+  - 数据库表总数从 32 张扩展至 34 张
+  - 所有变更保持 SQLite / MySQL 双驱动兼容（`AdaptSQL` 自动处理 `INSERT OR REPLACE` → `REPLACE INTO`）
+
+### v3.9.0
 
 - Redis 缓存集成（MySQL + Redis 双层架构）
   - 新增 `internal/cache/redis.go`：`go-redis/v9` 客户端封装，连接池（20 连接 / 5 空闲）、KV/JSON/Hash 操作、健康检查、优雅降级

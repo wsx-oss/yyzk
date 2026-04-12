@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -1053,26 +1051,6 @@ func (a *API) HardwareSnapshot(c *gin.Context) {
 	c.JSON(200, hs)
 }
 
-func saveUploadedFile(fh *multipart.FileHeader, dstDir string) (string, int64, error) {
-	if err := os.MkdirAll(dstDir, 0o755); err != nil {
-		return "", 0, err
-	}
-	f, err := fh.Open()
-	if err != nil {
-		return "", 0, err
-	}
-	defer f.Close()
-	name := time.Now().Format("20060102_150405") + "_" + filepath.Base(fh.Filename)
-	path := filepath.Join(dstDir, name)
-	out, err := os.Create(path)
-	if err != nil {
-		return "", 0, err
-	}
-	defer out.Close()
-	n, err := io.Copy(out, f)
-	return path, n, err
-}
-
 func (a *API) AudioUpload(c *gin.Context) {
 	fh, err := c.FormFile("file")
 	if err != nil {
@@ -1084,11 +1062,23 @@ func (a *API) AudioUpload(c *gin.Context) {
 	if d, err := strconv.ParseFloat(durationStr, 64); err == nil {
 		duration = d
 	}
-	path, size, err := saveUploadedFile(fh, filepath.Join("data", "recordings"))
+
+	// Read file into memory for DB storage
+	f, err := fh.Open()
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "open file: " + err.Error()})
 		return
 	}
+	defer f.Close()
+	fileData, err := io.ReadAll(f)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "read file: " + err.Error()})
+		return
+	}
+
+	filename := time.Now().Format("20060102_150405") + "_" + fh.Filename
+	size := int64(len(fileData))
+
 	userId := c.PostForm("user_id")
 	interactType := c.PostForm("interact_type")
 	content := c.PostForm("content")
@@ -1102,8 +1092,8 @@ func (a *API) AudioUpload(c *gin.Context) {
 	tags := c.PostForm("tags")
 	remark := c.PostForm("remark")
 	interactTime := c.PostForm("interact_time")
-	res, err := a.db.Exec(`INSERT INTO recordings(filename, mime, duration, size, user_id, interact_type, content, clarity, result, score, tags, remark, interact_time) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		path, fh.Header.Get("Content-Type"), duration, size, userId, interactType, content, clarity, result, score, tags, remark, interactTime)
+	res, err := a.db.Exec(`INSERT INTO recordings(filename, mime, duration, size, user_id, interact_type, content, clarity, result, score, tags, remark, interact_time, file_data) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		filename, fh.Header.Get("Content-Type"), duration, size, userId, interactType, content, clarity, result, score, tags, remark, interactTime, fileData)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -1177,36 +1167,33 @@ func (a *API) AudioList(c *gin.Context) {
 func (a *API) AudioDownload(c *gin.Context) {
 	id := c.Param("id")
 	var filename string
-	err := a.db.QueryRow(`SELECT filename FROM recordings WHERE id = ?`, id).Scan(&filename)
+	var mime string
+	var fileData []byte
+	err := a.db.QueryRow(`SELECT filename, mime, file_data FROM recordings WHERE id = ?`, id).Scan(&filename, &mime, &fileData)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "not found"})
 		return
 	}
-	c.FileAttachment(filename, filepath.Base(filename))
+	if len(fileData) == 0 {
+		c.JSON(404, gin.H{"error": "no file data stored"})
+		return
+	}
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(filename)))
+	c.Data(200, mime, fileData)
 }
 
 func (a *API) AudioDelete(c *gin.Context) {
 	id := c.Param("id")
-	var filename string
-	err := a.db.QueryRow(`SELECT filename FROM recordings WHERE id = ?`, id).Scan(&filename)
-	if err == sql.ErrNoRows {
+	result, err := a.db.Exec(`DELETE FROM recordings WHERE id = ?`, id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
 		c.JSON(404, gin.H{"error": "recording not found"})
-		return
-	}
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-	// Delete from database
-	_, err = a.db.Exec(`DELETE FROM recordings WHERE id = ?`, id)
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-	// Delete file from disk
-	if err := os.Remove(filename); err != nil && !os.IsNotExist(err) {
-		// Log error but don't fail the request
-		c.JSON(200, gin.H{"ok": true, "warning": "file deletion failed"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})

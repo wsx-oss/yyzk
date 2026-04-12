@@ -274,6 +274,18 @@ func InitSimEngine(database *db.DB, pool *taskpool.Pool) (*simulation.Engine, *s
 		OnTelemetry:   pusher.OnTelemetry,
 		OnStateChange: pusher.OnStateChange,
 		OnAnomaly:     pusher.OnAnomaly,
+		SaveSnapshotFunc: func(data []byte) error {
+			_, err := database.Exec(`INSERT OR REPLACE INTO data_store(store_key, content, updated_at) VALUES('sim_snapshots', ?, datetime('now'))`, string(data))
+			return err
+		},
+		LoadSnapshotFunc: func() ([]byte, error) {
+			var content string
+			err := database.QueryRow(`SELECT content FROM data_store WHERE store_key='sim_snapshots'`).Scan(&content)
+			if err != nil || content == "" {
+				return nil, nil
+			}
+			return []byte(content), nil
+		},
 	})
 
 	// Restore from previous session snapshots (7x24 recovery)
@@ -294,6 +306,20 @@ func InitSimEngine(database *db.DB, pool *taskpool.Pool) (*simulation.Engine, *s
 		EvalInterval:   100,
 		DataDir:        "data",
 	})
+
+	// Hook DB-backed persistence for RL policy
+	trainer.SavePolicyFunc = func(data []byte) error {
+		_, err := database.Exec(`INSERT OR REPLACE INTO data_store(store_key, content, updated_at) VALUES('rl_policy', ?, datetime('now'))`, string(data))
+		return err
+	}
+	trainer.LoadPolicyFunc = func() ([]byte, error) {
+		var content string
+		err := database.QueryRow(`SELECT content FROM data_store WHERE store_key='rl_policy'`).Scan(&content)
+		if err != nil || content == "" {
+			return nil, nil
+		}
+		return []byte(content), nil
+	}
 
 	// Hook eval callback for DB persistence
 	trainer.OnEval = func(result simulation.EvalResult, epsilon float64) {

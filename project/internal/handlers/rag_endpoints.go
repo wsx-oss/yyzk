@@ -123,8 +123,8 @@ func SimExplainHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			StateKey string `json:"state_key"` // optional: specific state to explain
-			Question string `json:"question"`   // optional: user question about RL
-			Scenario string `json:"scenario"`   // optional: low_battery, collision, etc.
+			Question string `json:"question"`  // optional: user question about RL
+			Scenario string `json:"scenario"`  // optional: low_battery, collision, etc.
 		}
 		if err := c.BindJSON(&req); err != nil {
 			c.JSON(400, gin.H{"error": "无效的请求"})
@@ -185,10 +185,10 @@ func SimExplainHandler() gin.HandlerFunc {
 		}
 
 		c.JSON(200, gin.H{
-			"ok":           true,
-			"explanation":  explanation,
-			"rag_enhanced": ragContext != "",
-			"rl_enhanced":  rlHints != "",
+			"ok":               true,
+			"explanation":      explanation,
+			"rag_enhanced":     ragContext != "",
+			"rl_enhanced":      rlHints != "",
 			"policy_available": bridge.Available(),
 		})
 	}
@@ -210,7 +210,7 @@ func buildFallbackRLExplanation(rlHints string) string {
 // RegisterRAGEndpoints registers all RAG-enhanced endpoints across modules.
 func RegisterRAGEndpoints(r *gin.Engine, database *db.DB) {
 	// Ensure shared RAG is initialised
-	InitSharedRAG()
+	InitSharedRAG(database)
 
 	// Alert analysis with RAG+RL
 	r.POST("/api/alerts/analyze", AlertAnalyzeHandler(database))

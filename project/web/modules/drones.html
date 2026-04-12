@@ -131,16 +131,6 @@
     </div>
   </div>
 
-  <!-- Hints -->
-  <div class="hint-box">
-    <div><strong>无人机统一注册说明</strong></div>
-    <div>1. 在此页面注册无人机后，系统会自动创建对应的<strong>远程控制设备</strong>和<strong>GPS追踪设备</strong>，无需在各功能模块重复添加。</div>
-    <div>2. <strong>远程控制</strong>（SSH/VNC/RDP）：在"远程桌面控制"页面可直接选择已注册的无人机进行连接。</div>
-    <div>3. <strong>GPS/电池/飞行任务</strong>：只要无人机上运行了 <code>hw-agent</code>，数据会自动推送到平台，实时显示在各功能模块中。注册时无需填写经纬度，系统会在无人机 Agent 首次推送 GPS 数据时自动获取真实位置并回填。</div>
-    <div>4. <strong>Agent ID</strong> 是无人机上报数据的唯一标识。在伴飞计算机上运行 <code>hw-agent -server http://主控端IP:8080 -id "你的AgentID"</code> 即可关联。</div>
-    <div>5. 编辑或删除无人机时，关联的远程设备和GPS设备会自动同步更新或级联删除。</div>
-  </div>
-
   <!-- Charts -->
   <div class="card">
     <div class="card-title">统计概览</div>
@@ -154,6 +144,16 @@
         <div style="flex:1;width:100%;max-width:280px;position:relative;"><canvas id="protocolChart"></canvas></div>
       </div>
     </div>
+  </div>
+
+  <!-- Hints -->
+  <div class="hint-box">
+    <div><strong>无人机统一注册说明</strong></div>
+    <div>1. 在此页面注册无人机后，系统会自动创建对应的<strong>远程控制设备</strong>和<strong>GPS追踪设备</strong>，无需在各功能模块重复添加。</div>
+    <div>2. <strong>远程控制</strong>（SSH/VNC/RDP）：在“远程桌面控制”页面可直接选择已注册的无人机进行连接。</div>
+    <div>3. <strong>GPS/电池/飞行任务</strong>：只要无人机上运行了 <code>hw-agent</code>，数据会自动推送到平台，实时显示在各功能模块中。注册时无需填写经纬度，系统会在无人机 Agent 首次推送 GPS 数据时自动获取真实位置并回填。</div>
+    <div>4. <strong>Agent ID</strong> 是无人机上报数据的唯一标识。在伴飞计算机上运行 <code>hw-agent -server http://主控端IP:8080 -id "你的AgentID"</code> 即可关联。</div>
+    <div>5. 编辑或删除无人机时，关联的远程设备和GPS设备会自动同步更新或级联删除。</div>
   </div>
 
   <!-- Register / Edit Drone Modal -->

@@ -526,15 +526,6 @@
     </table>
   </div>
 
-  <!-- Usage Tips -->
-  <div class="hint-box" style="margin-bottom: 20px;">
-    <div><strong>使用提示:</strong></div>
-    <div>1. 数据源为远程设备IP，目标地址为本机。同步会从远程设备拉取数据到本地数据库。</div>
-    <div>2. 请确保远程设备已运行本系统（go run .），且两台设备在同一局域网内。</div>
-    <div>3. 全量同步会覆盖本地数据，增量同步只同步新增/更新的数据。</div>
-    <div>4. 同步内容包括：设备信息、无人机、电池监控、GPS定位、飞行任务、硬件状态、告警日志等。</div>
-  </div>
-
   <!-- Statistics -->
   <div class="card">
     <div class="card-title">数据同步统计</div>
@@ -582,6 +573,15 @@
         <div class="info-value" id="infoAvgDuration">-</div>
       </div>
     </div>
+  </div>
+
+  <!-- Usage Tips -->
+  <div class="hint-box" style="margin-bottom: 20px;">
+    <div><strong>使用提示:</strong></div>
+    <div>1. 数据源为远程设备IP，目标地址为本机。同步会从远程设备拉取数据到本地数据库。</div>
+    <div>2. 请确保远程设备已运行本系统（go run .），且两台设备在同一局域网内。</div>
+    <div>3. 全量同步会覆盖本地数据，增量同步只同步新增/更新的数据。</div>
+    <div>4. 同步内容包括：设备信息、无人机、电池监控、GPS定位、飞行任务、硬件状态、告警日志等。</div>
   </div>
 
   <!-- Add/Edit Modal -->

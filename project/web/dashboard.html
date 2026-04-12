@@ -527,8 +527,7 @@
       overflow: hidden;
     }
     .layout-sidebar.collapsed .sidebar-footer {
-      padding: 12px 4px;
-      font-size: 10px;
+      display: none;
     }
 
     /* ===== Dark overrides for injected widgets ===== */
@@ -697,7 +696,6 @@
   <aside class="layout-sidebar" id="sidebar">
     <nav class="sidebar-nav">
 
-      <div class="nav-section-label">核心功能</div>
       <div class="nav-item">
         <a class="active" data-page="drones" data-label="无人机管理">
           <span class="nav-icon">🛩</span>
@@ -705,7 +703,6 @@
         </a>
       </div>
 
-      <div class="nav-section-label">飞行任务</div>
       <div class="nav-group">
         <div class="nav-group-toggle open" data-group="flight" data-label="飞行任务管理">
           <span class="nav-icon">🗺</span>
@@ -719,7 +716,6 @@
         </div>
       </div>
 
-      <div class="nav-section-label">仿真 &amp; AI</div>
       <div class="nav-group">
         <div class="nav-group-toggle open" data-group="simai" data-label="仿真与智能决策">
           <span class="nav-icon">🧪</span>
@@ -732,7 +728,6 @@
         </div>
       </div>
 
-      <div class="nav-section-label">系统运维</div>
       <div class="nav-group">
         <div class="nav-group-toggle open" data-group="ops" data-label="系统调度与运维">
           <span class="nav-icon">⚙</span>
@@ -745,7 +740,6 @@
         </div>
       </div>
 
-      <div class="nav-section-label">状态监控</div>
       <div class="nav-group">
         <div class="nav-group-toggle open" data-group="status" data-label="无人机状态监控">
           <span class="nav-icon">📺</span>
@@ -761,7 +755,6 @@
         </div>
       </div>
 
-      <div class="nav-section-label">日志管理</div>
       <div class="nav-group">
         <div class="nav-group-toggle open" data-group="logs" data-label="日志管理">
           <span class="nav-icon">📋</span>
@@ -832,6 +825,10 @@
     // ---- Nav group toggle ----
     document.querySelectorAll('.nav-group-toggle').forEach(toggle => {
       toggle.addEventListener('click', () => {
+        if (sidebar.classList.contains('collapsed')) {
+          sidebar.classList.remove('collapsed');
+          layoutContent.classList.remove('sidebar-collapsed');
+        }
         toggle.classList.toggle('open');
         const children = toggle.nextElementSibling;
         if (children) children.classList.toggle('open');

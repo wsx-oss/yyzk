@@ -144,7 +144,7 @@
       <div class="action-buttons">
         <button class="btn btn-primary" onclick="manualBackup()">立即备份</button>
         <button class="btn btn-secondary" onclick="refreshAll()">刷新</button>
-        <button class="btn btn-danger btn-action" onclick="showCleanup()">清理旧备份</button>
+        <button class="btn btn-danger" onclick="showCleanup()">清理旧备份</button>
       </div>
     </div>
   </div>
@@ -218,10 +218,11 @@
         </tbody>
       </table>
     </div>
-    <div class="hint-box" style="margin-top:16px;">
-      💡 系统每 24 小时自动执行一次全量数据库备份，最多保留 10 份。恢复操作前系统会自动创建安全备份。
-      可通过备份记录的"恢复"按钮或上方文件上传区域两种方式恢复数据。
-    </div>
+  </div>
+
+  <div class="hint-box" style="margin-top:16px;">
+    💡 系统每 24 小时自动执行一次全量数据库备份，最多保留 10 份。恢复操作前系统会自动创建安全备份。
+    可通过备份记录的“恢复”按钮或上方文件上传区域两种方式恢复数据。
   </div>
 
   <!-- Confirm modal -->

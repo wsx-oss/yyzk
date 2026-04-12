@@ -8,21 +8,60 @@ import (
 	"path/filepath"
 	"strings"
 
+	"smartcontrol/internal/db"
 	"smartcontrol/internal/rag"
 )
 
 // SharedRAG holds a reference to the global RAG engine so all handlers can use it.
 var SharedRAG *rag.Engine
 
-// InitSharedRAG initialises the shared RAG engine by scanning the knowledge_base
-// directory. It should be called once from main (or from the first handler that
-// needs it). If the engine has already been initialised, this is a no-op.
-func InitSharedRAG() {
+// sharedDB stores a reference to the database for data_store operations.
+var sharedDB *db.DB
+
+// InitSharedRAG initialises the shared RAG engine by loading knowledge documents
+// from the database (knowledge_docs table). On first run, it seeds the table from
+// the local knowledge_base/ directory, then loads from DB.
+func InitSharedRAG(database *db.DB) {
 	if SharedRAG != nil {
 		return
 	}
+	sharedDB = database
 	SharedRAG = rag.New()
 
+	// Try loading from DB
+	docs := loadKnowledgeDocsFromDB(database)
+	if len(docs) == 0 {
+		// First run: seed from filesystem
+		docs = seedKnowledgeDocsToDB(database)
+	}
+	if len(docs) > 0 {
+		SharedRAG.LoadTexts(docs)
+		log.Printf("[RAG] shared engine loaded %d chunks from database (%d docs)", SharedRAG.ChunkCount(), len(docs))
+		return
+	}
+	log.Println("[RAG] shared engine: no knowledge base documents found (non-fatal)")
+}
+
+// loadKnowledgeDocsFromDB reads all documents from the knowledge_docs table.
+func loadKnowledgeDocsFromDB(database *db.DB) map[string]string {
+	rows, err := database.Query(`SELECT name, content FROM knowledge_docs`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	docs := make(map[string]string)
+	for rows.Next() {
+		var name, content string
+		if rows.Scan(&name, &content) == nil && content != "" {
+			docs[name] = content
+		}
+	}
+	return docs
+}
+
+// seedKnowledgeDocsToDB reads .md files from the knowledge_base/ directory and
+// inserts them into the knowledge_docs table. Returns the loaded docs map.
+func seedKnowledgeDocsToDB(database *db.DB) map[string]string {
 	candidates := []string{
 		"knowledge_base",
 		"project/knowledge_base",
@@ -32,14 +71,34 @@ func InitSharedRAG() {
 		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "knowledge_base"))
 	}
 	for _, dir := range candidates {
-		if info, err := os.Stat(dir); err == nil && info.IsDir() {
-			if err := SharedRAG.LoadDirectory(dir); err == nil && SharedRAG.ChunkCount() > 0 {
-				log.Printf("[RAG] shared engine loaded %d chunks from %s", SharedRAG.ChunkCount(), dir)
-				return
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		docs := make(map[string]string)
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".md") {
+				continue
 			}
+			data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+			if err != nil || len(data) < 10 {
+				continue
+			}
+			name := entry.Name()
+			content := string(data)
+			database.Exec(`INSERT OR REPLACE INTO knowledge_docs(name, content, updated_at) VALUES(?,?,datetime('now'))`, name, content)
+			docs[name] = content
+		}
+		if len(docs) > 0 {
+			log.Printf("[RAG] seeded %d knowledge docs from %s into database", len(docs), dir)
+			return docs
 		}
 	}
-	log.Println("[RAG] shared engine: no knowledge base documents found (non-fatal)")
+	return nil
 }
 
 // RAGRetrieveContext is a helper that queries the shared RAG engine and returns
@@ -61,45 +120,33 @@ func RAGRetrieveContext(query string, topK int) string {
 // RLPolicyBridge reads the trained RL Q-table policy and extracts
 // human-readable decision hints that can be injected into LLM prompts
 // to bias planning toward RL-proven strategies.
-type RLPolicyBridge struct {
-	policyPath string
-}
+type RLPolicyBridge struct{}
 
-// NewRLPolicyBridge creates a bridge pointing at the saved RL policy.
+// NewRLPolicyBridge creates a bridge that reads RL policy from DB.
 func NewRLPolicyBridge() *RLPolicyBridge {
-	candidates := []string{
-		"data/rl_policy.json",
-		"project/data/rl_policy.json",
-		filepath.Join("..", "data", "rl_policy.json"),
-	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return &RLPolicyBridge{policyPath: p}
-		}
-	}
 	return &RLPolicyBridge{}
 }
 
-// Available returns true if a trained policy file exists on disk.
+// Available returns true if RL policy data exists in the database.
 func (b *RLPolicyBridge) Available() bool {
-	if b.policyPath == "" {
+	if sharedDB == nil {
 		return false
 	}
-	_, err := os.Stat(b.policyPath)
-	return err == nil
+	var content string
+	err := sharedDB.QueryRow(`SELECT content FROM data_store WHERE store_key='rl_policy'`).Scan(&content)
+	return err == nil && content != ""
 }
 
-// GenerateFlightHints reads the Q-table and produces concise natural-language
-// hints about what the RL agent prefers in various situations. These hints are
-// appended to the LLM's flight-planning prompt so it benefits from simulated
-// experience without requiring model fine-tuning.
+// GenerateFlightHints reads the Q-table from DB and produces concise
+// natural-language hints about what the RL agent prefers in various situations.
 func (b *RLPolicyBridge) GenerateFlightHints() string {
-	if !b.Available() {
+	if sharedDB == nil {
 		return ""
 	}
 
-	raw, err := os.ReadFile(b.policyPath)
-	if err != nil {
+	var raw string
+	err := sharedDB.QueryRow(`SELECT content FROM data_store WHERE store_key='rl_policy'`).Scan(&raw)
+	if err != nil || raw == "" {
 		return ""
 	}
 
@@ -107,7 +154,7 @@ func (b *RLPolicyBridge) GenerateFlightHints() string {
 		Table   map[string][]float64 `json:"table"`
 		Epsilon float64              `json:"epsilon"`
 	}
-	if err := json.Unmarshal(raw, &data); err != nil || len(data.Table) == 0 {
+	if err := json.Unmarshal([]byte(raw), &data); err != nil || len(data.Table) == 0 {
 		return ""
 	}
 

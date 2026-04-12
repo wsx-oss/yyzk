@@ -22,7 +22,7 @@ type AIAssistantAPI struct {
 // NewAIAssistantAPI creates a new AIAssistantAPI
 func NewAIAssistantAPI(db *db.DB) *AIAssistantAPI {
 	// Ensure the shared RAG engine is initialised
-	InitSharedRAG()
+	InitSharedRAG(db)
 	return &AIAssistantAPI{
 		db:  db,
 		llm: llm.NewClient(),

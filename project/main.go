@@ -170,7 +170,7 @@ func main() {
 	handlers.RegisterSimulationRoutes(r, database, simEngine, rlTrainer)
 
 	// Shared RAG engine + RAG-enhanced endpoints (alerts analyze, RL explain)
-	handlers.InitSharedRAG()
+	handlers.InitSharedRAG(database)
 	handlers.RegisterRAGEndpoints(r, database)
 
 	// Stats caches & cached stats API

@@ -5,7 +5,7 @@
 > **项目名称**：CloudControl — 企业级智能无人机管控平台
 > **技术栈**：Go 1.25 + Gin + MySQL(Aiven) + Leaflet + WebSocket + Chart.js + RAG(BM25) + RL(Q-Learning)
 > **前端架构**：`dashboard.html` 壳层 + iframe 加载 22 个模块页 + `ai-assistant.js` 浮窗 + `notification-bell.js` 铃铛
-> **当前版本**：v3.8.0
+> **当前版本**：v4.0.0
 > **本轮目标**：5 大类 23 项优化，覆盖地图、界面、性能、业务、AI、视觉全链路
 > **进度汇总**：已完成 12 项 ✅ | 部分完成 3 项 ⚠️ | 待开始 8 项 ⬜
 
@@ -480,7 +480,7 @@
 
 **任务清单**：
 
-- [x] **知识库构建**：`internal/rag/rag.go` 实现 BM25 关键词检索引擎，自动加载 `knowledge_base/`（20 个 .md 文档），切分为 ~500 字符 chunk，构建倒排索引
+- [x] **知识库构建**：`internal/rag/rag.go` 实现 BM25 关键词检索引擎，知识库文档存储于数据库 `knowledge_docs` 表（首次运行自动从 `knowledge_base/` 目录导入 20 篇 .md 文档），切分为 ~500 字符 chunk，构建倒排索引
 - [x] **检索增强流程**：用户提问 → BM25 检索 Top-K chunk → 注入 context → LLM 生成回答，已集成到 `ai_assistant.go` 的 `RAGRetrieveContext()`
 - [x] **知识库管理接口**：
   - `GET /api/ai/rag/search?q=xxx` — 直接查询知识库
@@ -694,7 +694,7 @@
 | `project/internal/handlers/patrol.go`       | #06                                 |
 | `project/internal/taskpool/pool.go`         | #07                                 |
 | `project/internal/rag/rag.go`               | #18 ✅                              |
-| `project/knowledge_base/`（20 个 .md 文档） | #18 ✅                              |
+| `project/knowledge_base/`（20 个 .md 种子文档） | #18 ✅（已迁移至 knowledge_docs 表） |
 | `project/.env`                              | #01 #07 #16 #22                     |
 | `README.md`                                 | #15                                 |
 | `Cloudcontrol.pptx`                         | #17                                 |

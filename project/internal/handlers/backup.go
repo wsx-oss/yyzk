@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,7 +35,6 @@ type restoreProgress struct {
 // BackupAPI holds database reference, auto-backup state and restore progress.
 type BackupAPI struct {
 	db          *db.DB
-	backupDir   string
 	mu          sync.Mutex // serialise backup / restore operations
 	autoEnabled int32      // atomic: 1 = on, 0 = off
 	autoStop    chan struct{}
@@ -49,15 +46,10 @@ type BackupAPI struct {
 	rpCurrent restoreProgress
 }
 
-// NewBackupAPI creates a BackupAPI with the given backup directory.
-func NewBackupAPI(database *db.DB, backupDir string) *BackupAPI {
-	if backupDir == "" {
-		backupDir = "data/backups"
-	}
-	os.MkdirAll(backupDir, 0o755)
+// NewBackupAPI creates a BackupAPI with DB-backed storage.
+func NewBackupAPI(database *db.DB) *BackupAPI {
 	return &BackupAPI{
 		db:          database,
-		backupDir:   backupDir,
 		autoEnabled: 1,
 		autoStop:    make(chan struct{}),
 		maxKeep:     10,
@@ -71,7 +63,7 @@ func NewBackupAPI(database *db.DB, backupDir string) *BackupAPI {
 
 // RegisterBackupRoutes wires all backup/restore endpoints.
 func RegisterBackupRoutes(r *gin.Engine, database *db.DB) *BackupAPI {
-	api := NewBackupAPI(database, "data/backups")
+	api := NewBackupAPI(database)
 	g := r.Group("/api/backup")
 	{
 		g.GET("/list", api.ListBackups)
@@ -228,8 +220,9 @@ func (b *BackupAPI) RestoreBackup(c *gin.Context) {
 	}
 
 	// Fetch backup record
-	var filePath, status string
-	err = b.db.QueryRow(`SELECT file_path, status FROM backup_records WHERE id = ?`, id).Scan(&filePath, &status)
+	var sqlContent sql.NullString
+	var status string
+	err = b.db.QueryRow(`SELECT status, sql_content FROM backup_records WHERE id = ?`, id).Scan(&status, &sqlContent)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "备份记录不存在"})
 		return
@@ -238,22 +231,13 @@ func (b *BackupAPI) RestoreBackup(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "该备份状态不是 success，无法恢复"})
 		return
 	}
-
-	// Safety check: file exists
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		c.JSON(400, gin.H{"error": "备份文件不存在: " + filePath})
-		return
-	}
-
-	// Read SQL content
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		c.JSON(500, gin.H{"error": "读取备份文件失败: " + err.Error()})
+	if !sqlContent.Valid || sqlContent.String == "" {
+		c.JSON(400, gin.H{"error": "备份数据为空"})
 		return
 	}
 
 	// Launch async restore
-	go b.asyncRestore(string(content), fmt.Sprintf("从备份 #%d 恢复", id), id)
+	go b.asyncRestore(sqlContent.String, fmt.Sprintf("从备份 #%d 恢复", id), id)
 
 	c.JSON(200, gin.H{"ok": true, "message": "恢复任务已启动，请通过进度接口查看状态"})
 }
@@ -291,10 +275,6 @@ func (b *BackupAPI) RestoreFromUpload(c *gin.Context) {
 		return
 	}
 
-	// Save uploaded file to backup dir for reference
-	savedPath := filepath.Join(b.backupDir, "upload_"+time.Now().Format("20060102_150405")+".sql")
-	os.WriteFile(savedPath, data, 0o644)
-
 	// Launch async restore
 	go b.asyncRestore(string(data), fmt.Sprintf("从上传文件恢复 (%s)", header.Filename), 0)
 
@@ -308,34 +288,37 @@ func (b *BackupAPI) RestoreProgressAPI(c *gin.Context) {
 	c.JSON(200, b.rpCurrent)
 }
 
-// DeleteBackup removes a backup record and its file.
+// DeleteBackup removes a backup record from the database.
 func (b *BackupAPI) DeleteBackup(c *gin.Context) {
 	idStr := c.Param("id")
-	var filePath string
-	err := b.db.QueryRow(`SELECT file_path FROM backup_records WHERE id = ?`, idStr).Scan(&filePath)
+	result, err := b.db.Exec(`DELETE FROM backup_records WHERE id = ?`, idStr)
 	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
 		c.JSON(404, gin.H{"error": "备份记录不存在"})
 		return
 	}
-	os.Remove(filePath)
-	b.db.Exec(`DELETE FROM backup_records WHERE id = ?`, idStr)
 	c.JSON(200, gin.H{"ok": true})
 }
 
-// DownloadBackup streams the SQL backup file to the client.
+// DownloadBackup streams the SQL backup content from DB to the client.
 func (b *BackupAPI) DownloadBackup(c *gin.Context) {
 	idStr := c.Param("id")
-	var filePath string
-	err := b.db.QueryRow(`SELECT file_path FROM backup_records WHERE id = ?`, idStr).Scan(&filePath)
+	var fileName string
+	var sqlContent sql.NullString
+	err := b.db.QueryRow(`SELECT file_path, sql_content FROM backup_records WHERE id = ?`, idStr).Scan(&fileName, &sqlContent)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "备份记录不存在"})
 		return
 	}
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		c.JSON(404, gin.H{"error": "备份文件不存在"})
+	if !sqlContent.Valid || sqlContent.String == "" {
+		c.JSON(404, gin.H{"error": "备份数据为空"})
 		return
 	}
-	c.FileAttachment(filePath, filepath.Base(filePath))
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
+	c.Data(200, "application/sql", []byte(sqlContent.String))
 }
 
 // BackupStatus returns a summary: total backups, last backup time, auto-backup status.
@@ -361,7 +344,7 @@ func (b *BackupAPI) BackupStatus(c *gin.Context) {
 		"failed":       failCount,
 		"last_backup":  lastBackup.String,
 		"total_size":   totalSize,
-		"backup_dir":   b.backupDir,
+		"storage":      "database",
 		"auto_enabled": atomic.LoadInt32(&b.autoEnabled) == 1,
 	})
 }
@@ -390,12 +373,11 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 	start := time.Now()
 	ts := start.Format("20060102_150405")
 	filename := fmt.Sprintf("backup_%s_%s.sql", ts, backupType)
-	filePath := filepath.Join(b.backupDir, filename)
 
 	// Insert running record
 	res, err := b.db.Exec(
 		`INSERT INTO backup_records(backup_type, file_path, status, operator, remark) VALUES(?,?,?,?,?)`,
-		backupType, filePath, "running", operator, remark,
+		backupType, filename, "running", operator, remark,
 	)
 	if err != nil {
 		log.Printf("[Backup] failed to insert record: %v", err)
@@ -403,8 +385,8 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 	}
 	recordID, _ := res.LastInsertId()
 
-	// Perform dump
-	tableCount, rowCount, err := b.dumpToFile(filePath)
+	// Perform dump to string
+	sqlContent, tableCount, rowCount, err := b.dumpToString()
 	elapsed := time.Since(start).Milliseconds()
 
 	if err != nil {
@@ -419,26 +401,22 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 		return
 	}
 
-	// Get file size
-	var fileSize int64
-	if fi, err := os.Stat(filePath); err == nil {
-		fileSize = fi.Size()
-	}
+	fileSize := int64(len(sqlContent))
 
-	b.db.Exec(`UPDATE backup_records SET status='success', file_size=?, table_count=?, row_count=?, duration_ms=?, finished_at=NOW() WHERE id=?`,
-		fileSize, tableCount, rowCount, elapsed, recordID)
+	b.db.Exec(`UPDATE backup_records SET status='success', file_size=?, table_count=?, row_count=?, duration_ms=?, sql_content=?, finished_at=NOW() WHERE id=?`,
+		fileSize, tableCount, rowCount, elapsed, sqlContent, recordID)
 
 	log.Printf("[Backup] %s completed: %d tables, %d rows, %d bytes, %dms", backupType, tableCount, rowCount, fileSize, elapsed)
 }
 
-// dumpToFile exports all user tables to a SQL file. Returns (tableCount, totalRows, error).
-func (b *BackupAPI) dumpToFile(filePath string) (int, int, error) {
+// dumpToString exports all user tables to a SQL string stored in DB. Returns (sqlContent, tableCount, totalRows, error).
+func (b *BackupAPI) dumpToString() (string, int, int, error) {
 	raw := b.db.Raw()
 
 	// Get list of tables
 	rows, err := raw.Query("SHOW TABLES")
 	if err != nil {
-		return 0, 0, fmt.Errorf("SHOW TABLES: %w", err)
+		return "", 0, 0, fmt.Errorf("SHOW TABLES: %w", err)
 	}
 	var tables []string
 	for rows.Next() {
@@ -448,18 +426,14 @@ func (b *BackupAPI) dumpToFile(filePath string) (int, int, error) {
 	}
 	rows.Close()
 
-	f, err := os.Create(filePath)
-	if err != nil {
-		return 0, 0, fmt.Errorf("create file: %w", err)
-	}
-	defer f.Close()
+	var buf strings.Builder
 
 	// Header
-	fmt.Fprintf(f, "-- 云翼智控 Database Backup\n")
-	fmt.Fprintf(f, "-- Generated at: %s\n", time.Now().Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(f, "-- Tables: %d\n", len(tables))
-	fmt.Fprintf(f, "SET NAMES utf8mb4;\n")
-	fmt.Fprintf(f, "SET FOREIGN_KEY_CHECKS = 0;\n\n")
+	fmt.Fprintf(&buf, "-- 云翼智控 Database Backup\n")
+	fmt.Fprintf(&buf, "-- Generated at: %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(&buf, "-- Tables: %d\n", len(tables))
+	fmt.Fprintf(&buf, "SET NAMES utf8mb4;\n")
+	fmt.Fprintf(&buf, "SET FOREIGN_KEY_CHECKS = 0;\n\n")
 
 	totalRows := 0
 	tableCount := 0
@@ -473,16 +447,16 @@ func (b *BackupAPI) dumpToFile(filePath string) (int, int, error) {
 		}
 		tableCount++
 
-		fmt.Fprintf(f, "-- ----------------------------\n")
-		fmt.Fprintf(f, "-- Table: %s\n", table)
-		fmt.Fprintf(f, "-- ----------------------------\n")
-		fmt.Fprintf(f, "DROP TABLE IF EXISTS `%s`;\n", table)
-		fmt.Fprintf(f, "%s;\n\n", createSQL)
+		fmt.Fprintf(&buf, "-- ----------------------------\n")
+		fmt.Fprintf(&buf, "-- Table: %s\n", table)
+		fmt.Fprintf(&buf, "-- ----------------------------\n")
+		fmt.Fprintf(&buf, "DROP TABLE IF EXISTS `%s`;\n", table)
+		fmt.Fprintf(&buf, "%s;\n\n", createSQL)
 
 		// Dump data
 		dataRows, err := raw.Query("SELECT * FROM `" + table + "`")
 		if err != nil {
-			fmt.Fprintf(f, "-- ERROR reading data: %v\n\n", err)
+			fmt.Fprintf(&buf, "-- ERROR reading data: %v\n\n", err)
 			continue
 		}
 
@@ -535,7 +509,7 @@ func (b *BackupAPI) dumpToFile(filePath string) (int, int, error) {
 
 			// Flush every 500 rows
 			if len(batchValues) >= 500 {
-				fmt.Fprintf(f, "INSERT INTO `%s` (`%s`) VALUES\n%s;\n",
+				fmt.Fprintf(&buf, "INSERT INTO `%s` (`%s`) VALUES\n%s;\n",
 					table, strings.Join(cols, "`, `"), strings.Join(batchValues, ",\n"))
 				batchValues = batchValues[:0]
 			}
@@ -544,18 +518,18 @@ func (b *BackupAPI) dumpToFile(filePath string) (int, int, error) {
 
 		// Flush remaining
 		if len(batchValues) > 0 {
-			fmt.Fprintf(f, "INSERT INTO `%s` (`%s`) VALUES\n%s;\n",
+			fmt.Fprintf(&buf, "INSERT INTO `%s` (`%s`) VALUES\n%s;\n",
 				table, strings.Join(cols, "`, `"), strings.Join(batchValues, ",\n"))
 		}
 
 		totalRows += rowCount
-		fmt.Fprintf(f, "-- Rows: %d\n\n", rowCount)
+		fmt.Fprintf(&buf, "-- Rows: %d\n\n", rowCount)
 	}
 
-	fmt.Fprintf(f, "SET FOREIGN_KEY_CHECKS = 1;\n")
-	fmt.Fprintf(f, "-- Backup complete: %d tables, %d rows\n", tableCount, totalRows)
+	fmt.Fprintf(&buf, "SET FOREIGN_KEY_CHECKS = 1;\n")
+	fmt.Fprintf(&buf, "-- Backup complete: %d tables, %d rows\n", tableCount, totalRows)
 
-	return tableCount, totalRows, nil
+	return buf.String(), tableCount, totalRows, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -674,11 +648,10 @@ func (b *BackupAPI) doBackupUnlocked(backupType, operator, remark string) {
 	start := time.Now()
 	ts := start.Format("20060102_150405")
 	filename := fmt.Sprintf("backup_%s_%s.sql", ts, backupType)
-	filePath := filepath.Join(b.backupDir, filename)
 
 	res, err := b.db.Exec(
 		`INSERT INTO backup_records(backup_type, file_path, status, operator, remark) VALUES(?,?,?,?,?)`,
-		backupType, filePath, "running", operator, remark,
+		backupType, filename, "running", operator, remark,
 	)
 	if err != nil {
 		log.Printf("[Backup] failed to insert record: %v", err)
@@ -686,7 +659,7 @@ func (b *BackupAPI) doBackupUnlocked(backupType, operator, remark string) {
 	}
 	recordID, _ := res.LastInsertId()
 
-	tableCount, rowCount, err := b.dumpToFile(filePath)
+	sqlContent, tableCount, rowCount, err := b.dumpToString()
 	elapsed := time.Since(start).Milliseconds()
 
 	if err != nil {
@@ -696,12 +669,9 @@ func (b *BackupAPI) doBackupUnlocked(backupType, operator, remark string) {
 		return
 	}
 
-	var fileSize int64
-	if fi, err := os.Stat(filePath); err == nil {
-		fileSize = fi.Size()
-	}
-	b.db.Exec(`UPDATE backup_records SET status='success', file_size=?, table_count=?, row_count=?, duration_ms=?, finished_at=NOW() WHERE id=?`,
-		fileSize, tableCount, rowCount, elapsed, recordID)
+	fileSize := int64(len(sqlContent))
+	b.db.Exec(`UPDATE backup_records SET status='success', file_size=?, table_count=?, row_count=?, duration_ms=?, sql_content=?, finished_at=NOW() WHERE id=?`,
+		fileSize, tableCount, rowCount, elapsed, sqlContent, recordID)
 	log.Printf("[Backup] %s completed: %d tables, %d rows, %d bytes, %dms", backupType, tableCount, rowCount, fileSize, elapsed)
 }
 
@@ -743,7 +713,7 @@ func filterRestoreStatements(stmts []string) []string {
 // ---------------------------------------------------------------------------
 
 func (b *BackupAPI) pruneOldBackups(maxKeep int) int {
-	rows, err := b.db.Query(`SELECT id, file_path FROM backup_records WHERE status='success' ORDER BY created_at DESC`)
+	rows, err := b.db.Query(`SELECT id FROM backup_records WHERE status='success' ORDER BY created_at DESC`)
 	if err != nil {
 		return 0
 	}
@@ -753,11 +723,9 @@ func (b *BackupAPI) pruneOldBackups(maxKeep int) int {
 	idx := 0
 	for rows.Next() {
 		var id int
-		var filePath string
-		rows.Scan(&id, &filePath)
+		rows.Scan(&id)
 		idx++
 		if idx > maxKeep {
-			os.Remove(filePath)
 			b.db.Exec(`DELETE FROM backup_records WHERE id = ?`, id)
 			deleted++
 		}

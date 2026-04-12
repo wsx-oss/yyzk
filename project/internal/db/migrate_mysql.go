@@ -385,8 +385,23 @@ func migrateMySQL(db *sql.DB) error {
 			operator VARCHAR(255) DEFAULT 'system',
 			remark VARCHAR(500) DEFAULT '',
 			duration_ms INT DEFAULT 0,
+			sql_content LONGTEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			finished_at DATETIME
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS knowledge_docs (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			name VARCHAR(255) NOT NULL UNIQUE,
+			content LONGTEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS data_store (
+			store_key VARCHAR(255) PRIMARY KEY,
+			content LONGTEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 
@@ -455,6 +470,7 @@ func migrateMySQL(db *sql.DB) error {
 		`CREATE INDEX idx_backup_records_type ON backup_records(backup_type)`,
 		`CREATE INDEX idx_backup_records_status ON backup_records(status)`,
 		`CREATE INDEX idx_backup_records_created ON backup_records(created_at)`,
+		`CREATE INDEX idx_knowledge_docs_name ON knowledge_docs(name)`,
 	}
 	for _, s := range indexes {
 		db.Exec(s) // ignore duplicate index errors
@@ -558,6 +574,10 @@ func migrateMySQL(db *sql.DB) error {
 	for _, s := range simIndexes {
 		db.Exec(s) // ignore duplicate index errors
 	}
+
+	// Add new columns to existing tables (ignore errors if already exist)
+	db.Exec(`ALTER TABLE backup_records ADD COLUMN sql_content LONGTEXT`)
+	db.Exec(`ALTER TABLE recordings ADD COLUMN file_data LONGBLOB`)
 
 	log.Println("[DB] MySQL migration completed (including simulation tables)")
 	return nil

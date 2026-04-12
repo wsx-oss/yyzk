@@ -13,12 +13,12 @@ import (
 
 // Chunk represents a piece of knowledge from the knowledge base.
 type Chunk struct {
-	ID       int     `json:"id"`
-	Source   string  `json:"source"`   // filename
-	Section  string  `json:"section"`  // heading / section title
-	Content  string  `json:"content"`  // raw text
-	Score    float64 `json:"score"`    // retrieval relevance score
-	tokens   []string
+	ID      int     `json:"id"`
+	Source  string  `json:"source"`  // filename
+	Section string  `json:"section"` // heading / section title
+	Content string  `json:"content"` // raw text
+	Score   float64 `json:"score"`   // retrieval relevance score
+	tokens  []string
 }
 
 // Engine is a lightweight keyword-based RAG retrieval engine using BM25 scoring.
@@ -68,6 +68,16 @@ func (e *Engine) LoadDirectory(dir string) error {
 func (e *Engine) LoadText(name, content string) {
 	e.mu.Lock()
 	e.addDocument(name, content)
+	e.buildIndex()
+	e.mu.Unlock()
+}
+
+// LoadTexts adds multiple named documents in a single batch (for DB-backed loading).
+func (e *Engine) LoadTexts(docs map[string]string) {
+	e.mu.Lock()
+	for name, content := range docs {
+		e.addDocument(name, content)
+	}
 	e.buildIndex()
 	e.mu.Unlock()
 }

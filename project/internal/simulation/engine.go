@@ -42,17 +42,23 @@ type Engine struct {
 	onStateChange func(string, InstanceState)
 	onAnomaly     func(string, AnomalyEvent) // push anomaly events
 
+	// Optional DB-backed persistence callbacks (replace file I/O when set)
+	SaveSnapshotFunc func(data []byte) error
+	LoadSnapshotFunc func() ([]byte, error)
+
 	snapshotMu sync.Mutex
 }
 
 // EngineConfig holds engine initialization parameters.
 type EngineConfig struct {
-	MaxInstances  int
-	MaxGoroutines int
-	DataDir       string
-	OnTelemetry   func(TelemetrySnapshot)
-	OnStateChange func(string, InstanceState)
-	OnAnomaly     func(string, AnomalyEvent)
+	MaxInstances     int
+	MaxGoroutines    int
+	DataDir          string
+	OnTelemetry      func(TelemetrySnapshot)
+	OnStateChange    func(string, InstanceState)
+	OnAnomaly        func(string, AnomalyEvent)
+	SaveSnapshotFunc func(data []byte) error
+	LoadSnapshotFunc func() ([]byte, error)
 }
 
 // NewEngine creates and starts the simulation engine.
@@ -68,16 +74,18 @@ func NewEngine(cfg EngineConfig) *Engine {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	e := &Engine{
-		instances:     make(map[string]*Instance),
-		batches:       make(map[string]*BatchConfig),
-		limiter:       NewResourceLimiter(cfg.MaxInstances, cfg.MaxGoroutines),
-		ctx:           ctx,
-		cancel:        cancel,
-		startTime:     time.Now(),
-		dataDir:       cfg.DataDir,
-		onTelemetry:   cfg.OnTelemetry,
-		onStateChange: cfg.OnStateChange,
-		onAnomaly:     cfg.OnAnomaly,
+		instances:        make(map[string]*Instance),
+		batches:          make(map[string]*BatchConfig),
+		limiter:          NewResourceLimiter(cfg.MaxInstances, cfg.MaxGoroutines),
+		ctx:              ctx,
+		cancel:           cancel,
+		startTime:        time.Now(),
+		dataDir:          cfg.DataDir,
+		onTelemetry:      cfg.OnTelemetry,
+		onStateChange:    cfg.OnStateChange,
+		onAnomaly:        cfg.OnAnomaly,
+		SaveSnapshotFunc: cfg.SaveSnapshotFunc,
+		LoadSnapshotFunc: cfg.LoadSnapshotFunc,
 	}
 
 	// Start periodic snapshot persistence
@@ -626,7 +634,7 @@ func (e *Engine) Metrics() EngineMetrics {
 
 // ---------- Persistence for 7x24 Recovery ----------
 
-// PersistSnapshots saves all instance states to disk.
+// PersistSnapshots saves all instance states to the database (or disk as fallback).
 func (e *Engine) PersistSnapshots() {
 	e.snapshotMu.Lock()
 	defer e.snapshotMu.Unlock()
@@ -647,13 +655,23 @@ func (e *Engine) PersistSnapshots() {
 	}
 	e.mu.RUnlock()
 
-	path := filepath.Join(e.dataDir, "sim_snapshots.json")
-	os.MkdirAll(filepath.Dir(path), 0o755)
 	raw, err := json.Marshal(data)
 	if err != nil {
 		log.Printf("[SimEngine] snapshot marshal error: %v", err)
 		return
 	}
+
+	// Prefer DB-backed persistence when callback is set
+	if e.SaveSnapshotFunc != nil {
+		if err := e.SaveSnapshotFunc(raw); err != nil {
+			log.Printf("[SimEngine] DB snapshot save error: %v", err)
+		}
+		return
+	}
+
+	// Fallback: file-based persistence
+	path := filepath.Join(e.dataDir, "sim_snapshots.json")
+	os.MkdirAll(filepath.Dir(path), 0o755)
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
 		log.Printf("[SimEngine] snapshot write error: %v", err)
 	}
@@ -661,13 +679,25 @@ func (e *Engine) PersistSnapshots() {
 
 // RestoreFromSnapshots loads persisted state and recreates instances.
 func (e *Engine) RestoreFromSnapshots() (int, error) {
-	path := filepath.Join(e.dataDir, "sim_snapshots.json")
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
+	var raw []byte
+	var err error
+
+	// Prefer DB-backed restore when callback is set
+	if e.LoadSnapshotFunc != nil {
+		raw, err = e.LoadSnapshotFunc()
+		if err != nil || len(raw) == 0 {
 			return 0, nil
 		}
-		return 0, err
+	} else {
+		// Fallback: file-based restore
+		path := filepath.Join(e.dataDir, "sim_snapshots.json")
+		raw, err = os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return 0, nil
+			}
+			return 0, err
+		}
 	}
 
 	type PersistData struct {

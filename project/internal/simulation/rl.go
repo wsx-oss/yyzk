@@ -299,6 +299,10 @@ type RLTrainer struct {
 
 	// Callback for persisting eval results to DB
 	OnEval func(result EvalResult, epsilon float64)
+
+	// Optional DB-backed persistence callbacks (replace file I/O when set)
+	SavePolicyFunc func(data []byte) error
+	LoadPolicyFunc func() ([]byte, error)
 }
 
 // EvalResult stores evaluation metrics for a training checkpoint.
@@ -863,7 +867,7 @@ func (t *RLTrainer) computeReward(snap TelemetrySnapshot, action int, prevState 
 	return r
 }
 
-// SavePolicy persists the Q-table to disk.
+// SavePolicy persists the Q-table to the database (or disk as fallback).
 func (t *RLTrainer) SavePolicy() {
 	t.policy.mu.RLock()
 	defer t.policy.mu.RUnlock()
@@ -881,6 +885,17 @@ func (t *RLTrainer) SavePolicy() {
 		return
 	}
 
+	// Prefer DB-backed persistence when callback is set
+	if t.SavePolicyFunc != nil {
+		if err := t.SavePolicyFunc(raw); err != nil {
+			log.Printf("[RLTrainer] DB policy save error: %v", err)
+		} else {
+			log.Printf("[RLTrainer] policy saved to DB (%d states)", len(t.policy.table))
+		}
+		return
+	}
+
+	// Fallback: file-based persistence
 	path := filepath.Join(t.dataDir, "rl_policy.json")
 	os.MkdirAll(filepath.Dir(path), 0o755)
 	if err := os.WriteFile(path, raw, 0o644); err != nil {
@@ -890,15 +905,28 @@ func (t *RLTrainer) SavePolicy() {
 	}
 }
 
-// LoadPolicy loads a saved Q-table from disk.
+// LoadPolicy loads a saved Q-table from the database (or disk as fallback).
 func (t *RLTrainer) LoadPolicy() error {
-	path := filepath.Join(t.dataDir, "rl_policy.json")
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
+	var raw []byte
+
+	// Prefer DB-backed restore when callback is set
+	if t.LoadPolicyFunc != nil {
+		var err error
+		raw, err = t.LoadPolicyFunc()
+		if err != nil || len(raw) == 0 {
 			return nil
 		}
-		return err
+	} else {
+		// Fallback: file-based restore
+		path := filepath.Join(t.dataDir, "rl_policy.json")
+		var err error
+		raw, err = os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
 	}
 
 	var data struct {

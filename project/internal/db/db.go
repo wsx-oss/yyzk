@@ -804,5 +804,31 @@ func migrateSQLite(db *sql.DB) error {
 		}
 	}
 
+	// knowledge base documents & generic data store
+	dataTables := []string{
+		`CREATE TABLE IF NOT EXISTS knowledge_docs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL UNIQUE,
+			content TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_knowledge_docs_name ON knowledge_docs(name)`,
+		`CREATE TABLE IF NOT EXISTS data_store (
+			store_key TEXT PRIMARY KEY,
+			content TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+	}
+	for _, s := range dataTables {
+		if _, err := db.Exec(s); err != nil {
+			return fmt.Errorf("data table: %w", err)
+		}
+	}
+
+	// add new columns to existing tables
+	db.Exec(`ALTER TABLE backup_records ADD COLUMN sql_content TEXT`)
+	db.Exec(`ALTER TABLE recordings ADD COLUMN file_data BLOB`)
+
 	return nil
 }
