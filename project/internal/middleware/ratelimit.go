@@ -1,10 +1,13 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"smartcontrol/internal/cache"
 
 	"github.com/gin-gonic/gin"
 )
@@ -50,7 +53,7 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		
 		ip := c.ClientIP()
 		
-		if !rl.allow(ip) {
+		if !rl.allowWithRedis(ip) {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error": "rate limit exceeded",
 				"retry_after": rl.duration.Seconds(),
@@ -61,6 +64,24 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		
 		c.Next()
 	}
+}
+
+// allowWithRedis tries Redis-based rate limiting first; falls back to in-memory.
+func (rl *RateLimiter) allowWithRedis(ip string) bool {
+	if !cache.Available() {
+		return rl.allow(ip)
+	}
+	key := fmt.Sprintf("ratelimit:%s", ip)
+	count, err := cache.Incr(key)
+	if err != nil {
+		// Redis error – degrade to in-memory
+		return rl.allow(ip)
+	}
+	if count == 1 {
+		// First request in this window – set TTL
+		_ = cache.Expire(key, rl.duration)
+	}
+	return count <= int64(rl.rate)
 }
 
 func (rl *RateLimiter) allow(ip string) bool {

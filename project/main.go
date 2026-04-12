@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"smartcontrol/internal/agent"
+	"smartcontrol/internal/cache"
 	"smartcontrol/internal/db"
 	"smartcontrol/internal/handlers"
 	"smartcontrol/internal/middleware"
@@ -62,6 +63,25 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// ---- Redis initialization ----
+	redisHost := getenv("REDIS_HOST", "")
+	redisPort := getenv("REDIS_PORT", "6379")
+	redisPassword := getenv("REDIS_PASSWORD", "")
+	redisDB := getenvInt("REDIS_DB", 0)
+	if redisHost != "" {
+		if err := cache.Init(cache.RedisConfig{
+			Host:     redisHost,
+			Port:     redisPort,
+			Password: redisPassword,
+			DB:       redisDB,
+		}); err != nil {
+			log.Printf("[main] Redis init warning: %v (will degrade to in-memory)", err)
+		}
+	} else {
+		log.Println("[main] REDIS_HOST not set, Redis disabled")
+	}
+	defer cache.Close()
+
 	// Start embedded hardware agent on port 9100 (for local machine monitoring)
 	agentPort := getenvInt("SC_AGENT_PORT", 9100)
 	agent.StartBackground(agentPort)
@@ -87,6 +107,9 @@ func main() {
 			dbOK = false
 		}
 
+		// Redis check
+		redisOK := cache.Available()
+
 		// LLM API check (lightweight HEAD, 3s timeout)
 		llmOK := false
 		llmURL := getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com")
@@ -105,11 +128,12 @@ func main() {
 		}
 
 		c.JSON(200, gin.H{
-			"status":        overall,
-			"uptime_s":      int(time.Since(startTime).Seconds()),
-			"db_reachable":  dbOK,
-			"llm_reachable": llmOK,
-			"patrol_online": patrolOK,
+			"status":          overall,
+			"uptime_s":        int(time.Since(startTime).Seconds()),
+			"db_reachable":    dbOK,
+			"redis_reachable": redisOK,
+			"llm_reachable":   llmOK,
+			"patrol_online":   patrolOK,
 		})
 	})
 

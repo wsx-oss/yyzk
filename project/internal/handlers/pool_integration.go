@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"smartcontrol/internal/cache"
 	"smartcontrol/internal/db"
 	"smartcontrol/internal/taskpool"
 
@@ -97,11 +98,36 @@ type StatsCacheStore struct {
 
 var statsStore = &StatsCacheStore{caches: make(map[string]*taskpool.StatsCache)}
 
+// statsRedisKey returns the Redis key used for a stats cache entry.
+func statsRedisKey(key string) string {
+	return "stats:" + key
+}
+
+// writeStatsToRedis writes the computed stats to Redis (best-effort).
+func writeStatsToRedis(key string, data interface{}, ttl time.Duration) {
+	if !cache.Available() {
+		return
+	}
+	if err := cache.SetJSON(statsRedisKey(key), data, ttl); err != nil {
+		log.Printf("[StatsCache] Redis write %s failed: %v", key, err)
+	}
+}
+
+// wrapWithRedisSync wraps a stats compute function so that every refresh
+// also writes the result to Redis.
+func wrapWithRedisSync(key string, ttl time.Duration, fn func() interface{}) func() interface{} {
+	return func() interface{} {
+		result := fn()
+		writeStatsToRedis(key, result, ttl)
+		return result
+	}
+}
+
 // InitStatsCaches starts background cache refresh for expensive stats queries.
 func InitStatsCaches(database *db.DB) {
 	// Drone stats cache (refreshes every 10s)
 	statsStore.mu.Lock()
-	statsStore.caches["drones"] = taskpool.NewStatsCache(10*time.Second, func() interface{} {
+	statsStore.caches["drones"] = taskpool.NewStatsCache(10*time.Second, wrapWithRedisSync("drones", 20*time.Second, func() interface{} {
 		result := gin.H{}
 		var total, online, offline int
 		database.QueryRow(`SELECT COUNT(*) FROM drones`).Scan(&total)
@@ -111,10 +137,10 @@ func InitStatsCaches(database *db.DB) {
 		result["online"] = online
 		result["offline"] = offline
 		return result
-	})
+	}))
 
 	// GPS stats cache (refreshes every 10s)
-	statsStore.caches["gps"] = taskpool.NewStatsCache(10*time.Second, func() interface{} {
+	statsStore.caches["gps"] = taskpool.NewStatsCache(10*time.Second, wrapWithRedisSync("gps", 20*time.Second, func() interface{} {
 		result := gin.H{}
 		var total, online, offline, waiting, fenceEnabled, alertCount int
 		database.QueryRow(`SELECT COUNT(*) FROM gps_devices WHERE COALESCE(drone_id,0)>0`).Scan(&total)
@@ -130,10 +156,10 @@ func InitStatsCaches(database *db.DB) {
 		result["fence_enabled"] = fenceEnabled
 		result["alert_count"] = alertCount
 		return result
-	})
+	}))
 
 	// Battery stats cache (refreshes every 15s)
-	statsStore.caches["battery"] = taskpool.NewStatsCache(15*time.Second, func() interface{} {
+	statsStore.caches["battery"] = taskpool.NewStatsCache(15*time.Second, wrapWithRedisSync("battery", 30*time.Second, func() interface{} {
 		result := gin.H{}
 		var total, alertCount int
 		var avgLevel float64
@@ -144,10 +170,10 @@ func InitStatsCaches(database *db.DB) {
 		result["avg_level"] = avgLevel
 		result["alert_count"] = alertCount
 		return result
-	})
+	}))
 
 	// Alert stats cache (refreshes every 10s)
-	statsStore.caches["alerts"] = taskpool.NewStatsCache(10*time.Second, func() interface{} {
+	statsStore.caches["alerts"] = taskpool.NewStatsCache(10*time.Second, wrapWithRedisSync("alerts", 20*time.Second, func() interface{} {
 		result := gin.H{}
 		var total, unack, critical, warning int
 		database.QueryRow(`SELECT COUNT(*) FROM alerts`).Scan(&total)
@@ -159,10 +185,10 @@ func InitStatsCaches(database *db.DB) {
 		result["critical"] = critical
 		result["warning"] = warning
 		return result
-	})
+	}))
 
 	// Hardware stats cache (refreshes every 15s)
-	statsStore.caches["hardware"] = taskpool.NewStatsCache(15*time.Second, func() interface{} {
+	statsStore.caches["hardware"] = taskpool.NewStatsCache(15*time.Second, wrapWithRedisSync("hardware", 30*time.Second, func() interface{} {
 		result := gin.H{}
 		var total, online, offline int
 		database.QueryRow(`SELECT COUNT(*) FROM hardware_items`).Scan(&total)
@@ -201,10 +227,10 @@ func InitStatsCaches(database *db.DB) {
 		result["status_distribution"] = statusDist
 		result["type_distribution"] = typeDist
 		return result
-	})
+	}))
 
 	// Flight missions stats cache (refreshes every 15s)
-	statsStore.caches["flight_missions"] = taskpool.NewStatsCache(15*time.Second, func() interface{} {
+	statsStore.caches["flight_missions"] = taskpool.NewStatsCache(15*time.Second, wrapWithRedisSync("flight_missions", 30*time.Second, func() interface{} {
 		result := gin.H{}
 		var total int
 		database.QueryRow(`SELECT COUNT(*) FROM flight_missions`).Scan(&total)
@@ -224,14 +250,24 @@ func InitStatsCaches(database *db.DB) {
 		result["total"] = total
 		result["status_distribution"] = statusDist
 		return result
-	})
+	}))
 
 	statsStore.mu.Unlock()
-	log.Println("[PoolIntegration] Stats caches initialized (drones, gps, battery, alerts, hardware, flight_missions)")
+	log.Println("[PoolIntegration] Stats caches initialized (drones, gps, battery, alerts, hardware, flight_missions) with Redis sync")
 }
 
 // GetCachedStats returns the cached stats for a given key, or nil if not found.
+// It tries Redis first for cross-instance consistency, then falls back to
+// the local in-memory StatsCache.
 func GetCachedStats(key string) interface{} {
+	// Try Redis first
+	if cache.Available() {
+		var result gin.H
+		if err := cache.GetJSON(statsRedisKey(key), &result); err == nil {
+			return result
+		}
+	}
+	// Fallback to in-memory
 	statsStore.mu.RLock()
 	defer statsStore.mu.RUnlock()
 	if c, ok := statsStore.caches[key]; ok {

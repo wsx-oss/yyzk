@@ -2,13 +2,19 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"strconv"
 	"strings"
+	"time"
 
+	"smartcontrol/internal/cache"
 	"smartcontrol/internal/db"
 
 	"github.com/gin-gonic/gin"
 )
+
+const notifUnreadKey = "notif:unread_count"
+const notifUnreadTTL = 30 * time.Second
 
 // NotificationAPI handles notification center endpoints
 type NotificationAPI struct {
@@ -74,12 +80,29 @@ func (n *NotificationAPI) NotificationList(c *gin.Context) {
 
 // NotificationUnreadCount returns the count of unread notifications
 func (n *NotificationAPI) NotificationUnreadCount(c *gin.Context) {
+	// Try Redis cache first
+	if cache.Available() {
+		var cached int
+		if err := cache.GetJSON(notifUnreadKey, &cached); err == nil {
+			c.JSON(200, gin.H{"count": cached})
+			return
+		}
+	}
+
 	var count int
 	err := n.db.QueryRow("SELECT COUNT(*) FROM notifications WHERE is_read = 0").Scan(&count)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Cache result in Redis
+	if cache.Available() {
+		if err := cache.SetJSON(notifUnreadKey, count, notifUnreadTTL); err != nil {
+			log.Printf("[Notification] Redis cache set failed: %v", err)
+		}
+	}
+
 	c.JSON(200, gin.H{"count": count})
 }
 
@@ -91,6 +114,7 @@ func (n *NotificationAPI) NotificationMarkRead(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	invalidateNotifCache()
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -101,6 +125,7 @@ func (n *NotificationAPI) NotificationMarkAllRead(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	invalidateNotifCache()
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -144,7 +169,16 @@ func (n *NotificationAPI) NotificationCreate(c *gin.Context) {
 		return
 	}
 	id, _ := res.LastInsertId()
+	invalidateNotifCache()
 	c.JSON(200, gin.H{"ok": true, "id": id})
+}
+
+// invalidateNotifCache removes the cached unread count so the next request
+// fetches a fresh value from MySQL.
+func invalidateNotifCache() {
+	if cache.Available() {
+		_ = cache.Del(notifUnreadKey)
+	}
 }
 
 // RegisterNotificationRoutes registers all notification routes

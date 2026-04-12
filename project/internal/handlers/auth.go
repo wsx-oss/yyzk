@@ -4,9 +4,12 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"fmt"
+	"log"
 	"net/http"
 	"time"
 
+	"smartcontrol/internal/cache"
 	"smartcontrol/internal/db"
 
 	"github.com/gin-gonic/gin"
@@ -115,6 +118,9 @@ func (a *AuthAPI) Login(c *gin.Context) {
 		return
 	}
 
+	// Cache session in Redis (best-effort, login succeeds even if Redis fails)
+	cacheSession(token, userID, req.Username, expiresAt)
+
 	c.JSON(http.StatusOK, gin.H{
 		"token":      token,
 		"username":   req.Username,
@@ -149,6 +155,9 @@ func (a *AuthAPI) Logout(c *gin.Context) {
 		return
 	}
 
+	// Remove from Redis cache
+	deleteSessionCache(token)
+
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
@@ -167,6 +176,13 @@ func (a *AuthAPI) ValidateToken(c *gin.Context) {
 		token = token[7:]
 	}
 
+	// Try Redis cache first (fast path)
+	if sess, ok := getSessionCache(token); ok {
+		c.JSON(http.StatusOK, gin.H{"valid": true, "username": sess.Username, "expires_at": sess.ExpiresAt})
+		return
+	}
+
+	// Fallback to MySQL
 	var userID int
 	var expiresAt string
 	err := a.db.QueryRow(`SELECT user_id, expires_at FROM sessions WHERE token = ?`, token).Scan(&userID, &expiresAt)
@@ -184,6 +200,7 @@ func (a *AuthAPI) ValidateToken(c *gin.Context) {
 	if err != nil || time.Now().After(expires) {
 		// Delete expired token
 		a.db.Exec(`DELETE FROM sessions WHERE token = ?`, token)
+		deleteSessionCache(token)
 		c.JSON(http.StatusUnauthorized, gin.H{"valid": false, "error": "token expired"})
 		return
 	}
@@ -196,6 +213,9 @@ func (a *AuthAPI) ValidateToken(c *gin.Context) {
 		return
 	}
 
+	// Re-cache in Redis for next time
+	cacheSession(token, userID, username, expires)
+
 	c.JSON(http.StatusOK, gin.H{"valid": true, "username": username, "expires_at": expires.Unix()})
 }
 
@@ -205,4 +225,69 @@ func (a *AuthAPI) cleanupExpiredSessions() {
 	for range ticker.C {
 		_, _ = a.db.Exec(`DELETE FROM sessions WHERE datetime(expires_at) < datetime('now')`)
 	}
+}
+
+// ---------- Redis session cache helpers ----------
+
+const sessionKeyPrefix = "session:"
+
+type cachedSession struct {
+	UserID    int    `json:"user_id"`
+	Username  string `json:"username"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+// cacheSession stores a session in Redis with TTL matching the expiry time.
+func cacheSession(token string, userID int, username string, expiresAt time.Time) {
+	if !cache.Available() {
+		return
+	}
+	ttl := time.Until(expiresAt)
+	if ttl <= 0 {
+		return
+	}
+	sess := cachedSession{
+		UserID:    userID,
+		Username:  username,
+		ExpiresAt: expiresAt.Unix(),
+	}
+	if err := cache.SetJSON(sessionKeyPrefix+token, sess, ttl); err != nil {
+		log.Printf("[Auth] Redis session cache set failed: %v", err)
+	}
+}
+
+// getSessionCache retrieves a session from Redis. Returns (session, true) on
+// cache hit, or (zero, false) on miss.
+func getSessionCache(token string) (cachedSession, bool) {
+	if !cache.Available() {
+		return cachedSession{}, false
+	}
+	var sess cachedSession
+	if err := cache.GetJSON(sessionKeyPrefix+token, &sess); err != nil {
+		return cachedSession{}, false
+	}
+	// Double-check expiry
+	if time.Now().Unix() > sess.ExpiresAt {
+		_ = cache.Del(sessionKeyPrefix + token)
+		return cachedSession{}, false
+	}
+	return sess, true
+}
+
+// deleteSessionCache removes a session from Redis.
+func deleteSessionCache(token string) {
+	if !cache.Available() {
+		return
+	}
+	if err := cache.Del(sessionKeyPrefix + token); err != nil {
+		log.Printf("[Auth] Redis session cache del failed: %v", err)
+	}
+}
+
+// SessionCacheInfo returns a summary of Redis session cache status (for /api/healthz).
+func SessionCacheInfo() string {
+	if !cache.Available() {
+		return "disabled"
+	}
+	return fmt.Sprintf("redis (prefix=%s)", sessionKeyPrefix)
 }

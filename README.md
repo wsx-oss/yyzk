@@ -5,7 +5,7 @@
 
 **企业级智能管控平台 | 实时监控 | 远程控制 | 性能分析**
 
-基于 Go 1.25 + Gin + MySQL + WebSocket + noVNC + RAG + RL 的完整解决方案
+基于 Go 1.25 + Gin + MySQL + Redis + WebSocket + noVNC + RAG + RL 的完整解决方案
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -39,13 +39,13 @@ CloudControl 是一套面向企业级应用的综合性管控平台。
 - **后端**：Go + Gin，位于 `project/`，数据库已从 SQLite 迁移至 **MySQL**（Aiven 云数据库），通过环境变量 `SC_DB_DRIVER` 切换驱动，内置 SQL 方言自动适配层（`AdaptSQL`），共 32 张业务表
 - **前端**：静态页面位于 `project/web/`，由后端内嵌静态资源并通过 `/app` 提供访问
 - **时区**：统一为 **Asia/Shanghai (UTC+8)**，Go 后端 `time.Local` 与 MySQL 会话时区均已配置
-- **Redis**：`.env` 中已配置 Redis 连接信息（`REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB`），当前尚未集成到 Go 后端代码中（`go.mod` 无 Redis 客户端依赖），预留用于后续缓存/会话/消息队列等场景
+- **Redis**：已集成 `go-redis/v9` 客户端库，通过 `.env` 配置连接（`REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB`）。用于 **会话缓存**（Token 验证快速路径）、**分布式限流**（替代进程内令牌桶）、**统计缓存同步**（6 类业务统计写入 Redis）、**通知未读数缓存**。Redis 不可用时自动降级为纯内存模式，不影响系统正常运行
 - **RAG 知识库**：内置 BM25 关键词检索引擎（`internal/rag/rag.go`），自动加载 `knowledge_base/` 目录下 20 篇领域文档，为 AI 助手提供检索增强生成能力
 
 ### 核心特性
 
-- **安全认证**：用户注册/登录（bcrypt 加密）、会话管理（Token 24h 过期）、API Token 认证
-- **性能优化**：数据库索引优化、分页支持、请求限流（500次/分钟/IP）
+- **安全认证**：用户注册/登录（bcrypt 加密）、会话管理（Token 24h 过期，Redis 缓存加速验证）、API Token 认证
+- **性能优化**：数据库索引优化、分页支持、Redis 分布式限流（500次/分钟/IP，自动降级内存限流）、统计缓存 Redis 同步
 - **安全防护**：CORS 跨域、SQL 注入防护、输入验证、Panic 自动恢复
 - **实时监控**：CPU/内存/磁盘/网络监控、WebSocket 实时推送、阈值自动告警
 - **智能能力**：LLM 航线规划 + NFZ 纠偏 + 多候选方案、CoT 思维链 AI 分析、智能巡检与通知中心、RAG 检索增强生成（BM25 + 20 篇知识库文档）
@@ -131,7 +131,7 @@ go mod tidy
 
 项目启动时自动读取 `project/.env`，无则使用系统环境变量和内置默认值。
 
-示例 `.env`（MySQL，当前默认）：
+示例 `.env`（MySQL + Redis，当前默认）：
 
 ```env
 SC_LISTEN_ADDR=:8080
@@ -143,6 +143,10 @@ LLM_API_KEY=
 LLM_BASE_URL=https://openapi.monica.im/v1
 LLM_MODEL=gpt-4.1
 AMAP_KEY=
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 ```
 
 示例 `.env`（SQLite 模式）：
@@ -217,16 +221,22 @@ go run .
 | `AMAP_KEY` | `""` | 高德地图 Key（地址解析/逆编码） |
 | `TIANDITU_KEY` | `""` | 天地图 Key（影像底图 + 标注图层） |
 
-### Redis 配置（预留，尚未集成）
+### Redis 配置
 
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
-| `REDIS_HOST` | - | Redis 服务器地址 |
-| `REDIS_PORT` | - | Redis 端口 |
-| `REDIS_PASSWORD` | - | Redis 密码 |
+| `REDIS_HOST` | `""` | Redis 服务器地址（留空则禁用 Redis，降级为纯内存模式） |
+| `REDIS_PORT` | `6379` | Redis 端口 |
+| `REDIS_PASSWORD` | `""` | Redis 密码 |
 | `REDIS_DB` | `0` | Redis 数据库编号 |
 
-> **注意**：Redis 配置已在 `.env` 中预留并测试可连通，但 Go 后端尚未引入 Redis 客户端库（如 `go-redis`），当前不会实际连接 Redis。后续计划用于会话缓存、实时消息队列、分布式锁等场景。
+> **Redis 集成说明**：已通过 `go-redis/v9` 接入，启动时自动连接。当前用于 4 个场景：
+> 1. **会话缓存**：Token 验证优先查 Redis（`session:<token>`），命中直接返回，未命中回退 MySQL 并回填缓存，TTL 随会话过期时间
+> 2. **分布式限流**：基于 `INCR + EXPIRE` 的滑动窗口计数器（`ratelimit:<ip>`），替代进程内令牌桶，支持多实例部署
+> 3. **统计缓存同步**：6 类业务统计（无人机/GPS/电池/告警/硬件/飞行任务）每次刷新同步写入 Redis（`stats:<key>`），读取时优先 Redis
+> 4. **通知未读数缓存**：`notif:unread_count` 缓存 30s，创建/已读/全部已读时自动失效
+>
+> **降级策略**：`REDIS_HOST` 为空或 Redis 不可达时，所有功能自动降级为纯内存模式，不影响系统正常运行。
 
 ---
 
@@ -319,7 +329,7 @@ go run .
 | 统计缓存 | GET | `/api/stats/cached` | 聚合统计缓存（6 类业务数据 + pool 指标） |
 | RAG | GET | `/api/ai/rag/search?q=xxx` | 知识库检索（BM25 关键词匹配） |
 | RAG | GET | `/api/ai/rag/stats` | 知识库状态（chunk 数量/文档数） |
-| 健康检查 | GET | `/api/healthz` | 系统健康检查（db/llm/patrol/uptime） |
+| 健康检查 | GET | `/api/healthz` | 系统健康检查（db/redis/llm/patrol/uptime） |
 | 仿真 | GET | `/api/sim/metrics` | 仿真引擎运行指标 |
 | 仿真 | POST | `/api/sim/batches` | 创建仿真批次（支持 mission 模板） |
 | 仿真 | GET | `/api/sim/instances` | 仿真实例列表 |
@@ -350,6 +360,8 @@ project/
 │   └── agent/main.go               # hw-agent 独立程序（地面站 MAVLink 中继）
 ├── internal/
 │   ├── agent/agent.go              # 内嵌 Agent（主服务自动启动）
+│   ├── cache/
+│   │   └── redis.go                # Redis 客户端封装（连接池、KV/JSON/Hash 操作、健康检查、优雅降级）
 │   ├── db/
 │   │   ├── db.go                   # 数据库连接、SQL 兼容层（AdaptSQL）、DB/Tx 包装器
 │   │   ├── migrate_mysql.go        # MySQL 建表 DDL（32 张表）
@@ -493,7 +505,18 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 ## 版本更新
 
-### v3.8.0 (最新)
+### v3.9.0 (最新)
+
+- Redis 缓存集成（MySQL + Redis 双层架构）
+  - 新增 `internal/cache/redis.go`：`go-redis/v9` 客户端封装，连接池（20 连接 / 5 空闲）、KV/JSON/Hash 操作、健康检查、优雅降级
+  - 会话缓存加速：`auth.go` Token 验证优先查 Redis（`session:<token>`），命中直接返回，未命中回退 MySQL 并回填，TTL 随会话过期
+  - 分布式限流：`ratelimit.go` 基于 Redis `INCR + EXPIRE` 滑动窗口计数器（`ratelimit:<ip>`），支持多实例部署，Redis 不可用自动降级内存限流
+  - 统计缓存同步：`pool_integration.go` 6 类业务统计（无人机/GPS/电池/告警/硬件/飞行任务）每次刷新同步写入 Redis（`stats:<key>`），`/api/stats/cached` 优先读 Redis
+  - 通知未读数缓存：`notification.go` 缓存 `notif:unread_count`（30s TTL），创建/已读/全部已读时自动失效
+  - `/api/healthz` 新增 `redis_reachable` 字段
+  - 全局降级策略：`REDIS_HOST` 为空或 Redis 不可达时，所有功能自动降级为纯内存模式
+
+### v3.8.0
 
 - 离线状态通知抑制
   - `patrol.go` 无人机下线通知 5 分钟/台冷却期，防止通知风暴
