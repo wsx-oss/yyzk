@@ -367,15 +367,20 @@
 
     // ========== Charts ==========
     function initCharts() {
+      var _bdk2 = document.documentElement.classList.contains('dark');
       statusChart = createChart($('#statusChart'), {
         type: 'doughnut',
         data: {
           labels: ['正常', '电量低', '严重不足', '温度过高', '健康度低'],
-          datasets: [{ data: [0, 0, 0, 0, 0], backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'] }]
+          datasets: [{ data: [0, 0, 0, 0, 0], backgroundColor: _bdk2 ? ['#34d399','#fcd34d','#f87171','#f472b6','#818cf8'] : ['#00b42a','#ff7d00','#f53f3f','#eb2f96','#6366f1'], hoverOffset: 10 }]
         },
         options: {
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
+          cutout: '65%',
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 16, usePointStyle: true, pointStyle: 'circle' } },
+            tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 台 ('+p+'%)'; } } }
+          }
         }
       });
       gaugeChart = createChart($('#gaugeChart'), {
@@ -387,17 +392,18 @@
             backgroundColor: function(ctx) {
               const chart = ctx.chart;
               const {ctx: c, chartArea} = chart;
-              if (!chartArea) return ['#165dff', '#10b981'][ctx.dataIndex];
+              if (!chartArea) return ['#165dff', '#00b42a'][ctx.dataIndex];
               const grad = c.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
               if (ctx.dataIndex === 0) {
-                grad.addColorStop(0, '#ef4444'); grad.addColorStop(0.3, '#f59e0b'); grad.addColorStop(1, '#22c55e');
+                grad.addColorStop(0, '#f53f3f'); grad.addColorStop(0.3, '#ff7d00'); grad.addColorStop(1, '#00b42a');
               } else {
-                grad.addColorStop(0, '#f59e0b'); grad.addColorStop(1, '#10b981');
+                grad.addColorStop(0, '#ff7d00'); grad.addColorStop(1, '#00b42a');
               }
               return grad;
             },
-            borderRadius: 6,
-            barThickness: 48
+            borderRadius: 10,
+            borderSkipped: false,
+            barThickness: 44
           }]
         },
         options: {
@@ -405,12 +411,12 @@
           maintainAspectRatio: false,
           indexAxis: 'y',
           scales: {
-            x: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
-            y: { grid: { display: false }, ticks: { font: { size: window.innerWidth < 768 ? 11 : 13 } } },
+            x: { min: 0, max: 100, ticks: { callback: v => v + '%', font: { size: 11 } }, grid: { color: _bdk2 ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' } },
+            y: { grid: { display: false }, ticks: { font: { size: window.innerWidth < 768 ? 11 : 13, weight: '500' } } },
           },
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: (ctx) => ctx.label + ': ' + ctx.raw + '%' } },
+            tooltip: { callbacks: { label: (ctx) => ' ' + ctx.label + ': ' + ctx.raw + '%' } },
           },
         }
       });
@@ -683,9 +689,13 @@
 
         if (historyChart) { historyChart.destroy(); historyChart = null; }
         const hCtx = $('#historyChart').getContext('2d');
+        const _bdk = document.documentElement.classList.contains('dark');
         const levelGrad = hCtx.createLinearGradient(0, 0, 0, 260);
-        levelGrad.addColorStop(0, 'rgba(14,165,233,0.25)');
-        levelGrad.addColorStop(1, 'rgba(14,165,233,0.02)');
+        levelGrad.addColorStop(0, 'rgba(22,93,255,0.32)');
+        levelGrad.addColorStop(1, 'rgba(22,93,255,0.02)');
+        const healthGrad = hCtx.createLinearGradient(0, 0, 0, 260);
+        healthGrad.addColorStop(0, 'rgba(0,180,42,0.18)');
+        healthGrad.addColorStop(1, 'rgba(0,180,42,0.02)');
 
         // Mark alert points (low battery <= 20%)
         const levelData = reversed.map(r => r.level);
@@ -696,10 +706,10 @@
           data: {
             labels: labels,
             datasets: [
-              { label: '电量(%)', data: levelData, borderColor: '#165dff', backgroundColor: levelGrad, fill: true, tension: 0.3, pointRadius: 2, yAxisID: 'yPct' },
-              { label: '健康度(%)', data: reversed.map(r => r.health), borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'yPct' },
-              { label: '电压(V)', data: reversed.map(r => r.voltage), borderColor: '#8b5cf6', backgroundColor: 'transparent', tension: 0.3, pointRadius: 1, borderDash: [4,2], yAxisID: 'yVolt' },
-              { label: '温度(°C)', data: reversed.map(r => r.temperature), borderColor: '#ef4444', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, yAxisID: 'yTemp' },
+              { label: '电量(%)', data: levelData, borderColor: _bdk ? '#4e9fff' : '#165dff', backgroundColor: levelGrad, fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: _bdk ? '#4e9fff' : '#165dff', borderWidth: 2.5, yAxisID: 'yPct' },
+              { label: '健康度(%)', data: reversed.map(r => r.health), borderColor: _bdk ? '#34d399' : '#00b42a', backgroundColor: healthGrad, fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: _bdk ? '#34d399' : '#00b42a', borderWidth: 2, yAxisID: 'yPct' },
+              { label: '电压(V)', data: reversed.map(r => r.voltage), borderColor: _bdk ? '#9b7cee' : '#722ed1', backgroundColor: 'transparent', tension: 0.4, pointRadius: 1, pointHoverRadius: 4, borderDash: [4,2], borderWidth: 1.5, yAxisID: 'yVolt' },
+              { label: '温度(°C)', data: reversed.map(r => r.temperature), borderColor: _bdk ? '#f87171' : '#f53f3f', backgroundColor: 'transparent', tension: 0.4, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: _bdk ? '#f87171' : '#f53f3f', borderWidth: 2, yAxisID: 'yTemp' },
               { label: '低电告警', data: alertPoints, borderColor: 'transparent', backgroundColor: '#ef4444', pointStyle: 'triangle', pointRadius: 6, pointHoverRadius: 8, showLine: false, yAxisID: 'yPct' },
             ]
           },
@@ -711,8 +721,8 @@
               legend: {
                 position: 'bottom',
                 labels: {
-                  font: { size: window.innerWidth < 768 ? 10 : 12 },
-                  padding: window.innerWidth < 768 ? 8 : 16,
+                  font: { size: window.innerWidth < 768 ? 10 : 12, weight: '500' },
+                  padding: window.innerWidth < 768 ? 10 : 18,
                   usePointStyle: true, pointStyle: 'circle',
                   filter: (item) => item.text !== '低电告警' || alertPoints.some(v => v !== null),
                 },
@@ -720,18 +730,18 @@
               tooltip: {
                 callbacks: {
                   label: (ctx) => {
-                    if (ctx.dataset.label === '低电告警') return '⚠ 低电告警: ' + ctx.raw + '%';
+                    if (ctx.dataset.label === '低电告警') return ' ⚠ 低电告警: ' + ctx.raw + '%';
                     const unit = ctx.dataset.label.includes('V') ? 'V' : ctx.dataset.label.includes('°C') ? '°C' : '%';
-                    return `${ctx.dataset.label}: ${typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : ctx.raw}${unit}`;
+                    return ` ${ctx.dataset.label}: ${typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : ctx.raw}${unit}`;
                   },
                 },
               },
             },
             scales: {
-              yPct:  { type: 'linear', position: 'left', min: 0, max: 100, title: { display: true, text: '%', color: '#94a3b8' }, ticks: { callback: v => v + '%' }, grid: { color: 'rgba(148,163,184,0.08)' } },
-              yTemp: { type: 'linear', position: 'right', min: 0, max: 80, title: { display: true, text: '°C', color: '#ef4444' }, ticks: { color: '#ef4444' }, grid: { drawOnChartArea: false } },
+              yPct:  { type: 'linear', position: 'left', min: 0, max: 100, title: { display: true, text: '%', color: '#94a3b8' }, ticks: { callback: v => v + '%', font: { size: 11 } }, grid: { color: _bdk ? 'rgba(56,132,255,0.08)' : 'rgba(148,163,184,0.08)' } },
+              yTemp: { type: 'linear', position: 'right', min: 0, max: 80, title: { display: true, text: '°C', color: _bdk ? '#f87171' : '#ef4444' }, ticks: { color: _bdk ? '#f87171' : '#ef4444', font: { size: 11 } }, grid: { drawOnChartArea: false } },
               yVolt: { type: 'linear', position: 'right', min: 8, max: 26, display: false },
-              x: { ticks: { maxRotation: 45, font: { size: window.innerWidth < 768 ? 9 : 11 } } },
+              x: { ticks: { maxRotation: 45, font: { size: window.innerWidth < 768 ? 9 : 11 } }, grid: { display: false } },
             },
           },
           plugins: [{

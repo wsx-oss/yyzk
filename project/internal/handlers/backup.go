@@ -455,7 +455,7 @@ func (b *BackupAPI) dumpToFile(filePath string) (int, int, error) {
 	defer f.Close()
 
 	// Header
-	fmt.Fprintf(f, "-- CloudControl Database Backup\n")
+	fmt.Fprintf(f, "-- 云翼智控 Database Backup\n")
 	fmt.Fprintf(f, "-- Generated at: %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(f, "-- Tables: %d\n", len(tables))
 	fmt.Fprintf(f, "SET NAMES utf8mb4;\n")

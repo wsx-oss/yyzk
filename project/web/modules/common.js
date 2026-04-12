@@ -6,13 +6,46 @@ const $$ = (q) => document.querySelectorAll(q);
 (function initThemeSync() {
   function setChartDefaults(isDark) {
     if (typeof Chart === 'undefined') return;
-    var textColor = isDark ? 'rgba(255,255,255,0.85)' : '#4e5969';
-    var gridColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)';
+    var textColor = isDark ? 'rgba(185,205,240,0.85)' : '#4e5969';
+    var textColorSub = isDark ? 'rgba(145,175,225,0.72)' : '#86909c';
+    var gridColor = isDark ? 'rgba(56,132,255,0.12)' : 'rgba(0,0,0,0.06)';
+    var tooltipBg = isDark ? 'rgba(10,18,36,0.92)' : 'rgba(255,255,255,0.96)';
+    var tooltipText = isDark ? '#e0ebff' : '#1d2129';
+    var tooltipBorder = isDark ? 'rgba(56,132,255,0.25)' : 'rgba(0,0,0,0.08)';
     var defaults = Chart.defaults;
     defaults.color = textColor;
     defaults.borderColor = gridColor;
-    if (defaults.scale) { defaults.scale.grid = defaults.scale.grid || {}; defaults.scale.grid.color = gridColor; }
-    if (defaults.plugins && defaults.plugins.legend && defaults.plugins.legend.labels) { defaults.plugins.legend.labels.color = textColor; }
+    defaults.font.family = "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif";
+    defaults.animation.duration = 750;
+    defaults.animation.easing = 'easeOutQuart';
+    defaults.responsive = true;
+    if (defaults.scale) {
+      defaults.scale.grid = defaults.scale.grid || {};
+      defaults.scale.grid.color = gridColor;
+      defaults.scale.grid.drawBorder = false;
+    }
+    if (defaults.plugins) {
+      if (defaults.plugins.legend && defaults.plugins.legend.labels) {
+        defaults.plugins.legend.labels.color = textColor;
+        defaults.plugins.legend.labels.usePointStyle = true;
+        defaults.plugins.legend.labels.pointStyle = 'circle';
+        defaults.plugins.legend.labels.padding = 16;
+      }
+      if (defaults.plugins.tooltip) {
+        defaults.plugins.tooltip.backgroundColor = tooltipBg;
+        defaults.plugins.tooltip.titleColor = tooltipText;
+        defaults.plugins.tooltip.bodyColor = textColorSub;
+        defaults.plugins.tooltip.borderColor = tooltipBorder;
+        defaults.plugins.tooltip.borderWidth = 1;
+        defaults.plugins.tooltip.cornerRadius = 10;
+        defaults.plugins.tooltip.padding = 12;
+        defaults.plugins.tooltip.boxPadding = 6;
+        defaults.plugins.tooltip.titleFont = { weight: '600', size: 13 };
+        defaults.plugins.tooltip.bodyFont = { size: 12 };
+        defaults.plugins.tooltip.displayColors = true;
+        defaults.plugins.tooltip.usePointStyle = true;
+      }
+    }
   }
   function applyTheme(isDark) {
     if (isDark) {
@@ -104,11 +137,52 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-// Create chart (using Chart.js)
+// ---- Chart Gradient Utility ----
+function createLinearGradient(ctx, colorStart, colorEnd, height) {
+  height = height || 300;
+  var grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, colorStart);
+  grad.addColorStop(1, colorEnd);
+  return grad;
+}
+
+// Professional color palette (Geeker-Admin inspired)
+var CC_CHART_COLORS = {
+  blue:    { solid: '#165dff', light: 'rgba(22,93,255,0.15)',  gradient: ['rgba(22,93,255,0.35)', 'rgba(22,93,255,0.02)'] },
+  cyan:    { solid: '#14c9c9', light: 'rgba(20,201,201,0.15)', gradient: ['rgba(20,201,201,0.35)', 'rgba(20,201,201,0.02)'] },
+  green:   { solid: '#00b42a', light: 'rgba(0,180,42,0.15)',   gradient: ['rgba(0,180,42,0.35)',   'rgba(0,180,42,0.02)'] },
+  orange:  { solid: '#ff7d00', light: 'rgba(255,125,0,0.15)',  gradient: ['rgba(255,125,0,0.35)',  'rgba(255,125,0,0.02)'] },
+  red:     { solid: '#f53f3f', light: 'rgba(245,63,63,0.15)',  gradient: ['rgba(245,63,63,0.35)',  'rgba(245,63,63,0.02)'] },
+  purple:  { solid: '#722ed1', light: 'rgba(114,46,209,0.15)', gradient: ['rgba(114,46,209,0.35)', 'rgba(114,46,209,0.02)'] },
+  magenta: { solid: '#eb2f96', light: 'rgba(235,47,150,0.15)', gradient: ['rgba(235,47,150,0.35)', 'rgba(235,47,150,0.02)'] },
+  gold:    { solid: '#f7ba1e', light: 'rgba(247,186,30,0.15)', gradient: ['rgba(247,186,30,0.35)', 'rgba(247,186,30,0.02)'] },
+};
+var CC_PIE_PALETTE = ['#165dff', '#14c9c9', '#00b42a', '#722ed1', '#f7ba1e', '#ff7d00', '#eb2f96', '#f53f3f'];
+var CC_PIE_PALETTE_DARK = ['#4e9fff', '#36d6d6', '#34d399', '#9b7cee', '#fcd34d', '#fbbf24', '#f472b6', '#f87171'];
+
+// Create chart (using Chart.js) with enhanced defaults
 function createChart(canvas, config) {
   if (typeof Chart === "undefined") {
     console.warn("Chart.js not loaded");
     return null;
+  }
+  var isDark = document.documentElement.classList.contains('dark');
+  // Auto-enhance doughnut/pie charts
+  if (config.type === 'doughnut' || config.type === 'pie') {
+    var ds = config.data && config.data.datasets && config.data.datasets[0];
+    if (ds) {
+      if (!ds.borderWidth && ds.borderWidth !== 0) ds.borderWidth = 3;
+      if (!ds.borderColor) ds.borderColor = isDark ? '#0e1525' : '#ffffff';
+      if (!ds.hoverBorderColor) ds.hoverBorderColor = isDark ? '#0e1525' : '#ffffff';
+      if (!ds.hoverOffset) ds.hoverOffset = 8;
+    }
+    var opts = config.options = config.options || {};
+    if (!opts.cutout && config.type === 'doughnut') opts.cutout = '62%';
+  }
+  // Auto-enhance bar charts
+  if (config.type === 'bar') {
+    var ds = config.data && config.data.datasets && config.data.datasets[0];
+    if (ds && !ds.borderRadius && ds.borderRadius !== 0) ds.borderRadius = 6;
   }
   return new Chart(canvas, config);
 }

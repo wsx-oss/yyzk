@@ -193,26 +193,33 @@
     var allDevices = [], visibleDevices = [];
 
     /* ---- Charts ---- */
+    var _dk = document.documentElement.classList.contains('dark');
     var statusChart = createChart($('#statusChart'), {
       type: 'doughnut',
       data: {
         labels: ['在线', '离线'],
-        datasets: [{ data: [0, 0], backgroundColor: ['#10b981', '#ef4444'] }]
+        datasets: [{ data: [0, 0], backgroundColor: _dk ? ['#34d399', '#f87171'] : ['#00b42a', '#f53f3f'], hoverOffset: 10 }]
       },
-      options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+      options: { maintainAspectRatio: false, cutout: '65%', plugins: {
+        legend: { position: 'right', labels: { font: { size: 12, weight: '500' }, padding: 14, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 台 ('+p+'%)'; } } }
+      } }
     });
 
     var protocolChart = createChart($('#protocolChart'), {
       type: 'bar',
       data: {
         labels: ['RDP', 'VNC', 'SSH'],
-        datasets: [{ label: '数量', data: [0, 0, 0], backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6'] }]
+        datasets: [{ label: '数量', data: [0, 0, 0], backgroundColor: _dk ? ['#4e9fff', '#34d399', '#9b7cee'] : ['#165dff', '#00b42a', '#722ed1'], borderRadius: 8, borderSkipped: false, barThickness: 28 }]
       },
       options: {
         maintainAspectRatio: false,
         indexAxis: 'y',
-        scales: { x: { beginAtZero: true } },
-        plugins: { legend: { display: false } }
+        scales: {
+          x: { beginAtZero: true, grid: { color: _dk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 } } },
+          y: { grid: { display: false }, ticks: { font: { size: 12, weight: '500' } } }
+        },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return ' ' + c.parsed.x + ' 台'; } } } }
       }
     });
 

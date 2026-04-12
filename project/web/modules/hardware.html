@@ -740,10 +740,11 @@
 
     // ========== Charts ==========
     function renderCharts(stats) {
+      const dk = document.documentElement.classList.contains('dark');
       // Status distribution - Doughnut
       const statusDist = stats.status_distribution || {};
       const statusLabels = ['在线', '离线', '警告'];
-      const statusColors = ['#10b981', '#ef4444', '#f59e0b'];
+      const statusColors = dk ? ['#34d399', '#f87171', '#fcd34d'] : ['#00b42a', '#f53f3f', '#ff7d00'];
       const statusData = statusLabels.map(l => statusDist[l] || 0);
 
       if (statusChartInstance) statusChartInstance.destroy();
@@ -752,13 +753,15 @@
         type: 'doughnut',
         data: {
           labels: statusLabels,
-          datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 2, borderColor: '#fff' }]
+          datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 3, borderColor: dk ? '#0e1525' : '#fff', hoverBorderColor: dk ? '#0e1525' : '#fff', hoverOffset: 10 }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          cutout: '65%',
           plugins: {
-            legend: { position: 'right', labels: { padding: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 } } }
+            legend: { position: 'right', labels: { padding: 14, usePointStyle: true, pointStyle: 'circle', font: { size: 12, weight: '500' } } },
+            tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 台 ('+p+'%)'; } } }
           }
         }
       });
@@ -766,7 +769,7 @@
       // Type distribution - Horizontal Bar
       const typeDist = stats.type_distribution || {};
       const typeLabels = ['无人机', '服务器', '路由器', '交换机', '存储设备'];
-      const typeColors = ['#3b82f6', '#165dff', '#10b981', '#f59e0b', '#a855f7'];
+      const typeColors = dk ? ['#4e9fff', '#6db3ff', '#34d399', '#fcd34d', '#9b7cee'] : ['#165dff', '#3b82f6', '#00b42a', '#ff7d00', '#722ed1'];
       const typeData = typeLabels.map(l => typeDist[l] || 0);
 
       if (typeChartInstance) typeChartInstance.destroy();
@@ -779,8 +782,9 @@
             label: '数量',
             data: typeData,
             backgroundColor: typeColors,
-            borderRadius: 4,
-            barThickness: 28
+            borderRadius: 8,
+            borderSkipped: false,
+            barThickness: 26
           }]
         },
         options: {
@@ -788,12 +792,12 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f1f5f9' } },
-            y: { grid: { display: false } }
+            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0, font: { size: 11 } }, grid: { color: dk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' } },
+            y: { grid: { display: false }, ticks: { font: { size: 12, weight: '500' } } }
           },
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: function (ctx) { return ctx.parsed.x + ' 台'; } } }
+            tooltip: { callbacks: { label: function (ctx) { return ' ' + ctx.parsed.x + ' 台'; } } }
           }
         }
       });

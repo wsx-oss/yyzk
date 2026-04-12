@@ -580,18 +580,24 @@
 
     // ========== Init Charts ==========
     function initCharts() {
+      var _fdk = document.documentElement.classList.contains('dark');
       statusChart = createChart($('#statusChart'), {
         type: 'doughnut',
         data: {
           labels: ['待起飞', '飞行中', '返航中', '已完成'],
           datasets: [{
             data: [0, 0, 0, 0],
-            backgroundColor: ['#6366f1', '#165dff', '#f59e0b', '#10b981']
+            backgroundColor: _fdk ? ['#818cf8', '#4e9fff', '#fcd34d', '#34d399'] : ['#6366f1', '#165dff', '#ff7d00', '#00b42a'],
+            hoverOffset: 10
           }]
         },
         options: {
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } }
+          cutout: '65%',
+          plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 16, usePointStyle: true, pointStyle: 'circle' } },
+            tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 个 ('+p+'%)'; } } }
+          }
         }
       });
       phaseChart = createChart($('#phaseChart'), {
@@ -601,19 +607,20 @@
           datasets: [{
             label: '任务数量',
             data: [0, 0, 0, 0, 0, 0],
-            backgroundColor: ['#94a3b8', '#6366f1', '#165dff', '#f59e0b', '#f97316', '#10b981'],
+            backgroundColor: _fdk ? ['#a0aec0', '#818cf8', '#4e9fff', '#fcd34d', '#fbbf24', '#34d399'] : ['#94a3b8', '#6366f1', '#165dff', '#ff7d00', '#f97316', '#00b42a'],
             barThickness: 24,
-            borderRadius: 4
+            borderRadius: 8,
+            borderSkipped: false
           }]
         },
         options: {
           maintainAspectRatio: false,
           indexAxis: 'y',
           scales: {
-            x: { beginAtZero: true, ticks: { stepSize: 1 } },
-            y: { grid: { display: false } }
+            x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: _fdk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' } },
+            y: { grid: { display: false }, ticks: { font: { size: 12, weight: '500' } } }
           },
-          plugins: { legend: { display: false }, tooltip: { enabled: true } }
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return ' ' + c.parsed.x + ' 个'; } } } }
         }
       });
     }

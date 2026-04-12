@@ -31,7 +31,7 @@ func NewAIAssistantAPI(db *db.DB) *AIAssistantAPI {
 
 // knowledgeBase returns the system prompt with contextual knowledge
 func (a *AIAssistantAPI) knowledgeBase() string {
-	return `你是 CloudControl 智能无人机管控平台的 AI 助手，名字叫"小云"。你的职责是帮助用户操作平台、查询数据、解答问题、分析告警和提供操作引导。
+	return `你是 云翼智控 智能无人机管控平台的 AI 助手，名字叫"小云"。你的职责是帮助用户操作平台、查询数据、解答问题、分析告警和提供操作引导。
 
 【平台功能模块】
 1. 无人机管理 (drones) - 注册、编辑、删除无人机，查看在线/离线状态
@@ -277,7 +277,7 @@ func (a *AIAssistantAPI) gatherContext(query string) string {
 func (a *AIAssistantAPI) handleBuiltinCommand(cmd string) (string, bool) {
 	switch cmd {
 	case "/help":
-		return `🤖 我是小云，CloudControl 平台 AI 助手，可以帮你：
+		return `🤖 我是小云，云翼智控 平台 AI 助手，可以帮你：
 
 **快捷指令：**
 - /status - 查看系统整体状态

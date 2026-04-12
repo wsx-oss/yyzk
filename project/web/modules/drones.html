@@ -320,15 +320,22 @@
 
     // ========== Charts ==========
     function initCharts() {
+      var dk = document.documentElement.classList.contains('dark');
       statusChart = createChart($('#statusChart'), {
         type: 'doughnut',
-        data: { labels: ['在线', '离线', 'GPS活跃'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#00b42a', '#f53f3f', '#165dff'], borderWidth: 2, borderColor: '#fff', hoverBorderColor: '#fff', hoverOffset: 6 }] },
-        options: { maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle', color: '#4e5969' } } } }
+        data: { labels: ['在线', '离线', 'GPS活跃'], datasets: [{ data: [0, 0, 0], backgroundColor: dk ? ['#34d399','#f87171','#4e9fff'] : ['#00b42a','#f53f3f','#165dff'], hoverOffset: 10 }] },
+        options: { maintainAspectRatio: false, cutout: '68%', plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 18, usePointStyle: true, pointStyle: 'circle' } },
+          tooltip: { callbacks: { label: function(ctx){ var t=ctx.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(ctx.raw/t*100).toFixed(1):0; return ' '+ctx.label+': '+ctx.raw+' 台 ('+p+'%)'; } } }
+        } }
       });
       protocolChart = createChart($('#protocolChart'), {
         type: 'doughnut',
-        data: { labels: ['SSH', 'VNC', 'RDP'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#722ed1', '#165dff', '#14c9c9'], borderWidth: 2, borderColor: '#fff', hoverBorderColor: '#fff', hoverOffset: 6 }] },
-        options: { maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16, usePointStyle: true, pointStyle: 'circle', color: '#4e5969' } } } }
+        data: { labels: ['SSH', 'VNC', 'RDP'], datasets: [{ data: [0, 0, 0], backgroundColor: dk ? ['#9b7cee','#4e9fff','#36d6d6'] : ['#722ed1','#165dff','#14c9c9'], hoverOffset: 10 }] },
+        options: { maintainAspectRatio: false, cutout: '68%', plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 18, usePointStyle: true, pointStyle: 'circle' } },
+          tooltip: { callbacks: { label: function(ctx){ var t=ctx.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(ctx.raw/t*100).toFixed(1):0; return ' '+ctx.label+': '+ctx.raw+' 台 ('+p+'%)'; } } }
+        } }
       });
     }
 

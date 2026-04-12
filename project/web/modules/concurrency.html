@@ -382,23 +382,28 @@
 
     function renderTrendChart() {
       const ctx = document.getElementById('trendChart');
+      const dk = document.documentElement.classList.contains('dark');
       if (!trendChart) {
+        const tCtx = ctx.getContext('2d');
+        const gGreen = createLinearGradient(tCtx, dk ? 'rgba(52,211,153,0.25)' : 'rgba(0,180,42,0.22)', dk ? 'rgba(52,211,153,0.02)' : 'rgba(0,180,42,0.02)', 200);
+        const gRed = createLinearGradient(tCtx, dk ? 'rgba(248,113,113,0.25)' : 'rgba(245,63,63,0.22)', dk ? 'rgba(248,113,113,0.02)' : 'rgba(245,63,63,0.02)', 200);
         trendChart = new Chart(ctx, {
           type: 'line',
           data: {
             labels: trendData.labels,
             datasets: [
-              { label: '完成/次', data: trendData.completed, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 },
-              { label: '失败/次', data: trendData.failed, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 },
+              { label: '完成/次', data: trendData.completed, borderColor: dk ? '#34d399' : '#00b42a', backgroundColor: gGreen, fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2.5, pointBackgroundColor: dk ? '#34d399' : '#00b42a' },
+              { label: '失败/次', data: trendData.failed, borderColor: dk ? '#f87171' : '#f53f3f', backgroundColor: gRed, fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2.5, pointBackgroundColor: dk ? '#f87171' : '#f53f3f' },
             ]
           },
           options: {
             responsive: true, maintainAspectRatio: false,
             animation: false,
-            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 11, weight: '500' }, padding: 16, usePointStyle: true, pointStyle: 'circle' } } },
             scales: {
-              x: { ticks: { maxTicksLimit: 8, font: { size: 10 } } },
-              y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } }
+              x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } }, grid: { color: dk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' } }
             }
           }
         });
@@ -416,15 +421,19 @@
       const data = keys.map(k => (groups[k].completed || 0) + (groups[k].failed || 0));
       const colors = keys.map(k => groupColors[k] || groupColors.default);
 
+      const dk2 = document.documentElement.classList.contains('dark');
       if (!groupChart) {
         groupChart = new Chart(ctx, {
           type: 'doughnut',
-          data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+          data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 3, borderColor: dk2 ? '#0e1525' : '#fff', hoverBorderColor: dk2 ? '#0e1525' : '#fff', hoverOffset: 10 }] },
           options: {
             responsive: true, maintainAspectRatio: false,
             animation: false,
-            plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } } },
-            cutout: '55%',
+            plugins: {
+              legend: { position: 'bottom', labels: { font: { size: 11, weight: '500' }, padding: 14, usePointStyle: true, pointStyle: 'circle' } },
+              tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 次 ('+p+'%)'; } } }
+            },
+            cutout: '65%',
           }
         });
       } else {

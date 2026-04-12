@@ -194,7 +194,7 @@
           <div class="ai-avatar">${SVG_BOT_AVATAR}</div>
           <div>
             <div class="ai-title">小云 AI 助手</div>
-            <div class="ai-subtitle" id="aiSubtitle">CloudControl 智能助手</div>
+            <div class="ai-subtitle" id="aiSubtitle">云翼智控 智能助手</div>
           </div>
         </div>
         <div class="ai-header-actions">
@@ -285,13 +285,13 @@
     aiAPI('/ai/rag/stats', 'GET')
       .then(data => {
         if (data && data.enabled) {
-          subtitleEl.textContent = `CloudControl 智能助手 · RAG已启用 (${data.chunk_count || 0})`;
+          subtitleEl.textContent = `云翼智控 智能助手 · RAG已启用 (${data.chunk_count || 0})`;
         } else {
-          subtitleEl.textContent = 'CloudControl 智能助手 · RAG未启用';
+          subtitleEl.textContent = '云翼智控 智能助手 · RAG未启用';
         }
       })
       .catch(() => {
-        subtitleEl.textContent = 'CloudControl 智能助手';
+        subtitleEl.textContent = '云翼智控 智能助手';
       });
   }
 
@@ -470,7 +470,7 @@
 
   function showWelcome() {
     appendMessage('assistant',
-      '👋 你好！我是 **小云**，CloudControl 平台的 AI 助手。\n\n' +
+      '👋 你好！我是 **小云**，云翼智控 平台的 AI 助手。\n\n' +
       '我可以帮你：\n' +
       '• 📊 查询系统状态和数据\n' +
       '• ⚠️ 分析告警和异常\n' +

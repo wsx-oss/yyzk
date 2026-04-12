@@ -205,29 +205,37 @@
     let prevNetSent = null, prevNetRecv = null, prevNetTs = null;
 
     /* ── charts ── */
+    const _mdk = document.documentElement.classList.contains('dark');
     const chartOpts = {
       responsive: true, maintainAspectRatio: false,
       animation: { duration: 300 },
+      interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: false } },
       scales: {
-        y: { beginAtZero: true, max: 100, ticks: { font: { size: 11 } } },
-        x: { ticks: { font: { size: 10 }, maxRotation: 0 } }
+        y: { beginAtZero: true, max: 100, ticks: { font: { size: 11 }, callback: function(v){return v+'%'} }, grid: { color: _mdk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' } },
+        x: { ticks: { font: { size: 10 }, maxRotation: 0 }, grid: { display: false } }
       }
     };
 
+    const _cpuCtx = $('#cpuChart').getContext('2d');
+    const _cpuGrad = createLinearGradient(_cpuCtx, 'rgba(22,93,255,0.28)', 'rgba(22,93,255,0.02)', 200);
     const cpuChart = createChart($('#cpuChart'), {
       type: 'line',
-      data: { labels: chartLabels, datasets: [{ label: 'CPU %', data: cpuData, borderColor: '#165dff', backgroundColor: 'rgba(22,93,255,.08)', tension: 0.4, fill: true, pointRadius: 2, borderWidth: 2 }] },
+      data: { labels: chartLabels, datasets: [{ label: 'CPU %', data: cpuData, borderColor: _mdk ? '#4e9fff' : '#165dff', backgroundColor: _cpuGrad, tension: 0.4, fill: true, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: _mdk ? '#4e9fff' : '#165dff', borderWidth: 2.5 }] },
       options: chartOpts
     });
+    const _memCtx = $('#memChart').getContext('2d');
+    const _memGrad = createLinearGradient(_memCtx, 'rgba(0,180,42,0.28)', 'rgba(0,180,42,0.02)', 200);
     const memChart = createChart($('#memChart'), {
       type: 'line',
-      data: { labels: chartLabels, datasets: [{ label: 'Memory %', data: memData, borderColor: '#00b42a', backgroundColor: 'rgba(0,180,42,.08)', tension: 0.4, fill: true, pointRadius: 2, borderWidth: 2 }] },
+      data: { labels: chartLabels, datasets: [{ label: 'Memory %', data: memData, borderColor: _mdk ? '#34d399' : '#00b42a', backgroundColor: _memGrad, tension: 0.4, fill: true, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: _mdk ? '#34d399' : '#00b42a', borderWidth: 2.5 }] },
       options: chartOpts
     });
+    const _diskCtx = $('#diskChart').getContext('2d');
+    const _diskGrad = createLinearGradient(_diskCtx, 'rgba(255,125,0,0.28)', 'rgba(255,125,0,0.02)', 200);
     const diskChart = createChart($('#diskChart'), {
       type: 'line',
-      data: { labels: chartLabels, datasets: [{ label: 'Disk %', data: diskData, borderColor: '#ff7d00', backgroundColor: 'rgba(255,125,0,.08)', tension: 0.4, fill: true, pointRadius: 2, borderWidth: 2 }] },
+      data: { labels: chartLabels, datasets: [{ label: 'Disk %', data: diskData, borderColor: _mdk ? '#fbbf24' : '#ff7d00', backgroundColor: _diskGrad, tension: 0.4, fill: true, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: _mdk ? '#fbbf24' : '#ff7d00', borderWidth: 2.5 }] },
       options: chartOpts
     });
 

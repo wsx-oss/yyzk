@@ -232,6 +232,9 @@
 
     // ========== Init Charts ==========
     function initCharts() {
+      var dk = document.documentElement.classList.contains('dark');
+      var respCtx = $('#responseChart').getContext('2d');
+      var respGrad = createLinearGradient(respCtx, 'rgba(22,93,255,0.32)', 'rgba(22,93,255,0.02)', 240);
       responseChart = createChart($('#responseChart'), {
         type: 'line',
         data: {
@@ -239,21 +242,31 @@
           datasets: [{
             label: '响应时间(ms)',
             data: [],
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59,130,246,0.1)',
+            borderColor: dk ? '#4e9fff' : '#165dff',
+            backgroundColor: respGrad,
             fill: true,
-            tension: 0.3,
-            pointRadius: 4,
-            pointBackgroundColor: '#3b82f6'
+            tension: 0.4,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointBackgroundColor: dk ? '#4e9fff' : '#165dff',
+            pointBorderColor: dk ? '#0e1525' : '#fff',
+            pointBorderWidth: 2,
+            borderWidth: 2.5
           }]
         },
         options: {
           maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true, title: { display: false } }, x: { title: { display: false } } },
-          plugins: { legend: { display: false } }
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: { beginAtZero: true, grid: { color: dk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 } } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+          },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx){ return ' 响应时间: ' + ctx.raw + ' ms'; } } } }
         }
       });
 
+      var tpCtx = $('#throughputChart').getContext('2d');
+      var tpGrad = createLinearGradient(tpCtx, dk ? 'rgba(52,211,153,0.85)' : 'rgba(0,180,42,0.85)', dk ? 'rgba(52,211,153,0.45)' : 'rgba(0,180,42,0.45)', 240);
       throughputChart = createChart($('#throughputChart'), {
         type: 'bar',
         data: {
@@ -261,17 +274,23 @@
           datasets: [{
             label: '吞吐量',
             data: [],
-            backgroundColor: '#10b981',
-            borderRadius: 4,
-            barThickness: 40
+            backgroundColor: tpGrad,
+            borderColor: dk ? '#34d399' : '#00b42a',
+            borderWidth: 1,
+            borderRadius: 8,
+            borderSkipped: false,
+            barThickness: 36
           }]
         },
         options: {
           maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true }, x: { grid: { display: false } } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: dk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 } } },
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+          },
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: (ctx) => ctx.parsed.y + ' req/s' } }
+            tooltip: { callbacks: { label: function(ctx){ return ' 吞吐量: ' + ctx.parsed.y + ' req/s'; } } }
           }
         }
       });
@@ -282,15 +301,21 @@
           labels: [],
           datasets: [{
             data: [],
-            backgroundColor: ['#ef4444', '#f59e0b', '#fb923c', '#3b82f6', '#10b981', '#a855f7']
+            backgroundColor: dk ? CC_PIE_PALETTE_DARK : CC_PIE_PALETTE,
+            hoverOffset: 10
           }]
         },
         options: {
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'right', labels: { font: { size: 12 }, padding: 10 } } }
+          cutout: '65%',
+          plugins: {
+            legend: { position: 'right', labels: { font: { size: 12, weight: '500' }, padding: 14, usePointStyle: true, pointStyle: 'circle' } },
+            tooltip: { callbacks: { label: function(ctx){ var t=ctx.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(ctx.raw/t*100).toFixed(1):0; return ' '+ctx.label+': '+ctx.raw+'% (占比'+p+'%)'; } } }
+          }
         }
       });
 
+      var radarGridColor = dk ? 'rgba(56,132,255,0.15)' : 'rgba(0,0,0,0.06)';
       radarChart = createChart($('#radarChart'), {
         type: 'radar',
         data: {
@@ -299,8 +324,16 @@
         },
         options: {
           maintainAspectRatio: false,
-          scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20 } } },
-          plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
+          scales: {
+            r: {
+              beginAtZero: true, max: 100,
+              ticks: { stepSize: 20, backdropColor: 'transparent', font: { size: 10 }, color: dk ? 'rgba(145,175,225,0.6)' : '#86909c' },
+              grid: { color: radarGridColor, lineWidth: 1 },
+              angleLines: { color: radarGridColor },
+              pointLabels: { font: { size: 12, weight: '500' }, color: dk ? 'rgba(185,205,240,0.85)' : '#4e5969' }
+            }
+          },
+          plugins: { legend: { position: 'bottom', labels: { font: { size: 11, weight: '500' }, padding: 14, usePointStyle: true, pointStyle: 'circle' } } }
         }
       });
     }
@@ -482,10 +515,10 @@
           moduleData[mod].err.push(parseNum(it.error_rate));
         }
         const radarColors = [
-          { bg: 'rgba(59,130,246,0.2)', border: '#3b82f6' },
-          { bg: 'rgba(16,185,129,0.2)', border: '#10b981' },
-          { bg: 'rgba(245,158,11,0.2)', border: '#f59e0b' },
-          { bg: 'rgba(168,85,247,0.2)', border: '#a855f7' }
+          { bg: 'rgba(22,93,255,0.18)', border: '#165dff' },
+          { bg: 'rgba(20,201,201,0.18)', border: '#14c9c9' },
+          { bg: 'rgba(255,125,0,0.18)', border: '#ff7d00' },
+          { bg: 'rgba(114,46,209,0.18)', border: '#722ed1' }
         ];
         const datasets = [];
         let ci = 0;

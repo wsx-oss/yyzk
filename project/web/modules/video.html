@@ -109,13 +109,17 @@
     var currentPlayerUrl = '';
     var currentPlayerMode = '';
 
+    var _dk = document.documentElement.classList.contains('dark');
     var videoChart = createChart($('#videoChart'), {
       type: 'doughnut',
       data: {
         labels: ['已配置视频流', '未配置视频流'],
-        datasets: [{ data: [0, 0], backgroundColor: ['#3b82f6', '#e2e8f0'] }]
+        datasets: [{ data: [0, 0], backgroundColor: _dk ? ['#4e9fff', '#2a3a5c'] : ['#165dff', '#e5e6eb'], hoverOffset: 10 }]
       },
-      options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } } } }
+      options: { maintainAspectRatio: false, cutout: '65%', plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 14, usePointStyle: true, pointStyle: 'circle' } },
+        tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 台 ('+p+'%)'; } } }
+      } }
     });
 
     window.addEventListener('DOMContentLoaded', function() { loadDrones(); });

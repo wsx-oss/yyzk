@@ -632,9 +632,10 @@
 
     // ========== Charts ==========
     function renderCharts(stats) {
+      const dk = document.documentElement.classList.contains('dark');
       const statusDist = stats.status_distribution || {};
       const statusLabels = ['待发布', '已发布', '已撤回'];
-      const statusColors = ['#165dff', '#10b981', '#ef4444'];
+      const statusColors = dk ? ['#4e9fff','#34d399','#f87171'] : ['#165dff','#00b42a','#f53f3f'];
       const statusData = statusLabels.map(l => statusDist[l] || 0);
 
       if (statusChartInst) statusChartInst.destroy();
@@ -642,20 +643,22 @@
         type: 'doughnut',
         data: {
           labels: statusLabels,
-          datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 2, borderColor: '#fff' }]
+          datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 3, borderColor: dk ? '#0e1525' : '#fff', hoverBorderColor: dk ? '#0e1525' : '#fff', hoverOffset: 10 }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          cutout: '65%',
           plugins: {
-            legend: { position: 'right', labels: { padding: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 } } }
+            legend: { position: 'right', labels: { padding: 14, usePointStyle: true, pointStyle: 'circle', font: { size: 12, weight: '500' } } },
+            tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 个 ('+p+'%)'; } } }
           }
         }
       });
 
       const typeDist = stats.type_distribution || {};
       const typeLabels = ['功能更新', '安全更新', '性能优化'];
-      const typeColors = ['#165dff', '#10b981', '#a855f7'];
+      const typeColors = dk ? ['#4e9fff','#34d399','#9b7cee'] : ['#165dff','#00b42a','#722ed1'];
       const typeData = typeLabels.map(l => typeDist[l] || 0);
 
       if (typeChartInst) typeChartInst.destroy();
@@ -663,17 +666,17 @@
         type: 'bar',
         data: {
           labels: typeLabels,
-          datasets: [{ label: '数量', data: typeData, backgroundColor: typeColors, borderRadius: 4, barThickness: 28 }]
+          datasets: [{ label: '数量', data: typeData, backgroundColor: typeColors, borderRadius: 8, borderSkipped: false, barThickness: 28 }]
         },
         options: {
           indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f1f5f9' } },
-            y: { grid: { display: false } }
+            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0, font: { size: 11 } }, grid: { color: dk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' } },
+            y: { grid: { display: false }, ticks: { font: { size: 12, weight: '500' } } }
           },
-          plugins: { legend: { display: false } }
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return ' ' + c.parsed.x + ' 个'; } } } }
         }
       });
     }
