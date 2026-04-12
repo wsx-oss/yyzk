@@ -5,9 +5,9 @@
 
 **企业级智能管控平台 | 实时监控 | 远程控制 | 性能分析**
 
-基于 Go 1.24 + Gin + MySQL + WebSocket + noVNC 的完整解决方案
+基于 Go 1.25 + Gin + MySQL + WebSocket + noVNC + RAG + RL 的完整解决方案
 
-[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
@@ -36,9 +36,11 @@
 CloudControl 是一套面向企业级应用的综合性管控平台。
 
 **技术栈**：
-- **后端**：Go + Gin，位于 `project/`，数据库已从 SQLite 迁移至 **MySQL**（Aiven 云数据库），通过环境变量 `SC_DB_DRIVER` 切换驱动，内置 SQL 方言自动适配层（`AdaptSQL`）
+- **后端**：Go + Gin，位于 `project/`，数据库已从 SQLite 迁移至 **MySQL**（Aiven 云数据库），通过环境变量 `SC_DB_DRIVER` 切换驱动，内置 SQL 方言自动适配层（`AdaptSQL`），共 32 张业务表
 - **前端**：静态页面位于 `project/web/`，由后端内嵌静态资源并通过 `/app` 提供访问
 - **时区**：统一为 **Asia/Shanghai (UTC+8)**，Go 后端 `time.Local` 与 MySQL 会话时区均已配置
+- **Redis**：`.env` 中已配置 Redis 连接信息（`REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB`），当前尚未集成到 Go 后端代码中（`go.mod` 无 Redis 客户端依赖），预留用于后续缓存/会话/消息队列等场景
+- **RAG 知识库**：内置 BM25 关键词检索引擎（`internal/rag/rag.go`），自动加载 `knowledge_base/` 目录下 20 篇领域文档，为 AI 助手提供检索增强生成能力
 
 ### 核心特性
 
@@ -46,7 +48,7 @@ CloudControl 是一套面向企业级应用的综合性管控平台。
 - **性能优化**：数据库索引优化、分页支持、请求限流（500次/分钟/IP）
 - **安全防护**：CORS 跨域、SQL 注入防护、输入验证、Panic 自动恢复
 - **实时监控**：CPU/内存/磁盘/网络监控、WebSocket 实时推送、阈值自动告警
-- **智能能力**：LLM 航线规划 + NFZ 纠偏 + 多候选方案、CoT 思维链 AI 分析、智能巡检与通知中心
+- **智能能力**：LLM 航线规划 + NFZ 纠偏 + 多候选方案、CoT 思维链 AI 分析、智能巡检与通知中心、RAG 检索增强生成（BM25 + 20 篇知识库文档）
 - **并发框架**：统一 Worker Pool（IO/CPU 双池）、优先级调度、超时控制、panic 恢复、DB 批写、WS 节流、统计缓存
 - **仿真与强化学习**：多实例无人机仿真引擎、任务模板（巡逻/巡检/配送/测绘/搜救）、碰撞规避、禁飞区地理围栏检测、Leaflet 实时地图（贝塞尔曲线轨迹）、RL 训练评估与策略导出
 
@@ -121,7 +123,7 @@ Stop-Process -Id <PID> -Force
 
 ```bash
 cd project
-go version   # 建议 Go 1.24+
+go version   # 建议 Go 1.25+
 go mod tidy
 ```
 
@@ -205,12 +207,26 @@ go run .
 
 ### 智能规划 / 地图（可选）
 
-| 变量名 | 说明 |
-|--------|------|
-| `LLM_API_KEY` | 大模型 API Key（留空降级为直线规划） |
-| `LLM_BASE_URL` | 大模型 API Base URL |
-| `LLM_MODEL` | 大模型名称 |
-| `AMAP_KEY` | 高德地图 Key（地址解析/逆编码） |
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `LLM_API_KEY` | `""` | 大模型 API Key（留空降级为直线规划） |
+| `LLM_BASE_URL` | `https://openapi.monica.im/v1` | 大模型 API Base URL |
+| `LLM_MODEL` | `gpt-4.1` | 大模型名称 |
+| `LLM_RPM` | `30` | LLM 请求速率限制（次/分钟），令牌桶限流 |
+| `LLM_TIMEOUT_SEC` | `60` | LLM 单次请求超时（秒） |
+| `AMAP_KEY` | `""` | 高德地图 Key（地址解析/逆编码） |
+| `TIANDITU_KEY` | `""` | 天地图 Key（影像底图 + 标注图层） |
+
+### Redis 配置（预留，尚未集成）
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `REDIS_HOST` | - | Redis 服务器地址 |
+| `REDIS_PORT` | - | Redis 端口 |
+| `REDIS_PASSWORD` | - | Redis 密码 |
+| `REDIS_DB` | `0` | Redis 数据库编号 |
+
+> **注意**：Redis 配置已在 `.env` 中预留并测试可连通，但 Go 后端尚未引入 Redis 客户端库（如 `go-redis`），当前不会实际连接 Redis。后续计划用于会话缓存、实时消息队列、分布式锁等场景。
 
 ---
 
@@ -299,7 +315,11 @@ go run .
 | AI助手 | POST | `/api/ai-assistant/chat` | AI 助手对话 |
 | AI助手 | GET | `/api/ai-assistant/suggestions` | 获取快捷指令建议 |
 | 并发池 | GET | `/api/taskpool/metrics` | 任务池指标快照（workers/队列/任务组统计） |
+| 并发池 | GET | `/api/taskpool/llm-rpm` | LLM RPM 限流指标（当前/上限/失败/平均延迟） |
 | 统计缓存 | GET | `/api/stats/cached` | 聚合统计缓存（6 类业务数据 + pool 指标） |
+| RAG | GET | `/api/ai/rag/search?q=xxx` | 知识库检索（BM25 关键词匹配） |
+| RAG | GET | `/api/ai/rag/stats` | 知识库状态（chunk 数量/文档数） |
+| 健康检查 | GET | `/api/healthz` | 系统健康检查（db/llm/patrol/uptime） |
 | 仿真 | GET | `/api/sim/metrics` | 仿真引擎运行指标 |
 | 仿真 | POST | `/api/sim/batches` | 创建仿真批次（支持 mission 模板） |
 | 仿真 | GET | `/api/sim/instances` | 仿真实例列表 |
@@ -332,10 +352,10 @@ project/
 │   ├── agent/agent.go              # 内嵌 Agent（主服务自动启动）
 │   ├── db/
 │   │   ├── db.go                   # 数据库连接、SQL 兼容层（AdaptSQL）、DB/Tx 包装器
-│   │   ├── migrate_mysql.go        # MySQL 建表 DDL
+│   │   ├── migrate_mysql.go        # MySQL 建表 DDL（32 张表）
 │   │   └── migrate_sqlite.go       # SQLite 建表 DDL
 │   ├── taskpool/                    # 统一并发框架
-│   │   ├── pool.go                 # Worker Pool 引擎（IO/CPU 双池、优先级、超时、panic 恢复、周期调度、指标）
+│   │   ├── pool.go                 # Worker Pool 引擎（IO/CPU 双池、优先级、超时、panic 恢复、周期调度、LLM RPM 限流、指标）
 │   │   └── batcher.go              # 辅助工具（WriteBatcher / Throttler / StatsCache）
 │   ├── handlers/                    # API 处理函数
 │   │   ├── api.go                  # 通用 API（设备、硬件、报警、日志、更新、同步等）
@@ -348,23 +368,30 @@ project/
 │   │   ├── noflyzone.go            # 禁飞区管理
 │   │   ├── cot.go                  # 思维链 AI 分析
 │   │   ├── backup.go               # 备份与数据回滚（自动/手动/恢复/进度追踪）
-│   │   ├── ai_assistant.go         # AI 智能助手（多轮对话/知识库/快捷指令）
+│   │   ├── ai_assistant.go         # AI 智能助手（多轮对话/知识库/快捷指令/RAG 集成）
 │   │   ├── notification.go         # 消息通知中心
-│   │   ├── patrol.go               # AI 定时巡检（已接入 Pool 周期调度）
+│   │   ├── patrol.go               # AI 定时巡检（含离线健康检查 + 通知冷却抑制）
 │   │   ├── pool_integration.go     # 并发整合层（批写/节流/统计缓存/任务提交辅助）
-│   │   ├── taskpool_api.go         # 并发池指标 API（/api/taskpool/metrics）
+│   │   ├── taskpool_api.go         # 并发池指标 API（/api/taskpool/metrics + /api/taskpool/llm-rpm）
+│   │   ├── rag_endpoints.go        # RAG 知识库查询 API（/api/ai/rag/*）
+│   │   ├── rag_integration.go      # RAG 与 AI 助手集成层
 │   │   ├── simulation.go           # 仿真引擎 API（批次/实例/异常/RL）
 │   │   ├── sim_integration.go      # 仿真引擎与 DB/WS 集成
 │   │   └── wshub.go                # WebSocket 事件广播
-│   ├── llm/llm.go                  # LLM 大模型调用封装
+│   ├── llm/
+│   │   ├── llm.go                  # LLM 大模型调用封装（含 RPM 令牌桶限流）
+│   │   └── reasoning.go            # LLM 推理链解析
+│   ├── rag/rag.go                  # RAG 检索引擎（BM25 关键词检索 + 倒排索引）
+│   ├── cot/cot.go                  # CoT 思维链推理模块
 │   ├── amap/amap.go                # 高德地图 API 封装
 │   ├── middleware/                  # 中间件（认证、限流、日志）
 │   ├── monitor/monitor.go          # 系统指标采集
 │   ├── syncengine/engine.go        # 数据同步引擎（18 张表）
+│   ├── utils/                       # 通用工具函数
 │   └── simulation/                 # 仿真与强化学习引擎
-│       ├── engine.go               # 多实例仿真引擎（批次管理+碰撞规避）
-│       ├── instance.go             # 单机仿真状态机与动作执行
-│       ├── rl.go                   # Q-learning 训练器与经验回放
+│       ├── engine.go               # 多实例仿真引擎（批次管理+碰撞规避+禁飞区围栏）
+│       ├── instance.go             # 单机仿真状态机与动作执行（含低电量自动检测）
+│       ├── rl.go                   # Q-learning 训练器与经验回放（11 维状态空间）
 │       └── types.go                # 仿真核心数据结构与任务类型
 ├── web/
 │   ├── index.html                  # 系统首页
@@ -382,6 +409,15 @@ project/
 │       ├── ai-assistant.js         # 右下角 AI 智能助手浮窗
 │       ├── notification-bell.js    # 右上角消息通知铃铛
 │       └── common.js / common.css  # 公共工具函数和样式
+├── knowledge_base/                    # RAG 知识库文档（20 篇 .md）
+│   ├── platform_overview.md           # 平台总览
+│   ├── drone_operations.md            # 无人机操作指南
+│   ├── flight_planning.md             # 航线规划知识
+│   ├── battery_safety.md              # 电池安全规范
+│   ├── simulation_guide.md            # 仿真引擎使用指南
+│   ├── rl_policy_guide.md             # 强化学习策略指南
+│   ├── emergency_procedures.md        # 应急处理流程
+│   └── ...                            # 其余 13 篇领域文档
 └── data/
     ├── backups/                    # 数据库备份文件存储
     ├── recordings/                 # 语音文件存储
@@ -457,7 +493,23 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 ## 版本更新
 
-### v3.7.0 (最新)
+### v3.8.0 (最新)
+
+- 离线状态通知抑制
+  - `patrol.go` 无人机下线通知 5 分钟/台冷却期，防止通知风暴
+  - 巡检前预检 DB ping + LLM HEAD，离线时跳过巡检不生成通知
+  - `notification-bell.js` 检测 `navigator.onLine` + fetch 失败计数，显示离线 badge，暂停轮询
+  - `/api/healthz` 增强：返回 `db_reachable`、`llm_reachable`、`patrol_online`、`uptime_s`
+- 并发任务 RPM 优化
+  - `llm.go` 新增 `golang.org/x/time/rate` 令牌桶限流器，按 `LLM_RPM`（默认 30）控制
+  - `concurrency.html` 新增 LLM RPM 监控卡片（当前分钟/上限/排队/平均延迟）
+  - `/api/taskpool/llm-rpm` 独立 RPM 指标端点
+  - LLM 超时支持 `LLM_TIMEOUT_SEC` 环境变量配置（默认 60s）
+- 模拟机低电量异常自动检测
+  - `instance.go` ≤20% 电量自动注入 `low_battery` 警告；≤15% 升级为 Critical 并强制返航
+  - 电量恢复 >20% 后自动清除异常标签
+
+### v3.7.0
 
 - 仿真引擎禁飞区地理围栏集成
   - `engine.go` 新增 `SetNoFlyZones()` / `CheckGeofence()` / `pointInPolygon()`（ray-casting 点在多边形内检测）
@@ -567,7 +619,8 @@ rm app.db-shm app.db-wal  # 删除锁文件后重启
 
 - MySQL 数据库支持（`SC_DB_DRIVER` 切换）
 - SQL 兼容层自动转换（AdaptSQL）
-- SQLite → MySQL 数据迁移完成（1473+ 行数据，26 张表）
+- SQLite → MySQL 数据迁移完成（1473+ 行数据，26 张表，后续扩展至 32 张表）
+- 数据库连接池配置（25 最大连接 / 10 空闲连接）
 - 系统时区统一 Asia/Shanghai (UTC+8)
 - 侧边栏菜单滚动优化、CoT 智能决策菜单可见
 
