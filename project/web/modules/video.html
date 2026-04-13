@@ -86,10 +86,11 @@
   </div>
 
   <!-- Chart -->
-  <div class="card">
+  <div class="card" style="padding-bottom:24px;">
     <div class="card-title">视频配置统计</div>
-    <div style="height:260px;display:flex;flex-direction:column;align-items:center;width:100%;">
-      <div style="flex:1;width:100%;max-width:320px;position:relative;"><canvas id="videoChart"></canvas></div>
+    <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
+      <div style="width:100%;max-width:240px;position:relative;aspect-ratio:1/1;"><canvas id="videoChart"></canvas></div>
+      <div id="videoLegend" style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-top:16px;font-size:12px;font-weight:500;color:#475569;"></div>
     </div>
   </div>
 
@@ -109,6 +110,16 @@
     var currentPlayerUrl = '';
     var currentPlayerMode = '';
 
+    function renderLegend(chart, containerEl) {
+      if (!chart || !containerEl) return;
+      var labels = chart.data.labels || [];
+      var ds = chart.data.datasets[0] || {};
+      var colors = ds.backgroundColor || [];
+      containerEl.innerHTML = labels.map(function(lbl, i) {
+        return '<span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:' + (colors[i]||'#ccc') + ';"></span>' + lbl + '</span>';
+      }).join('');
+    }
+
     var _dk = document.documentElement.classList.contains('dark');
     var videoChart = createChart($('#videoChart'), {
       type: 'doughnut',
@@ -117,10 +128,11 @@
         datasets: [{ data: [0, 0], backgroundColor: _dk ? ['#4e9fff', '#2a3a5c'] : ['#165dff', '#e5e6eb'], hoverOffset: 10 }]
       },
       options: { maintainAspectRatio: false, cutout: '65%', plugins: {
-        legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 14, usePointStyle: true, pointStyle: 'circle' } },
+        legend: { display: false },
         tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 台 ('+p+'%)'; } } }
       } }
     });
+    renderLegend(videoChart, $('#videoLegend'));
 
     window.addEventListener('DOMContentLoaded', function() { loadDrones(); });
 
@@ -172,6 +184,7 @@
       if (videoChart) {
         videoChart.data.datasets[0].data = [withVideo, total - withVideo];
         videoChart.update();
+        renderLegend(videoChart, $('#videoLegend'));
       }
     }
 

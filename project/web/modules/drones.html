@@ -132,16 +132,18 @@
   </div>
 
   <!-- Charts -->
-  <div class="card">
+  <div class="card" style="padding-bottom:24px;">
     <div class="card-title">统计概览</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;">
-      <div style="height:280px;display:flex;flex-direction:column;align-items:center;width:100%;">
+      <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
         <div style="font-weight:600;margin-bottom:12px;text-align:center;">状态分布</div>
-        <div style="flex:1;width:100%;max-width:280px;position:relative;"><canvas id="statusChart"></canvas></div>
+        <div style="width:100%;max-width:240px;position:relative;aspect-ratio:1/1;"><canvas id="statusChart"></canvas></div>
+        <div id="statusLegend" style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-top:16px;font-size:12px;font-weight:500;color:#475569;"></div>
       </div>
-      <div style="height:280px;display:flex;flex-direction:column;align-items:center;width:100%;">
+      <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
         <div style="font-weight:600;margin-bottom:12px;text-align:center;">协议分布</div>
-        <div style="flex:1;width:100%;max-width:280px;position:relative;"><canvas id="protocolChart"></canvas></div>
+        <div style="width:100%;max-width:240px;position:relative;aspect-ratio:1/1;"><canvas id="protocolChart"></canvas></div>
+        <div id="protocolLegend" style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-top:16px;font-size:12px;font-weight:500;color:#475569;"></div>
       </div>
     </div>
   </div>
@@ -319,24 +321,37 @@
     let activeFilterStatus = '';
 
     // ========== Charts ==========
+    function renderLegend(chart, containerEl) {
+      if (!chart || !containerEl) return;
+      var labels = chart.data.labels || [];
+      var ds = chart.data.datasets[0] || {};
+      var colors = ds.backgroundColor || [];
+      var vals = ds.data || [];
+      containerEl.innerHTML = labels.map(function(lbl, i) {
+        return '<span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:' + (colors[i]||'#ccc') + ';"></span>' + lbl + '</span>';
+      }).join('');
+    }
+
     function initCharts() {
       var dk = document.documentElement.classList.contains('dark');
       statusChart = createChart($('#statusChart'), {
         type: 'doughnut',
         data: { labels: ['在线', '离线', 'GPS活跃'], datasets: [{ data: [0, 0, 0], backgroundColor: dk ? ['#34d399','#f87171','#4e9fff'] : ['#00b42a','#f53f3f','#165dff'], hoverOffset: 10 }] },
         options: { maintainAspectRatio: false, cutout: '68%', plugins: {
-          legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 18, usePointStyle: true, pointStyle: 'circle' } },
+          legend: { display: false },
           tooltip: { callbacks: { label: function(ctx){ var t=ctx.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(ctx.raw/t*100).toFixed(1):0; return ' '+ctx.label+': '+ctx.raw+' 台 ('+p+'%)'; } } }
         } }
       });
+      renderLegend(statusChart, $('#statusLegend'));
       protocolChart = createChart($('#protocolChart'), {
         type: 'doughnut',
         data: { labels: ['SSH', 'VNC', 'RDP'], datasets: [{ data: [0, 0, 0], backgroundColor: dk ? ['#9b7cee','#4e9fff','#36d6d6'] : ['#722ed1','#165dff','#14c9c9'], hoverOffset: 10 }] },
         options: { maintainAspectRatio: false, cutout: '68%', plugins: {
-          legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 18, usePointStyle: true, pointStyle: 'circle' } },
+          legend: { display: false },
           tooltip: { callbacks: { label: function(ctx){ var t=ctx.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(ctx.raw/t*100).toFixed(1):0; return ' '+ctx.label+': '+ctx.raw+' 台 ('+p+'%)'; } } }
         } }
       });
+      renderLegend(protocolChart, $('#protocolLegend'));
     }
 
     // ========== Load Data ==========
@@ -374,6 +389,7 @@
         if (statusChart) {
           statusChart.data.datasets[0].data = [s.online||0, s.offline||0, s.gps_active||0];
           statusChart.update();
+          renderLegend(statusChart, $('#statusLegend'));
         }
       } catch (e) {
         console.error('loadStats error:', e);
@@ -387,6 +403,10 @@
         items.forEach(d => { let p = (d.protocol||'').toUpperCase(); if (pc[p] !== undefined) pc[p]++; });
         protocolChart.data.datasets[0].data = [pc.SSH, pc.VNC, pc.RDP];
         protocolChart.update();
+        renderLegend(protocolChart, $('#protocolLegend'));
+      }
+      if (statusChart) {
+        renderLegend(statusChart, $('#statusLegend'));
       }
     }
 
