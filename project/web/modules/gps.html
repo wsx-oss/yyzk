@@ -317,7 +317,7 @@
 
     // ========== Map Init ==========
     function initMap() {
-      map = L.map('mapContainer').setView([34.7930, 113.6636], 15);
+      map = L.map('mapContainer').setView([DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
       tdtImgLayer().addTo(map);
       tdtCiaLayer().addTo(map);
       // MarkerCluster: handles overlapping markers — click cluster to spiderfy (fan out)
@@ -699,7 +699,7 @@
         $('#detailModal').classList.add('active');
         setTimeout(() => {
           if (detailMap) { detailMap.remove(); detailMap = null; }
-          detailMap = L.map('detailMap').setView([d.latitude || 34.7930, d.longitude || 113.6636], 15);
+          detailMap = L.map('detailMap').setView([d.latitude || DEFAULT_CAMPUS_MAP_CENTER.lat, d.longitude || DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
           tdtImgLayer().addTo(detailMap);
           tdtCiaLayer().addTo(detailMap);
           if (d.latitude !== 0 || d.longitude !== 0) {
@@ -724,7 +724,7 @@
         $('#historyModal').classList.add('active');
         setTimeout(() => {
           if (historyMap) { historyMap.remove(); historyMap = null; }
-          historyMap = L.map('historyMap').setView([34.7930, 113.6636], 15);
+          historyMap = L.map('historyMap').setView([DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
           tdtImgLayer().addTo(historyMap);
           tdtCiaLayer().addTo(historyMap);
           if (items.length) {

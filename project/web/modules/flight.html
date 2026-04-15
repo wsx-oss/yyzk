@@ -947,7 +947,7 @@
       mPickerNFZLayers.forEach(l => { try { l.remove(); } catch(e) {} });
       mPickerNFZLayers = [];
       try {
-        mPickerMap = L.map('mPickerMap', { center: [34.7930, 113.6636], zoom: 15 });
+        mPickerMap = L.map('mPickerMap', { center: [DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], zoom: DEFAULT_CAMPUS_MAP_CENTER.zoom });
         tdtImgLayer().addTo(mPickerMap);
         tdtCiaLayer().addTo(mPickerMap);
         addNoFlyZonesToMap(mPickerMap, mPickerNFZLayers);
@@ -968,6 +968,13 @@
         });
       } catch(e) { console.warn('Picker map init failed:', e); }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var startInput = $('#mStartAddr');
+      var goalInput = $('#mGoalAddr');
+      if (startInput) startInput.placeholder = '例如：' + DEFAULT_CAMPUS_ROUTE_START.name + ' / ' + DEFAULT_CAMPUS_ROUTE_START.lat.toFixed(6) + ',' + DEFAULT_CAMPUS_ROUTE_START.lng.toFixed(6);
+      if (goalInput) goalInput.placeholder = '例如：' + DEFAULT_CAMPUS_ROUTE_GOAL.name + ' / ' + DEFAULT_CAMPUS_ROUTE_GOAL.lat.toFixed(6) + ',' + DEFAULT_CAMPUS_ROUTE_GOAL.lng.toFixed(6);
+    });
 
     // --- Address geocoding ---
     async function resolveAddress(which) {
