@@ -44,9 +44,13 @@ func NewRateLimiter(rate int, duration time.Duration) *RateLimiter {
 // Middleware returns a Gin middleware handler
 func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Skip rate limiting for static files
+		// Skip rate limiting for static files, auth, WebSocket and streaming endpoints
 		path := c.Request.URL.Path
-		if strings.HasPrefix(path, "/app/") || path == "/" {
+		if strings.HasPrefix(path, "/app/") || path == "/" ||
+			strings.HasPrefix(path, "/api/auth/") ||
+			path == "/api/healthz" ||
+			path == "/api/vnc/ws" || path == "/api/ssh/ws" ||
+			strings.HasSuffix(path, "/stream") {
 			c.Next()
 			return
 		}

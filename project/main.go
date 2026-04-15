@@ -94,8 +94,8 @@ func main() {
 	r.Use(middleware.RequestLogger())
 	r.Use(corsMiddleware())
 
-	// Rate limiting: 100 requests per minute per IP
-	rateLimiter := middleware.NewRateLimiter(500, 1*time.Minute)
+	// Rate limiting: 3000 requests per minute per IP (high for local dev with many polling modules)
+	rateLimiter := middleware.NewRateLimiter(3000, 1*time.Minute)
 	r.Use(rateLimiter.Middleware())
 
 	startTime := time.Now()
