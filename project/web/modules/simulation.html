@@ -480,6 +480,73 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   .ds-header-title { font-size:20px; letter-spacing:4px; }
 }
 
+body {
+  background: var(--cc-page-bg, var(--bg));
+  background-attachment: fixed;
+}
+.header,
+.tabs,
+.card,
+.stat-card,
+.metric-badge,
+.mission-info,
+.plan-est-box,
+.plan-result,
+.multi-plan-card,
+.modal {
+  background: var(--cc-glass-bg-strong);
+  border-color: var(--cc-glass-border);
+  box-shadow: var(--cc-shadow-1), inset 0 1px 0 var(--cc-glass-border-strong);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+.tab {
+  border-color: transparent;
+}
+.tab:hover,
+.tab.active {
+  background: var(--cc-glass-bg);
+  border-color: var(--cc-glass-border);
+}
+input, select, textarea,
+.cot-inline-body,
+.cot-step,
+.cot-final,
+.plan-waypoints,
+.plan-map-context,
+.plan-explanation,
+.scroll-lock-btn {
+  background: var(--cc-glass-bg);
+  border-color: var(--cc-glass-border);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+.cot-inline-header {
+  background: linear-gradient(135deg, rgba(22,93,255,0.14), rgba(20,201,201,0.10));
+}
+.cot-inline-header:hover {
+  background: linear-gradient(135deg, rgba(22,93,255,0.20), rgba(20,201,201,0.14));
+}
+th,
+.plan-waypoints th {
+  background: rgba(255,255,255,0.20);
+}
+.modal-overlay {
+  background: rgba(10,18,36,0.28);
+  backdrop-filter: blur(10px);
+}
+#simMap,
+.plan-picker-map,
+.plan-result-map,
+.multi-plan-map {
+  border-color: var(--cc-glass-border);
+  box-shadow: var(--cc-shadow-1);
+}
+.badge-gray {
+  background: rgba(148,163,184,0.16);
+}
+
 </style>
 </head>
 <body>
