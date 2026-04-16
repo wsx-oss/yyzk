@@ -433,11 +433,37 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 		deviceID = int(newID)
 		// record initial history
 		BatchGPSHistory(a.db, deviceID, p.Latitude, p.Longitude, p.Altitude, p.Speed, p.Heading)
-		// If a drone exists with this agent_id, link them together
+		// If a drone exists with this agent_id, link them together; otherwise auto-create one
 		var droneID int
 		if a.db.QueryRow(`SELECT id FROM drones WHERE agent_id=?`, p.AgentID).Scan(&droneID) == nil && droneID > 0 {
 			a.db.Exec(`UPDATE gps_devices SET drone_id=? WHERE id=?`, droneID, deviceID)
 			a.db.Exec(`UPDATE drones SET linked_gps_device_id=?, status='online', updated_at=datetime('now') WHERE id=?`, deviceID, droneID)
+		} else {
+			// Auto-create drone entry for this agent (auto-discovery)
+			droneName := p.AgentID
+			droneRes, err3 := a.db.Exec(
+				`INSERT INTO drones(name, model, description, ip, ssh_port, vnc_port, rdp_port, protocol, username, password,
+				agent_id, initial_lat, initial_lng, initial_alt, fence_enabled, fence_lat, fence_lng, fence_radius,
+				auto_connect, log_enabled, status, linked_gps_device_id, video_url)
+				VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				droneName, "自动发现", "通过数据推送自动注册", "", 22, 5900, 3389, "SSH", "", "",
+				p.AgentID, p.Latitude, p.Longitude, p.Altitude, 0, 0, 0, 500,
+				0, 0, "online", deviceID, "",
+			)
+			if err3 == nil {
+				newDroneID, _ := droneRes.LastInsertId()
+				droneID = int(newDroneID)
+				a.db.Exec(`UPDATE gps_devices SET drone_id=? WHERE id=?`, droneID, deviceID)
+				// Auto-create linked remote device
+				devRes, _ := a.db.Exec(
+					`INSERT INTO devices(name, ip, ssh_port, vnc_port, rdp_port, protocol, username, password, status, agent_id) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+					droneName, "", 22, 5900, 3389, "SSH", "", "", "offline", p.AgentID,
+				)
+				if devRes != nil {
+					linkedDevID, _ := devRes.LastInsertId()
+					a.db.Exec(`UPDATE drones SET linked_device_id=? WHERE id=?`, int(linkedDevID), droneID)
+				}
+			}
 		}
 		ThrottledBroadcast("gps", WSEvent{Type: "gps_update", Data: gin.H{"device_id": deviceID, "latitude": p.Latitude, "longitude": p.Longitude, "altitude": p.Altitude, "speed": p.Speed, "heading": p.Heading, "created": true}})
 		c.JSON(200, gin.H{"ok": true, "id": deviceID, "created": true})

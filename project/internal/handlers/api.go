@@ -310,11 +310,13 @@ func RegisterRoutes(r *gin.Engine, database *db.DB) {
 		api.GET("/flight/missions", a.FlightMissionsList)
 		api.POST("/flight/missions", a.FlightMissionsCreate)
 		api.GET("/flight/missions/stats", a.FlightMissionsStats)
+		api.GET("/flight/missions/active", a.FlightActiveMissions)
 		api.POST("/flight/missions/import", a.FlightMissionsImport)
 		api.GET("/flight/missions/:id", a.FlightMissionsGet)
 		api.PUT("/flight/missions/:id", a.FlightMissionsUpdate)
 		api.DELETE("/flight/missions/:id", a.FlightMissionsDelete)
 		api.POST("/flight/missions/:id/phase", a.FlightMissionsUpdatePhase)
+		api.POST("/flight/missions/:id/control", a.DroneControl)
 		api.GET("/flight/missions/:id/logs", a.FlightMissionsLogs)
 		api.POST("/flight/missions/push", a.FlightMissionPushByAgent)
 

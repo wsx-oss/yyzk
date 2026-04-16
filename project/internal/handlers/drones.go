@@ -13,6 +13,7 @@ import (
 func (a *API) DronesList(c *gin.Context) {
 	name := strings.TrimSpace(c.Query("name"))
 	status := strings.TrimSpace(c.Query("status"))
+	dataActive := strings.TrimSpace(c.Query("data_active"))
 
 	where := []string{"1=1"}
 	args := []any{}
@@ -23,6 +24,9 @@ func (a *API) DronesList(c *gin.Context) {
 	if status != "" {
 		where = append(where, "status = ?")
 		args = append(args, status)
+	}
+	if dataActive == "true" {
+		where = append(where, "linked_gps_device_id > 0 AND linked_gps_device_id IN (SELECT id FROM gps_devices WHERE status='在线')")
 	}
 
 	wc := strings.Join(where, " AND ")

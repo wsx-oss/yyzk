@@ -497,6 +497,29 @@ func (a *API) FlightMissionsStats(c *gin.Context) {
 	c.JSON(200, stats)
 }
 
+// FlightActiveMissions returns a compact list of active (non-completed) missions
+// with their device_id. Used by GPS page to show flight status on map markers.
+func (a *API) FlightActiveMissions(c *gin.Context) {
+	rows, err := a.db.Query(`SELECT id, name, device_id, status, current_phase, progress FROM flight_missions WHERE status != '已完成' AND device_id > 0`)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+	items := []gin.H{}
+	for rows.Next() {
+		var id, deviceID, progress int
+		var name, status, phase string
+		if err := rows.Scan(&id, &name, &deviceID, &status, &phase, &progress); err == nil {
+			items = append(items, gin.H{
+				"id": id, "name": name, "device_id": deviceID,
+				"status": status, "current_phase": phase, "progress": progress,
+			})
+		}
+	}
+	c.JSON(200, gin.H{"items": items})
+}
+
 // FlightMissionsLogs returns logs for a specific mission
 func (a *API) FlightMissionsLogs(c *gin.Context) {
 	id := c.Param("id")
@@ -550,6 +573,102 @@ func (a *API) FlightMissionsImport(c *gin.Context) {
 	}
 	hub.Broadcast("flight", WSEvent{Type: "flight_imported", Data: gin.H{"count": count}})
 	c.JSON(200, gin.H{"ok": true, "imported": count})
+}
+
+// DroneControl handles drone takeoff/land control commands from the mission UI.
+// It updates the mission phase and status accordingly, similar to FlightMissionsUpdatePhase
+// but designed specifically for the UI control buttons.
+func (a *API) DroneControl(c *gin.Context) {
+	missionID := c.Param("id")
+	var p struct {
+		Action string `json:"action"` // "takeoff" or "land"
+	}
+	if err := c.BindJSON(&p); err != nil {
+		c.JSON(400, gin.H{"error": "bad json"})
+		return
+	}
+	p.Action = strings.TrimSpace(strings.ToLower(p.Action))
+
+	var phase string
+	switch p.Action {
+	case "takeoff":
+		phase = "起飞"
+	case "land":
+		phase = "降落"
+	case "return":
+		phase = "返航"
+	default:
+		c.JSON(400, gin.H{"error": "无效的控制指令，支持: takeoff, land, return"})
+		return
+	}
+
+	// Check mission exists and is not completed
+	var currentPhase, currentStatus string
+	var deviceID int
+	err := a.db.QueryRow(`SELECT current_phase, status, device_id FROM flight_missions WHERE id=?`, missionID).Scan(&currentPhase, &currentStatus, &deviceID)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "任务不存在"})
+		return
+	}
+	if currentStatus == "已完成" {
+		c.JSON(400, gin.H{"error": "任务已完成，无法控制"})
+		return
+	}
+
+	// Validate phase transition (only allow forward)
+	phaseOrder := []string{"待命", "起飞", "巡航", "执行任务", "返航", "降落"}
+	currentIdx := -1
+	newIdx := -1
+	for i, ph := range phaseOrder {
+		if ph == currentPhase {
+			currentIdx = i
+		}
+		if ph == phase {
+			newIdx = i
+		}
+	}
+	if newIdx <= currentIdx {
+		c.JSON(400, gin.H{"error": "无法执行此操作: 当前阶段为 " + currentPhase})
+		return
+	}
+
+	statusMap := map[string]string{
+		"待命": "待起飞", "起飞": "飞行中", "巡航": "飞行中", "执行任务": "飞行中", "返航": "返航中", "降落": "已完成",
+	}
+	progressMap := map[string]int{
+		"待命": 0, "起飞": 10, "巡航": 30, "执行任务": 60, "返航": 80, "降落": 100,
+	}
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	status := statusMap[phase]
+	progress := progressMap[phase]
+
+	updates := "SET status=?, current_phase=?, progress=?, updated_at=?"
+	args := []any{status, phase, progress, now}
+
+	if phase == "起飞" {
+		updates += ", start_time=?"
+		args = append(args, now)
+	}
+	if phase == "降落" {
+		updates += ", end_time=?"
+		args = append(args, now)
+	}
+
+	args = append(args, missionID)
+	_, err = a.db.Exec("UPDATE flight_missions "+updates+" WHERE id=?", args...)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Add mission log
+	actionLabel := map[string]string{"takeoff": "启动无人机", "land": "降落无人机", "return": "返航无人机"}
+	a.db.Exec(`INSERT INTO mission_logs(mission_id, phase, message) VALUES(?,?,?)`,
+		missionID, phase, "[控制指令] "+actionLabel[p.Action])
+
+	hub.Broadcast("flight", WSEvent{Type: "flight_phase", Data: gin.H{"id": missionID, "status": status, "phase": phase, "progress": progress, "action": p.Action}})
+	c.JSON(200, gin.H{"ok": true, "status": status, "phase": phase, "progress": progress})
 }
 
 // FlightStream is a WebSocket endpoint for real-time flight mission event push.

@@ -80,7 +80,6 @@
     <div class="drone-header-row">
       <div class="module-title">无人机管理</div>
       <div class="drone-header-btns">
-        <button class="btn btn-primary" onclick="openNewModal()">注册无人机</button>
         <button class="btn btn-secondary" onclick="refreshAll()">刷新</button>
       </div>
     </div>
@@ -106,7 +105,7 @@
   <!-- Stats -->
   <div class="stats-grid">
     <div class="stat-box">
-      <div class="stat-label">注册总数</div>
+      <div class="stat-label">发现总数</div>
       <div class="stat-value" id="statTotal">0</div>
     </div>
     <div class="stat-box">
@@ -127,8 +126,8 @@
   <div class="drone-cards" id="droneCards">
     <div class="empty-state">
       <div class="empty-icon">&#x1F681;</div>
-      <div class="empty-text">暂无已注册的无人机</div>
-      <div class="empty-hint">点击"注册无人机"按钮，添加第一架无人机</div>
+      <div class="empty-text">暂无发现的无人机</div>
+      <div class="empty-hint">当无人机通过飞控/4G模块向服务器发送数据后，系统会自动在此列表中生成对应的无人机</div>
     </div>
   </div>
 
@@ -151,18 +150,18 @@
 
   <!-- Hints -->
   <div class="hint-box">
-    <div><strong>无人机统一注册说明</strong></div>
-    <div>1. 在此页面注册无人机后，系统会自动创建对应的<strong>远程控制设备</strong>和<strong>GPS追踪设备</strong>，无需在各功能模块重复添加。</div>
-    <div>2. <strong>远程控制</strong>（SSH/VNC/RDP）：在“远程桌面控制”页面可直接选择已注册的无人机进行连接。</div>
-    <div>3. <strong>GPS/电池/飞行任务</strong>：只要无人机上运行了 <code>hw-agent</code>，数据会自动推送到平台，实时显示在各功能模块中。注册时无需填写经纬度，系统会在无人机 Agent 首次推送 GPS 数据时自动获取真实位置并回填。</div>
-    <div>4. <strong>Agent ID</strong> 是无人机上报数据的唯一标识。在伴飞计算机上运行 <code>hw-agent -server http://主控端IP:8080 -id "你的AgentID"</code> 即可关联。</div>
-    <div>5. 编辑或删除无人机时，关联的远程设备和GPS设备会自动同步更新或级联删除。</div>
+    <div><strong>无人机自动发现说明</strong></div>
+    <div>1. <strong>自动注册</strong>：无人机的数据通过飞控及4G模块发送给服务器后端，后端解析数据后自动在此页面生成对应的无人机，无需手动创建。</div>
+    <div>2. <strong>MAVLink协议</strong>：通过MAVLink Bridge接收飞控心跳包时，系统自动创建无人机及关联设备（Agent ID格式为 <code>mavlink-{sysId}</code>）。</div>
+    <div>3. <strong>Agent推送</strong>：无人机上运行 <code>hw-agent -server http://主控端IP:8080</code> 推送GPS数据时，系统也会自动创建无人机。</div>
+    <div>4. <strong>实时状态</strong>：无人机状态由数据推送自动更新。GPS推送中的无人机可在"航线规划"中被选择执行飞行任务。</div>
+    <div>5. 可点击"编辑"按钮补充无人机的远程连接信息、电子围栏等配置。</div>
   </div>
 
-  <!-- Register / Edit Drone Modal -->
+  <!-- Edit Drone Modal -->
   <div class="modal-overlay" id="droneModal">
     <div class="modal-box">
-      <div class="modal-title" id="droneModalTitle">注册无人机</div>
+      <div class="modal-title" id="droneModalTitle">编辑无人机</div>
       <div class="modal-form">
         <!-- Basic Info -->
         <div class="form-section">
@@ -296,7 +295,7 @@
       </div>
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-        <button class="btn btn-primary" id="btnSubmit" onclick="submitDrone()">确认注册</button>
+        <button class="btn btn-primary" id="btnSubmit" onclick="submitDrone()">确认保存</button>
       </div>
     </div>
   </div>
@@ -415,7 +414,7 @@
     function renderCards(items) {
       const container = $('#droneCards');
       if (!items.length) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F681;</div><div class="empty-text">暂无已注册的无人机</div><div class="empty-hint">点击"注册无人机"按钮，添加第一架无人机</div></div>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F681;</div><div class="empty-text">暂无发现的无人机</div><div class="empty-hint">当无人机通过飞控/4G模块向服务器发送数据后，系统会自动在此列表中生成对应的无人机</div></div>';
         return;
       }
       container.innerHTML = items.map(d => {
@@ -542,17 +541,13 @@
         video_url: $('#fVideoUrl').value.trim(),
       };
       if (!body.name) { showToast('请输入无人机名称', 'error'); return; }
-      if (!body.ip) { showToast('请输入IP地址', 'error'); return; }
+      if (!editingId) { showToast('无人机由系统自动发现注册，不支持手动创建', 'error'); return; }
       try {
         let res;
-        if (editingId) {
-          res = await api('/drones/' + editingId, { method: 'PUT', body });
-        } else {
-          res = await api('/drones', { method: 'POST', body });
-        }
+        res = await api('/drones/' + editingId, { method: 'PUT', body });
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
-        showToast(editingId ? '无人机信息已更新' : '无人机注册成功！已自动创建远程设备和GPS设备', 'success');
+        showToast('无人机信息已更新', 'success');
         // Clear filters to ensure newly created/updated drone is visible immediately
         $('#filterName').value = '';
         $('#filterStatus').value = '';

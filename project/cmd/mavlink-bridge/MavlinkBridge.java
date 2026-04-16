@@ -222,9 +222,27 @@ public class MavlinkBridge {
         String modeName = decodeFlightMode(mainMode, subMode);
         String status = armed ? "armed" : "disarmed";
 
-        // 更新 drones 表状态
-        execSQL("UPDATE drones SET status=?, updated_at=NOW() WHERE agent_id=?",
-                armed ? "online" : "online", "mavlink-" + sysId);
+        // 更新 drones 表状态（如果不存在则自动创建 - auto-discovery）
+        String agentIdHb = "mavlink-" + sysId;
+        int droneRows = execUpdate("UPDATE drones SET status='online', updated_at=NOW() WHERE agent_id=?", agentIdHb);
+        if (droneRows == 0) {
+            // Auto-create drone entry
+            String droneName = "无人机-" + sysId;
+            execSQL("INSERT IGNORE INTO drones(name, model, description, ip, ssh_port, vnc_port, rdp_port, protocol, username, password, " +
+                    "agent_id, initial_lat, initial_lng, initial_alt, fence_enabled, fence_lat, fence_lng, fence_radius, " +
+                    "auto_connect, log_enabled, status, video_url, created_at, updated_at) " +
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())",
+                    droneName, "MAVLink自动发现", "通过MAVLink心跳自动注册", "", 22, 5900, 3389, "SSH", "", "",
+                    agentIdHb, 0, 0, 0, 0, 0, 0, 500, 0, 0, "online", "");
+            // Auto-create linked gps_device
+            execSQL("INSERT IGNORE INTO gps_devices(name, agent_id, device_type, latitude, longitude, altitude, speed, heading, status, fence_enabled, last_update) " +
+                    "VALUES(?,?,?,?,?,?,?,?,?,0,NOW())",
+                    droneName, agentIdHb, "无人机", 0, 0, 0, 0, 0, "等待连接");
+            // Link them together
+            execSQL("UPDATE drones d JOIN gps_devices g ON g.agent_id = d.agent_id " +
+                    "SET d.linked_gps_device_id = g.id WHERE d.agent_id = ? AND (d.linked_gps_device_id IS NULL OR d.linked_gps_device_id = 0)", agentIdHb);
+            log("Auto-created drone for agent " + agentIdHb);
+        }
 
         // 写入遥测表
         upsertTelemetry(sysId, "heartbeat",
