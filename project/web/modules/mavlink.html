@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MAVLink 遥测</title>
+  <link rel="icon" type="image/jpeg" href="/app/logo.jpg" />
+  <link rel="stylesheet" href="/app/modules/common.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .module-title::before { content: "\1F4F6"; }
+
+    /* Overview cards */
+    .overview-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .ov-card { background: var(--cc-bg-2, #fff); border-radius: var(--cc-radius-lg, 12px); padding: 20px; border: 1px solid var(--cc-border, #e5e6eb); text-align: center; }
+    .ov-card .ov-value { font-size: 32px; font-weight: 700; color: var(--cc-primary, #165dff); line-height: 1.2; }
+    .ov-card .ov-label { font-size: 13px; color: var(--cc-text-3, #86909c); margin-top: 4px; }
+    .ov-card.online .ov-value { color: #009a29; }
+    .ov-card.alerts .ov-value { color: #cb2634; }
+
+    /* Drone list */
+    .drone-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .drone-card { background: var(--cc-bg-2, #fff); border-radius: var(--cc-radius-lg, 12px); padding: 20px; border: 1px solid var(--cc-border, #e5e6eb); cursor: pointer; transition: all 0.2s; }
+    .drone-card:hover { border-color: var(--cc-primary, #165dff); box-shadow: 0 4px 16px rgba(22,93,255,0.08); }
+    .drone-card.selected { border-color: var(--cc-primary, #165dff); box-shadow: 0 4px 16px rgba(22,93,255,0.12); }
+    .drone-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .drone-name { font-size: 16px; font-weight: 600; color: var(--cc-text-1, #1d2129); }
+    .drone-online { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 2px 10px; border-radius: 20px; font-weight: 500; }
+    .drone-online.on { background: #e8ffea; color: #009a29; }
+    .drone-online.off { background: var(--cc-bg-3, #f2f3f5); color: var(--cc-text-3, #86909c); }
+    .drone-online .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .drone-online.on .dot { background: #009a29; animation: pulse 1.5s infinite; }
+    .drone-online.off .dot { background: #86909c; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .drone-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+    .drone-info-item { display: flex; flex-direction: column; }
+    .drone-info-label { color: var(--cc-text-3, #86909c); font-size: 11px; }
+    .drone-info-val { color: var(--cc-text-1, #1d2129); font-weight: 500; }
+
+    /* Detail panel */
+    .detail-panel { background: var(--cc-bg-2, #fff); border-radius: var(--cc-radius-lg, 12px); border: 1px solid var(--cc-border, #e5e6eb); padding: 24px; margin-bottom: 24px; }
+    .detail-title { font-size: 17px; font-weight: 600; color: var(--cc-text-1, #1d2129); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+    /* Telemetry grid */
+    .telem-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .telem-card { background: var(--cc-bg-1, #f7f8fa); border-radius: 10px; padding: 16px; }
+    .telem-card-title { font-size: 13px; font-weight: 600; color: var(--cc-text-2, #4e5969); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .telem-card-title .icon { font-size: 16px; }
+    .telem-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
+    .telem-field { display: flex; justify-content: space-between; }
+    .telem-field .label { color: var(--cc-text-3, #86909c); }
+    .telem-field .value { color: var(--cc-text-1, #1d2129); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* Chart container */
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+    .chart-box { background: var(--cc-bg-2, #fff); border-radius: var(--cc-radius-lg, 12px); border: 1px solid var(--cc-border, #e5e6eb); padding: 20px; }
+    .chart-box-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--cc-text-1, #1d2129); }
+    .chart-container { position: relative; height: 220px; }
+
+    /* Messages log */
+    .msg-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+    .msg-table th, .msg-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--cc-border, #e5e6eb); }
+    .msg-table th { background: var(--cc-bg-1, #f7f8fa); font-weight: 600; color: var(--cc-text-2, #4e5969); }
+    .sev-emergency, .sev-alert, .sev-critical { color: #cb2634; font-weight: 600; }
+    .sev-error { color: #d25f00; font-weight: 600; }
+    .sev-warning { color: #d25f00; }
+    .sev-notice, .sev-info { color: #0e42d2; }
+    .sev-debug { color: var(--cc-text-3, #86909c); }
+
+    /* Tab bar */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--cc-border, #e5e6eb); }
+    .tab-item { padding: 10px 24px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--cc-text-3, #86909c); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; user-select: none; }
+    .tab-item:hover { color: var(--cc-primary, #165dff); }
+    .tab-item.active { color: var(--cc-primary, #165dff); border-bottom-color: var(--cc-primary, #165dff); font-weight: 600; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--cc-text-3, #86909c); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+    @media (max-width: 768px) {
+      .chart-row { grid-template-columns: 1fr; }
+      .drone-cards { grid-template-columns: 1fr; }
+      .telem-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <script src="/app/modules/common.js"></script>
+  <div class="module-container">
+    <h2 class="module-title">MAVLink 遥测数据</h2>
+    <p class="module-desc">实时查看通过 MAVLink 协议连接的无人机遥测数据，包括位置、姿态、电池、飞行状态等信息。</p>
+
+    <!-- Overview -->
+    <div class="overview-row" id="overview">
+      <div class="ov-card"><div class="ov-value" id="ovTotal">-</div><div class="ov-label">已连接无人机</div></div>
+      <div class="ov-card online"><div class="ov-value" id="ovOnline">-</div><div class="ov-label">在线</div></div>
+      <div class="ov-card"><div class="ov-value" id="ovMessages">-</div><div class="ov-label">累计消息</div></div>
+      <div class="ov-card alerts"><div class="ov-value" id="ovAlerts">-</div><div class="ov-label">近1h告警</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <div class="tab-item active" data-tab="drones">无人机列表</div>
+      <div class="tab-item" data-tab="detail">实时遥测</div>
+      <div class="tab-item" data-tab="messages">状态消息</div>
+    </div>
+
+    <!-- Tab: Drone List -->
+    <div class="tab-content active" id="tab-drones">
+      <div class="drone-cards" id="droneCards">
+        <div class="empty-state"><div class="icon">📶</div><div>暂无 MAVLink 无人机连接<br><small>当无人机通过 TCP 9080 端口发送 MAVLink 数据后将自动出现</small></div></div>
+      </div>
+    </div>
+
+    <!-- Tab: Real-time Detail -->
+    <div class="tab-content" id="tab-detail">
+      <div id="detailContent">
+        <div class="empty-state"><div class="icon">📡</div><div>请先从"无人机列表"中选择一架无人机</div></div>
+      </div>
+    </div>
+
+    <!-- Tab: Messages -->
+    <div class="tab-content" id="tab-messages">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <select id="msgSysFilter" class="cc-select" style="width:160px;"><option value="">全部无人机</option></select>
+        <select id="msgSevFilter" class="cc-select" style="width:140px;">
+          <option value="">全部级别</option>
+          <option value="emergency">Emergency</option>
+          <option value="alert">Alert</option>
+          <option value="critical">Critical</option>
+          <option value="error">Error</option>
+          <option value="warning">Warning</option>
+          <option value="info">Info</option>
+        </select>
+        <button class="cc-btn" onclick="loadMessages()">刷新</button>
+      </div>
+      <table class="msg-table">
+        <thead><tr><th>时间</th><th>无人机</th><th>级别</th><th>消息</th></tr></thead>
+        <tbody id="msgBody"><tr><td colspan="4" style="text-align:center;color:var(--cc-text-3);">加载中...</td></tr></tbody>
+      </table>
+      <div style="margin-top:12px;text-align:center;">
+        <button class="cc-btn cc-btn-text" id="msgLoadMore" onclick="loadMessages(true)">加载更多</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api/mavlink';
+    let selectedSysId = null;
+    let sseSource = null;
+    let msgPage = 1;
+    let altitudeChart = null, speedChart = null;
+    let altData = [], spdData = [], chartLabels = [];
+
+    // ============ Tab switching ============
+    document.querySelectorAll('.tab-item').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    // ============ Overview ============
+    async function loadOverview() {
+      try {
+        const r = await fetch(API + '/overview');
+        const d = await r.json();
+        document.getElementById('ovTotal').textContent = d.total_drones || 0;
+        document.getElementById('ovOnline').textContent = d.online_drones || 0;
+        document.getElementById('ovMessages').textContent = d.total_messages || 0;
+        document.getElementById('ovAlerts').textContent = d.recent_alerts_1h || 0;
+      } catch (e) { console.warn('overview error', e); }
+    }
+
+    // ============ Drone List ============
+    async function loadDrones() {
+      try {
+        const r = await fetch(API + '/drones');
+        const d = await r.json();
+        const container = document.getElementById('droneCards');
+        if (!d.items || d.items.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="icon">📶</div><div>暂无 MAVLink 无人机连接<br><small>当无人机通过 TCP 端口发送 MAVLink 数据后将自动出现</small></div></div>';
+          return;
+        }
+        container.innerHTML = d.items.map(drone => {
+          const t = drone.telemetry || {};
+          const hb = t.heartbeat || {};
+          const pos = t.global_position || {};
+          const bat = t.battery || {};
+          const online = drone.online;
+          const sel = drone.sys_id == selectedSysId ? 'selected' : '';
+          return `<div class="drone-card ${sel}" onclick="selectDrone(${drone.sys_id})">
+            <div class="drone-header">
+              <span class="drone-name">${drone.name || ('无人机 #' + drone.sys_id)}</span>
+              <span class="drone-online ${online?'on':'off'}"><span class="dot"></span>${online?'在线':'离线'}</span>
+            </div>
+            <div class="drone-info">
+              <div class="drone-info-item"><span class="drone-info-label">SYS ID</span><span class="drone-info-val">${drone.sys_id}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">飞行模式</span><span class="drone-info-val">${hb.mode || '-'}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">位置</span><span class="drone-info-val">${pos.lat ? pos.lat.toFixed(6) + ', ' + pos.lon.toFixed(6) : '-'}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">高度</span><span class="drone-info-val">${pos.rel_alt != null ? pos.rel_alt.toFixed(1) + ' m' : '-'}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">电池</span><span class="drone-info-val">${bat.remaining != null ? bat.remaining + '%' : '-'}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">速度</span><span class="drone-info-val">${pos.speed != null ? pos.speed.toFixed(1) + ' m/s' : '-'}</span></div>
+            </div>
+          </div>`;
+        }).join('');
+
+        // Populate sys_id filter for messages
+        const sel = document.getElementById('msgSysFilter');
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">全部无人机</option>' +
+          d.items.map(dr => `<option value="${dr.sys_id}">无人机 #${dr.sys_id}</option>`).join('');
+        sel.value = cur;
+      } catch (e) { console.warn('drones error', e); }
+    }
+
+    // ============ Select Drone & Show Detail ============
+    function selectDrone(sysId) {
+      selectedSysId = sysId;
+      // Switch to detail tab
+      document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelector('[data-tab="detail"]').classList.add('active');
+      document.getElementById('tab-detail').classList.add('active');
+      loadDetail();
+      startSSE();
+    }
+
+    async function loadDetail() {
+      if (!selectedSysId) return;
+      try {
+        const r = await fetch(API + '/drones/' + selectedSysId + '/telemetry');
+        const d = await r.json();
+        renderDetail(d);
+      } catch (e) { console.warn('detail error', e); }
+    }
+
+    function renderDetail(d) {
+      const el = document.getElementById('detailContent');
+      const hb = d.heartbeat || {};
+      const pos = d.position || d.global_position || {};
+      const att = d.attitude || {};
+      const bat = d.battery || {};
+      const hud = d.vfr_hud || {};
+      const gps = d.gps_raw || {};
+      const ls = d.landed_state || d.extended_sys_state || {};
+      const home = d.home_position || {};
+      const rc = d.rc_channels || {};
+
+      el.innerHTML = `
+        <div class="detail-title">无人机 #${selectedSysId} 实时遥测</div>
+        <div class="telem-grid">
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">💓</span>心跳 / 状态</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">解锁</span><span class="value">${hb.armed ? '✅ 已解锁' : '🔒 未解锁'}</span></div>
+              <div class="telem-field"><span class="label">飞行模式</span><span class="value">${hb.mode || '-'}</span></div>
+              <div class="telem-field"><span class="label">着陆状态</span><span class="value">${ls.state || ls.landed_state || '-'}</span></div>
+              <div class="telem-field"><span class="label">机型</span><span class="value">${hb.mav_type || '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">📍</span>位置信息</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">纬度</span><span class="value">${pos.lat != null ? pos.lat.toFixed(7) : '-'}</span></div>
+              <div class="telem-field"><span class="label">经度</span><span class="value">${pos.lon != null ? pos.lon.toFixed(7) : '-'}</span></div>
+              <div class="telem-field"><span class="label">海拔</span><span class="value">${pos.alt != null ? pos.alt.toFixed(1) + ' m' : '-'}</span></div>
+              <div class="telem-field"><span class="label">相对高度</span><span class="value">${pos.rel_alt != null ? pos.rel_alt.toFixed(1) + ' m' : '-'}</span></div>
+              <div class="telem-field"><span class="label">速度</span><span class="value">${pos.speed != null ? pos.speed.toFixed(2) + ' m/s' : '-'}</span></div>
+              <div class="telem-field"><span class="label">航向</span><span class="value">${pos.hdg != null ? pos.hdg + '°' : '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">🛰️</span>GPS 原始</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">定位类型</span><span class="value">${gps.fix_name || '-'}</span></div>
+              <div class="telem-field"><span class="label">卫星数</span><span class="value">${gps.satellites != null ? gps.satellites + ' 颗' : '-'}</span></div>
+              <div class="telem-field"><span class="label">水平精度</span><span class="value">${gps.eph != null ? gps.eph.toFixed(2) + ' m' : '-'}</span></div>
+              <div class="telem-field"><span class="label">垂直精度</span><span class="value">${gps.epv != null ? gps.epv.toFixed(2) + ' m' : '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">🔄</span>姿态</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">横滚</span><span class="value">${att.roll != null ? att.roll.toFixed(1) + '°' : '-'}</span></div>
+              <div class="telem-field"><span class="label">俯仰</span><span class="value">${att.pitch != null ? att.pitch.toFixed(1) + '°' : '-'}</span></div>
+              <div class="telem-field"><span class="label">偏航</span><span class="value">${att.yaw != null ? att.yaw.toFixed(1) + '°' : '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">🔋</span>电池</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">电压</span><span class="value">${bat.voltage != null ? bat.voltage.toFixed(2) + ' V' : '-'}</span></div>
+              <div class="telem-field"><span class="label">电流</span><span class="value">${bat.current != null ? bat.current.toFixed(1) + ' A' : '-'}</span></div>
+              <div class="telem-field"><span class="label">剩余</span><span class="value">${bat.remaining != null ? bat.remaining + '%' : '-'}</span></div>
+              <div class="telem-field"><span class="label">温度</span><span class="value">${bat.temperature != null ? bat.temperature.toFixed(1) + '°C' : '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">🎛️</span>VFR HUD</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">空速</span><span class="value">${hud.airspeed != null ? hud.airspeed.toFixed(1) + ' m/s' : '-'}</span></div>
+              <div class="telem-field"><span class="label">地速</span><span class="value">${hud.groundspeed != null ? hud.groundspeed.toFixed(1) + ' m/s' : '-'}</span></div>
+              <div class="telem-field"><span class="label">爬升率</span><span class="value">${hud.climb != null ? hud.climb.toFixed(2) + ' m/s' : '-'}</span></div>
+              <div class="telem-field"><span class="label">油门</span><span class="value">${hud.throttle != null ? hud.throttle + '%' : '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">🏠</span>返航点</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">纬度</span><span class="value">${home.lat != null ? home.lat.toFixed(7) : '-'}</span></div>
+              <div class="telem-field"><span class="label">经度</span><span class="value">${home.lon != null ? home.lon.toFixed(7) : '-'}</span></div>
+              <div class="telem-field"><span class="label">高度</span><span class="value">${home.alt != null ? home.alt.toFixed(1) + ' m' : '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">🎮</span>遥控通道</div>
+            <div class="telem-fields">
+              ${rc.channels ? rc.channels.slice(0,8).map((v,i) => `<div class="telem-field"><span class="label">CH${i+1}</span><span class="value">${v==65535?'-':v}</span></div>`).join('') : '<div class="telem-field"><span class="label">-</span><span class="value">无数据</span></div>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="chart-row">
+          <div class="chart-box">
+            <div class="chart-box-title">高度趋势</div>
+            <div class="chart-container"><canvas id="altChart"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-box-title">速度趋势</div>
+            <div class="chart-container"><canvas id="spdChart"></canvas></div>
+          </div>
+        </div>
+      `;
+      initCharts();
+    }
+
+    function initCharts() {
+      const _dk = document.documentElement.classList.contains('dark');
+      const gridColor = _dk ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+      const textColor = _dk ? '#a6a6a6' : '#86909c';
+
+      const altCtx = document.getElementById('altChart');
+      const spdCtx = document.getElementById('spdChart');
+      if (!altCtx || !spdCtx) return;
+
+      if (altitudeChart) { altitudeChart.destroy(); altitudeChart = null; }
+      if (speedChart) { speedChart.destroy(); speedChart = null; }
+
+      const commonOpts = {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 300 },
+        scales: {
+          x: { grid: { color: gridColor }, ticks: { color: textColor, maxTicksLimit: 10 } },
+          y: { grid: { color: gridColor }, ticks: { color: textColor } }
+        },
+        plugins: { legend: { display: false } }
+      };
+
+      altitudeChart = new Chart(altCtx, {
+        type: 'line',
+        data: { labels: chartLabels, datasets: [{
+          label: '相对高度 (m)', data: altData,
+          borderColor: '#165dff', backgroundColor: 'rgba(22,93,255,0.08)',
+          fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2
+        }]},
+        options: commonOpts
+      });
+
+      speedChart = new Chart(spdCtx, {
+        type: 'line',
+        data: { labels: chartLabels, datasets: [{
+          label: '速度 (m/s)', data: spdData,
+          borderColor: '#0fc6c2', backgroundColor: 'rgba(15,198,194,0.08)',
+          fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2
+        }]},
+        options: commonOpts
+      });
+    }
+
+    // ============ SSE Streaming ============
+    function startSSE() {
+      if (sseSource) { sseSource.close(); sseSource = null; }
+      if (!selectedSysId) return;
+
+      sseSource = new EventSource(API + '/stream?sys_id=' + selectedSysId);
+      sseSource.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          renderDetail(d);
+
+          // Update charts
+          const pos = d.position || {};
+          const now = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+          if (pos.rel_alt != null || pos.speed != null) {
+            chartLabels.push(now);
+            altData.push(pos.rel_alt || 0);
+            spdData.push(pos.speed || 0);
+            if (chartLabels.length > 60) { chartLabels.shift(); altData.shift(); spdData.shift(); }
+            if (altitudeChart) altitudeChart.update('none');
+            if (speedChart) speedChart.update('none');
+          }
+        } catch (err) { /* ignore parse errors */ }
+      };
+      sseSource.onerror = () => {
+        setTimeout(() => { if (selectedSysId) startSSE(); }, 3000);
+      };
+    }
+
+    // ============ Messages ============
+    async function loadMessages(more) {
+      if (more) { msgPage++; } else { msgPage = 1; }
+      const sysId = document.getElementById('msgSysFilter').value;
+      const sev = document.getElementById('msgSevFilter').value;
+      let url = API + '/messages?page=' + msgPage + '&page_size=30';
+      if (sysId) url += '&sys_id=' + sysId;
+      if (sev) url += '&severity=' + sev;
+
+      try {
+        const r = await fetch(url);
+        const d = await r.json();
+        const body = document.getElementById('msgBody');
+        const rows = (d.items || []).map(m => `<tr>
+          <td style="white-space:nowrap;">${m.created_at}</td>
+          <td>#${m.sys_id}</td>
+          <td><span class="sev-${m.severity}">${m.severity}</span></td>
+          <td>${m.message}</td>
+        </tr>`).join('');
+
+        if (!more || msgPage === 1) {
+          body.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;color:var(--cc-text-3);">暂无消息</td></tr>';
+        } else {
+          body.insertAdjacentHTML('beforeend', rows);
+        }
+        document.getElementById('msgLoadMore').style.display = (d.items || []).length >= 30 ? '' : 'none';
+      } catch (e) { console.warn('messages error', e); }
+    }
+
+    // ============ Auto-refresh ============
+    async function refresh() {
+      await loadOverview();
+      await loadDrones();
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+    loadMessages();
+    setInterval(() => loadMessages(), 15000);
+
+    // Cleanup SSE on unload
+    window.addEventListener('beforeunload', () => { if (sseSource) sseSource.close(); });
+  </script>
+</body>
+</html>

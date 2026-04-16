@@ -220,6 +220,10 @@ func main() {
 	handlers.TCPGatewayRef = tcpGW
 	handlers.RegisterTCPGatewayRoutes(r)
 
+	// ---- MAVLink Telemetry API ----
+	handlers.RegisterMavlinkRoutes(r, database)
+	log.Printf("[main] MAVLink telemetry API registered at /api/mavlink/*")
+
 	srv := &http.Server{Addr: addr, Handler: r}
 	go func() {
 		log.Printf("listening on %s", addr)

@@ -156,6 +156,11 @@ func (g *Gateway) acceptLoop() {
 	}
 }
 
+// isMavlinkStart returns true if the byte is a MAVLink v1 (0xFE) or v2 (0xFD) start marker.
+func isMavlinkStart(b byte) bool {
+	return b == 0xFE || b == 0xFD
+}
+
 func (g *Gateway) handleConn(conn net.Conn) {
 	defer g.wg.Done()
 	remote := conn.RemoteAddr().String()
@@ -179,7 +184,26 @@ func (g *Gateway) handleConn(conn net.Conn) {
 		log.Printf("[TCPGateway] Connection closed: %s (agent=%s)", remote, dc.AgentID)
 	}()
 
-	// Send a welcome/handshake so the device knows the connection is accepted
+	reader := bufio.NewReaderSize(conn, 8192)
+
+	// Peek at the first byte to detect MAVLink binary stream
+	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	firstBytes, err := reader.Peek(1)
+	if err != nil {
+		log.Printf("[TCPGateway] Peek error from %s: %v", remote, err)
+		return
+	}
+
+	if isMavlinkStart(firstBytes[0]) {
+		// MAVLink binary stream detected
+		log.Printf("[TCPGateway] MAVLink binary stream detected from %s (magic=0x%02X)", remote, firstBytes[0])
+		host, _, _ := net.SplitHostPort(dc.RemoteAddr)
+		dc.AgentID = "mavlink-" + host
+		g.handleMavlinkConn(dc, reader)
+		return
+	}
+
+	// Regular JSON/text protocol – send welcome
 	welcome := map[string]interface{}{
 		"status":  "connected",
 		"message": "TCP gateway ready. Send JSON (newline-delimited) or raw data.",
@@ -189,7 +213,6 @@ func (g *Gateway) handleConn(conn net.Conn) {
 		conn.Write(append(wb, '\n'))
 	}
 
-	reader := bufio.NewReaderSize(conn, 4096)
 	for {
 		select {
 		case <-g.shutdown:
@@ -241,6 +264,94 @@ func (g *Gateway) handleConn(conn net.Conn) {
 		} else {
 			g.processRawData(dc, line)
 		}
+	}
+}
+
+// handleMavlinkConn handles a connection detected as MAVLink binary.
+// It reads raw bytes, logs them, and stores them for the Java MAVLink bridge.
+// The actual MAVLink parsing is done by the Java MavlinkBridge service.
+func (g *Gateway) handleMavlinkConn(dc *DeviceConn, reader *bufio.Reader) {
+	log.Printf("[TCPGateway] Handling MAVLink connection from %s (agent=%s)", dc.RemoteAddr, dc.AgentID)
+
+	buf := make([]byte, 4096)
+	var mavlinkBytesTotal int64
+
+	for {
+		select {
+		case <-g.shutdown:
+			return
+		default:
+		}
+
+		dc.Conn.SetReadDeadline(time.Now().Add(120 * time.Second))
+		n, err := reader.Read(buf)
+		if n > 0 {
+			mavlinkBytesTotal += int64(n)
+			g.mu.Lock()
+			dc.BytesRecv += int64(n)
+			dc.LastDataAt = time.Now()
+			g.mu.Unlock()
+
+			// Log MAVLink packet summary (first byte is start marker)
+			data := buf[:n]
+			g.logMavlinkFrames(dc, data)
+		}
+		if err != nil {
+			if err == io.EOF {
+				log.Printf("[TCPGateway] MAVLink connection EOF from %s (total %d bytes)", dc.RemoteAddr, mavlinkBytesTotal)
+				return
+			}
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				continue
+			}
+			log.Printf("[TCPGateway] MAVLink read error from %s: %v", dc.RemoteAddr, err)
+			return
+		}
+	}
+}
+
+// logMavlinkFrames scans raw bytes for MAVLink frame markers and logs basic info.
+func (g *Gateway) logMavlinkFrames(dc *DeviceConn, data []byte) {
+	for i := 0; i < len(data); {
+		if data[i] == 0xFE && i+6 <= len(data) {
+			// MAVLink v1: FE len seq sys comp msgid payload[len] ckl ckh
+			payloadLen := int(data[i+1])
+			frameLen := 6 + payloadLen + 2 // header(6) + payload + checksum(2)
+			if i+frameLen <= len(data) {
+				msgID := int(data[i+5])
+				sysID := int(data[i+3])
+				log.Printf("[TCPGateway] MAVLink v1 frame: sysid=%d msgid=%d len=%d from %s",
+					sysID, msgID, payloadLen, dc.RemoteAddr)
+				// Store frame summary in device_tcp_log
+				g.storeRawMessage(dc.AgentID, "mavlink_v1", map[string]interface{}{
+					"sys_id": sysID, "msg_id": msgID, "payload_len": payloadLen,
+					"hex": fmt.Sprintf("%x", data[i:i+frameLen]),
+				})
+				i += frameLen
+				continue
+			}
+		} else if data[i] == 0xFD && i+10 <= len(data) {
+			// MAVLink v2: FD len incompat_flags compat_flags seq sys comp msgid(3) payload[len] ckl ckh [sig13]
+			payloadLen := int(data[i+1])
+			msgID := int(data[i+7]) | int(data[i+8])<<8 | int(data[i+9])<<16
+			sysID := int(data[i+5])
+			frameLen := 10 + payloadLen + 2 // header(10) + payload + checksum(2)
+			// Check for signature
+			if i+3 <= len(data) && (data[i+2]&0x01) != 0 {
+				frameLen += 13
+			}
+			if i+frameLen <= len(data) {
+				log.Printf("[TCPGateway] MAVLink v2 frame: sysid=%d msgid=%d len=%d from %s",
+					sysID, msgID, payloadLen, dc.RemoteAddr)
+				g.storeRawMessage(dc.AgentID, "mavlink_v2", map[string]interface{}{
+					"sys_id": sysID, "msg_id": msgID, "payload_len": payloadLen,
+					"hex": fmt.Sprintf("%x", data[i:i+frameLen]),
+				})
+				i += frameLen
+				continue
+			}
+		}
+		i++
 	}
 }
 

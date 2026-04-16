@@ -236,6 +236,19 @@ go run .
 | `REDIS_PASSWORD` | `""` | Redis 密码 |
 | `REDIS_DB` | `0` | Redis 数据库编号 |
 
+### MAVLink Bridge 配置
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `MAVLINK_TCP_PORT` | `9080` | MAVLink Bridge 监听端口（Java 服务） |
+| `MAVLINK_MYSQL_URL` | 自动拼接 | JDBC 连接字符串（默认从 MYSQL_* 变量拼接） |
+
+> **MAVLink 集成说明**：系统通过两层架构处理 MAVLink 数据：
+> 1. **Go TCP 网关**（端口 9080）：自动检测 MAVLink 二进制流（0xFE/0xFD 魔数），记录帧概要到 `device_tcp_log`
+> 2. **Java MavlinkBridge**（`project/cmd/mavlink-bridge/`）：使用 `mavlink.jar` 完整解析 15+ MAVLink 报文，写入 `mavlink_telemetry` 表 + Redis 实时缓存
+>
+> 启动 Java 服务：`cd project/cmd/mavlink-bridge && run.bat`（Windows）或 `./run.sh`（Linux），需要 JDK 11+
+
 > **Redis 集成说明**：已通过 `go-redis/v9` 接入，启动时自动连接。当前用于 4 个场景：
 > 1. **会话缓存**：Token 验证优先查 Redis（`session:<token>`），命中直接返回，未命中回退 MySQL 并回填缓存，TTL 随会话过期时间
 > 2. **分布式限流**：基于 `INCR + EXPIRE` 的滑动窗口计数器（`ratelimit:<ip>`），替代进程内令牌桶，支持多实例部署
@@ -272,6 +285,7 @@ go run .
 | 20 | 消息通知中心 | 右上角铃铛、未读计数、类型筛选、AI 定时巡检、点击跳转、批量已读 |
 | 21 | 并发任务监控 | 统一 Worker Pool 指标、IO/CPU 池状态、任务组分布、完成/失败趋势图、自动刷新 |
 | 22 | 仿真模拟引擎 | 批次创建/启停/删除、异常注入、任务模板、碰撞规避、禁飞区围栏检测、贝塞尔曲线轨迹、实时地图、RL 训练与策略导出 |
+| 23 | MAVLink 遥测 | 通过 mavlink.jar 解析 TCP 9080 端口 MAVLink v1/v2 二进制协议，支持 HEARTBEAT/GPS/ATTITUDE/BATTERY 等 15+ 报文解析，数据写入 MySQL + Redis 实时缓存，前端遥测仪表盘（SSE 推送）、高度/速度趋势图、状态消息日志 |
 
 ---
 
@@ -346,6 +360,15 @@ go run .
 | 强化学习 | GET | `/api/sim/rl/status` | 获取训练状态与指标 |
 | 强化学习 | GET | `/api/sim/rl/history` | 获取持久化训练历史 |
 | 强化学习 | GET | `/api/sim/rl/export-policy` | 导出策略摘要（实机部署参考） |
+| MAVLink | GET | `/api/mavlink/drones` | MAVLink 无人机列表（含遥测汇总） |
+| MAVLink | GET | `/api/mavlink/drones/:sysid/telemetry` | 指定无人机全部遥测（Redis 优先） |
+| MAVLink | GET | `/api/mavlink/drones/:sysid/position` | 实时位置（经纬度/高度/速度） |
+| MAVLink | GET | `/api/mavlink/drones/:sysid/attitude` | 实时姿态（横滚/俯仰/偏航） |
+| MAVLink | GET | `/api/mavlink/drones/:sysid/battery` | 实时电池（电压/电流/剩余/温度） |
+| MAVLink | GET | `/api/mavlink/drones/:sysid/status` | 组合状态视图 |
+| MAVLink | GET | `/api/mavlink/messages` | 状态消息日志（分页/过滤） |
+| MAVLink | GET | `/api/mavlink/overview` | 概览统计（在线/告警） |
+| MAVLink | SSE | `/api/mavlink/stream?sys_id=N` | 实时遥测推送（500ms 间隔） |
 
 ### 分页参数
 
@@ -363,14 +386,18 @@ project/
 ├── app.db                          # SQLite 数据库（历史备份，已迁移至 MySQL）
 ├── migrate_sqlite_to_mysql.py      # SQLite → MySQL 数据迁移脚本
 ├── cmd/
-│   └── agent/main.go               # hw-agent 独立程序（地面站 MAVLink 中继）
+│   ├── agent/main.go               # hw-agent 独立程序（地面站 MAVLink 中继）
+│   └── mavlink-bridge/             # MAVLink 二进制协议解析服务（Java）
+│       ├── MavlinkBridge.java      # TCP 服务，使用 mavlink.jar 解析 MAVLink 报文，写入 MySQL + Redis
+│       ├── run.bat / run.sh        # 一键编译启动脚本（自动下载 MySQL JDBC 驱动）
+│       └── classes/                # 编译输出目录
 ├── internal/
 │   ├── agent/agent.go              # 内嵌 Agent（主服务自动启动）
 │   ├── cache/
 │   │   └── redis.go                # Redis 客户端封装（连接池、KV/JSON/Hash 操作、健康检查、优雅降级）
 │   ├── db/
 │   │   ├── db.go                   # 数据库连接、SQL 兼容层（AdaptSQL）、DB/Tx 包装器
-│   │   ├── migrate_mysql.go        # MySQL 建表 DDL（34 张表，含 knowledge_docs / data_store）
+│   │   ├── migrate_mysql.go        # MySQL 建表 DDL（36 张表，含 mavlink_telemetry / mavlink_message_log）
 │   │   └── migrate_sqlite.go       # SQLite 建表 DDL
 │   ├── taskpool/                    # 统一并发框架
 │   │   ├── pool.go                 # Worker Pool 引擎（IO/CPU 双池、优先级、超时、panic 恢复、周期调度、LLM RPM 限流、指标）
@@ -394,6 +421,7 @@ project/
 │   │   ├── rag_endpoints.go        # RAG 知识库查询 API（/api/ai/rag/*）
 │   │   ├── rag_integration.go      # RAG 与 AI 助手集成层（从 knowledge_docs 表加载知识库）
 │   │   ├── simulation.go           # 仿真引擎 API（批次/实例/异常/RL）
+│   │   ├── mavlink_api.go          # MAVLink 遥测 API（无人机列表/遥测/位置/姿态/电池/SSE 流）
 │   │   ├── sim_integration.go      # 仿真引擎与 DB/WS 集成（快照/策略通过 data_store 表持久化）
 │   │   └── wshub.go                # WebSocket 事件广播
 │   ├── llm/
@@ -416,7 +444,7 @@ project/
 │   ├── dashboard.html              # 仪表盘导航（含侧边栏滚动）
 │   ├── vnc.html / ssh.html         # VNC/SSH 客户端页面
 │   └── modules/                    # 22 个功能模块页面
-│       ├── drones.html / gps.html / battery.html / flight.html
+│       ├── drones.html / gps.html / battery.html / flight.html / mavlink.html
 │       ├── noflyzone.html / cot.html / hardware.html / remote.html
 │       ├── video.html / monitor.html / alerts.html / logs.html
 │       ├── audio.html / updates.html / sync.html / performance.html
