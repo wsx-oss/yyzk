@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MAVLink Debug Console</title>
+  <link rel="icon" type="image/jpeg" href="/app/logo.jpg" />
+  <style>
+    :root {
+      --bg-0: #0d1117; --bg-1: #161b22; --bg-2: #1c2128; --bg-3: #21262d;
+      --border: #30363d; --text-0: #f0f6fc; --text-1: #c9d1d9; --text-2: #8b949e; --text-3: #6e7681;
+      --green: #3fb950; --yellow: #d29922; --red: #f85149; --blue: #58a6ff; --purple: #bc8cff;
+      --cyan: #39d353; --orange: #db6d28; --pink: #f778ba;
+      --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg-0); color: var(--text-1); font-family: var(--mono); font-size: 13px; height: 100vh; overflow: hidden; }
+
+    /* Layout */
+    .layout { display: grid; grid-template-rows: 42px 1fr 28px; height: 100vh; }
+
+    /* Top bar */
+    .topbar { display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--bg-1); border-bottom: 1px solid var(--border); }
+    .topbar .logo { font-weight: 700; color: var(--green); font-size: 14px; letter-spacing: 0.5px; }
+    .topbar .sep { width: 1px; height: 20px; background: var(--border); }
+    .topbar .controls { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+    .topbar select, .topbar input { background: var(--bg-2); border: 1px solid var(--border); color: var(--text-1); padding: 4px 8px; border-radius: 4px; font-family: var(--mono); font-size: 12px; }
+    .topbar select:focus, .topbar input:focus { outline: none; border-color: var(--blue); }
+    .btn { padding: 4px 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text-1); cursor: pointer; font-family: var(--mono); font-size: 12px; transition: all 0.15s; }
+    .btn:hover { background: var(--bg-3); }
+    .btn.active { background: var(--green); color: var(--bg-0); border-color: var(--green); }
+    .btn.danger { border-color: var(--red); color: var(--red); }
+    .btn.danger:hover { background: var(--red); color: #fff; }
+    .indicator { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+    .indicator.connected { background: var(--green); box-shadow: 0 0 6px var(--green); animation: glow 1.5s infinite; }
+    @keyframes glow { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* Main area */
+    .main { display: grid; grid-template-columns: 280px 1fr; overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar { background: var(--bg-1); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+    .sidebar-header { padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-3); border-bottom: 1px solid var(--border); }
+    .sidebar-section { padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .sidebar-section-title { padding: 4px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-3); }
+    .drone-item { padding: 6px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.1s; }
+    .drone-item:hover { background: var(--bg-2); }
+    .drone-item.selected { background: var(--bg-3); border-left: 2px solid var(--blue); }
+    .drone-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .drone-item .dot.on { background: var(--green); }
+    .drone-item .dot.off { background: var(--text-3); }
+    .drone-item .name { font-size: 12px; color: var(--text-1); }
+    .drone-item .meta { font-size: 10px; color: var(--text-3); margin-left: auto; }
+
+    /* Filter checkboxes */
+    .filter-list { padding: 4px 12px; max-height: 200px; overflow-y: auto; }
+    .filter-item { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11px; color: var(--text-2); cursor: pointer; }
+    .filter-item input { accent-color: var(--blue); }
+    .filter-item .color-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+    /* Console */
+    .console-area { display: flex; flex-direction: column; overflow: hidden; }
+    .console-tabs { display: flex; gap: 0; background: var(--bg-1); border-bottom: 1px solid var(--border); }
+    .console-tab { padding: 8px 16px; font-size: 12px; color: var(--text-3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .console-tab:hover { color: var(--text-1); }
+    .console-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .console-tab .badge { background: var(--bg-3); color: var(--text-2); padding: 1px 6px; border-radius: 8px; font-size: 10px; margin-left: 4px; }
+
+    .console-body { flex: 1; overflow-y: auto; padding: 0; font-size: 12px; line-height: 1.6; }
+    .console-body::-webkit-scrollbar { width: 6px; }
+    .console-body::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+    .console-body::-webkit-scrollbar-track { background: transparent; }
+
+    /* Log line */
+    .log-line { padding: 1px 12px; border-bottom: 1px solid rgba(48,54,61,0.3); display: flex; gap: 8px; font-family: var(--mono); white-space: nowrap; }
+    .log-line:hover { background: var(--bg-2); }
+    .log-line .ts { color: var(--text-3); flex-shrink: 0; min-width: 85px; }
+    .log-line .tag { padding: 0 6px; border-radius: 3px; font-size: 10px; font-weight: 600; flex-shrink: 0; min-width: 90px; text-align: center; }
+    .log-line .sysid { color: var(--purple); flex-shrink: 0; min-width: 50px; }
+    .log-line .msgid { color: var(--yellow); flex-shrink: 0; min-width: 70px; }
+    .log-line .content { color: var(--text-1); overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+    .log-line .content:hover { text-decoration: underline; }
+
+    .tag-heartbeat { background: rgba(63,185,80,0.15); color: var(--green); }
+    .tag-position { background: rgba(88,166,255,0.15); color: var(--blue); }
+    .tag-attitude { background: rgba(188,140,255,0.15); color: var(--purple); }
+    .tag-battery { background: rgba(210,153,34,0.15); color: var(--yellow); }
+    .tag-gps { background: rgba(57,211,83,0.15); color: var(--cyan); }
+    .tag-vfr_hud { background: rgba(219,109,40,0.15); color: var(--orange); }
+    .tag-rc { background: rgba(247,120,186,0.15); color: var(--pink); }
+    .tag-frame { background: rgba(139,148,158,0.15); color: var(--text-2); }
+    .tag-status { background: rgba(248,81,73,0.15); color: var(--red); }
+    .tag-other { background: rgba(139,148,158,0.1); color: var(--text-3); }
+
+    /* Detail panel (expandable) */
+    .detail-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; }
+    .detail-overlay.active { display: flex; justify-content: center; align-items: center; }
+    .detail-box { background: var(--bg-1); border: 1px solid var(--border); border-radius: 8px; width: 720px; max-width: 90vw; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }
+    .detail-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .detail-header .title { font-size: 13px; font-weight: 600; color: var(--text-0); }
+    .detail-header .close-btn { cursor: pointer; color: var(--text-3); font-size: 18px; }
+    .detail-header .close-btn:hover { color: var(--red); }
+    .detail-json { flex: 1; overflow: auto; padding: 16px; }
+    .detail-json pre { white-space: pre-wrap; word-break: break-all; color: var(--text-1); line-height: 1.5; }
+    .json-key { color: var(--blue); }
+    .json-string { color: var(--green); }
+    .json-number { color: var(--yellow); }
+    .json-bool { color: var(--purple); }
+    .json-null { color: var(--text-3); }
+
+    /* Telemetry live panel */
+    .live-panel { padding: 12px; overflow-y: auto; }
+    .live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+    .live-card { background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+    .live-card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-3); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .live-card-title .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .live-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+    .live-field { display: flex; justify-content: space-between; font-size: 12px; }
+    .live-field .k { color: var(--text-3); }
+    .live-field .v { color: var(--text-0); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .live-field .v.stale { color: var(--text-3); }
+
+    /* Status bar */
+    .statusbar { display: flex; align-items: center; gap: 16px; padding: 0 12px; background: var(--bg-1); border-top: 1px solid var(--border); font-size: 11px; color: var(--text-3); }
+    .statusbar .stat { display: flex; align-items: center; gap: 4px; }
+    .statusbar .stat .val { color: var(--text-2); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Top Bar -->
+    <div class="topbar">
+      <span class="logo">MAVLINK DEBUG</span>
+      <span class="sep"></span>
+      <span style="font-size:11px;color:var(--text-3);">Developer Console</span>
+      <div class="controls">
+        <span class="indicator" id="connIndicator"></span>
+        <span id="connLabel" style="font-size:11px;color:var(--text-3);">Disconnected</span>
+        <span class="sep"></span>
+        <button class="btn active" id="btnConnect" onclick="toggleSSE()">Connect</button>
+        <button class="btn" id="btnPause" onclick="togglePause()">Pause</button>
+        <button class="btn danger" onclick="clearConsole()">Clear</button>
+        <span class="sep"></span>
+        <input type="text" id="searchInput" placeholder="Filter..." style="width:140px;" oninput="applyFilter()">
+        <select id="autoScroll" onchange="autoScrollEnabled=this.value==='on'">
+          <option value="on">Auto-scroll ON</option>
+          <option value="off">Auto-scroll OFF</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">MAVLink Inspector</div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Drones</div>
+          <div id="droneList">
+            <div style="padding:8px 12px;color:var(--text-3);font-size:11px;">Waiting for data...</div>
+          </div>
+        </div>
+
+        <div class="sidebar-section" style="flex:1;overflow-y:auto;">
+          <div class="sidebar-section-title">Message Filter</div>
+          <div class="filter-list" id="filterList"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Stats</div>
+          <div style="padding:4px 12px;font-size:11px;color:var(--text-2);">
+            <div style="display:flex;justify-content:space-between;"><span>Messages/s</span><span id="statMps" style="color:var(--green);">0</span></div>
+            <div style="display:flex;justify-content:space-between;"><span>Total Lines</span><span id="statTotal" style="color:var(--blue);">0</span></div>
+            <div style="display:flex;justify-content:space-between;"><span>Uptime</span><span id="statUptime" style="color:var(--text-1);">0s</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Console -->
+      <div class="console-area">
+        <div class="console-tabs">
+          <div class="console-tab active" data-tab="stream" onclick="switchTab('stream')">Stream <span class="badge" id="streamCount">0</span></div>
+          <div class="console-tab" data-tab="live" onclick="switchTab('live')">Live View</div>
+          <div class="console-tab" data-tab="frames" onclick="switchTab('frames')">Raw Frames <span class="badge" id="framesCount">0</span></div>
+        </div>
+
+        <!-- Stream tab -->
+        <div class="console-body" id="tab-stream" style="display:block;"></div>
+
+        <!-- Live View tab -->
+        <div class="console-body" id="tab-live" style="display:none;">
+          <div class="live-panel">
+            <div class="live-grid" id="liveGrid">
+              <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3);">Waiting for telemetry data...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Raw Frames tab -->
+        <div class="console-body" id="tab-frames" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="statusbar">
+      <div class="stat">SEQ: <span class="val" id="sbSeq">0</span></div>
+      <div class="stat">Drones: <span class="val" id="sbDrones">0</span></div>
+      <div class="stat">Latency: <span class="val" id="sbLatency">-</span></div>
+      <div class="stat">Buffer: <span class="val" id="sbBuffer">0</span></div>
+      <div style="margin-left:auto;color:var(--text-3);">Port 9080 | SSE /api/mavlink/debug/stream</div>
+    </div>
+  </div>
+
+  <!-- Detail Overlay -->
+  <div class="detail-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
+    <div class="detail-box">
+      <div class="detail-header">
+        <span class="title" id="detailTitle">Message Detail</span>
+        <span class="close-btn" onclick="closeDetail()">&times;</span>
+      </div>
+      <div class="detail-json"><pre id="detailPre"></pre></div>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api/mavlink';
+    let sse = null;
+    let paused = false;
+    let autoScrollEnabled = true;
+    let totalLines = 0;
+    let frameLines = 0;
+    let startTime = Date.now();
+    let mpsCounter = 0;
+    let mpsValue = 0;
+    let filterText = '';
+    let activeTab = 'stream';
+    let selectedDrone = null;
+
+    // Message type config
+    const MSG_TYPES = {
+      heartbeat:       { label: 'HEARTBEAT',  color: 'green',  tag: 'heartbeat', enabled: true },
+      position:        { label: 'POSITION',   color: 'blue',   tag: 'position',  enabled: true },
+      global_position: { label: 'POSITION',   color: 'blue',   tag: 'position',  enabled: true },
+      attitude:        { label: 'ATTITUDE',   color: 'purple', tag: 'attitude',  enabled: true },
+      battery:         { label: 'BATTERY',    color: 'yellow', tag: 'battery',   enabled: true },
+      gps_raw:         { label: 'GPS_RAW',    color: 'cyan',   tag: 'gps',       enabled: true },
+      gps2_raw:        { label: 'GPS2_RAW',   color: 'cyan',   tag: 'gps',       enabled: true },
+      vfr_hud:         { label: 'VFR_HUD',    color: 'orange', tag: 'vfr_hud',   enabled: true },
+      rc_channels:     { label: 'RC_CHAN',     color: 'pink',   tag: 'rc',        enabled: true },
+      sys_status:      { label: 'SYS_STATUS', color: 'red',    tag: 'status',    enabled: true },
+      landed_state:    { label: 'LANDED',     color: 'green',  tag: 'other',     enabled: true },
+      home_position:   { label: 'HOME_POS',   color: 'blue',   tag: 'other',     enabled: true },
+      mission_current: { label: 'MISSION',    color: 'orange', tag: 'other',     enabled: true },
+      command_ack:     { label: 'CMD_ACK',    color: 'yellow', tag: 'other',     enabled: true },
+      status_text:     { label: 'STATUSTEXT', color: 'red',    tag: 'status',    enabled: true },
+      autopilot_version:{ label: 'AP_VER',    color: 'purple', tag: 'other',     enabled: true },
+    };
+
+    const TAG_COLORS = {
+      green: 'var(--green)', blue: 'var(--blue)', purple: 'var(--purple)',
+      yellow: 'var(--yellow)', cyan: 'var(--cyan)', orange: 'var(--orange)',
+      pink: 'var(--pink)', red: 'var(--red)',
+    };
+
+    // Build filter checkboxes
+    function buildFilterList() {
+      const el = document.getElementById('filterList');
+      el.innerHTML = Object.entries(MSG_TYPES).map(([k, v]) => `
+        <label class="filter-item">
+          <input type="checkbox" checked data-key="${k}" onchange="MSG_TYPES['${k}'].enabled=this.checked">
+          <span class="color-dot" style="background:${TAG_COLORS[v.color]||'var(--text-3)'}"></span>
+          ${v.label}
+        </label>
+      `).join('');
+    }
+    buildFilterList();
+
+    // Tab switching
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.console-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      ['stream','live','frames'].forEach(t => {
+        document.getElementById('tab-'+t).style.display = t === tab ? 'block' : 'none';
+      });
+    }
+
+    // SSE Connection
+    function toggleSSE() {
+      if (sse) { disconnectSSE(); } else { connectSSE(); }
+    }
+
+    function connectSSE() {
+      if (sse) return;
+      sse = new EventSource(API + '/debug/stream');
+      sse.onopen = () => {
+        document.getElementById('connIndicator').classList.add('connected');
+        document.getElementById('connLabel').textContent = 'Connected';
+        document.getElementById('btnConnect').textContent = 'Disconnect';
+        startTime = Date.now();
+      };
+      sse.onmessage = (e) => {
+        if (paused) return;
+        try {
+          const d = JSON.parse(e.data);
+          processEvent(d);
+        } catch (err) { /* ignore */ }
+      };
+      sse.onerror = () => {
+        disconnectSSE();
+        setTimeout(connectSSE, 2000);
+      };
+    }
+
+    function disconnectSSE() {
+      if (sse) { sse.close(); sse = null; }
+      document.getElementById('connIndicator').classList.remove('connected');
+      document.getElementById('connLabel').textContent = 'Disconnected';
+      document.getElementById('btnConnect').textContent = 'Connect';
+      document.getElementById('btnConnect').classList.toggle('active', false);
+    }
+
+    function togglePause() {
+      paused = !paused;
+      const btn = document.getElementById('btnPause');
+      btn.textContent = paused ? 'Resume' : 'Pause';
+      btn.classList.toggle('active', paused);
+    }
+
+    function clearConsole() {
+      document.getElementById('tab-stream').innerHTML = '';
+      document.getElementById('tab-frames').innerHTML = '';
+      totalLines = 0; frameLines = 0;
+      document.getElementById('streamCount').textContent = '0';
+      document.getElementById('framesCount').textContent = '0';
+    }
+
+    function applyFilter() {
+      filterText = document.getElementById('searchInput').value.toLowerCase();
+    }
+
+    // Process SSE event
+    function processEvent(d) {
+      const ts = d.ts || new Date().toLocaleTimeString();
+      const tsShort = ts.split(' ').pop(); // HH:MM:SS.mmm
+
+      // Update status bar
+      document.getElementById('sbSeq').textContent = d.seq || 0;
+      document.getElementById('sbDrones').textContent = (d.sys_ids || []).length;
+      document.getElementById('sbLatency').textContent = (Date.now() - d.ts_unix) + 'ms';
+
+      // Update drone list
+      updateDroneList(d.drones || {}, d.sys_ids || []);
+
+      // Stream tab: add telemetry lines
+      const streamEl = document.getElementById('tab-stream');
+      for (const [sidStr, drone] of Object.entries(d.drones || {})) {
+        const telem = drone.telemetry || {};
+        for (const [msgType, data] of Object.entries(telem)) {
+          const cfg = MSG_TYPES[msgType] || { label: msgType.toUpperCase(), tag: 'other', enabled: true };
+          if (!cfg.enabled) continue;
+          if (selectedDrone && sidStr !== String(selectedDrone)) continue;
+
+          const summary = summarize(msgType, data);
+          if (filterText && !summary.toLowerCase().includes(filterText) && !msgType.includes(filterText)) continue;
+
+          const line = createLogLine(tsShort, cfg, sidStr, msgType, summary, data);
+          streamEl.appendChild(line);
+          totalLines++;
+          mpsCounter++;
+        }
+      }
+
+      // Frames tab: add raw frames
+      const framesEl = document.getElementById('tab-frames');
+      for (const frame of (d.recent_frames || [])) {
+        if (framesEl.querySelector(`[data-fid="${frame.id}"]`)) continue;
+        const p = frame.payload || {};
+        const line = createLogLine(
+          frame.received_at?.split(' ').pop() || tsShort,
+          { label: frame.msg_type?.toUpperCase() || 'FRAME', tag: 'frame' },
+          String(p.sys_id || '?'),
+          `msgid=${p.msg_id||'?'}`,
+          `len=${p.payload_len||0} hex=${(p.hex||'').substring(0,40)}${(p.hex||'').length>40?'...':''}`,
+          frame
+        );
+        line.dataset.fid = frame.id;
+        framesEl.appendChild(line);
+        frameLines++;
+      }
+
+      // Live view
+      updateLiveView(d.drones || {});
+
+      // Trim old lines
+      trimLines(streamEl, 2000);
+      trimLines(framesEl, 500);
+
+      // Badges
+      document.getElementById('streamCount').textContent = totalLines;
+      document.getElementById('framesCount').textContent = frameLines;
+      document.getElementById('sbBuffer').textContent = streamEl.childElementCount;
+
+      // Auto-scroll
+      if (autoScrollEnabled) {
+        if (activeTab === 'stream') streamEl.scrollTop = streamEl.scrollHeight;
+        if (activeTab === 'frames') framesEl.scrollTop = framesEl.scrollHeight;
+      }
+    }
+
+    function createLogLine(ts, cfg, sysId, msgId, content, rawData) {
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.innerHTML = `
+        <span class="ts">${ts}</span>
+        <span class="tag tag-${cfg.tag}">${cfg.label}</span>
+        <span class="sysid">SYS:${sysId}</span>
+        <span class="msgid">${msgId}</span>
+        <span class="content">${escapeHtml(content)}</span>
+      `;
+      div.querySelector('.content').addEventListener('click', () => showDetail(cfg.label + ' SYS:' + sysId, rawData));
+      return div;
+    }
+
+    function summarize(msgType, data) {
+      if (!data || typeof data !== 'object') return JSON.stringify(data);
+      switch (msgType) {
+        case 'heartbeat':
+          return `mode=${data.mode||'-'} armed=${data.armed?'YES':'NO'} type=${data.mav_type||'-'} state=${data.system_status||'-'}`;
+        case 'position': case 'global_position':
+          return `lat=${fmt(data.lat,7)} lon=${fmt(data.lon,7)} alt=${fmt(data.alt,1)}m rel=${fmt(data.rel_alt,1)}m spd=${fmt(data.speed,2)}m/s hdg=${data.hdg||'-'}`;
+        case 'attitude':
+          return `roll=${fmt(data.roll,2)} pitch=${fmt(data.pitch,2)} yaw=${fmt(data.yaw,2)} rollspd=${fmt(data.rollspeed,3)} pitchspd=${fmt(data.pitchspeed,3)}`;
+        case 'battery':
+          return `volt=${fmt(data.voltage,2)}V curr=${fmt(data.current,1)}A rem=${data.remaining??'-'}% temp=${fmt(data.temperature,1)}C`;
+        case 'gps_raw': case 'gps2_raw':
+          return `fix=${data.fix_name||data.fix_type||'-'} sat=${data.satellites??'-'} eph=${fmt(data.eph,2)} epv=${fmt(data.epv,2)}`;
+        case 'vfr_hud':
+          return `airspd=${fmt(data.airspeed,1)} gndspd=${fmt(data.groundspeed,1)} climb=${fmt(data.climb,2)} thr=${data.throttle??'-'}%`;
+        case 'rc_channels':
+          const ch = data.channels || [];
+          return `ch=[${ch.slice(0,8).map(v=>v===65535?'-':v).join(',')}] rssi=${data.rssi??'-'}`;
+        case 'sys_status':
+          return `load=${data.load||'-'} vbat=${fmt(data.voltage_battery,0)}mV curr=${fmt(data.current_battery,0)}mA drop=${data.drop_rate_comm||'-'}`;
+        case 'home_position':
+          return `lat=${fmt(data.lat,7)} lon=${fmt(data.lon,7)} alt=${fmt(data.alt,1)}m`;
+        case 'status_text':
+          return `[${data.severity||'?'}] ${data.text||data.message||''}`;
+        case 'landed_state':
+          return `state=${data.state||data.landed_state||'-'} vtol=${data.vtol_state||'-'}`;
+        case 'mission_current':
+          return `seq=${data.seq??'-'} total=${data.total??'-'}`;
+        case 'command_ack':
+          return `cmd=${data.command||'-'} result=${data.result||'-'}`;
+        default:
+          return JSON.stringify(data).substring(0, 200);
+      }
+    }
+
+    function fmt(v, d) { return v != null ? Number(v).toFixed(d) : '-'; }
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function trimLines(el, max) {
+      while (el.childElementCount > max) el.removeChild(el.firstChild);
+    }
+
+    // Drone list
+    function updateDroneList(drones, sysIds) {
+      const el = document.getElementById('droneList');
+      if (sysIds.length === 0) {
+        el.innerHTML = '<div style="padding:8px 12px;color:var(--text-3);font-size:11px;">No drones detected</div>';
+        return;
+      }
+      el.innerHTML = sysIds.map(sid => {
+        const dr = drones[String(sid)] || {};
+        const on = dr.online;
+        const hb = (dr.telemetry||{}).heartbeat || {};
+        const sel = selectedDrone === sid ? 'selected' : '';
+        return `<div class="drone-item ${sel}" onclick="selectDrone(${sid})">
+          <span class="dot ${on?'on':'off'}"></span>
+          <span class="name">Drone #${sid}</span>
+          <span class="meta">${hb.mode||''}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function selectDrone(sid) {
+      selectedDrone = selectedDrone === sid ? null : sid;
+    }
+
+    // Live view
+    function updateLiveView(drones) {
+      const grid = document.getElementById('liveGrid');
+      const entries = Object.entries(drones);
+      if (entries.length === 0) return;
+
+      let html = '';
+      for (const [sidStr, drone] of entries) {
+        if (selectedDrone && sidStr !== String(selectedDrone)) continue;
+        const t = drone.telemetry || {};
+        const on = drone.online;
+
+        // Heartbeat card
+        const hb = t.heartbeat || {};
+        html += liveCard(`Drone #${sidStr} - Heartbeat`, on ? 'var(--green)' : 'var(--text-3)', [
+          ['Mode', hb.mode||'-'], ['Armed', hb.armed?'YES':'NO'], ['Type', hb.mav_type||'-'], ['State', hb.system_status||'-']
+        ]);
+
+        // Position card
+        const pos = t.position || t.global_position || {};
+        html += liveCard(`Drone #${sidStr} - Position`, 'var(--blue)', [
+          ['Lat', fmt(pos.lat,7)], ['Lon', fmt(pos.lon,7)], ['Alt', fmt(pos.alt,1)+'m'], ['RelAlt', fmt(pos.rel_alt,1)+'m'],
+          ['Speed', fmt(pos.speed,2)+'m/s'], ['Heading', (pos.hdg||'-')+'°']
+        ]);
+
+        // Attitude card
+        const att = t.attitude || {};
+        html += liveCard(`Drone #${sidStr} - Attitude`, 'var(--purple)', [
+          ['Roll', fmt(att.roll,2)+'°'], ['Pitch', fmt(att.pitch,2)+'°'], ['Yaw', fmt(att.yaw,2)+'°']
+        ]);
+
+        // Battery card
+        const bat = t.battery || {};
+        html += liveCard(`Drone #${sidStr} - Battery`, 'var(--yellow)', [
+          ['Voltage', fmt(bat.voltage,2)+'V'], ['Current', fmt(bat.current,1)+'A'], ['Remaining', (bat.remaining??'-')+'%'], ['Temp', fmt(bat.temperature,1)+'°C']
+        ]);
+
+        // GPS card
+        const gps = t.gps_raw || {};
+        html += liveCard(`Drone #${sidStr} - GPS`, 'var(--cyan)', [
+          ['Fix', gps.fix_name||'-'], ['Sats', gps.satellites??'-'], ['EPH', fmt(gps.eph,2)+'m'], ['EPV', fmt(gps.epv,2)+'m']
+        ]);
+
+        // VFR HUD card
+        const hud = t.vfr_hud || {};
+        html += liveCard(`Drone #${sidStr} - VFR HUD`, 'var(--orange)', [
+          ['Airspeed', fmt(hud.airspeed,1)+'m/s'], ['GndSpeed', fmt(hud.groundspeed,1)+'m/s'],
+          ['Climb', fmt(hud.climb,2)+'m/s'], ['Throttle', (hud.throttle??'-')+'%']
+        ]);
+      }
+      grid.innerHTML = html || '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3);">Select a drone or wait for data...</div>';
+    }
+
+    function liveCard(title, dotColor, fields) {
+      return `<div class="live-card">
+        <div class="live-card-title"><span class="dot" style="background:${dotColor}"></span>${title}</div>
+        <div class="live-fields">${fields.map(([k,v]) =>
+          `<div class="live-field"><span class="k">${k}</span><span class="v${v==='-'?' stale':''}">${v}</span></div>`
+        ).join('')}</div>
+      </div>`;
+    }
+
+    // Detail overlay
+    function showDetail(title, data) {
+      document.getElementById('detailTitle').textContent = title;
+      document.getElementById('detailPre').innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+      document.getElementById('detailOverlay').classList.add('active');
+    }
+    function closeDetail() {
+      document.getElementById('detailOverlay').classList.remove('active');
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+    function syntaxHighlight(json) {
+      return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+        let cls = 'json-number';
+        if (/^"/.test(match)) {
+          cls = /:$/.test(match) ? 'json-key' : 'json-string';
+        } else if (/true|false/.test(match)) {
+          cls = 'json-bool';
+        } else if (/null/.test(match)) {
+          cls = 'json-null';
+        }
+        return `<span class="${cls}">${match}</span>`;
+      });
+    }
+
+    // MPS counter
+    setInterval(() => {
+      mpsValue = mpsCounter;
+      mpsCounter = 0;
+      document.getElementById('statMps').textContent = mpsValue;
+      document.getElementById('statTotal').textContent = totalLines;
+      const sec = Math.floor((Date.now() - startTime) / 1000);
+      const m = Math.floor(sec/60), s = sec%60;
+      document.getElementById('statUptime').textContent = m > 0 ? `${m}m${s}s` : `${s}s`;
+    }, 1000);
+
+    // Auto-connect on load
+    connectSSE();
+  </script>
+</body>
+</html>
