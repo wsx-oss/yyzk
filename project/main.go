@@ -20,6 +20,7 @@ import (
 	"smartcontrol/internal/middleware"
 	"smartcontrol/internal/monitor"
 	"smartcontrol/internal/taskpool"
+	"smartcontrol/internal/tcpgateway"
 
 	"github.com/gin-gonic/gin"
 )
@@ -207,6 +208,18 @@ func main() {
 	// Auto-backup: every 24 hours, keep latest 10 backups
 	backupAPI.StartAutoBackup(24*time.Hour, 10)
 
+	// ---- TCP Gateway for raw device connections ----
+	tcpPort := getenv("SC_TCP_PORT", "9080")
+	tcpGW := tcpgateway.New(":"+tcpPort, database)
+	if err := tcpGW.EnsureTable(); err != nil {
+		log.Printf("[main] TCP gateway table init warning: %v", err)
+	}
+	if err := tcpGW.Start(); err != nil {
+		log.Printf("[main] TCP gateway start warning: %v (raw TCP disabled)", err)
+	}
+	handlers.TCPGatewayRef = tcpGW
+	handlers.RegisterTCPGatewayRoutes(r)
+
 	srv := &http.Server{Addr: addr, Handler: r}
 	go func() {
 		log.Printf("listening on %s", addr)
@@ -220,6 +233,7 @@ func main() {
 	log.Printf("shutting down...")
 
 	// Graceful shutdown: flush batchers, stop caches, stop sim engine, stop pool, then HTTP server
+	tcpGW.Stop()
 	handlers.StopBatchers()
 	handlers.StopStatsCaches()
 	rlTrainer.StopTraining()
