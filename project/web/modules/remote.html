@@ -39,6 +39,11 @@
     .status-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;}
     .status-dot.online{background:#10b981;}
     .status-dot.offline{background:#ef4444;}
+    body{background:var(--cc-page-bg, var(--cc-bg-1));background-attachment:fixed;}
+    .modal{background:var(--cc-glass-bg-strong);border:1px solid var(--cc-glass-border);box-shadow:var(--cc-shadow-1), inset 0 1px 0 var(--cc-glass-border-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
+    .stat-box{background:var(--cc-glass-bg);border:1px solid var(--cc-glass-border);box-shadow:var(--cc-shadow-1), inset 0 1px 0 rgba(255,255,255,0.14);backdrop-filter:blur(20px) saturate(170%);-webkit-backdrop-filter:blur(20px) saturate(170%);}
+    .bandwidth-bar .bar-bg{background:rgba(148,163,184,0.18);border:1px solid rgba(255,255,255,0.14);}
+    .bandwidth-bar .bar-fill{box-shadow:0 8px 20px rgba(22,93,255,0.16);}
   </style>
 </head>
 <body>

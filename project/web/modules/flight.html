@@ -258,6 +258,56 @@
     .action-fb-stat { text-align: center; flex: 1; }
     .action-fb-stat .stat-num { font-size: 20px; font-weight: 700; color: #0f172a; }
     .action-fb-stat .stat-label { font-size: 11px; color: #64748b; margin-top: 2px; }
+    body {
+      background: var(--cc-page-bg, var(--cc-bg-1));
+      background-attachment: fixed;
+    }
+    .realtime-card,
+    .action-card,
+    .action-summary,
+    .action-feedback,
+    .action-fb-item,
+    .action-fb-stats,
+    .plan-result,
+    .plan-waypoints,
+    .plan-explanation,
+    .plan-map-context,
+    .plan-est-box,
+    .multi-plan-card,
+    .cot-inline-section,
+    .cot-inline-body,
+    .cot-step,
+    .cot-final {
+      background: var(--cc-glass-bg-strong);
+      border: 1px solid var(--cc-glass-border);
+      box-shadow: var(--cc-shadow-1), inset 0 1px 0 var(--cc-glass-border-strong);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+    }
+    .realtime-card,
+    .plan-explanation,
+    .plan-map-context {
+      background: linear-gradient(135deg, rgba(22,93,255,0.10), rgba(20,201,201,0.08)), var(--cc-glass-bg-strong);
+    }
+    .action-mode-tab {
+      background: var(--cc-glass-bg);
+      border-color: var(--cc-glass-border);
+      color: var(--cc-text-2);
+    }
+    .action-mode-tab.active {
+      box-shadow: 0 8px 20px rgba(22,93,255,0.18);
+    }
+    .plan-picker-map,
+    .plan-result-map,
+    .action-config-map,
+    .multi-plan-map {
+      border-color: var(--cc-glass-border);
+      box-shadow: var(--cc-shadow-1);
+    }
+    .plan-loading .spinner {
+      border-color: rgba(255,255,255,0.18);
+      border-top-color: var(--cc-primary);
+    }
   </style>
 </head>
 <body>
@@ -948,7 +998,7 @@
       mPickerNFZLayers.forEach(l => { try { l.remove(); } catch(e) {} });
       mPickerNFZLayers = [];
       try {
-        mPickerMap = L.map('mPickerMap', { center: [34.7930, 113.6636], zoom: 15 });
+        mPickerMap = L.map('mPickerMap', { center: [DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], zoom: DEFAULT_CAMPUS_MAP_CENTER.zoom });
         tdtImgLayer().addTo(mPickerMap);
         tdtCiaLayer().addTo(mPickerMap);
         addNoFlyZonesToMap(mPickerMap, mPickerNFZLayers);
@@ -969,6 +1019,13 @@
         });
       } catch(e) { console.warn('Picker map init failed:', e); }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var startInput = $('#mStartAddr');
+      var goalInput = $('#mGoalAddr');
+      if (startInput) startInput.placeholder = '例如：' + DEFAULT_CAMPUS_ROUTE_START.name + ' / ' + DEFAULT_CAMPUS_ROUTE_START.lat.toFixed(6) + ',' + DEFAULT_CAMPUS_ROUTE_START.lng.toFixed(6);
+      if (goalInput) goalInput.placeholder = '例如：' + DEFAULT_CAMPUS_ROUTE_GOAL.name + ' / ' + DEFAULT_CAMPUS_ROUTE_GOAL.lat.toFixed(6) + ',' + DEFAULT_CAMPUS_ROUTE_GOAL.lng.toFixed(6);
+    });
 
     // --- Address geocoding ---
     async function resolveAddress(which) {

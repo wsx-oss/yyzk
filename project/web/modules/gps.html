@@ -74,6 +74,59 @@
     .tab-content.active { display: block; }
 
     .alert-row-unack { background: #fef2f2; }
+    body {
+      background: var(--cc-page-bg, var(--cc-bg-1));
+      background-attachment: fixed;
+    }
+    .map-card {
+      background: var(--cc-glass-bg-strong);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--cc-radius-xl);
+      box-shadow: var(--cc-shadow-1), inset 0 1px 0 var(--cc-glass-border-strong);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+    }
+    .map-card-header {
+      background: var(--cc-glass-bg-soft);
+      border-bottom: 1px solid var(--cc-glass-border);
+    }
+    #mapContainer,
+    #detailMap,
+    #historyMap {
+      border: 1px solid var(--cc-glass-border);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+    .pagination-bar button {
+      background: var(--cc-glass-bg);
+      color: var(--cc-text-2);
+      border-color: var(--cc-glass-border);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
+    }
+    .pagination-bar button:hover:not(:disabled) {
+      background: var(--cc-glass-bg-strong);
+    }
+    .tab-bar {
+      background: var(--cc-glass-bg-soft);
+      border: 1px solid var(--cc-glass-border);
+      border-radius: var(--cc-radius-lg);
+      padding: 6px;
+      box-shadow: var(--cc-shadow-1), inset 0 1px 0 rgba(255,255,255,0.12);
+      backdrop-filter: blur(20px) saturate(170%);
+      -webkit-backdrop-filter: blur(20px) saturate(170%);
+    }
+    .tab-item {
+      border-radius: 12px;
+      margin-bottom: 0;
+    }
+    .tab-item.active {
+      background: var(--cc-glass-bg-strong);
+      border-bottom-color: transparent;
+      box-shadow: var(--cc-shadow-1);
+    }
+    .alert-row-unack {
+      background: rgba(245,63,63,0.08);
+    }
   </style>
 </head>
 <body>
@@ -318,7 +371,7 @@
 
     // ========== Map Init ==========
     function initMap() {
-      map = L.map('mapContainer').setView([34.7930, 113.6636], 15);
+      map = L.map('mapContainer').setView([DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
       tdtImgLayer().addTo(map);
       tdtCiaLayer().addTo(map);
       // MarkerCluster: handles overlapping markers — click cluster to spiderfy (fan out)
@@ -700,7 +753,7 @@
         $('#detailModal').classList.add('active');
         setTimeout(() => {
           if (detailMap) { detailMap.remove(); detailMap = null; }
-          detailMap = L.map('detailMap').setView([d.latitude || 34.7930, d.longitude || 113.6636], 15);
+          detailMap = L.map('detailMap').setView([d.latitude || DEFAULT_CAMPUS_MAP_CENTER.lat, d.longitude || DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
           tdtImgLayer().addTo(detailMap);
           tdtCiaLayer().addTo(detailMap);
           if (d.latitude !== 0 || d.longitude !== 0) {
@@ -725,7 +778,7 @@
         $('#historyModal').classList.add('active');
         setTimeout(() => {
           if (historyMap) { historyMap.remove(); historyMap = null; }
-          historyMap = L.map('historyMap').setView([34.7930, 113.6636], 15);
+          historyMap = L.map('historyMap').setView([DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
           tdtImgLayer().addTo(historyMap);
           tdtCiaLayer().addTo(historyMap);
           if (items.length) {
