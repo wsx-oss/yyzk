@@ -25,6 +25,10 @@
 - [API接口文档](#api接口文档)
 - [项目结构](#项目结构)
 - [部署指南](#部署指南)
+  - [本地编译](#本地编译)
+  - [Ubuntu 22 服务器部署（完整流程）](#ubuntu-22-服务器部署完整流程)
+  - [自动更新脚本](#自动更新脚本)
+  - [服务器运维速查](#服务器运维速查)
 - [故障排查](#故障排查)
 - [版本更新](#版本更新)
 - [团队协作规范](#团队协作规范)
@@ -440,7 +444,7 @@ project/
 
 ## 部署指南
 
-### 单机部署
+### 本地编译
 
 ```bash
 cd project
@@ -451,27 +455,485 @@ go build -o sc .          # Linux
 
 部署时保留：可执行文件 + `.env`（静态页面已 embed 打入二进制，所有数据存储于数据库）。
 
-### Linux systemd
+### Windows 交叉编译 Linux 二进制
+
+```powershell
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o sc .
+```
+
+---
+
+### Ubuntu 22 服务器部署（完整流程）
+
+> 以下以 `root` 用户、项目目录 `~/yyzk/Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System` 为例。
+> 若使用非 root 用户，将所有 `/root/` 替换为 `$HOME` 路径，并将 systemd 中 `User=root` 改为对应用户名。
+
+#### 前置条件
+
+| 依赖 | 要求 |
+|------|------|
+| OS | Ubuntu 22.04 LTS |
+| Go | 1.25+（从官方 tarball 安装） |
+| MySQL | 已运行，数据库已创建 |
+| Redis | 已运行 |
+| Nginx | apt 安装 |
+| 域名 | 已添加至 Cloudflare（DNS A 记录指向服务器 IP，开启代理橙色云） |
+
+#### 1. 安装 Go
+
+```bash
+wget https://go.dev/dl/go1.25.0.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf go1.25.0.linux-amd64.tar.gz
+rm go1.25.0.linux-amd64.tar.gz
+
+echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee /etc/profile.d/go.sh
+source /etc/profile.d/go.sh
+go version   # 确认 go1.25.0
+```
+
+#### 2. 安装 Nginx
+
+```bash
+sudo apt update && sudo apt install -y nginx git
+```
+
+#### 3. 配置 GitHub SSH Key（私有仓库）
+
+```bash
+ssh-keygen -t ed25519 -C "deploy-server" -f ~/.ssh/github_deploy -N ""
+cat ~/.ssh/github_deploy.pub
+# → 复制输出，到 GitHub → Settings → SSH and GPG keys → New SSH key 粘贴
+
+cat >> ~/.ssh/config << 'EOF'
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/github_deploy
+    StrictHostKeyChecking accept-new
+EOF
+
+ssh -T git@github.com   # 测试连通
+```
+
+#### 4. 克隆仓库 & 编译
+
+```bash
+mkdir -p ~/yyzk && cd ~/yyzk
+git clone git@github.com:wsx-oss/Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System.git
+cd Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System/project
+
+CGO_ENABLED=0 go build -o smartcontrol main.go
+echo "编译完成: $(ls -lh smartcontrol)"
+```
+
+#### 5. 创建 systemd 服务
+
+创建 `/etc/systemd/system/yyzk.service`：
 
 ```ini
 [Unit]
-Description=CloudControl
-After=network.target
+Description=云翼智控 SmartControl Server
+After=network.target mysql.service redis.service
+Wants=mysql.service redis.service
 
 [Service]
 Type=simple
-ExecStart=/opt/smartcontrol/sc
-WorkingDirectory=/opt/smartcontrol
+User=root
+WorkingDirectory=/root/yyzk/Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System/project
+EnvironmentFile=-/root/yyzk/Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System/project/.env
+ExecStart=/root/yyzk/Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System/project/smartcontrol
 Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+KillSignal=SIGTERM
+TimeoutStopSec=15
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-### 交叉编译
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable yyzk
+sudo systemctl start yyzk
 
-```powershell
-$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o sc .
+# 验证
+sudo systemctl status yyzk
+curl -s http://127.0.0.1:8080/api/healthz
+```
+
+#### 6. Nginx 反向代理 + Cloudflare Origin Certificate
+
+**6.1 生成 Cloudflare Origin 证书**
+
+1. Cloudflare Dashboard → 域名 → **SSL/TLS → Origin Server → Create Certificate**
+2. 保持默认（RSA, 15 年），点 Create
+3. 将证书和私钥保存到服务器：
+
+```bash
+sudo mkdir -p /etc/ssl/cloudflare
+sudo nano /etc/ssl/cloudflare/origin.pem      # 粘贴 Origin Certificate
+sudo nano /etc/ssl/cloudflare/origin.key       # 粘贴 Private Key
+sudo chmod 600 /etc/ssl/cloudflare/origin.key
+```
+
+**6.2 Cloudflare 设置**
+
+- **DNS → Records**：A 记录 `@` 和 `www` 指向服务器 IP，**Proxy 开启**（橙色云）
+- **SSL/TLS → Overview**：设为 **Full (strict)**
+
+**6.3 Nginx 配置**
+
+创建 `/etc/nginx/sites-available/yyzk`：
+
+```nginx
+server {
+    listen 80;
+    server_name yyzk.online www.yyzk.online;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yyzk.online www.yyzk.online;
+
+    ssl_certificate     /etc/ssl/cloudflare/origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    # Cloudflare Real-IP 还原
+    set_real_ip_from 173.245.48.0/20;
+    set_real_ip_from 103.21.244.0/22;
+    set_real_ip_from 103.22.200.0/22;
+    set_real_ip_from 103.31.4.0/22;
+    set_real_ip_from 141.101.64.0/18;
+    set_real_ip_from 108.162.192.0/18;
+    set_real_ip_from 190.93.240.0/20;
+    set_real_ip_from 188.114.96.0/20;
+    set_real_ip_from 197.234.240.0/22;
+    set_real_ip_from 198.41.128.0/17;
+    set_real_ip_from 162.158.0.0/15;
+    set_real_ip_from 104.16.0.0/13;
+    set_real_ip_from 104.24.0.0/14;
+    set_real_ip_from 172.64.0.0/13;
+    set_real_ip_from 131.0.72.0/22;
+    real_ip_header CF-Connecting-IP;
+
+    client_max_body_size 64m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket 支持（VNC / SSH / metrics stream 等）
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+}
+```
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/yyzk /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+#### 7. 防火墙
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 22/tcp
+sudo ufw --force enable
+```
+
+#### 8. 验证部署
+
+```bash
+curl -s http://127.0.0.1:8080/api/healthz          # 本地
+curl -s https://yyzk.online/api/healthz             # 外网（通过 Cloudflare）
+```
+
+---
+
+### 自动更新脚本
+
+脚本位于服务器 `~/yyzk/update.sh`，通过 crontab 每小时自动检查 GitHub 是否有新提交，有则自动拉取、编译、重启。
+
+#### 核心流程
+
+1. `git fetch` 检查远端是否有新提交，无更新直接退出
+2. 备份 `project/knowledge_base/` 和 `project/data/`（防止运行时数据被覆盖）
+3. `git pull --ff-only` 拉取最新代码
+4. 恢复备份的 `knowledge_base/` 和 `data/`
+5. 编译新二进制到临时文件 `smartcontrol.new`
+6. 编译失败则不动现有服务，旧版本继续运行
+7. 编译成功后保留旧二进制为 `smartcontrol.rollback`，替换并重启服务
+8. 健康检查（`/api/healthz`，兼容 429 限流响应），失败则自动回滚
+
+#### 脚本完整内容
+
+创建 `~/yyzk/update.sh`：
+
+```bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO_DIR="$HOME/yyzk/Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System"
+PROJECT_DIR="$REPO_DIR/project"
+BINARY_NAME="smartcontrol"
+SERVICE_NAME="yyzk"
+
+LOG_DIR="$HOME/yyzk"
+LOG_FILE="$LOG_DIR/update.log"
+LOCK_FILE="$LOG_DIR/update.lock"
+BACKUP_DIR="$HOME/yyzk/backups"
+
+MAX_BACKUPS=5
+HEALTH_URL="http://127.0.0.1:8080/api/healthz"
+
+mkdir -p "$LOG_DIR" "$BACKUP_DIR"
+
+# 文件锁，防止多个实例同时执行
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] 已有更新任务在运行，跳过" >> "$LOG_FILE"
+    exit 0
+fi
+
+# 日志统一写入 LOG_FILE（crontab 不要再用 >> 重定向）
+exec >> "$LOG_FILE" 2>&1
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+rollback() {
+    log "开始回滚..."
+    if [ -f "$PROJECT_DIR/${BINARY_NAME}.rollback" ]; then
+        mv -f "$PROJECT_DIR/${BINARY_NAME}.rollback" "$PROJECT_DIR/$BINARY_NAME"
+        chmod +x "$PROJECT_DIR/$BINARY_NAME"
+        systemctl restart "$SERVICE_NAME" || true
+        sleep 3
+        if systemctl is-active --quiet "$SERVICE_NAME"; then
+            log "已回滚到上一版本，服务已恢复"
+        else
+            log "回滚后服务仍未恢复，请手动排查"
+        fi
+    else
+        log "未找到 ${BINARY_NAME}.rollback，无法自动回滚"
+    fi
+}
+
+check_service_healthy() {
+    local code
+    code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "$HEALTH_URL" || true)"
+    case "$code" in
+        200) return 0 ;;
+        429) log "健康检查返回 429（限流），视为存活"; return 0 ;;
+    esac
+    # HTTP 检查不通过时，兜底看 systemd 状态
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+        log "HTTP 返回 $code，但 systemd 显示服务在运行，视为存活"
+        return 0
+    fi
+    return 1
+}
+
+get_remote_ref() {
+    if git show-ref --verify --quiet refs/remotes/origin/main; then
+        echo "origin/main"; return 0
+    fi
+    if git show-ref --verify --quiet refs/remotes/origin/master; then
+        echo "origin/master"; return 0
+    fi
+    return 1
+}
+
+get_local_branch() {
+    git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "main"
+}
+
+# ===== 主流程 =====
+log "===== 开始检查更新 ====="
+
+cd "$REPO_DIR"
+git fetch --prune origin >/dev/null 2>&1
+
+REMOTE_REF="$(get_remote_ref || true)"
+if [ -z "${REMOTE_REF:-}" ]; then
+    log "无法找到 origin/main 或 origin/master"; exit 1
+fi
+
+LOCAL_HEAD="$(git rev-parse HEAD)"
+REMOTE_HEAD="$(git rev-parse "$REMOTE_REF")"
+
+if [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
+    log "无更新 (HEAD=$LOCAL_HEAD), 跳过"; exit 0
+fi
+
+log "检测到更新: $LOCAL_HEAD → $REMOTE_HEAD"
+
+# 备份运行时数据
+TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
+SNAP_DIR="$BACKUP_DIR/$TIMESTAMP"
+mkdir -p "$SNAP_DIR"
+[ -d "$PROJECT_DIR/knowledge_base" ] && cp -a "$PROJECT_DIR/knowledge_base" "$SNAP_DIR/" && log "已备份 knowledge_base/"
+[ -d "$PROJECT_DIR/data" ] && cp -a "$PROJECT_DIR/data" "$SNAP_DIR/" && log "已备份 data/"
+
+# 拉取代码
+CURRENT_BRANCH="$(get_local_branch)"
+git pull --ff-only origin "$CURRENT_BRANCH"
+log "git pull 完成"
+
+# 恢复运行时数据
+[ -d "$SNAP_DIR/knowledge_base" ] && rm -rf "$PROJECT_DIR/knowledge_base" && cp -a "$SNAP_DIR/knowledge_base" "$PROJECT_DIR/" && log "已恢复 knowledge_base/"
+[ -d "$SNAP_DIR/data" ] && rm -rf "$PROJECT_DIR/data" && cp -a "$SNAP_DIR/data" "$PROJECT_DIR/" && log "已恢复 data/"
+
+# 编译
+cd "$PROJECT_DIR"
+log "开始编译..."
+if ! CGO_ENABLED=0 /usr/local/go/bin/go build -o "${BINARY_NAME}.new" main.go; then
+    log "编译失败，旧版本继续运行"; rm -f "${BINARY_NAME}.new"; exit 1
+fi
+chmod +x "${BINARY_NAME}.new"
+log "编译成功: $(ls -lh "${BINARY_NAME}.new")"
+
+# 替换二进制（保留回滚副本）
+[ -f "$BINARY_NAME" ] && cp -f "$BINARY_NAME" "${BINARY_NAME}.rollback"
+mv -f "${BINARY_NAME}.new" "$BINARY_NAME"
+chmod +x "$BINARY_NAME"
+
+# 重启服务
+log "重启服务..."
+if ! systemctl restart "$SERVICE_NAME"; then
+    log "systemctl restart 失败，回滚"; rollback; exit 1
+fi
+
+# 健康检查（最多等 23 秒）
+sleep 3
+HEALTHY=false
+for i in $(seq 1 10); do
+    if check_service_healthy; then HEALTHY=true; break; fi
+    sleep 2
+done
+
+if [ "$HEALTHY" != "true" ]; then
+    log "健康检查失败，回滚..."; rollback; exit 1
+fi
+
+log "新版本部署成功: $(git rev-parse --short HEAD)"
+
+# 清理旧备份（只保留最近 N 份）
+find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm -rf
+
+log "===== 更新流程完成 ====="
+```
+
+```bash
+chmod +x ~/yyzk/update.sh
+```
+
+#### 设置 Crontab
+
+```bash
+crontab -e
+# 添加以下一行（每小时第 0 分钟执行，日志由脚本自行管理，不要加 >> 重定向）
+0 * * * * /bin/bash /root/yyzk/update.sh
+```
+
+> **注意**：如果使用非 root 用户，需配置 sudoers 免密重启服务：
+> ```bash
+> echo "用户名 ALL=(ALL) NOPASSWD: /bin/systemctl restart yyzk, /bin/systemctl stop yyzk, /bin/systemctl start yyzk" | sudo tee /etc/sudoers.d/yyzk-deploy
+> ```
+
+---
+
+### 服务器运维速查
+
+#### 服务管理
+
+```bash
+sudo systemctl status yyzk          # 查看服务状态
+sudo systemctl start yyzk           # 启动
+sudo systemctl stop yyzk            # 停止
+sudo systemctl restart yyzk         # 重启
+```
+
+#### 查看日志
+
+```bash
+# 应用实时日志（systemd journal）
+sudo journalctl -u yyzk -f
+
+# 应用最近 200 行日志
+sudo journalctl -u yyzk --no-pager -n 200
+
+# 自动更新脚本日志
+tail -50 ~/yyzk/update.log
+
+# Nginx 访问/错误日志
+tail -f /var/log/nginx/access.log
+tail -f /var/log/nginx/error.log
+```
+
+#### 手动触发更新
+
+```bash
+bash ~/yyzk/update.sh
+tail -50 ~/yyzk/update.log          # 查看结果
+```
+
+#### 手动回滚
+
+```bash
+cd ~/yyzk/Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System/project
+mv smartcontrol.rollback smartcontrol
+sudo systemctl restart yyzk
+```
+
+#### 健康检查
+
+```bash
+curl -s http://127.0.0.1:8080/api/healthz | python3 -m json.tool
+```
+
+返回示例：
+
+```json
+{
+    "status": "ok",
+    "uptime_s": 3600,
+    "db_reachable": true,
+    "redis_reachable": true,
+    "llm_reachable": true,
+    "patrol_online": true
+}
+```
+
+#### 服务器目录结构
+
+```text
+~/yyzk/
+├── Intelligent-Tool-Human-Computer-Interaction-and-Remote-Control-System/   # Git 仓库
+│   └── project/
+│       ├── smartcontrol              # 当前运行的二进制
+│       ├── smartcontrol.rollback     # 上一版本（用于回滚）
+│       ├── .env                      # 环境变量（随仓库分发）
+│       ├── knowledge_base/           # RAG 知识库（运行时数据，更新时自动保护）
+│       └── data/                     # 备份/录音/RL策略/仿真快照（运行时数据，更新时自动保护）
+├── update.sh                         # 自动更新脚本
+├── update.log                        # 更新日志
+├── update.lock                       # 执行锁（防并发）
+└── backups/                          # 更新前的 knowledge_base/ 和 data/ 快照（保留最近 5 份）
 ```
 
 ---
