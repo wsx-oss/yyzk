@@ -658,11 +658,17 @@ func (s *SimAPI) RLStart(c *gin.Context) {
 		p.EvalInterval = 100
 	}
 	s.trainer.StartTraining(p.EvalInterval)
+	// Persist training state to DB for auto-resume after restart
+	stateJSON, _ := json.Marshal(map[string]interface{}{"training": true, "eval_interval": p.EvalInterval})
+	s.db.Exec(`INSERT OR REPLACE INTO data_store(store_key, content, updated_at) VALUES('rl_training_state', ?, datetime('now'))`, string(stateJSON))
 	c.JSON(200, gin.H{"ok": true, "message": "RL训练已启动"})
 }
 
 func (s *SimAPI) RLStop(c *gin.Context) {
 	s.trainer.StopTraining()
+	// Persist stopped state to DB
+	stateJSON, _ := json.Marshal(map[string]interface{}{"training": false, "eval_interval": 0})
+	s.db.Exec(`INSERT OR REPLACE INTO data_store(store_key, content, updated_at) VALUES('rl_training_state', ?, datetime('now'))`, string(stateJSON))
 	c.JSON(200, gin.H{"ok": true, "message": "RL训练已停止"})
 }
 

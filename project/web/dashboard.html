@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>云翼智控</title>
+  <link rel="icon" type="image/jpeg" href="/app/logo.jpg" />
   <style>
     :root {
       --sidebar-width: 220px;
@@ -817,7 +818,7 @@
   <!-- ===== Content ===== -->
   <div class="layout-content" id="layoutContent">
     <div class="content-area">
-      <iframe id="contentFrame" src="/app/modules/drones.html" allowfullscreen></iframe>
+      <iframe id="contentFrame" src="about:blank" allowfullscreen></iframe>
     </div>
   </div>
 
@@ -858,9 +859,15 @@
     // ---- Sidebar collapse ----
     const sidebar = document.getElementById('sidebar');
     const layoutContent = document.getElementById('layoutContent');
+    // Restore sidebar collapse state
+    if (localStorage.getItem('cc-sidebar-collapsed') === '1') {
+      sidebar.classList.add('collapsed');
+      layoutContent.classList.add('sidebar-collapsed');
+    }
     document.getElementById('sidebarToggle').addEventListener('click', () => {
       sidebar.classList.toggle('collapsed');
       layoutContent.classList.toggle('sidebar-collapsed');
+      localStorage.setItem('cc-sidebar-collapsed', sidebar.classList.contains('collapsed') ? '1' : '0');
     });
 
     // ---- Nav group toggle ----
@@ -869,6 +876,7 @@
         if (sidebar.classList.contains('collapsed')) {
           sidebar.classList.remove('collapsed');
           layoutContent.classList.remove('sidebar-collapsed');
+          localStorage.setItem('cc-sidebar-collapsed', '0');
         }
         toggle.classList.toggle('open');
         const children = toggle.nextElementSibling;
@@ -934,12 +942,21 @@
     document.querySelectorAll('.nav-item a[data-page], .nav-item-link[data-page]').forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
+        localStorage.setItem('cc-active-page', item.dataset.page);
         navigateTo(item.dataset.page);
       });
     });
 
     // Expose for iframe child pages
     window.navigateTo = navigateTo;
+
+    // Restore last active page on load
+    const savedPage = localStorage.getItem('cc-active-page');
+    if (savedPage) {
+      navigateTo(savedPage);
+    } else {
+      navigateTo('monitor');
+    }
 
     // ---- Theme System ----
     const isDark = () => document.documentElement.classList.contains('dark');

@@ -375,6 +375,35 @@ func RegisterRoutes(r *gin.Engine, database *db.DB) {
 		// Public frontend config (map keys etc.)
 		r.GET("/api/config", a.AppConfig)
 	}
+
+	// Auto-resume sync tasks that were running before restart
+	go a.resumeSyncTasks()
+}
+
+// resumeSyncTasks restarts sync tasks that had status='运行中' in the DB.
+// Called once at startup so that a server restart resumes previously active tasks.
+func (a *API) resumeSyncTasks() {
+	rows, err := a.db.Query("SELECT id, source, target, mode, frequency, end_time FROM sync_tasks WHERE status = '运行中'")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	resumed := 0
+	for rows.Next() {
+		var id int
+		var source, target, mode, frequency string
+		var endTime sql.NullString
+		if rows.Scan(&id, &source, &target, &mode, &frequency, &endTime) != nil {
+			continue
+		}
+		if err := a.syncEng.StartTask(id, source, target, mode, frequency, endTime.String); err == nil {
+			resumed++
+			log.Printf("[SyncEngine] auto-resumed sync task %d (%s -> %s)", id, source, target)
+		}
+	}
+	if resumed > 0 {
+		log.Printf("[SyncEngine] auto-resumed %d sync tasks from previous session", resumed)
+	}
 }
 
 // ==================== Hardware Items API ====================
