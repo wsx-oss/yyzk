@@ -39,15 +39,18 @@ type Gateway struct {
 	onData   func(agentID string, data map[string]interface{}) // optional callback
 	shutdown chan struct{}
 	wg       sync.WaitGroup
+
+	mavParser *MavlinkParser // Native MAVLink payload parser
 }
 
 // New creates a TCP gateway but does not start listening yet.
 func New(addr string, database *db.DB) *Gateway {
 	return &Gateway{
-		db:       database,
-		addr:     addr,
-		clients:  make(map[string]*DeviceConn),
-		shutdown: make(chan struct{}),
+		db:        database,
+		addr:      addr,
+		clients:   make(map[string]*DeviceConn),
+		shutdown:  make(chan struct{}),
+		mavParser: NewMavlinkParser(database),
 	}
 }
 
@@ -268,8 +271,8 @@ func (g *Gateway) handleConn(conn net.Conn) {
 }
 
 // handleMavlinkConn handles a connection detected as MAVLink binary.
-// It reads raw bytes, logs them, and stores them for the Java MAVLink bridge.
-// The actual MAVLink parsing is done by the Java MavlinkBridge service.
+// It reads raw bytes, parses MAVLink frames natively (HEARTBEAT, GPS, ATTITUDE,
+// BATTERY, etc.), and writes structured telemetry to mavlink_telemetry + Redis.
 func (g *Gateway) handleMavlinkConn(dc *DeviceConn, reader *bufio.Reader) {
 	log.Printf("[TCPGateway] Handling MAVLink connection from %s (agent=%s)", dc.RemoteAddr, dc.AgentID)
 
@@ -310,7 +313,7 @@ func (g *Gateway) handleMavlinkConn(dc *DeviceConn, reader *bufio.Reader) {
 	}
 }
 
-// logMavlinkFrames scans raw bytes for MAVLink frame markers and logs basic info.
+// logMavlinkFrames scans raw bytes for MAVLink frame markers, logs info, and parses payloads.
 func (g *Gateway) logMavlinkFrames(dc *DeviceConn, data []byte) {
 	for i := 0; i < len(data); {
 		if data[i] == 0xFE && i+6 <= len(data) {
@@ -320,13 +323,18 @@ func (g *Gateway) logMavlinkFrames(dc *DeviceConn, data []byte) {
 			if i+frameLen <= len(data) {
 				msgID := int(data[i+5])
 				sysID := int(data[i+3])
-				log.Printf("[TCPGateway] MAVLink v1 frame: sysid=%d msgid=%d len=%d from %s",
-					sysID, msgID, payloadLen, dc.RemoteAddr)
+				compID := int(data[i+4])
+				payload := data[i+6 : i+6+payloadLen]
+
 				// Store frame summary in device_tcp_log
 				g.storeRawMessage(dc.AgentID, "mavlink_v1", map[string]interface{}{
 					"sys_id": sysID, "msg_id": msgID, "payload_len": payloadLen,
 					"hex": fmt.Sprintf("%x", data[i:i+frameLen]),
 				})
+
+				// Parse and store structured telemetry
+				g.mavParser.ParseAndStore(sysID, compID, msgID, payload)
+
 				i += frameLen
 				continue
 			}
@@ -335,18 +343,23 @@ func (g *Gateway) logMavlinkFrames(dc *DeviceConn, data []byte) {
 			payloadLen := int(data[i+1])
 			msgID := int(data[i+7]) | int(data[i+8])<<8 | int(data[i+9])<<16
 			sysID := int(data[i+5])
+			compID := int(data[i+6])
 			frameLen := 10 + payloadLen + 2 // header(10) + payload + checksum(2)
 			// Check for signature
 			if i+3 <= len(data) && (data[i+2]&0x01) != 0 {
 				frameLen += 13
 			}
 			if i+frameLen <= len(data) {
-				log.Printf("[TCPGateway] MAVLink v2 frame: sysid=%d msgid=%d len=%d from %s",
-					sysID, msgID, payloadLen, dc.RemoteAddr)
+				payload := data[i+10 : i+10+payloadLen]
+
 				g.storeRawMessage(dc.AgentID, "mavlink_v2", map[string]interface{}{
 					"sys_id": sysID, "msg_id": msgID, "payload_len": payloadLen,
 					"hex": fmt.Sprintf("%x", data[i:i+frameLen]),
 				})
+
+				// Parse and store structured telemetry
+				g.mavParser.ParseAndStore(sysID, compID, msgID, payload)
+
 				i += frameLen
 				continue
 			}

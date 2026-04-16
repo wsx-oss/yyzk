@@ -108,6 +108,34 @@
     .json-bool { color: var(--purple); }
     .json-null { color: var(--text-3); }
 
+    /* Decoded payload panel */
+    .decoded-section { margin-bottom: 16px; }
+    .decoded-title { font-size: 13px; font-weight: 700; color: var(--green); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
+    .decoded-title .dtag { font-size: 10px; padding: 2px 8px; border-radius: 3px; background: rgba(63,185,80,0.15); color: var(--green); font-weight: 600; }
+    .decoded-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+    .decoded-field { display: flex; justify-content: space-between; align-items: center; padding: 3px 8px; border-radius: 4px; font-size: 12px; }
+    .decoded-field:hover { background: var(--bg-2); }
+    .decoded-field .df-label { color: var(--text-2); }
+    .decoded-field .df-value { color: var(--text-0); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .decoded-field .df-unit { color: var(--text-3); font-size: 10px; margin-left: 2px; }
+    .decoded-field.highlight .df-value { color: var(--green); }
+    .decoded-field.warn .df-value { color: var(--yellow); }
+    .decoded-field.error .df-value { color: var(--red); }
+    .decoded-header-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 4px 12px; margin-bottom: 12px; padding: 8px; background: var(--bg-2); border-radius: 6px; }
+    .decoded-header-item { font-size: 11px; display: flex; justify-content: space-between; }
+    .decoded-header-item .k { color: var(--text-3); }
+    .decoded-header-item .v { color: var(--cyan); font-weight: 600; }
+    .decoded-raw-hex { margin-top: 12px; padding: 10px; background: var(--bg-2); border-radius: 6px; font-size: 11px; word-break: break-all; color: var(--text-3); line-height: 1.6; }
+    .decoded-raw-hex .hex-header { color: var(--cyan); }
+    .decoded-raw-hex .hex-payload { color: var(--yellow); }
+    .decoded-raw-hex .hex-checksum { color: var(--red); }
+    .detail-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .detail-tab { padding: 6px 16px; cursor: pointer; font-size: 12px; color: var(--text-3); border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .detail-tab:hover { color: var(--text-1); }
+    .detail-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .detail-tab-content { display: none; }
+    .detail-tab-content.active { display: block; }
+
     /* Telemetry live panel */
     .live-panel { padding: 12px; overflow-y: auto; }
     .live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
@@ -371,17 +399,42 @@
         }
       }
 
-      // Frames tab: add raw frames
+      // Frames tab: add raw frames with decoded summary
       const framesEl = document.getElementById('tab-frames');
       for (const frame of (d.recent_frames || [])) {
         if (framesEl.querySelector(`[data-fid="${frame.id}"]`)) continue;
         const p = frame.payload || {};
+        const msgId = p.msg_id;
+        const msgInfo = MavDecode.MSG_NAMES[msgId] || null;
+        const msgLabel = msgInfo ? `${msgInfo.cn}(${msgInfo.en})` : (frame.msg_type?.toUpperCase() || 'FRAME');
+
+        // Try to decode for summary
+        let frameSummary = `len=${p.payload_len||0}`;
+        if (p.hex) {
+          try {
+            const decoded = MavDecode.parseFrameHex(p.hex);
+            if (decoded && decoded.decoded) {
+              const fields = decoded.decoded.fields || [];
+              frameSummary = fields.slice(0, 4).map(f => `${f.cn}=${f.value}${f.unit}`).join(' | ');
+            } else {
+              frameSummary += ` hex=${(p.hex||'').substring(0,40)}${(p.hex||'').length>40?'...':''}`;
+            }
+          } catch(e) {
+            frameSummary += ` hex=${(p.hex||'').substring(0,40)}${(p.hex||'').length>40?'...':''}`;
+          }
+        }
+
+        const tagCfg = msgInfo ? (MSG_TYPES[Object.keys(MSG_TYPES).find(k => {
+          const mi = {heartbeat:0,position:33,global_position:33,attitude:30,battery:147,gps_raw:24,gps2_raw:124,vfr_hud:74,rc_channels:65,sys_status:1,landed_state:245,home_position:242,mission_current:42,command_ack:77,status_text:253};
+          return mi[k] === msgId;
+        })] || { label: msgLabel, tag: 'frame' }) : { label: msgLabel, tag: 'frame' };
+
         const line = createLogLine(
           frame.received_at?.split(' ').pop() || tsShort,
-          { label: frame.msg_type?.toUpperCase() || 'FRAME', tag: 'frame' },
+          { label: tagCfg.label || msgLabel, tag: tagCfg.tag || 'frame' },
           String(p.sys_id || '?'),
-          `msgid=${p.msg_id||'?'}`,
-          `len=${p.payload_len||0} hex=${(p.hex||'').substring(0,40)}${(p.hex||'').length>40?'...':''}`,
+          `MSG_ID=${msgId ?? '?'}`,
+          frameSummary,
           frame
         );
         line.dataset.fid = frame.id;
@@ -553,9 +606,124 @@
     // Detail overlay
     function showDetail(title, data) {
       document.getElementById('detailTitle').textContent = title;
-      document.getElementById('detailPre').innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+      const container = document.getElementById('detailPre');
+
+      // Try to decode hex from raw frame data
+      const hex = data?.payload?.hex || data?.raw_payload?.hex || null;
+      const msgId = data?.payload?.msg_id ?? data?.raw_payload?.msg_id ?? null;
+      let parsed = null;
+      if (hex) {
+        try { parsed = MavDecode.parseFrameHex(hex); } catch(e) { console.warn('Decode error', e); }
+      }
+
+      if (parsed && parsed.decoded) {
+        // Render decoded view with tabs
+        const d = parsed.decoded;
+        const fields = d.fields || [];
+        let html = '';
+
+        // Tabs
+        html += `<div class="detail-tabs">
+          <div class="detail-tab active" onclick="switchDetailTab(this,'decoded')">解析结果</div>
+          <div class="detail-tab" onclick="switchDetailTab(this,'raw-hex')">原始HEX</div>
+          <div class="detail-tab" onclick="switchDetailTab(this,'raw-json')">原始JSON</div>
+        </div>`;
+
+        // Tab: Decoded
+        html += `<div class="detail-tab-content active" data-dtab="decoded">`;
+        html += `<div class="decoded-section">`;
+        html += `<div class="decoded-title">${escapeHtml(d.name)} <span class="dtag">MSG_ID=${parsed.msgId}</span> <span class="dtag">${parsed.version}</span></div>`;
+
+        // Frame header info
+        html += `<div class="decoded-header-grid">
+          <div class="decoded-header-item"><span class="k">协议版本</span><span class="v">MAVLink ${parsed.version}</span></div>
+          <div class="decoded-header-item"><span class="k">消息ID</span><span class="v">${parsed.msgId} (${parsed.msgName.en})</span></div>
+          <div class="decoded-header-item"><span class="k">系统ID</span><span class="v">${parsed.sysId}</span></div>
+          <div class="decoded-header-item"><span class="k">组件ID</span><span class="v">${parsed.compId}</span></div>
+          <div class="decoded-header-item"><span class="k">序列号</span><span class="v">${parsed.seq}</span></div>
+          <div class="decoded-header-item"><span class="k">载荷长度</span><span class="v">${parsed.payloadLen} 字节</span></div>
+        </div>`;
+
+        // Decoded fields
+        html += `<div class="decoded-grid">`;
+        for (const f of fields) {
+          html += `<div class="decoded-field ${f.cls}">
+            <span class="df-label" title="${escapeHtml(f.en)}">${escapeHtml(f.cn)}</span>
+            <span><span class="df-value">${escapeHtml(String(f.value))}</span>${f.unit ? `<span class="df-unit">${escapeHtml(f.unit)}</span>` : ''}</span>
+          </div>`;
+        }
+        html += `</div></div>`;
+
+        // Colored hex display
+        html += `<div class="decoded-raw-hex">
+          <span style="color:var(--text-2);font-weight:600;">帧数据: </span>
+          <span class="hex-header" title="帧头">${parsed.headerHex}</span>
+          <span class="hex-payload" title="载荷">${parsed.payloadHex}</span>
+          <span class="hex-checksum" title="校验和">${parsed.checksumHex}</span>
+          ${parsed.sigHex ? `<span style="color:var(--purple);" title="签名">${parsed.sigHex}</span>` : ''}
+        </div>`;
+        html += `</div>`;
+
+        // Tab: Raw Hex
+        html += `<div class="detail-tab-content" data-dtab="raw-hex">`;
+        html += `<div class="decoded-raw-hex" style="font-size:13px;line-height:2;">`;
+        // Format hex in rows of 32 chars (16 bytes)
+        const fullHex = parsed.fullHex;
+        for (let i = 0; i < fullHex.length; i += 32) {
+          const row = fullHex.substring(i, i + 32);
+          const offset = `${String(i/2).padStart(4,'0')}`;
+          html += `<span style="color:var(--text-3);">${offset}: </span>`;
+          for (let j = 0; j < row.length; j += 2) {
+            html += `<span>${row.substring(j, j+2)} </span>`;
+          }
+          html += `\n`;
+        }
+        html += `</div></div>`;
+
+        // Tab: Raw JSON
+        html += `<div class="detail-tab-content" data-dtab="raw-json">`;
+        html += syntaxHighlight(JSON.stringify(data, null, 2));
+        html += `</div>`;
+
+        container.innerHTML = html;
+      } else if (parsed) {
+        // Frame parsed but no specific decoder for this msg_id
+        const msgInfo = MavDecode.MSG_NAMES[parsed.msgId] || { en: `MSG_${parsed.msgId}`, cn: `未知消息_${parsed.msgId}` };
+        let html = `<div class="decoded-section">`;
+        html += `<div class="decoded-title">${escapeHtml(msgInfo.cn)} ${escapeHtml(msgInfo.en)} <span class="dtag">MSG_ID=${parsed.msgId}</span> <span class="dtag">${parsed.version}</span></div>`;
+        html += `<div class="decoded-header-grid">
+          <div class="decoded-header-item"><span class="k">协议版本</span><span class="v">MAVLink ${parsed.version}</span></div>
+          <div class="decoded-header-item"><span class="k">消息ID</span><span class="v">${parsed.msgId}</span></div>
+          <div class="decoded-header-item"><span class="k">系统ID</span><span class="v">${parsed.sysId}</span></div>
+          <div class="decoded-header-item"><span class="k">组件ID</span><span class="v">${parsed.compId}</span></div>
+          <div class="decoded-header-item"><span class="k">载荷长度</span><span class="v">${parsed.payloadLen} 字节</span></div>
+        </div>`;
+        html += `<div style="padding:12px;color:var(--text-3);font-style:italic;">该消息类型(MSG_ID=${parsed.msgId})暂无详细解析器，请查看原始数据。</div>`;
+        html += `<div class="decoded-raw-hex">
+          <span style="color:var(--text-2);font-weight:600;">帧数据: </span>
+          <span class="hex-header">${parsed.headerHex}</span>
+          <span class="hex-payload">${parsed.payloadHex}</span>
+          <span class="hex-checksum">${parsed.checksumHex}</span>
+        </div></div>`;
+        html += `<div style="margin-top:16px;">` + syntaxHighlight(JSON.stringify(data, null, 2)) + `</div>`;
+        container.innerHTML = html;
+      } else {
+        // No hex available, show raw JSON as before
+        container.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+      }
+
       document.getElementById('detailOverlay').classList.add('active');
     }
+
+    function switchDetailTab(el, tabName) {
+      const overlay = el.closest('.detail-json') || document.getElementById('detailPre').parentElement;
+      overlay.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+      overlay.querySelectorAll('.detail-tab-content').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      const target = overlay.querySelector(`.detail-tab-content[data-dtab="${tabName}"]`);
+      if (target) target.classList.add('active');
+    }
+
     function closeDetail() {
       document.getElementById('detailOverlay').classList.remove('active');
     }
@@ -574,6 +742,662 @@
         return `<span class="${cls}">${match}</span>`;
       });
     }
+
+    // ============ MAVLink Hex Decoder ============
+    const MavDecode = (() => {
+      // Byte helpers
+      function hexToBytes(hex) {
+        const b = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < hex.length; i += 2) b[i/2] = parseInt(hex.substr(i, 2), 16);
+        return b;
+      }
+      function u8(b, o)  { return b[o]; }
+      function u16(b, o) { return b[o] | (b[o+1] << 8); }
+      function i16(b, o) { const v = u16(b, o); return v > 0x7FFF ? v - 0x10000 : v; }
+      function u32(b, o) { return (b[o] | (b[o+1]<<8) | (b[o+2]<<16) | (b[o+3]<<24)) >>> 0; }
+      function i32(b, o) { return b[o] | (b[o+1]<<8) | (b[o+2]<<16) | (b[o+3]<<24); }
+      function f32(b, o) { const buf = new ArrayBuffer(4); const dv = new DataView(buf); dv.setUint8(0,b[o]); dv.setUint8(1,b[o+1]); dv.setUint8(2,b[o+2]); dv.setUint8(3,b[o+3]); return dv.getFloat32(0, true); }
+      function u64str(b, o) {
+        const lo = u32(b, o), hi = u32(b, o+4);
+        if (hi === 0) return String(lo);
+        return String(hi * 0x100000000 + lo);
+      }
+      function readStr(b, o, len) {
+        let s = '';
+        for (let i = 0; i < len && o+i < b.length; i++) { if (b[o+i] === 0) break; s += String.fromCharCode(b[o+i]); }
+        return s;
+      }
+      function rad2deg(r) { return r * 180.0 / Math.PI; }
+      function fmtF(v, d) { return v != null ? Number(v).toFixed(d) : '-'; }
+
+      // MSG_ID name map (Chinese + English)
+      const MSG_NAMES = {
+        0: { en: 'HEARTBEAT', cn: '心跳' },
+        1: { en: 'SYS_STATUS', cn: '系统状态' },
+        2: { en: 'SYSTEM_TIME', cn: '系统时间' },
+        24: { en: 'GPS_RAW_INT', cn: 'GPS原始数据' },
+        26: { en: 'SCALED_IMU', cn: '缩放IMU' },
+        29: { en: 'SCALED_PRESSURE', cn: '缩放气压' },
+        30: { en: 'ATTITUDE', cn: '飞行姿态' },
+        31: { en: 'ATTITUDE_QUATERNION', cn: '四元数姿态' },
+        32: { en: 'LOCAL_POSITION_NED', cn: '本地位置(NED)' },
+        33: { en: 'GLOBAL_POSITION_INT', cn: '全球定位' },
+        35: { en: 'RC_CHANNELS_RAW', cn: 'RC原始通道' },
+        36: { en: 'SERVO_OUTPUT_RAW', cn: '舵机输出' },
+        42: { en: 'MISSION_CURRENT', cn: '当前航点' },
+        43: { en: 'MISSION_REQUEST_LIST', cn: '请求航点列表' },
+        44: { en: 'MISSION_COUNT', cn: '航点数量' },
+        45: { en: 'MISSION_CLEAR_ALL', cn: '清除所有航点' },
+        47: { en: 'MISSION_ACK', cn: '航点确认' },
+        51: { en: 'MISSION_REQUEST_INT', cn: '请求航点' },
+        65: { en: 'RC_CHANNELS', cn: 'RC通道数据' },
+        69: { en: 'MANUAL_CONTROL', cn: '虚拟摇杆控制' },
+        73: { en: 'MISSION_ITEM_INT', cn: '航点数据' },
+        74: { en: 'VFR_HUD', cn: 'VFR飞行仪表' },
+        75: { en: 'COMMAND_INT', cn: '整型命令' },
+        76: { en: 'COMMAND_LONG', cn: '长命令' },
+        77: { en: 'COMMAND_ACK', cn: '命令确认' },
+        105: { en: 'HIGHRES_IMU', cn: '高精度IMU' },
+        116: { en: 'SCALED_IMU2', cn: '缩放IMU2' },
+        124: { en: 'GPS2_RAW', cn: 'GPS2原始数据' },
+        129: { en: 'SCALED_IMU3', cn: '缩放IMU3' },
+        147: { en: 'BATTERY_STATUS', cn: '电池状态' },
+        148: { en: 'AUTOPILOT_VERSION', cn: '自驾仪版本' },
+        170: { en: 'DATA32', cn: '数据透传32' },
+        171: { en: 'DATA64', cn: '数据透传64' },
+        241: { en: 'VIBRATION', cn: '振动数据' },
+        242: { en: 'HOME_POSITION', cn: '返航点位置' },
+        243: { en: 'SET_HOME_POSITION', cn: '设置返航点' },
+        245: { en: 'EXTENDED_SYS_STATE', cn: '扩展系统状态' },
+        253: { en: 'STATUSTEXT', cn: '状态文本消息' },
+        330: { en: 'OBSTACLE_DISTANCE', cn: '雷达距离' },
+        500: { en: 'COMPONENT_EXTENSION43', cn: '组件扩展消息' },
+      };
+
+      // Flight mode names (PX4 custom)
+      const PX4_MAIN_MODE = { 2:'定高模式(ALT_HOLD)', 3:'定点模式(POSITION)', 4:'自动模式(AUTO)', 6:'Offboard模式' };
+      const PX4_SUB_AUTO  = { 2:'自动起飞', 3:'自动跟踪', 4:'自动任务', 5:'自动返航', 6:'自动降落' };
+      const PX4_SUB_POS   = { 0:'普通定点', 2:'定点避障' };
+
+      // ArduPilot Copter modes
+      const COPTER_MODES = {
+        0:'自稳(STABILIZE)', 1:'特技(ACRO)', 2:'定高(ALT_HOLD)', 3:'自动(AUTO)',
+        4:'引导(GUIDED)', 5:'悬停(LOITER)', 6:'返航(RTL)', 7:'绕圈(CIRCLE)',
+        9:'降落(LAND)', 11:'漂移(DRIFT)', 13:'运动(SPORT)', 14:'翻转(FLIP)',
+        15:'自调(AUTOTUNE)', 16:'定点保持(POSHOLD)', 17:'刹车(BRAKE)', 18:'抛飞(THROW)',
+        19:'避障(AVOID_ADSB)', 20:'无GPS引导', 21:'智能返航(SMART_RTL)',
+        22:'光流悬停', 23:'跟随(FOLLOW)', 24:'Z字飞行', 25:'系统辨识'
+      };
+
+      // GPS fix types
+      const GPS_FIX = { 0:'无GPS(NO_GPS)', 1:'未定位(NO_FIX)', 2:'2D定位(2D_FIX)', 3:'3D定位(3D_FIX)', 4:'差分GPS(DGPS)', 5:'RTK浮点(RTK_FLOAT)', 6:'RTK固定(RTK_FIXED)' };
+
+      // MAV types
+      const MAV_TYPES = { 0:'通用(GENERIC)', 1:'固定翼(FIXED_WING)', 2:'四旋翼(QUADROTOR)', 3:'共轴(COAXIAL)', 4:'直升机(HELICOPTER)', 6:'地面站(GCS)', 10:'地面车(ROVER)', 13:'六旋翼(HEXAROTOR)', 14:'八旋翼(OCTOROTOR)', 15:'三旋翼(TRICOPTER)', 19:'VTOL双旋翼', 20:'VTOL四旋翼' };
+
+      // System status
+      const SYS_STATUS = { 0:'未初始化(UNINIT)', 1:'启动中(BOOT)', 2:'校准中(CALIBRATING)', 3:'待机(STANDBY)', 4:'活动(ACTIVE)', 5:'危急(CRITICAL)', 6:'紧急(EMERGENCY)', 7:'关机(POWEROFF)', 8:'飞行终止' };
+
+      // Severity
+      const SEVERITY = { 0:'紧急(EMERGENCY)', 1:'警报(ALERT)', 2:'严重(CRITICAL)', 3:'错误(ERROR)', 4:'警告(WARNING)', 5:'注意(NOTICE)', 6:'信息(INFO)', 7:'调试(DEBUG)' };
+
+      // Landed state
+      const LANDED = { 0:'未定义', 1:'在地面(ON_GROUND)', 2:'空中(IN_AIR)', 3:'起飞中(TAKEOFF)', 4:'降落中(LANDING)' };
+
+      // COMMAND IDs
+      const CMD_IDS = {
+        16:'航点导航(NAV_WAYPOINT)', 20:'返航(NAV_RETURN_TO_LAUNCH)', 21:'降落(NAV_LAND)',
+        22:'起飞(NAV_TAKEOFF)', 112:'延迟/停留(CONDITION_DELAY)', 176:'设置飞行模式(DO_SET_MODE)',
+        183:'控制载荷PWM(DO_SET_SERVO)', 192:'指点飞行(DO_REPOSITION)',
+        400:'解锁/锁定(COMPONENT_ARM_DISARM)', 511:'请求协议版本', 520:'请求自驾仪能力'
+      };
+
+      // Field helper: returns an object { label(CN), en, value, unit?, cls? }
+      function F(cn, en, val, unit, cls) { return { cn, en, value: val, unit: unit||'', cls: cls||'' }; }
+
+      // ---- Per-message decoders ----
+      function decodeHeartbeat(p) {
+        if (p.length < 9) return null;
+        const customMode = u32(p, 0);
+        const mavType = u8(p, 4);
+        const autopilot = u8(p, 5);
+        const baseMode = u8(p, 6);
+        const sysStatus = u8(p, 7);
+        const mavVer = u8(p, 8);
+        const armed = (baseMode & 0x80) !== 0;
+
+        // Determine mode name
+        let modeName = `MODE_${customMode}`;
+        if (mavType === 2 && COPTER_MODES[customMode]) modeName = COPTER_MODES[customMode];
+        else if (PX4_MAIN_MODE[customMode >> 0]) modeName = PX4_MAIN_MODE[customMode] || modeName;
+
+        return {
+          name: '心跳 HEARTBEAT',
+          fields: [
+            F('飞行模式', 'Mode', modeName, '', 'highlight'),
+            F('解锁状态', 'Armed', armed ? '✅ 已解锁(ARMED)' : '🔒 未解锁(DISARMED)', '', armed ? 'warn' : ''),
+            F('机型', 'MAV Type', MAV_TYPES[mavType] || `TYPE_${mavType}`),
+            F('系统状态', 'Sys Status', SYS_STATUS[sysStatus] || `STATE_${sysStatus}`),
+            F('自驾仪类型', 'Autopilot', autopilot === 12 ? 'PX4' : autopilot === 3 ? 'ArduPilot' : `AP_${autopilot}`),
+            F('自定义模式值', 'Custom Mode', `${customMode} (0x${customMode.toString(16).toUpperCase()})`),
+            F('基础模式', 'Base Mode', `0x${baseMode.toString(16).toUpperCase()} (${baseMode})`),
+            F('MAVLink版本', 'MAVLink Ver', mavVer),
+          ]
+        };
+      }
+
+      function decodeSysStatus(p) {
+        if (p.length < 31) return null;
+        const load = u16(p, 12);
+        const vbat = u16(p, 14);
+        const cbat = i16(p, 16);
+        const dropRate = u16(p, 18);
+        const errComm = u16(p, 20);
+        const batRem = p.length > 30 ? (p[30] > 127 ? p[30]-256 : p[30]) : -1;
+        return {
+          name: '系统状态 SYS_STATUS',
+          fields: [
+            F('CPU负载', 'Load', fmtF(load/10, 1), '%'),
+            F('电池电压', 'Voltage', `${vbat}`, 'mV'),
+            F('电池电流', 'Current', `${cbat}`, 'cA'),
+            F('电池剩余', 'Remaining', `${batRem}`, '%', batRem < 20 ? 'error' : batRem < 50 ? 'warn' : ''),
+            F('通信丢包率', 'Drop Rate', `${dropRate}`, '‰'),
+            F('通信错误数', 'Comm Errors', `${errComm}`),
+          ]
+        };
+      }
+
+      function decodeGPSRawInt(p, label) {
+        if (p.length < 30) return null;
+        const lat = i32(p, 8), lon = i32(p, 12), alt = i32(p, 16);
+        const eph = u16(p, 20), epv = u16(p, 22);
+        const vel = u16(p, 24), cog = u16(p, 26);
+        const fix = u8(p, 28), sats = u8(p, 29);
+        return {
+          name: label || 'GPS原始数据 GPS_RAW_INT',
+          fields: [
+            F('定位类型', 'Fix Type', GPS_FIX[fix] || `FIX_${fix}`, '', fix >= 3 ? 'highlight' : fix >= 2 ? 'warn' : 'error'),
+            F('可见卫星数', 'Satellites', `${sats}`, '颗', sats >= 10 ? 'highlight' : sats >= 6 ? 'warn' : 'error'),
+            F('纬度', 'Latitude', fmtF(lat / 1e7, 7), '°'),
+            F('经度', 'Longitude', fmtF(lon / 1e7, 7), '°'),
+            F('海拔高度', 'Altitude', fmtF(alt / 1000, 1), 'm'),
+            F('水平精度', 'EPH', fmtF(eph / 100, 2), 'm'),
+            F('垂直精度', 'EPV', fmtF(epv / 100, 2), 'm'),
+            F('地速', 'Velocity', fmtF(vel / 100, 2), 'm/s'),
+            F('航迹角', 'COG', fmtF(cog / 100, 1), '°'),
+          ]
+        };
+      }
+
+      function decodeAttitude(p) {
+        if (p.length < 28) return null;
+        const timeBoot = u32(p, 0);
+        const roll = f32(p, 4), pitch = f32(p, 8), yaw = f32(p, 12);
+        const rollspd = f32(p, 16), pitchspd = f32(p, 20), yawspd = f32(p, 24);
+        return {
+          name: '飞行姿态 ATTITUDE',
+          fields: [
+            F('启动时间', 'Boot Time', `${(timeBoot/1000).toFixed(1)}`, 's'),
+            F('横滚角', 'Roll', fmtF(rad2deg(roll), 2), '°'),
+            F('俯仰角', 'Pitch', fmtF(rad2deg(pitch), 2), '°'),
+            F('偏航角', 'Yaw', fmtF(rad2deg(yaw), 2), '°'),
+            F('横滚角速度', 'Roll Speed', fmtF(rollspd, 4), 'rad/s'),
+            F('俯仰角速度', 'Pitch Speed', fmtF(pitchspd, 4), 'rad/s'),
+            F('偏航角速度', 'Yaw Speed', fmtF(yawspd, 4), 'rad/s'),
+          ]
+        };
+      }
+
+      function decodeGlobalPositionInt(p) {
+        if (p.length < 28) return null;
+        const timeBoot = u32(p, 0);
+        const lat = i32(p, 4), lon = i32(p, 8);
+        const alt = i32(p, 12), relAlt = i32(p, 16);
+        const vx = i16(p, 20), vy = i16(p, 22), vz = i16(p, 24);
+        const hdg = u16(p, 26);
+        const speed = Math.sqrt(vx*vx + vy*vy) / 100;
+        return {
+          name: '全球定位 GLOBAL_POSITION_INT',
+          fields: [
+            F('纬度', 'Latitude', fmtF(lat / 1e7, 7), '°'),
+            F('经度', 'Longitude', fmtF(lon / 1e7, 7), '°'),
+            F('海拔高度', 'Altitude(MSL)', fmtF(alt / 1000, 1), 'm'),
+            F('相对高度', 'Relative Alt', fmtF(relAlt / 1000, 1), 'm', 'highlight'),
+            F('北向速度', 'Vx(North)', fmtF(vx / 100, 2), 'm/s'),
+            F('东向速度', 'Vy(East)', fmtF(vy / 100, 2), 'm/s'),
+            F('垂直速度', 'Vz(Down)', fmtF(vz / 100, 2), 'm/s'),
+            F('合成速度', 'Ground Speed', fmtF(speed, 2), 'm/s', 'highlight'),
+            F('航向', 'Heading', hdg === 65535 ? '无效' : fmtF(hdg / 100, 1), '°'),
+          ]
+        };
+      }
+
+      function decodeLocalPositionNED(p) {
+        if (p.length < 28) return null;
+        const t = u32(p, 0);
+        const x = f32(p, 4), y = f32(p, 8), z = f32(p, 12);
+        const vx = f32(p, 16), vy = f32(p, 20), vz = f32(p, 24);
+        return {
+          name: '本地位置 LOCAL_POSITION_NED',
+          fields: [
+            F('北向位置 X', 'X(North)', fmtF(x, 2), 'm'),
+            F('东向位置 Y', 'Y(East)', fmtF(y, 2), 'm'),
+            F('下向位置 Z', 'Z(Down)', fmtF(z, 2), 'm'),
+            F('北向速度', 'Vx', fmtF(vx, 2), 'm/s'),
+            F('东向速度', 'Vy', fmtF(vy, 2), 'm/s'),
+            F('下向速度', 'Vz', fmtF(vz, 2), 'm/s'),
+          ]
+        };
+      }
+
+      function decodeRCChannelsRaw(p) {
+        if (p.length < 22) return null;
+        const fields = [];
+        for (let ch = 0; ch < 8; ch++) {
+          const v = u16(p, 4 + ch*2);
+          fields.push(F(`通道 ${ch+1}`, `CH${ch+1}`, v === 65535 ? '无效' : `${v}`, 'μs'));
+        }
+        fields.push(F('端口', 'Port', `${u8(p, 20)}`));
+        fields.push(F('信号强度', 'RSSI', `${u8(p, 21)}`));
+        return { name: 'RC原始通道 RC_CHANNELS_RAW', fields };
+      }
+
+      function decodeMissionCurrent(p) {
+        if (p.length < 2) return null;
+        return {
+          name: '当前航点 MISSION_CURRENT',
+          fields: [ F('航点序号', 'Sequence', `${u16(p, 0)}`, '', 'highlight') ]
+        };
+      }
+
+      function decodeRCChannels(p) {
+        if (p.length < 42) return null;
+        const chanCount = u8(p, 4);
+        const fields = [F('通道数量', 'Channel Count', `${chanCount}`)];
+        for (let ch = 0; ch < Math.min(18, chanCount); ch++) {
+          if (5 + ch*2 + 2 > p.length) break;
+          const v = u16(p, 5 + ch*2);
+          fields.push(F(`通道 ${ch+1}`, `CH${ch+1}`, v === 65535 ? '无效' : `${v}`, 'μs'));
+        }
+        if (p.length >= 42) fields.push(F('信号强度', 'RSSI', `${u8(p, 41)}`));
+        return { name: 'RC通道数据 RC_CHANNELS', fields };
+      }
+
+      function decodeVFRHUD(p) {
+        if (p.length < 20) return null;
+        const airspeed = f32(p, 0), groundspeed = f32(p, 4);
+        const alt = f32(p, 8), climb = f32(p, 12);
+        const heading = i16(p, 16), throttle = u16(p, 18);
+        return {
+          name: 'VFR飞行仪表 VFR_HUD',
+          fields: [
+            F('空速', 'Airspeed', fmtF(airspeed, 1), 'm/s'),
+            F('地速', 'Ground Speed', fmtF(groundspeed, 1), 'm/s', 'highlight'),
+            F('高度', 'Altitude', fmtF(alt, 1), 'm'),
+            F('爬升率', 'Climb Rate', fmtF(climb, 2), 'm/s', climb > 0.5 ? 'highlight' : climb < -0.5 ? 'warn' : ''),
+            F('航向', 'Heading', `${heading}`, '°'),
+            F('油门百分比', 'Throttle', `${throttle}`, '%', throttle > 80 ? 'warn' : ''),
+          ]
+        };
+      }
+
+      function decodeCommandLong(p) {
+        if (p.length < 33) return null;
+        const p1 = f32(p, 0), p2 = f32(p, 4), p3 = f32(p, 8), p4 = f32(p, 12);
+        const p5 = f32(p, 16), p6 = f32(p, 20), p7 = f32(p, 24);
+        const cmd = u16(p, 28);
+        const tgtSys = u8(p, 30), tgtComp = u8(p, 31);
+        const conf = u8(p, 32);
+        const cmdName = CMD_IDS[cmd] || `CMD_${cmd}`;
+
+        // Special interpretation based on command
+        let extra = [];
+        if (cmd === 400) {
+          extra = [F('操作', 'Action', p1 === 1 ? '🔓 解锁(ARM)' : '🔒 锁定(DISARM)', '', p1 === 1 ? 'warn' : 'highlight')];
+        } else if (cmd === 176) {
+          const mainMode = Math.floor(p2);
+          const subMode = Math.floor(p3);
+          extra = [
+            F('主模式', 'Main Mode', PX4_MAIN_MODE[mainMode] || `MODE_${mainMode}`),
+            F('子模式', 'Sub Mode', (mainMode===4 ? PX4_SUB_AUTO[subMode] : mainMode===3 ? PX4_SUB_POS[subMode] : `SUB_${subMode}`) || `SUB_${subMode}`),
+          ];
+        } else if (cmd === 22) {
+          extra = [
+            F('航向角', 'Yaw', fmtF(p4, 1), '°'),
+            F('起飞高度', 'Alt', fmtF(p7, 1), 'm', 'highlight'),
+          ];
+        } else if (cmd === 21) {
+          extra = [
+            F('航向角', 'Yaw', fmtF(p4, 1), '°'),
+            F('降落高度(相对)', 'Alt', fmtF(p7, 1), 'm', 'highlight'),
+          ];
+        }
+
+        return {
+          name: `长命令 COMMAND_LONG [${cmdName}]`,
+          fields: [
+            F('命令ID', 'Command', `${cmd} — ${cmdName}`, '', 'highlight'),
+            F('目标系统', 'Target Sys', `${tgtSys}`),
+            F('目标组件', 'Target Comp', `${tgtComp}`),
+            F('确认', 'Confirmation', `${conf}`),
+            F('参数1', 'Param1', fmtF(p1, 4)),
+            F('参数2', 'Param2', fmtF(p2, 4)),
+            F('参数3', 'Param3', fmtF(p3, 4)),
+            F('参数4', 'Param4', fmtF(p4, 4)),
+            F('参数5', 'Param5', fmtF(p5, 4)),
+            F('参数6', 'Param6', fmtF(p6, 4)),
+            F('参数7', 'Param7', fmtF(p7, 4)),
+            ...extra,
+          ]
+        };
+      }
+
+      function decodeCommandAck(p) {
+        if (p.length < 3) return null;
+        const cmd = u16(p, 0);
+        const result = u8(p, 2);
+        const cmdName = CMD_IDS[cmd] || `CMD_${cmd}`;
+        const resultNames = { 0:'✅ 成功(ACCEPTED)', 1:'暂时拒绝', 2:'被拒绝', 3:'不支持', 4:'执行中', 5:'取消' };
+        const fields = [
+          F('命令ID', 'Command', `${cmd} — ${cmdName}`, '', 'highlight'),
+          F('执行结果', 'Result', resultNames[result] || `RESULT_${result}`, '', result === 0 ? 'highlight' : 'error'),
+        ];
+        if (p.length >= 4) fields.push(F('进度', 'Progress', `${u8(p, 3)}`));
+        if (p.length >= 8) fields.push(F('结果参数2', 'Result Param2', `${i32(p, 4)}`));
+        if (p.length >= 9) fields.push(F('目标系统', 'Target Sys', `${u8(p, 8)}`));
+        if (p.length >= 10) fields.push(F('目标组件', 'Target Comp', `${u8(p, 9)}`));
+        return { name: `命令确认 COMMAND_ACK [${cmdName}]`, fields };
+      }
+
+      function decodeBatteryStatus(p) {
+        if (p.length < 36) return null;
+        const currentConsumed = i32(p, 0);
+        const energyConsumed = i32(p, 4);
+        const temp = i16(p, 8);
+        const voltages = [];
+        for (let i = 0; i < 10; i++) {
+          const v = u16(p, 10 + i*2);
+          if (v !== 0xFFFF) voltages.push(v);
+        }
+        const current = i16(p, 30);
+        const batId = u8(p, 32);
+        const batFunc = u8(p, 33);
+        const batType = u8(p, 34);
+        const batRem = p[35] > 127 ? p[35] - 256 : p[35];
+
+        const totalV = voltages.reduce((a,b) => a+b, 0);
+        const fields = [
+          F('电池ID', 'Battery ID', `${batId}`),
+          F('总电压', 'Total Voltage', fmtF(totalV / 1000, 2), 'V', 'highlight'),
+          F('电流', 'Current', fmtF(current / 100, 2), 'A'),
+          F('剩余容量', 'Remaining', `${batRem}`, '%', batRem < 20 ? 'error' : batRem < 50 ? 'warn' : 'highlight'),
+          F('温度', 'Temperature', temp === 0x7FFF ? '无效' : fmtF(temp / 100, 1), '°C'),
+          F('累计消耗电流', 'Consumed', `${currentConsumed}`, 'mAh'),
+          F('累计消耗能量', 'Energy', `${energyConsumed}`, 'hJ'),
+        ];
+        voltages.forEach((v, i) => {
+          fields.push(F(`电芯${i+1}电压`, `Cell ${i+1}`, fmtF(v / 1000, 3), 'V'));
+        });
+        return { name: '电池状态 BATTERY_STATUS', fields };
+      }
+
+      function decodeStatustext(p) {
+        if (p.length < 2) return null;
+        const sev = u8(p, 0);
+        const text = readStr(p, 1, 50);
+        return {
+          name: '状态文本 STATUSTEXT',
+          fields: [
+            F('严重等级', 'Severity', SEVERITY[sev] || `SEV_${sev}`, '', sev <= 3 ? 'error' : sev <= 4 ? 'warn' : ''),
+            F('消息内容', 'Text', text, '', 'highlight'),
+          ]
+        };
+      }
+
+      function decodeExtendedSysState(p) {
+        if (p.length < 2) return null;
+        return {
+          name: '扩展系统状态 EXTENDED_SYS_STATE',
+          fields: [
+            F('VTOL状态', 'VTOL State', `${u8(p, 0)}`),
+            F('着陆状态', 'Landed State', LANDED[u8(p, 1)] || `STATE_${u8(p, 1)}`, '', u8(p, 1) === 2 ? 'highlight' : ''),
+          ]
+        };
+      }
+
+      function decodeHomePosition(p) {
+        if (p.length < 12) return null;
+        const lat = i32(p, 0), lon = i32(p, 4), alt = i32(p, 8);
+        const fields = [
+          F('返航点纬度', 'Latitude', fmtF(lat / 1e7, 7), '°'),
+          F('返航点经度', 'Longitude', fmtF(lon / 1e7, 7), '°'),
+          F('返航点海拔', 'Altitude', fmtF(alt / 1000, 1), 'm'),
+        ];
+        if (p.length >= 52) {
+          // approach_x/y are float but hold int32 for lat/lon
+          const axRaw = i32(p, 40), ayRaw = i32(p, 44), azRaw = i32(p, 48);
+          if (axRaw !== 0 && ayRaw !== 0) {
+            fields.push(F('备降点纬度', 'Alt Land Lat', fmtF(axRaw / 1e7, 7), '°'));
+            fields.push(F('备降点经度', 'Alt Land Lon', fmtF(ayRaw / 1e7, 7), '°'));
+            fields.push(F('备降点海拔', 'Alt Land Alt', fmtF(azRaw / 1000, 1), 'm'));
+          }
+        }
+        return { name: '返航点 HOME_POSITION', fields };
+      }
+
+      function decodeVibration(p) {
+        if (p.length < 32) return null;
+        const vx = f32(p, 8), vy = f32(p, 12), vz = f32(p, 16);
+        const c0 = u32(p, 20), c1 = u32(p, 24), c2 = u32(p, 28);
+        return {
+          name: '振动数据 VIBRATION',
+          fields: [
+            F('X轴振动', 'Vibration X', fmtF(vx, 4)),
+            F('Y轴振动', 'Vibration Y', fmtF(vy, 4)),
+            F('Z轴振动', 'Vibration Z', fmtF(vz, 4)),
+            F('X轴削波', 'Clipping X', `${c0}`, '', c0 > 0 ? 'warn' : ''),
+            F('Y轴削波', 'Clipping Y', `${c1}`, '', c1 > 0 ? 'warn' : ''),
+            F('Z轴削波', 'Clipping Z', `${c2}`, '', c2 > 0 ? 'warn' : ''),
+          ]
+        };
+      }
+
+      function decodeManualControl(p) {
+        if (p.length < 10) return null;
+        const x = i16(p, 0), y = i16(p, 2), z = i16(p, 4), r = i16(p, 6);
+        const buttons = u16(p, 8);
+        const fields = [
+          F('俯仰(前后)', 'X(Pitch)', `${x}`, '[-1000,1000]', x > 0 ? 'highlight' : x < 0 ? 'warn' : ''),
+          F('横滚(左右)', 'Y(Roll)', `${y}`, '[-1000,1000]'),
+          F('油门(上下)', 'Z(Throttle)', `${z}`, '[-1000,1000]'),
+          F('偏航(旋转)', 'R(Yaw)', `${r}`, '[-1000,1000]'),
+          F('按钮', 'Buttons', `0x${buttons.toString(16).toUpperCase()}`),
+        ];
+        if (p.length >= 11) fields.push(F('目标ID', 'Target', `${u8(p, 10)}`));
+        if (p.length >= 14) fields.push(F('扩展标志', 'Ext Flags', `0x${u8(p, 13).toString(16).toUpperCase()}`));
+        return { name: '虚拟摇杆 MANUAL_CONTROL', fields };
+      }
+
+      function decodeCommandInt(p) {
+        if (p.length < 35) return null;
+        const p1 = f32(p, 0), p2 = f32(p, 4), p3 = f32(p, 8), p4 = f32(p, 12);
+        const x = i32(p, 16), y = i32(p, 20), z = f32(p, 24);
+        const cmd = u16(p, 28);
+        const tgtSys = u8(p, 30), tgtComp = u8(p, 31);
+        const frame = u8(p, 32), current = u8(p, 33), autocont = u8(p, 34);
+        const cmdName = CMD_IDS[cmd] || `CMD_${cmd}`;
+
+        let extra = [];
+        if (cmd === 192) {
+          extra = [
+            F('速度', 'Speed', fmtF(p1, 1), 'm/s'),
+            F('航向角', 'Yaw', fmtF(p4, 1), '°'),
+            F('目标纬度', 'Target Lat', fmtF(x / 1e7, 7), '°'),
+            F('目标经度', 'Target Lon', fmtF(y / 1e7, 7), '°'),
+            F('目标高度', 'Target Alt', fmtF(z, 1), 'm', 'highlight'),
+          ];
+        }
+
+        return {
+          name: `整型命令 COMMAND_INT [${cmdName}]`,
+          fields: [
+            F('命令ID', 'Command', `${cmd} — ${cmdName}`, '', 'highlight'),
+            F('目标系统', 'Target Sys', `${tgtSys}`),
+            F('目标组件', 'Target Comp', `${tgtComp}`),
+            F('坐标系', 'Frame', `${frame}`),
+            F('参数1', 'Param1', fmtF(p1, 4)),
+            F('参数2', 'Param2', fmtF(p2, 4)),
+            F('参数3', 'Param3', fmtF(p3, 4)),
+            F('参数4', 'Param4', fmtF(p4, 4)),
+            F('X/纬度', 'X(Lat)', `${x}`),
+            F('Y/经度', 'Y(Lon)', `${y}`),
+            F('Z/高度', 'Z(Alt)', fmtF(z, 2)),
+            ...extra,
+          ]
+        };
+      }
+
+      function decodeMissionItemInt(p) {
+        if (p.length < 37) return null;
+        const p1 = f32(p, 0), p2 = f32(p, 4), p3 = f32(p, 8), p4 = f32(p, 12);
+        const x = i32(p, 16), y = i32(p, 20), z = f32(p, 24);
+        const seq = u16(p, 28), cmd = u16(p, 30);
+        const cmdNames = { 16:'航点(WAYPOINT)', 20:'返航(RTL)', 21:'降落(LAND)', 22:'起飞(TAKEOFF)', 112:'停留(DELAY)' };
+        const cmdName = cmdNames[cmd] || CMD_IDS[cmd] || `CMD_${cmd}`;
+        return {
+          name: `航点数据 MISSION_ITEM_INT #${seq}`,
+          fields: [
+            F('航点序号', 'Sequence', `${seq}`, '', 'highlight'),
+            F('命令', 'Command', `${cmd} — ${cmdName}`),
+            F('纬度', 'Latitude', x !== 0 ? fmtF(x / 1e7, 7) : '0', '°'),
+            F('经度', 'Longitude', y !== 0 ? fmtF(y / 1e7, 7) : '0', '°'),
+            F('高度', 'Altitude', fmtF(z, 1), 'm'),
+            F('参数1', 'Param1', fmtF(p1, 2)),
+            F('参数2', 'Param2', fmtF(p2, 2)),
+            F('参数3', 'Param3', fmtF(p3, 2)),
+            F('参数4', 'Param4', fmtF(p4, 2)),
+          ]
+        };
+      }
+
+      function decodeSystemTime(p) {
+        if (p.length < 12) return null;
+        const unixUsec = u64str(p, 0);
+        const bootMs = u32(p, 8);
+        const unixMs = Math.floor(Number(BigInt(unixUsec) / 1000n));
+        const dateStr = unixMs > 0 ? new Date(unixMs).toLocaleString('zh-CN') : '未同步';
+        return {
+          name: '系统时间 SYSTEM_TIME',
+          fields: [
+            F('Unix时间', 'Unix Time', dateStr, '', 'highlight'),
+            F('Unix微秒', 'Unix μs', unixUsec, 'μs'),
+            F('启动时间', 'Boot Time', `${(bootMs/1000).toFixed(1)}`, 's'),
+          ]
+        };
+      }
+
+      function decodeObstacleDistance(p) {
+        if (p.length < 158) return null;
+        const fields = [];
+        // First 16 horizontal distances
+        for (let i = 0; i < 16; i++) {
+          const d = u16(p, 8 + i*2);
+          const angle = i * 22.5;
+          const label = i === 0 ? '正前方' : i === 4 ? '右方' : i === 8 ? '正后方' : i === 12 ? '左方' : `${angle}°`;
+          fields.push(F(`避障[${i}] ${label}`, `Dist[${i}] ${angle}°`, d === 65535 ? '无效' : `${d}`, 'cm', d !== 65535 && d < 200 ? 'error' : d !== 65535 && d < 500 ? 'warn' : ''));
+        }
+        // Altitude radar at index 32
+        if (p.length >= 8 + 33*2) {
+          const altRadar = u16(p, 8 + 32*2);
+          fields.push(F('定高雷达距离', 'Alt Radar', altRadar === 65535 ? '无效' : `${altRadar}`, 'cm', 'highlight'));
+        }
+        return { name: '雷达距离 OBSTACLE_DISTANCE', fields };
+      }
+
+      // Main decode function
+      function decodePayload(msgId, payloadBytes) {
+        switch (msgId) {
+          case 0:   return decodeHeartbeat(payloadBytes);
+          case 1:   return decodeSysStatus(payloadBytes);
+          case 2:   return decodeSystemTime(payloadBytes);
+          case 24:  return decodeGPSRawInt(payloadBytes, 'GPS原始数据 GPS_RAW_INT');
+          case 30:  return decodeAttitude(payloadBytes);
+          case 32:  return decodeLocalPositionNED(payloadBytes);
+          case 33:  return decodeGlobalPositionInt(payloadBytes);
+          case 35:  return decodeRCChannelsRaw(payloadBytes);
+          case 42:  return decodeMissionCurrent(payloadBytes);
+          case 65:  return decodeRCChannels(payloadBytes);
+          case 69:  return decodeManualControl(payloadBytes);
+          case 73:  return decodeMissionItemInt(payloadBytes);
+          case 74:  return decodeVFRHUD(payloadBytes);
+          case 75:  return decodeCommandInt(payloadBytes);
+          case 76:  return decodeCommandLong(payloadBytes);
+          case 77:  return decodeCommandAck(payloadBytes);
+          case 124: return decodeGPSRawInt(payloadBytes, 'GPS2原始数据 GPS2_RAW');
+          case 147: return decodeBatteryStatus(payloadBytes);
+          case 241: return decodeVibration(payloadBytes);
+          case 242: return decodeHomePosition(payloadBytes);
+          case 245: return decodeExtendedSysState(payloadBytes);
+          case 253: return decodeStatustext(payloadBytes);
+          case 330: return decodeObstacleDistance(payloadBytes);
+          default:  return null;
+        }
+      }
+
+      // Parse full frame hex and return { header, decoded, coloredHex }
+      function parseFrameHex(hex) {
+        if (!hex || hex.length < 12) return null;
+        const bytes = hexToBytes(hex);
+        const stx = bytes[0];
+        let version, payloadLen, seq, sysId, compId, msgId, payloadStart, headerLen, payloadBytes;
+
+        if (stx === 0xFE) {
+          // MAVLink v1
+          version = 'v1.0';
+          payloadLen = bytes[1];
+          seq = bytes[2];
+          sysId = bytes[3];
+          compId = bytes[4];
+          msgId = bytes[5];
+          headerLen = 6;
+          payloadStart = 6;
+          payloadBytes = bytes.slice(payloadStart, payloadStart + payloadLen);
+        } else if (stx === 0xFD) {
+          // MAVLink v2
+          version = 'v2.0';
+          payloadLen = bytes[1];
+          seq = bytes[4];
+          sysId = bytes[5];
+          compId = bytes[6];
+          msgId = bytes[7] | (bytes[8] << 8) | (bytes[9] << 16);
+          headerLen = 10;
+          payloadStart = 10;
+          payloadBytes = bytes.slice(payloadStart, payloadStart + payloadLen);
+        } else {
+          return null;
+        }
+
+        const msgInfo = MSG_NAMES[msgId] || { en: `MSG_${msgId}`, cn: `消息_${msgId}` };
+        const decoded = decodePayload(msgId, payloadBytes);
+        const checksumStart = payloadStart + payloadLen;
+
+        // Colored hex segments
+        const headerHex = hex.substring(0, headerLen * 2);
+        const payloadHex = hex.substring(headerLen * 2, checksumStart * 2);
+        const checksumHex = hex.substring(checksumStart * 2, (checksumStart + 2) * 2);
+        const sigHex = hex.substring((checksumStart + 2) * 2);
+
+        return {
+          version, payloadLen, seq, sysId, compId, msgId,
+          msgName: msgInfo,
+          decoded,
+          headerHex, payloadHex, checksumHex, sigHex,
+          fullHex: hex,
+        };
+      }
+
+      return { parseFrameHex, decodePayload, hexToBytes, MSG_NAMES };
+    })();
 
     // MPS counter
     setInterval(() => {
