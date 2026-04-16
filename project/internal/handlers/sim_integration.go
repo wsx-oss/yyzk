@@ -333,6 +333,23 @@ func InitSimEngine(database *db.DB, pool *taskpool.Pool) (*simulation.Engine, *s
 		log.Printf("[SimIntegration] load RL policy warning: %v", err)
 	}
 
+	// Auto-resume RL training if it was active before restart
+	var rlStateContent string
+	if err := database.QueryRow(`SELECT content FROM data_store WHERE store_key='rl_training_state'`).Scan(&rlStateContent); err == nil && rlStateContent != "" {
+		var rlState struct {
+			Training     bool `json:"training"`
+			EvalInterval int  `json:"eval_interval"`
+		}
+		if json.Unmarshal([]byte(rlStateContent), &rlState) == nil && rlState.Training {
+			evalInterval := rlState.EvalInterval
+			if evalInterval <= 0 {
+				evalInterval = 100
+			}
+			trainer.StartTraining(evalInterval)
+			log.Printf("[SimIntegration] auto-resumed RL training (eval_interval=%d)", evalInterval)
+		}
+	}
+
 	// Load no-fly zones from DB for geofence-aware simulation
 	loadNoFlyZonesToEngine(database, engine)
 
