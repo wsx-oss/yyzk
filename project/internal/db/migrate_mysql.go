@@ -575,10 +575,41 @@ func migrateMySQL(db *sql.DB) error {
 		db.Exec(s) // ignore duplicate index errors
 	}
 
+	// ---- MAVLink telemetry tables ----
+	mavlinkTables := []string{
+		`CREATE TABLE IF NOT EXISTS mavlink_telemetry (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			sys_id INT NOT NULL,
+			msg_type VARCHAR(64) NOT NULL,
+			payload JSON,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE KEY uk_sys_msg (sys_id, msg_type),
+			INDEX idx_telemetry_time (updated_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS mavlink_message_log (
+			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			sys_id INT NOT NULL,
+			msg_type VARCHAR(64) NOT NULL,
+			severity VARCHAR(32) DEFAULT '',
+			message TEXT,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_mavlog_sys (sys_id),
+			INDEX idx_mavlog_time (created_at)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+	}
+	for _, s := range mavlinkTables {
+		if _, err := db.Exec(s); err != nil {
+			log.Printf("[DB] mavlink table warning: %v", err)
+		}
+	}
+
 	// Add new columns to existing tables (ignore errors if already exist)
 	db.Exec(`ALTER TABLE backup_records ADD COLUMN sql_content LONGTEXT`)
 	db.Exec(`ALTER TABLE recordings ADD COLUMN file_data LONGBLOB`)
+	db.Exec(`ALTER TABLE drones ADD COLUMN battery_level INT DEFAULT 0`)
 
-	log.Println("[DB] MySQL migration completed (including simulation tables)")
+	log.Println("[DB] MySQL migration completed (including simulation + mavlink tables)")
 	return nil
 }

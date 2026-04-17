@@ -615,17 +615,17 @@
     let phaseChart = null;
     let droneList = [];
 
-    // ========== Load Drones from unified registry ==========
+    // ========== Load Drones from unified registry (only data-active drones) ==========
     async function loadDrones() {
       try {
-        const res = await api('/drones');
+        const res = await api('/drones?data_active=true');
         const data = await res.json();
         const drones = Array.isArray(data.items) ? data.items : [];
         // linked_gps_device_id is the device_id used by flight_missions
         droneList = drones.filter(d => d.linked_gps_device_id && d.linked_gps_device_id > 0)
-                         .map(d => ({ id: d.linked_gps_device_id, name: d.name }));
+                         .map(d => ({ id: d.linked_gps_device_id, name: d.name, droneId: d.id }));
         const sel = $('#missionDevice');
-        sel.innerHTML = '<option value="0">未指定</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+        sel.innerHTML = '<option value="0">未指定（仅显示正在传输数据的无人机）</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)} [GPS推送中]</option>`).join('');
       } catch (e) { console.error('loadDrones error:', e); }
     }
 
@@ -1862,6 +1862,23 @@
             }).join('');
         }
 
+        // Drone control buttons (takeoff / return / land)
+        const ctrlDiv = document.createElement('div');
+        ctrlDiv.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed #e2e8f0;';
+        if (m.status !== '已完成' && m.device_id > 0) {
+          const cPhase = m.current_phase || '待命';
+          const phaseIdx = ['待命','起飞','巡航','执行任务','返航','降落'].indexOf(cPhase);
+          const canTakeoff = phaseIdx < 1; // can only takeoff from 待命
+          const canReturn = phaseIdx >= 1 && phaseIdx < 4; // can return during 起飞/巡航/执行任务
+          const canLand = phaseIdx >= 1 && phaseIdx < 5; // can land after takeoff and before 降落
+
+          ctrlDiv.innerHTML = '<strong style="font-size:13px;color:#475569;width:100%;margin-bottom:4px;">无人机控制：</strong>' +
+            `<button class="btn ${canTakeoff ? 'btn-success' : 'btn-secondary'}" style="padding:8px 20px;font-size:14px;font-weight:600;" ${canTakeoff ? '' : 'disabled'} onclick="droneControl(${m.id},'takeoff')">🚀 启动无人机</button>` +
+            `<button class="btn ${canReturn ? 'btn-primary' : 'btn-secondary'}" style="padding:8px 20px;font-size:14px;font-weight:600;" ${canReturn ? '' : 'disabled'} onclick="droneControl(${m.id},'return')">🔄 返航</button>` +
+            `<button class="btn ${canLand ? 'btn-danger' : 'btn-secondary'}" style="padding:8px 20px;font-size:14px;font-weight:600;" ${canLand ? '' : 'disabled'} onclick="droneControl(${m.id},'land')">🛬 降落无人机</button>`;
+          pc.parentNode.insertBefore(ctrlDiv, pc.nextSibling);
+        }
+
         // Logs timeline
         const lt = $('#logTimeline');
         const logItems = Array.isArray(logs.items) ? logs.items : [];
@@ -2141,6 +2158,27 @@
         loadStats();
       } catch (e) {
         showToast('阶段更新失败', 'error');
+      }
+    }
+
+    // ========== Drone Control (takeoff / land / return) ==========
+    async function droneControl(missionId, action) {
+      const labels = { takeoff: '启动无人机', land: '降落无人机', return: '返航' };
+      const label = labels[action] || action;
+      if (!confirm('确定要执行「' + label + '」操作吗？')) return;
+      try {
+        const res = await api('/flight/missions/' + missionId + '/control', {
+          method: 'POST',
+          body: { action }
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast(label + ' 指令已发送，阶段: ' + data.phase, 'success');
+        closeDetailModal();
+        loadMissions();
+        loadStats();
+      } catch (e) {
+        showToast(label + ' 操作失败', 'error');
       }
     }
 
