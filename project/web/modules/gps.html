@@ -193,7 +193,9 @@
     <div class="map-card-header">
       <div class="map-card-title">实时位置地图</div>
       <div class="map-legend">
+        <div class="map-legend-item"><svg width="14" height="14" viewBox="0 0 48 48"><g fill="#10b981" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="5"/><circle cx="36" cy="12" r="5"/><circle cx="12" cy="36" r="5"/><circle cx="36" cy="36" r="5"/><circle cx="24" cy="24" r="4"/></g></svg> 无人机</div>div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:#10b981;"></div> 在线</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#6366f1;animation:pulse 1.5s infinite;"></div> 飞行中</div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:#ef4444;"></div> 离线</div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:#6366f1;border:2px dashed #6366f1;background:transparent;"></div> 电子围栏</div>
       </div>
@@ -414,87 +416,174 @@
         const data = await res.json();
         activeMissions = {};
         if (Array.isArray(data.items)) {
-          data.items.forEach(m => { activeMissions[m.device_id] = m; });
+          data.items.forEach(m => {
+            // Key by gps_device_id so map markers (which use GPS device d.id) can find their mission
+            if (m.gps_device_id) activeMissions[m.gps_device_id] = m;
+            // Also key by device_id (drone_id) as fallback
+            if (m.device_id) activeMissions[m.device_id] = m;
+          });
         }
       } catch (e) { activeMissions = {}; }
     }
 
+    var mapInitialBoundsDone = false;
+
+    function buildMarkerIcon(d, mission) {
+      const online = isDeviceOnline(d);
+      const isFlying = mission && (mission.status === '飞行中' || mission.status === '返航中');
+      const isDrone = d.device_type === '无人机';
+      const color = isFlying ? '#6366f1' : (online ? '#10b981' : (d.status === '等待连接' ? '#f59e0b' : '#ef4444'));
+      const statusBadge = isDrone ? `<span style="font-size:9px;padding:0 4px;border-radius:4px;color:#fff;background:${color};margin-left:3px;">${isFlying ? mission.current_phase : (online ? '在线' : '离线')}</span>` : '';
+      const flyingBadge = isFlying ? `<div style="background:#6366f1;color:#fff;padding:0 5px;border-radius:6px;font-size:9px;font-weight:700;margin-top:1px;white-space:nowrap;animation:pulse 1.5s infinite;">✈ ${esc(mission.current_phase)}</div>` : '';
+      const droneSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="32" height="32" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3));${isFlying?'animation:pulse 1.5s infinite;':''}">
+        <g fill="${color}" stroke="#fff" stroke-width="1.5">
+          <circle cx="12" cy="12" r="6" opacity="0.7"/><circle cx="36" cy="12" r="6" opacity="0.7"/>
+          <circle cx="12" cy="36" r="6" opacity="0.7"/><circle cx="36" cy="36" r="6" opacity="0.7"/>
+          <line x1="12" y1="12" x2="24" y2="24"/><line x1="36" y1="12" x2="24" y2="24"/>
+          <line x1="12" y1="36" x2="24" y2="24"/><line x1="36" y1="36" x2="24" y2="24"/>
+          <circle cx="24" cy="24" r="5" fill="${color}"/>
+        </g>
+        <circle cx="24" cy="24" r="3" fill="#fff"/>
+      </svg>`;
+      const dotIcon = `<div style="width:${isFlying?20:16}px;height:${isFlying?20:16}px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);${isFlying?'animation:pulse 1.5s infinite;':''}"></div>`;
+      return L.divIcon({
+        className: '',
+        html: `<div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;transition:transform 0.3s;">
+          ${isDrone ? droneSvg : dotIcon}
+          <div style="background:rgba(255,255,255,0.95);padding:1px 6px;border-radius:8px;font-size:11px;font-weight:600;color:#1e293b;white-space:nowrap;margin-top:2px;box-shadow:0 1px 3px rgba(0,0,0,0.15);border:1px solid ${color};">${esc(d.name)}${statusBadge}</div>
+          ${flyingBadge}
+        </div>`,
+        iconSize: [isDrone ? 100 : 80, isDrone ? 64 : 48], iconAnchor: [isDrone ? 50 : 40, isDrone ? 16 : 10]
+      });
+    }
+
+    function buildPopupHTML(d, mission) {
+      const online = isDeviceOnline(d);
+      const isFlying = mission && (mission.status === '飞行中' || mission.status === '返航中');
+      const isDrone = d.device_type === '无人机';
+      const color = isFlying ? '#6366f1' : (online ? '#10b981' : (d.status === '等待连接' ? '#f59e0b' : '#ef4444'));
+      const statusLabel = isFlying ? '✈️ ' + mission.current_phase : (online ? '在线' : d.status);
+      const acc = d.accuracy || 0;
+      let gpsQuality, gpsQColor;
+      if (acc > 0 && acc <= 5)       { gpsQuality = '优秀'; gpsQColor = '#10b981'; }
+      else if (acc > 0 && acc <= 15) { gpsQuality = '良好'; gpsQColor = '#165dff'; }
+      else if (acc > 0 && acc <= 50) { gpsQuality = '一般'; gpsQColor = '#f59e0b'; }
+      else if (acc > 50)             { gpsQuality = '较差'; gpsQColor = '#ef4444'; }
+      else                           { gpsQuality = '未知'; gpsQColor = '#94a3b8'; }
+      const typeBadge = isDrone ? '<span style="display:inline-block;background:#eef2ff;color:#4338ca;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-left:4px;">无人机</span>' : '';
+      return `<div style="min-width:200px;">
+        <b style="font-size:14px;">${esc(d.name)}</b>${typeBadge}<br>
+        <span style="color:${color};font-weight:500;">${statusLabel}</span>
+        ${isDrone && d.agent_id ? '<span style="font-size:11px;color:#64748b;margin-left:6px;">'+esc(d.agent_id)+'</span>' : ''}
+        ${mission ? '<div style="margin-top:4px;padding:3px 8px;background:#eef2ff;border-radius:6px;font-size:11px;color:#4338ca;font-weight:600;">✈️ 任务: ' + esc(mission.name) + ' | ' + esc(mission.current_phase) + ' (' + mission.progress + '%)</div>' : ''}
+        <hr style="margin:6px 0;border:none;border-top:1px solid #e2e8f0;">
+        经度: ${d.longitude.toFixed(6)}<br>纬度: ${d.latitude.toFixed(6)}<br>
+        高度: ${d.altitude.toFixed(1)}m<br>速度: ${d.speed.toFixed(1)} m/s<br>航向: ${d.heading.toFixed(0)}°<br>
+        定位精度: ${acc > 0 ? acc.toFixed(1) + 'm' : '-'} <span style="color:${gpsQColor};font-weight:600;">${gpsQuality}</span>
+        <hr style="margin:6px 0;border:none;border-top:1px solid #e2e8f0;">
+        <div style="display:flex;gap:6px;margin-top:4px;">
+          <button onclick="viewDetail(${d.id})" style="flex:1;padding:4px 8px;background:#165dff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;">详情</button>
+          <button onclick="toggleMapVisible(${d.id})" style="flex:1;padding:4px 8px;background:#ef4444;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;">从地图隐藏</button>
+        </div>
+      </div>`;
+    }
+
+    // Cache device data for WS direct updates
+    var deviceDataCache = {};
+    // Separate layer for drone markers (not clustered — allows smooth movement)
+    var droneLayer = null;
+
+    function ensureDroneLayer() {
+      if (!droneLayer) { droneLayer = L.layerGroup().addTo(map); }
+    }
+
     function updateMapMarkers(devices) {
-      // clear old
-      if (markerClusterGroup) markerClusterGroup.clearLayers();
+      ensureDroneLayer();
+      // Remove old fence/accuracy circles
       Object.values(fenceCircles).forEach(c => map.removeLayer(c));
       Object.values(accuracyCircles).forEach(c => map.removeLayer(c));
-      markers = {};
       fenceCircles = {};
       accuracyCircles = {};
 
+      const activeIds = new Set();
       const bounds = [];
       devices.forEach(d => {
         if (d.latitude === 0 && d.longitude === 0) return;
         if (!d.map_visible) return;
-        const online = isDeviceOnline(d);
+        activeIds.add(d.id);
+        deviceDataCache[d.id] = d;
         const mission = activeMissions[d.id];
-        const isFlying = mission && (mission.status === '飞行中' || mission.status === '返航中');
-        const color = isFlying ? '#6366f1' : (online ? '#10b981' : (d.status === '等待连接' ? '#f59e0b' : '#ef4444'));
-        const statusLabel = isFlying ? '✈️ ' + mission.current_phase : (online ? '在线' : d.status);
-        const flyingBadge = isFlying ? `<div style="background:#6366f1;color:#fff;padding:0 5px;border-radius:6px;font-size:9px;font-weight:700;margin-top:1px;white-space:nowrap;animation:pulse 1.5s infinite;">\u2708 ${esc(mission.current_phase)}</div>` : '';
-        const icon = L.divIcon({
-          className: '',
-          html: `<div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;">
-            <div style="width:${isFlying ? 20 : 16}px;height:${isFlying ? 20 : 16}px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);${isFlying ? 'animation:pulse 1.5s infinite;' : ''}"></div>
-            <div style="background:rgba(255,255,255,0.92);padding:1px 6px;border-radius: 8px;font-size:11px;font-weight:600;color:#1e293b;white-space:nowrap;margin-top:2px;box-shadow:0 1px 3px rgba(0,0,0,0.15);border:1px solid ${color};">${esc(d.name)}</div>
-            ${flyingBadge}
-          </div>`,
-          iconSize: [80, 48], iconAnchor: [40, 10]
-        });
-        // GPS quality indicator based on accuracy
+        const newLatLng = [d.latitude, d.longitude];
+        bounds.push(newLatLng);
+        const isDrone = d.device_type === '无人机';
+
+        if (markers[d.id]) {
+          const oldM = markers[d.id];
+          oldM.setLatLng(newLatLng);
+          oldM.setIcon(buildMarkerIcon(d, mission));
+          oldM.setPopupContent(buildPopupHTML(d, mission));
+        } else {
+          const m = L.marker(newLatLng, { icon: buildMarkerIcon(d, mission) })
+            .bindPopup(buildPopupHTML(d, mission));
+          markers[d.id] = m;
+          // Drones go on separate layer (smooth tracking); others go to cluster
+          if (isDrone) { droneLayer.addLayer(m); } else { markerClusterGroup.addLayer(m); }
+        }
+
+        // Accuracy circle
         const acc = d.accuracy || 0;
-        let gpsQuality, gpsQColor;
-        if (acc > 0 && acc <= 5)       { gpsQuality = '优秀'; gpsQColor = '#10b981'; }
-        else if (acc > 0 && acc <= 15) { gpsQuality = '良好'; gpsQColor = '#165dff'; }
-        else if (acc > 0 && acc <= 50) { gpsQuality = '一般'; gpsQColor = '#f59e0b'; }
-        else if (acc > 50)             { gpsQuality = '较差'; gpsQColor = '#ef4444'; }
-        else                           { gpsQuality = '未知'; gpsQColor = '#94a3b8'; }
-
-        const m = L.marker([d.latitude, d.longitude], { icon })
-          .bindPopup(`<div style="min-width:180px;">
-            <b style="font-size:14px;">${esc(d.name)}</b><br>
-            <span style="color:${color};font-weight:500;">${statusLabel}</span>
-            ${mission ? '<div style="margin-top:4px;padding:3px 8px;background:#eef2ff;border-radius:6px;font-size:11px;color:#4338ca;font-weight:600;">\u2708\ufe0f \u4efb\u52a1: ' + esc(mission.name) + ' | ' + esc(mission.current_phase) + ' (' + mission.progress + '%)</div>' : ''}
-            <hr style="margin:6px 0;border:none;border-top:1px solid #e2e8f0;">
-            经度: ${d.longitude.toFixed(6)}<br>纬度: ${d.latitude.toFixed(6)}<br>
-            高度: ${d.altitude.toFixed(1)}m<br>速度: ${d.speed.toFixed(1)} m/s<br>航向: ${d.heading.toFixed(0)}°<br>
-            定位精度: ${acc > 0 ? acc.toFixed(1) + 'm' : '-'} <span style="color:${gpsQColor};font-weight:600;">${gpsQuality}</span>
-            <hr style="margin:6px 0;border:none;border-top:1px solid #e2e8f0;">
-            <div style="display:flex;gap:6px;margin-top:4px;">
-              <button onclick="viewDetail(${d.id})" style="flex:1;padding:4px 8px;background:#165dff;color:#fff;border:none;border-radius: 8px;cursor:pointer;font-size:12px;">详情</button>
-              <button onclick="toggleMapVisible(${d.id})" style="flex:1;padding:4px 8px;background:#ef4444;color:#fff;border:none;border-radius: 8px;cursor:pointer;font-size:12px;">从地图隐藏</button>
-            </div>
-          </div>`);
-        markers[d.id] = m;
-        markerClusterGroup.addLayer(m);
-        bounds.push([d.latitude, d.longitude]);
-
-        // Accuracy circle: visualize positioning error range when accuracy > 30m
         if (acc > 30) {
-          const accCircle = L.circle([d.latitude, d.longitude], {
+          let gpsQColor = '#94a3b8';
+          if (acc <= 5) gpsQColor = '#10b981';
+          else if (acc <= 15) gpsQColor = '#165dff';
+          else if (acc <= 50) gpsQColor = '#f59e0b';
+          else gpsQColor = '#ef4444';
+          accuracyCircles[d.id] = L.circle(newLatLng, {
             radius: acc, color: gpsQColor, fillColor: gpsQColor,
             fillOpacity: 0.06, weight: 1, dashArray: '4,4'
           }).addTo(map);
-          accuracyCircles[d.id] = accCircle;
         }
 
         if (d.fence_enabled && d.fence_radius > 0) {
-          const circle = L.circle([d.fence_lat, d.fence_lng], {
+          fenceCircles[d.id] = L.circle([d.fence_lat, d.fence_lng], {
             radius: d.fence_radius, color: '#6366f1', fillColor: '#6366f1',
             fillOpacity: 0.08, weight: 2, dashArray: '6,4'
           }).addTo(map);
-          fenceCircles[d.id] = circle;
         }
       });
 
-      if (bounds.length > 0) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+      // Remove markers for devices no longer visible
+      Object.keys(markers).forEach(id => {
+        if (!activeIds.has(Number(id))) {
+          droneLayer.removeLayer(markers[id]);
+          markerClusterGroup.removeLayer(markers[id]);
+          delete markers[id];
+        }
+      });
+
+      // Only fit bounds on first load
+      if (!mapInitialBoundsDone && bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+        mapInitialBoundsDone = true;
+      }
+    }
+
+    // Fast WebSocket position update — moves markers without full API reload
+    function handleWSPositionUpdate(data) {
+      const id = data.device_id;
+      if (!markers[id]) return;
+      const newLL = [data.latitude, data.longitude];
+      markers[id].setLatLng(newLL);
+      // Update cached device data for popup
+      if (deviceDataCache[id]) {
+        deviceDataCache[id].latitude = data.latitude;
+        deviceDataCache[id].longitude = data.longitude;
+        deviceDataCache[id].altitude = data.altitude || deviceDataCache[id].altitude;
+        deviceDataCache[id].speed = data.speed || 0;
+        deviceDataCache[id].heading = data.heading || 0;
+        const d = deviceDataCache[id];
+        const mission = activeMissions[d.id];
+        markers[id].setPopupContent(buildPopupHTML(d, mission));
       }
     }
 
@@ -626,7 +715,7 @@
       }
       tbody.innerHTML = items.map(d => `
         <tr>
-          <td><strong>${esc(d.name)}</strong></td>
+          <td><strong>${esc(d.name)}</strong>${d.device_type==='无人机'?' <span style="font-size:10px;padding:1px 5px;border-radius:4px;background:#eef2ff;color:#4338ca;font-weight:600;">无人机</span>':''}</td>
           <td>${d.longitude.toFixed(6)}</td>
           <td>${d.latitude.toFixed(6)}</td>
           <td>${d.altitude.toFixed(1)}</td>
@@ -863,10 +952,9 @@
       gpsWS.onmessage = function(evt) {
         try {
           var event = JSON.parse(evt.data);
-          if (event.type === 'gps_update') {
-            loadDevices();
-            loadStats();
-            loadAlerts();
+          if (event.type === 'gps_update' && event.data) {
+            // Direct fast marker position update — no API reload needed
+            handleWSPositionUpdate(event.data);
           }
         } catch(e) {}
       };
@@ -904,8 +992,20 @@
     }
 
     // ========== Init ==========
+    var _refreshing = false;
+    async function periodicRefresh() {
+      if (_refreshing) return;
+      _refreshing = true;
+      try { await loadDevices(); await loadStats(); } catch(e) {}
+      _refreshing = false;
+    }
     loadTdtConfig().finally(()=>{
       initMap(); initCharts(); loadDevices(); loadStats();
+      // Auto-enable real-time monitoring for live drone position tracking
+      realtimeEnabled = true;
+      connectGpsWS();
+      // Periodic fallback refresh (5s, guards against overlapping calls)
+      setInterval(periodicRefresh, 5000);
     });
   </script>
 </body>

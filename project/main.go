@@ -224,6 +224,9 @@ func main() {
 	handlers.RegisterMavlinkRoutes(r, database)
 	log.Printf("[main] MAVLink telemetry API registered at /api/mavlink/*")
 
+	// ---- Drone Telemetry Data Feeder (ground station relay) ----
+	handlers.StartDroneDataFeeder(database)
+
 	srv := &http.Server{Addr: addr, Handler: r}
 	go func() {
 		log.Printf("listening on %s", addr)
@@ -237,6 +240,7 @@ func main() {
 	log.Printf("shutting down...")
 
 	// Graceful shutdown: flush batchers, stop caches, stop sim engine, stop pool, then HTTP server
+	handlers.StopDroneDataFeeder()
 	tcpGW.Stop()
 	handlers.StopBatchers()
 	handlers.StopStatsCaches()
@@ -357,14 +361,16 @@ func thresholdAlertTask(database *db.DB, thCPU, thMEM, thDISK int) func(ctx cont
 func offlineDetectionTask(database *db.DB) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		// 1. Collect names of drones that are about to go offline (still 'online' but GPS stale)
+		//    Exclude drones managed by the data feeder (agent_id LIKE 'UAV-K9-%') — they never go offline.
 		var newlyOfflineNames []string
 		rows, err := database.Query(`
 			SELECT d.name FROM drones d
 			INNER JOIN gps_devices g ON g.id = d.linked_gps_device_id
 			WHERE d.status='online'
+			  AND d.agent_id NOT LIKE 'UAV-K9-%'
 			  AND g.status='在线'
 			  AND g.last_update IS NOT NULL
-			  AND datetime(g.last_update) < datetime('now','-15 seconds')`)
+			  AND datetime(g.last_update) < datetime('now','-30 seconds')`)
 		if err == nil {
 			for rows.Next() {
 				var name string
@@ -375,11 +381,11 @@ func offlineDetectionTask(database *db.DB) func(ctx context.Context) error {
 			rows.Close()
 		}
 
-		// 2. Standard offline transition updates
-		database.Exec(`UPDATE gps_devices SET status='离线' WHERE status='在线' AND last_update IS NOT NULL AND datetime(last_update) < datetime('now','-15 seconds')`)
-		database.Exec(`UPDATE drones SET status='offline', updated_at=datetime('now') WHERE status='online' AND linked_gps_device_id > 0 AND linked_gps_device_id IN (SELECT id FROM gps_devices WHERE status='离线')`)
-		database.Exec(`UPDATE devices SET status='offline', updated_at=datetime('now') WHERE status='online' AND drone_id > 0 AND drone_id IN (SELECT id FROM drones WHERE status='offline')`)
-		database.Exec(`UPDATE hardware_items SET status='离线' WHERE status='在线' AND detected_at IS NOT NULL AND datetime(detected_at) < datetime('now','-15 seconds')`)
+		// 2. Standard offline transition updates — exclude feeder-managed GPS devices and drones
+		database.Exec(`UPDATE gps_devices SET status='离线' WHERE status='在线' AND last_update IS NOT NULL AND agent_id NOT LIKE 'UAV-K9-%' AND datetime(last_update) < datetime('now','-30 seconds')`)
+		database.Exec(`UPDATE drones SET status='offline', updated_at=datetime('now') WHERE status='online' AND agent_id NOT LIKE 'UAV-K9-%' AND linked_gps_device_id > 0 AND linked_gps_device_id IN (SELECT id FROM gps_devices WHERE status='离线')`)
+		database.Exec(`UPDATE devices SET status='offline', updated_at=datetime('now') WHERE status='online' AND drone_id > 0 AND drone_id IN (SELECT id FROM drones WHERE status='offline' AND agent_id NOT LIKE 'UAV-K9-%')`)
+		database.Exec(`UPDATE hardware_items SET status='离线' WHERE status='在线' AND detected_at IS NOT NULL AND datetime(detected_at) < datetime('now','-30 seconds')`)
 
 		// 3. Auto-clear unread notifications for newly-offline drones
 		for _, name := range newlyOfflineNames {

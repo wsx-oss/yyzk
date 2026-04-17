@@ -615,17 +615,21 @@
     let phaseChart = null;
     let droneList = [];
 
-    // ========== Load Drones from unified registry (only data-active drones) ==========
+    // ========== Load Drones from unified registry ==========
     async function loadDrones() {
       try {
-        const res = await api('/drones?data_active=true');
+        const res = await api('/drones');
         const data = await res.json();
         const drones = Array.isArray(data.items) ? data.items : [];
-        // linked_gps_device_id is the device_id used by flight_missions
-        droneList = drones.filter(d => d.linked_gps_device_id && d.linked_gps_device_id > 0)
-                         .map(d => ({ id: d.linked_gps_device_id, name: d.name, droneId: d.id }));
+        // Only show drones that have a linked GPS device and are online or busy
+        droneList = drones.filter(d => d.linked_gps_device_id && d.linked_gps_device_id > 0 && (d.status === 'online' || d.status === 'busy'))
+                         .map(d => ({ id: d.linked_gps_device_id, name: d.name, droneId: d.id, status: d.status }));
         const sel = $('#missionDevice');
-        sel.innerHTML = '<option value="0">未指定（仅显示正在传输数据的无人机）</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)} [GPS推送中]</option>`).join('');
+        sel.innerHTML = '<option value="0">未指定</option>' + droneList.map(d => {
+          const label = d.status === 'busy' ? ' [忙碌]' : ' [在线]';
+          const disabled = d.status === 'busy' ? ' disabled' : '';
+          return `<option value="${d.id}"${disabled}>${esc(d.name)}${label}</option>`;
+        }).join('');
       } catch (e) { console.error('loadDrones error:', e); }
     }
 
@@ -756,8 +760,9 @@
           <td>${formatDate(m.created_at)}</td>
           <td>
             <button class="btn btn-primary btn-action" onclick="viewDetail(${m.id})">详情</button>
-            <button class="btn btn-secondary btn-action" onclick="editMission(${m.id})" ${m.status==='已完成'?'disabled':''}>编辑</button>
-            <button class="btn btn-danger btn-action" onclick="deleteMission(${m.id})">删除</button>
+            ${m.device_id > 0 && m.status === '待起飞' ? '<button class="btn btn-success btn-action" onclick="startMission('+m.id+')">开始</button>' : ''}
+            <button class="btn btn-secondary btn-action" onclick="editMission(${m.id})" ${m.status==='已完成'||m.status==='飞行中'||m.status==='返航中'?'disabled':''}>编辑</button>
+            <button class="btn btn-danger btn-action" onclick="deleteMission(${m.id})" ${m.status==='飞行中'||m.status==='返航中'?'disabled':''}>删除</button>
           </td>
         </tr>
       `).join('');
@@ -2179,6 +2184,22 @@
         loadStats();
       } catch (e) {
         showToast(label + ' 操作失败', 'error');
+      }
+    }
+
+    // ========== Start Mission (autonomous execution) ==========
+    async function startMission(id) {
+      if (!confirm('确认启动任务？无人机将自动起飞并沿航线飞行，完成后自动返航降落。')) return;
+      try {
+        const res = await api('/flight/missions/' + id + '/start', { method: 'POST' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast(data.message || '任务已启动', 'success');
+        loadMissions();
+        loadStats();
+        loadDrones();
+      } catch (e) {
+        showToast('启动任务失败', 'error');
       }
     }
 
