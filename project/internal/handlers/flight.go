@@ -2,9 +2,14 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
+	"log"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+
+	"smartcontrol/internal/amap"
 
 	"github.com/gin-gonic/gin"
 )
@@ -255,6 +260,176 @@ func (a *API) FlightMissionsUpdate(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 
+// FlightMissionStart begins autonomous execution of a mission.
+// The drone follows the planned route waypoints, then auto-returns to base.
+func (a *API) FlightMissionStart(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	if id <= 0 {
+		c.JSON(400, gin.H{"error": "invalid mission id"})
+		return
+	}
+	var deviceID int
+	var status, route string
+	err := a.db.QueryRow(`SELECT device_id, status, route FROM flight_missions WHERE id=?`, id).Scan(&deviceID, &status, &route)
+	if err == sql.ErrNoRows {
+		c.JSON(404, gin.H{"error": "mission not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	if deviceID <= 0 {
+		c.JSON(400, gin.H{"error": "任务未分配无人机，请先选择执行无人机"})
+		return
+	}
+	if status == "飞行中" || status == "返航中" {
+		c.JSON(400, gin.H{"error": "任务已在执行中"})
+		return
+	}
+	if status == "已完成" {
+		c.JSON(400, gin.H{"error": "任务已完成"})
+		return
+	}
+
+	// ---- Step 1: Try waypoints_json (most reliable source) ----
+	var waypoints []MissionWaypoint
+	var wpJSON sql.NullString
+	a.db.QueryRow(`SELECT waypoints_json FROM flight_missions WHERE id=?`, id).Scan(&wpJSON)
+	if wpJSON.Valid && wpJSON.String != "" && wpJSON.String != "null" && wpJSON.String != "[]" {
+		type wpObj struct {
+			Lat float64 `json:"lat"`
+			Lng float64 `json:"lng"`
+		}
+		var items []wpObj
+		if json.Unmarshal([]byte(wpJSON.String), &items) == nil {
+			for _, w := range items {
+				if w.Lat != 0 && w.Lng != 0 {
+					waypoints = append(waypoints, MissionWaypoint{Lat: w.Lat, Lng: w.Lng, Alt: 110})
+				}
+			}
+		}
+		// Also try [[lng,lat],[lng,lat]] array-of-arrays format
+		if len(waypoints) == 0 {
+			var arrays [][]float64
+			if json.Unmarshal([]byte(wpJSON.String), &arrays) == nil {
+				for _, arr := range arrays {
+					if len(arr) >= 2 && arr[0] != 0 && arr[1] != 0 {
+						waypoints = append(waypoints, MissionWaypoint{Lat: arr[1], Lng: arr[0], Alt: 110})
+					}
+				}
+			}
+		}
+	}
+
+	// ---- Step 2: Try parsing route as coordinate pairs ----
+	if len(waypoints) == 0 {
+		parts := strings.Split(route, "→")
+		if len(parts) < 2 {
+			parts = strings.Split(route, "->")
+		}
+		for _, seg := range parts {
+			seg = strings.TrimSpace(seg)
+			if seg == "" {
+				continue
+			}
+			coords := strings.Split(seg, ",")
+			if len(coords) >= 2 {
+				lat := parseFloat(strings.TrimSpace(coords[0]))
+				lng := parseFloat(strings.TrimSpace(coords[1]))
+				if lat != 0 && lng != 0 {
+					alt := 110.0
+					if len(coords) >= 3 {
+						if v := parseFloat(strings.TrimSpace(coords[2])); v > 0 {
+							alt = v
+						}
+					}
+					waypoints = append(waypoints, MissionWaypoint{Lat: lat, Lng: lng, Alt: alt})
+				}
+			}
+		}
+	}
+
+	// ---- Step 3: Route contains address text → geocode via AMap ----
+	if len(waypoints) == 0 && containsChinese(route) {
+		amapClient := amap.NewClient()
+		if amapClient.Available() {
+			parts := strings.Split(route, "→")
+			if len(parts) < 2 {
+				parts = strings.Split(route, "->")
+			}
+			seen := map[string]bool{}
+			for _, seg := range parts {
+				seg = strings.TrimSpace(seg)
+				if seg == "" || seen[seg] {
+					continue
+				}
+				seen[seg] = true
+				candidates, err := amapClient.Geocode(seg, "")
+				if err == nil && len(candidates) > 0 {
+					waypoints = append(waypoints, MissionWaypoint{
+						Lat: candidates[0].Lat, Lng: candidates[0].Lon, Alt: 110,
+					})
+					log.Printf("[FlightMission] Geocoded '%s' → (%.6f, %.6f)", seg, candidates[0].Lat, candidates[0].Lon)
+				}
+			}
+		}
+	}
+
+	// ---- Step 4: Fallback — generate patrol pattern around drone's current position ----
+	if len(waypoints) == 0 {
+		var droneLat, droneLng float64
+		a.db.QueryRow(`SELECT latitude, longitude FROM gps_devices WHERE id=?`, deviceID).Scan(&droneLat, &droneLng)
+		if droneLat != 0 && droneLng != 0 {
+			offset := 0.003 // ~300m
+			waypoints = []MissionWaypoint{
+				{Lat: droneLat + offset, Lng: droneLng, Alt: 110},
+				{Lat: droneLat + offset, Lng: droneLng + offset, Alt: 110},
+				{Lat: droneLat, Lng: droneLng + offset, Alt: 110},
+				{Lat: droneLat - offset, Lng: droneLng, Alt: 110},
+			}
+			log.Printf("[FlightMission] Using fallback patrol pattern around drone position (%.4f, %.4f)", droneLat, droneLng)
+		}
+	}
+
+	if len(waypoints) == 0 {
+		c.JSON(400, gin.H{"error": "无法从航线中解析出有效的航点坐标，请确保航线包含有效地址或坐标"})
+		return
+	}
+
+	// Start the mission on the feeder
+	if err := StartMission(id, deviceID, waypoints); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Persist parsed waypoints as JSON for mission restoration after restart
+	if wpBytes, err := json.Marshal(waypoints); err == nil {
+		a.db.Exec(`UPDATE flight_missions SET waypoints_json=? WHERE id=?`, string(wpBytes), id)
+	}
+
+	// Update mission status
+	a.db.Exec(`UPDATE flight_missions SET status='飞行中', current_phase='起飞', progress=5 WHERE id=?`, id)
+	a.db.Exec(`INSERT INTO mission_logs(mission_id, phase, message) VALUES(?,?,?)`, id, "起飞", "任务开始执行，无人机起飞中")
+
+	hub.Broadcast("flight", WSEvent{Type: "flight_started", Data: gin.H{"id": id}})
+	c.JSON(200, gin.H{"ok": true, "message": "任务已启动，无人机正在起飞"})
+}
+
+func parseFloat(s string) float64 {
+	v, _ := strconv.ParseFloat(s, 64)
+	return v
+}
+
+func containsChinese(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) {
+			return true
+		}
+	}
+	return false
+}
+
 // FlightMissionsDelete deletes a flight mission
 func (a *API) FlightMissionsDelete(c *gin.Context) {
 	id := c.Param("id")
@@ -498,9 +673,12 @@ func (a *API) FlightMissionsStats(c *gin.Context) {
 }
 
 // FlightActiveMissions returns a compact list of active (non-completed) missions
-// with their device_id. Used by GPS page to show flight status on map markers.
+// with both drone_id (device_id) and gps_device_id. Used by GPS page to show flight status on map markers.
 func (a *API) FlightActiveMissions(c *gin.Context) {
-	rows, err := a.db.Query(`SELECT id, name, device_id, status, current_phase, progress FROM flight_missions WHERE status != '已完成' AND device_id > 0`)
+	rows, err := a.db.Query(`SELECT fm.id, fm.name, fm.device_id, COALESCE(d.linked_gps_device_id,0), fm.status, fm.current_phase, fm.progress
+		FROM flight_missions fm
+		LEFT JOIN drones d ON d.id = fm.device_id
+		WHERE fm.status != '已完成' AND fm.device_id > 0`)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -508,11 +686,12 @@ func (a *API) FlightActiveMissions(c *gin.Context) {
 	defer rows.Close()
 	items := []gin.H{}
 	for rows.Next() {
-		var id, deviceID, progress int
+		var id, deviceID, gpsDeviceID, progress int
 		var name, status, phase string
-		if err := rows.Scan(&id, &name, &deviceID, &status, &phase, &progress); err == nil {
+		if err := rows.Scan(&id, &name, &deviceID, &gpsDeviceID, &status, &phase, &progress); err == nil {
 			items = append(items, gin.H{
 				"id": id, "name": name, "device_id": deviceID,
+				"gps_device_id": gpsDeviceID,
 				"status": status, "current_phase": phase, "progress": progress,
 			})
 		}

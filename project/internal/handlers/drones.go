@@ -400,7 +400,7 @@ func (a *API) DronesDelete(c *gin.Context) {
 func (a *API) DronesStats(c *gin.Context) {
 	var total, online, offline int
 	a.db.QueryRow(`SELECT COUNT(*) FROM drones`).Scan(&total)
-	a.db.QueryRow(`SELECT COUNT(*) FROM drones WHERE status='online'`).Scan(&online)
+	a.db.QueryRow(`SELECT COUNT(*) FROM drones WHERE status IN ('online','busy')`).Scan(&online)
 	offline = total - online
 
 	// count drones whose linked GPS device is actually pushing data (last 30s)

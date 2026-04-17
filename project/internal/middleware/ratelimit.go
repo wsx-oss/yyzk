@@ -54,8 +54,14 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		
+
 		ip := c.ClientIP()
+
+		// Skip rate limiting for localhost / loopback (local dev + internal polling)
+		if ip == "127.0.0.1" || ip == "::1" || ip == "localhost" {
+			c.Next()
+			return
+		}
 		
 		if !rl.allowWithRedis(ip) {
 			c.JSON(http.StatusTooManyRequests, gin.H{

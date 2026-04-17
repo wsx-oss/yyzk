@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -64,6 +65,9 @@ type DB struct {
 
 func (d *DB) Exec(query string, args ...any) (sql.Result, error) {
 	return d.inner.Exec(AdaptSQL(query), args...)
+}
+func (d *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return d.inner.ExecContext(ctx, AdaptSQL(query), args...)
 }
 func (d *DB) Query(query string, args ...any) (*sql.Rows, error) {
 	return d.inner.Query(AdaptSQL(query), args...)
@@ -153,9 +157,10 @@ func openMySQL(dsn string) (*sql.DB, error) {
 		return nil, fmt.Errorf("mysql connector: %w", err)
 	}
 	database := sql.OpenDB(connector)
-	database.SetMaxOpenConns(25)
-	database.SetMaxIdleConns(10)
+	database.SetMaxOpenConns(100)
+	database.SetMaxIdleConns(25)
 	database.SetConnMaxLifetime(5 * time.Minute)
+	database.SetConnMaxIdleTime(2 * time.Minute)
 	if err := database.Ping(); err != nil {
 		return nil, fmt.Errorf("MySQL ping: %w", err)
 	}

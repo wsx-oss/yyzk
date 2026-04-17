@@ -97,16 +97,24 @@ func (m *MavlinkAPI) ListDrones(c *gin.Context) {
 		}
 
 		// Enrich with drone table info
-		var name, serialNumber, model, status string
+		var name, model, status string
 		var droneID int
-		err := m.db.QueryRow(`SELECT id, name, COALESCE(serial_number,''), COALESCE(model,''), status FROM drones WHERE agent_id=?`,
-			fmt.Sprintf("mavlink-%d", sysID)).Scan(&droneID, &name, &serialNumber, &model, &status)
-		if err == nil {
-			d["drone_id"] = droneID
-			d["name"] = name
-			d["serial_number"] = serialNumber
-			d["model"] = model
-			d["drone_status"] = status
+		// Try UAV-K9-xxx format first, then mavlink-x format
+		agentPatterns := []string{
+			fmt.Sprintf("UAV-K9-%03d", sysID),
+			fmt.Sprintf("mavlink-%d", sysID),
+		}
+		for _, agentID := range agentPatterns {
+			err := m.db.QueryRow(`SELECT id, name, COALESCE(model,''), status FROM drones WHERE agent_id=?`,
+				agentID).Scan(&droneID, &name, &model, &status)
+			if err == nil {
+				d["drone_id"] = droneID
+				d["name"] = name
+				d["agent_id"] = agentID
+				d["model"] = model
+				d["drone_status"] = status
+				break
+			}
 		}
 		droneMap[sysID] = d
 	}
@@ -515,7 +523,7 @@ func (m *MavlinkAPI) DebugTelemetryLog(c *gin.Context) {
 	}
 	args = append(args, limit)
 
-	q := `SELECT sys_id, comp_id, msg_type, payload, updated_at FROM mavlink_telemetry WHERE ` + where + ` ORDER BY updated_at DESC LIMIT ?`
+	q := `SELECT sys_id, msg_type, payload, updated_at FROM mavlink_telemetry WHERE ` + where + ` ORDER BY updated_at DESC LIMIT ?`
 	rows, err := m.db.Query(q, args...)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -525,13 +533,13 @@ func (m *MavlinkAPI) DebugTelemetryLog(c *gin.Context) {
 
 	items := []gin.H{}
 	for rows.Next() {
-		var sid, cid int
+		var sid int
 		var mt, payload, updatedAt string
-		if rows.Scan(&sid, &cid, &mt, &payload, &updatedAt) == nil {
+		if rows.Scan(&sid, &mt, &payload, &updatedAt) == nil {
 			var parsed interface{}
 			json.Unmarshal([]byte(payload), &parsed)
 			items = append(items, gin.H{
-				"sys_id": sid, "comp_id": cid, "msg_type": mt,
+				"sys_id": sid, "comp_id": 1, "msg_type": mt,
 				"data": parsed, "raw_json": payload, "updated_at": updatedAt,
 			})
 		}
