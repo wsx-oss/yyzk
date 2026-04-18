@@ -68,7 +68,8 @@ type droneState struct {
 	missionID        int
 	missionWaypoints []MissionWaypoint
 	missionWPIdx     int
-	missionPhase     string // takeoff, cruise, return, landing
+	missionWPProg    float64 // 0-1 progress within current segment (Catmull-Rom)
+	missionPhase     string  // takeoff, cruise, return, landing
 	missionStartTime time.Time
 }
 
@@ -89,18 +90,19 @@ var (
 		{SysID: 1, Name: "翼龙-I", Model: "K9-四旋翼", AgentID: "UAV-K9-001",
 			IP: "10.21.30.101", SerialUID: "4A3F8B1C2D5E6F70A1B2", FWVersion: "1.17.83", BoardType: 5,
 			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
+		// 所有无人机基地统一设定为郑州大学主校区东门，无偏移
 		{SysID: 2, Name: "天鹰-II", Model: "K9-六旋翼", AgentID: "UAV-K9-002",
 			IP: "10.21.30.102", SerialUID: "5B4G9C2D3E6F7180B2C3", FWVersion: "1.17.83", BoardType: 5,
-			HomeLat: baseLat + 0.0002, HomeLng: baseLng + 0.0003, HomeAlt: baseAlt, FenceRadius: 2000},
+			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
 		{SysID: 3, Name: "云雀-III", Model: "K9-四旋翼", AgentID: "UAV-K9-003",
 			IP: "10.21.30.103", SerialUID: "6C5H0D3E4F7G8290C3D4", FWVersion: "1.18.02", BoardType: 5,
-			HomeLat: baseLat - 0.0002, HomeLng: baseLng + 0.0001, HomeAlt: baseAlt, FenceRadius: 2000},
+			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
 		{SysID: 4, Name: "苍鹰-IV", Model: "K9-四旋翼", AgentID: "UAV-K9-004",
 			IP: "10.21.30.104", SerialUID: "7D6I1E4F5G8H93A0D4E5", FWVersion: "1.18.02", BoardType: 5,
-			HomeLat: baseLat + 0.0004, HomeLng: baseLng - 0.0002, HomeAlt: baseAlt, FenceRadius: 2000},
+			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
 		{SysID: 5, Name: "飞鸿-V", Model: "K9-六旋翼", AgentID: "UAV-K9-005",
 			IP: "10.21.30.105", SerialUID: "8E7J2F5G6H9I04B1E5F6", FWVersion: "1.18.02", BoardType: 5,
-			HomeLat: baseLat - 0.0003, HomeLng: baseLng - 0.0003, HomeAlt: baseAlt, FenceRadius: 2000},
+			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
 	}
 
 	feederStates   []*droneState
@@ -120,17 +122,18 @@ func StartDroneDataFeeder(database *db.DB) {
 
 		for i, prof := range feederProfiles {
 			gpsID, dID := ensureDroneRegistered(database, prof)
+				// 初始状态：停在基地地面，未解锁，保持静止
 			feederStates[i] = &droneState{
-				lat: prof.HomeLat, lng: prof.HomeLng, alt: prof.HomeAlt + 30,
-				relAlt: 30, speed: 3.0, heading: float64(rand.Intn(360)),
+				lat: prof.HomeLat, lng: prof.HomeLng, alt: prof.HomeAlt,
+				relAlt: 0, speed: 0, heading: 0,
 				battLevel: 85 + rand.Intn(16),
 				battVoltage: 24.0 + rand.Float64()*1.2,
-				battCurrent: 5.0 + rand.Float64()*3, battTemp: 25.0 + rand.Float64()*5,
+				battCurrent: 0.3 + rand.Float64()*0.2, battTemp: 25.0 + rand.Float64()*3,
 				battHealth: 92 + rand.Intn(9), battCycles: 20 + rand.Intn(60),
 				fixType: 6, satellites: 16 + rand.Intn(8),
-				armed: true, mode: "LOITER", customMode: 5,
-				landedState: 2, gpsDeviceID: gpsID, droneID: dID,
-				throttle: 40 + rand.Intn(10), bootTimeMs: uint32(rand.Intn(300000) + 60000),
+				armed: false, mode: "POSHOLD", customMode: 16,
+				landedState: 1, gpsDeviceID: gpsID, droneID: dID,
+				throttle: 0, bootTimeMs: uint32(rand.Intn(300000) + 60000),
 			}
 			pushGPSData(database, prof, feederStates[i])
 			log.Printf("[DataFeeder] Drone %d (%s) ready — gps_device=%d drone=%d",
@@ -201,6 +204,38 @@ func StartMission(missionID int, deviceID int, waypoints []MissionWaypoint) erro
 		}
 	}
 	return fmt.Errorf("no feeder drone matching device_id=%d (checked gps_device_id and drone_id)", deviceID)
+}
+
+// StopMission 强制取消正在执行的任务，无人机回到基地地面静止状态
+func StopMission(missionID int) {
+	for i, s := range feederStates {
+		s.mu.Lock()
+		if s.missionActive && s.missionID == missionID {
+			s.missionActive = false
+			s.missionID = 0
+			s.missionWaypoints = nil
+			s.missionWPIdx = 0
+			s.missionWPProg = 0
+			s.missionPhase = ""
+			s.mode = "POSHOLD"
+			s.customMode = 16
+			s.armed = false
+			s.lat = feederProfiles[i].HomeLat
+			s.lng = feederProfiles[i].HomeLng
+			s.alt = feederProfiles[i].HomeAlt
+			s.relAlt = 0
+			s.speed = 0
+			s.throttle = 0
+			s.landedState = 1 // 着陆在基地地面
+			s.mu.Unlock()
+			if feederDB != nil {
+				feederDB.Exec(`UPDATE drones SET status='online' WHERE id=?`, s.droneID)
+			}
+			log.Printf("[DataFeeder] Mission %d force-stopped on drone %s", missionID, feederProfiles[i].Name)
+			return
+		}
+		s.mu.Unlock()
+	}
 }
 
 // IsDroneBusy checks if a drone (by gps device ID) is currently executing a mission.
@@ -484,6 +519,13 @@ const (
 	takeoffSpeed  = 0.00003 // slow horizontal drift toward WP1 during climb
 )
 
+// catmullRomFeeder evaluates a Catmull-Rom spline at parameter t ∈ [0,1] given 4 control points.
+func catmullRomFeeder(t, p0, p1, p2, p3 float64) float64 {
+	t2 := t * t
+	t3 := t2 * t
+	return 0.5 * ((2 * p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3)
+}
+
 func evolvePosition(s *droneState, p DroneProfile, database *db.DB) {
 	s.bootTimeMs += 200
 
@@ -496,35 +538,19 @@ func evolvePosition(s *droneState, p DroneProfile, database *db.DB) {
 		return
 	}
 
-	if s.landedState == 1 { // on ground — idle drift
-		s.lat += (rand.Float64() - 0.5) * 0.000004
-		s.lng += (rand.Float64() - 0.5) * 0.000004
-		s.alt = p.HomeAlt + (rand.Float64()-0.5)*0.3
-		s.relAlt = 0
-		s.speed = rand.Float64() * 0.1
-		s.heading += (rand.Float64() - 0.5) * 0.2
-		if s.heading < 0 {
-			s.heading += 360
-		}
-		if s.heading >= 360 {
-			s.heading -= 360
-		}
-	} else { // in air — gentle loiter
-		t := float64(s.bootTimeMs) / 1000.0
-		radius := 0.0003 + 0.0001*math.Sin(t*0.05)
-		angularSpeed := 0.02 + rand.Float64()*0.005
-		angle := t * angularSpeed
-		s.lat = p.HomeLat + radius*math.Sin(angle) + (rand.Float64()-0.5)*0.000005
-		s.lng = p.HomeLng + radius*math.Cos(angle) + (rand.Float64()-0.5)*0.000005
-		s.relAlt = 30 + 10*math.Sin(t*0.03) + (rand.Float64()-0.5)*0.5
-		s.alt = p.HomeAlt + s.relAlt
-		s.speed = 2.0 + rand.Float64()*3.0
-		s.heading = math.Mod(math.Atan2(math.Cos(angle), -math.Sin(angle))*180/math.Pi+360, 360)
-	}
-	s.satellites = 16 + rand.Intn(8)
-	if s.satellites > 24 {
-		s.satellites = 24
-	}
+	// ======== 空闲状态：无任务时保持绝对静止，禁止漂移/巡航 ========
+	// 无论地面还是空中，无任务时坐标完全不变，锁定在基地位置
+	s.lat = p.HomeLat
+	s.lng = p.HomeLng
+	s.alt = p.HomeAlt
+	s.relAlt = 0
+	s.speed = 0
+	s.throttle = 0
+	s.armed = false
+	s.landedState = 1 // 停在地面
+	s.mode = "POSHOLD"
+	s.customMode = 16
+	s.satellites = 18 + rand.Intn(6)
 }
 
 // evolveMission moves the drone along its planned route.
@@ -573,6 +599,7 @@ func evolveMission(s *droneState, p DroneProfile, database *db.DB) {
 			// All waypoints reached — begin return along reverse route
 			s.missionPhase = "return"
 			s.missionWPIdx = len(s.missionWaypoints) - 2 // start returning from second-to-last WP
+			s.missionWPProg = 0
 			s.mode = "RTL"
 			s.customMode = 6
 			mID := s.missionID
@@ -583,11 +610,34 @@ func evolveMission(s *droneState, p DroneProfile, database *db.DB) {
 			return
 		}
 		wp := s.missionWaypoints[s.missionWPIdx]
-		dx := wp.Lat - s.lat
-		dy := wp.Lng - s.lng
-		dist := math.Sqrt(dx*dx + dy*dy)
-		if dist < 0.00008 { // ≈ 8m — waypoint reached
+
+		// Determine segment "from" point
+		var fromLat, fromLng float64
+		if s.missionWPIdx == 0 {
+			fromLat = p.HomeLat
+			fromLng = p.HomeLng
+		} else {
+			fromLat = s.missionWaypoints[s.missionWPIdx-1].Lat
+			fromLng = s.missionWaypoints[s.missionWPIdx-1].Lng
+		}
+
+		// Segment length in degrees
+		dLat := wp.Lat - fromLat
+		dLng := wp.Lng - fromLng
+		segLen := math.Sqrt(dLat*dLat + dLng*dLng)
+		if segLen < 0.000001 {
+			segLen = 0.000001
+		}
+
+		// Advance progress
+		s.missionWPProg += missionSpeed / segLen
+
+		if s.missionWPProg >= 1.0 {
+			// Waypoint reached
+			s.lat = wp.Lat
+			s.lng = wp.Lng
 			s.missionWPIdx++
+			s.missionWPProg = 0
 			progress := 5 + int(float64(s.missionWPIdx)/float64(len(s.missionWaypoints))*55)
 			mID := s.missionID
 			if database != nil {
@@ -596,22 +646,49 @@ func evolveMission(s *droneState, p DroneProfile, database *db.DB) {
 			log.Printf("[DataFeeder] Mission %d — WP %d/%d reached (progress %d%%)", mID, s.missionWPIdx, len(s.missionWaypoints), progress)
 			return
 		}
-		// Move toward waypoint
-		s.heading = math.Mod(math.Atan2(dy, dx)*180/math.Pi+360, 360)
-		step := missionSpeed
-		if dist < step {
-			step = dist
+
+		// ---- Catmull-Rom spline interpolation (same as simulation engine) ----
+		var p0Lat, p0Lng, p3Lat, p3Lng float64
+		if s.missionWPIdx >= 2 {
+			p0Lat = s.missionWaypoints[s.missionWPIdx-2].Lat
+			p0Lng = s.missionWaypoints[s.missionWPIdx-2].Lng
+		} else if s.missionWPIdx == 1 {
+			p0Lat = p.HomeLat
+			p0Lng = p.HomeLng
+		} else {
+			p0Lat = 2*fromLat - wp.Lat
+			p0Lng = 2*fromLng - wp.Lng
 		}
-		s.lat += dx/dist*step + (rand.Float64()-0.5)*0.000001
-		s.lng += dy/dist*step + (rand.Float64()-0.5)*0.000001
+		if s.missionWPIdx+1 < len(s.missionWaypoints) {
+			p3Lat = s.missionWaypoints[s.missionWPIdx+1].Lat
+			p3Lng = s.missionWaypoints[s.missionWPIdx+1].Lng
+		} else {
+			p3Lat = 2*wp.Lat - fromLat
+			p3Lng = 2*wp.Lng - fromLng
+		}
+
+		t := s.missionWPProg
+		newLat := catmullRomFeeder(t, p0Lat, fromLat, wp.Lat, p3Lat)
+		newLng := catmullRomFeeder(t, p0Lng, fromLng, wp.Lng, p3Lng)
+
+		// Heading from old position to new position
+		hDx := newLat - s.lat
+		hDy := newLng - s.lng
+		if math.Abs(hDx) > 0.0000001 || math.Abs(hDy) > 0.0000001 {
+			s.heading = math.Mod(math.Atan2(hDy, hDx)*180/math.Pi+360, 360)
+		}
+
+		s.lat = newLat + (rand.Float64()-0.5)*0.0000005
+		s.lng = newLng + (rand.Float64()-0.5)*0.0000005
 		s.alt = p.HomeAlt + 50 + (rand.Float64()-0.5)*0.5
 		s.relAlt = 50 + (rand.Float64()-0.5)*0.5
 		s.speed = 12.0 + rand.Float64()*4.0
 		s.throttle = 55 + rand.Intn(10)
 
 	case "return":
-		// Follow waypoints in reverse, then fly to home base
+		// Follow waypoints in reverse via Catmull-Rom, then fly to home base
 		var targetLat, targetLng float64
+		var fromLat, fromLng float64
 		if s.missionWPIdx >= 0 {
 			targetLat = s.missionWaypoints[s.missionWPIdx].Lat
 			targetLng = s.missionWaypoints[s.missionWPIdx].Lng
@@ -619,12 +696,33 @@ func evolveMission(s *droneState, p DroneProfile, database *db.DB) {
 			targetLat = p.HomeLat
 			targetLng = p.HomeLng
 		}
-		dx := targetLat - s.lat
-		dy := targetLng - s.lng
-		dist := math.Sqrt(dx*dx + dy*dy)
-		if dist < 0.00008 {
+		// "from" for return is the waypoint we just came from (one index higher)
+		if s.missionWPIdx+1 < len(s.missionWaypoints) {
+			fromLat = s.missionWaypoints[s.missionWPIdx+1].Lat
+			fromLng = s.missionWaypoints[s.missionWPIdx+1].Lng
+		} else if len(s.missionWaypoints) > 0 {
+			last := s.missionWaypoints[len(s.missionWaypoints)-1]
+			fromLat = last.Lat
+			fromLng = last.Lng
+		} else {
+			fromLat = s.lat
+			fromLng = s.lng
+		}
+
+		dLat := targetLat - fromLat
+		dLng := targetLng - fromLng
+		segLen := math.Sqrt(dLat*dLat + dLng*dLng)
+		if segLen < 0.000001 {
+			segLen = 0.000001
+		}
+
+		s.missionWPProg += returnSpeed / segLen
+
+		if s.missionWPProg >= 1.0 {
+			s.lat = targetLat
+			s.lng = targetLng
+			s.missionWPProg = 0
 			if s.missionWPIdx >= 0 {
-				// Reverse waypoint reached — go to previous one
 				s.missionWPIdx--
 				nTotal := len(s.missionWaypoints)
 				returned := nTotal - 1 - s.missionWPIdx
@@ -635,7 +733,6 @@ func evolveMission(s *droneState, p DroneProfile, database *db.DB) {
 				}
 				log.Printf("[DataFeeder] Mission %d — return WP reached, %d remaining", mID, s.missionWPIdx+1)
 			} else {
-				// Reached home — begin landing
 				s.missionPhase = "landing"
 				s.mode = "LAND"
 				s.customMode = 9
@@ -647,13 +744,38 @@ func evolveMission(s *droneState, p DroneProfile, database *db.DB) {
 			}
 			return
 		}
-		s.heading = math.Mod(math.Atan2(dy, dx)*180/math.Pi+360, 360)
-		step := returnSpeed
-		if dist < step {
-			step = dist
+
+		// ---- Catmull-Rom for return (reverse direction) ----
+		var p0Lat, p0Lng, p3Lat, p3Lng float64
+		// p0 = point before "from" in return direction (higher index)
+		if s.missionWPIdx+2 < len(s.missionWaypoints) {
+			p0Lat = s.missionWaypoints[s.missionWPIdx+2].Lat
+			p0Lng = s.missionWaypoints[s.missionWPIdx+2].Lng
+		} else {
+			p0Lat = 2*fromLat - targetLat
+			p0Lng = 2*fromLng - targetLng
 		}
-		s.lat += dx / dist * step
-		s.lng += dy / dist * step
+		// p3 = point after target in return direction (lower index or home)
+		if s.missionWPIdx >= 1 {
+			p3Lat = s.missionWaypoints[s.missionWPIdx-1].Lat
+			p3Lng = s.missionWaypoints[s.missionWPIdx-1].Lng
+		} else {
+			p3Lat = p.HomeLat
+			p3Lng = p.HomeLng
+		}
+
+		rt := s.missionWPProg
+		newLat := catmullRomFeeder(rt, p0Lat, fromLat, targetLat, p3Lat)
+		newLng := catmullRomFeeder(rt, p0Lng, fromLng, targetLng, p3Lng)
+
+		hDx := newLat - s.lat
+		hDy := newLng - s.lng
+		if math.Abs(hDx) > 0.0000001 || math.Abs(hDy) > 0.0000001 {
+			s.heading = math.Mod(math.Atan2(hDy, hDx)*180/math.Pi+360, 360)
+		}
+
+		s.lat = newLat
+		s.lng = newLng
 		s.alt = p.HomeAlt + 50 + (rand.Float64()-0.5)*0.3
 		s.relAlt = 50
 		s.speed = 6.0 + rand.Float64()*3.0
@@ -665,25 +787,24 @@ func evolveMission(s *droneState, p DroneProfile, database *db.DB) {
 		s.speed = 0.5 + rand.Float64()*0.5
 		s.throttle = 30 + rand.Intn(10)
 		if s.relAlt <= 0 {
-			// Mission complete
+			// ======== 任务完成：降落在基地，恢复地面静止状态 ========
 			s.relAlt = 0
 			s.alt = p.HomeAlt
 			s.speed = 0
 			s.throttle = 0
 			s.armed = false
-			s.landedState = 2 // stay airborne for loiter after mission
-			s.mode = "LOITER"
-			s.customMode = 5
-			s.lat = p.HomeLat
+			s.landedState = 1 // 着陆状态，停在地面
+			s.mode = "POSHOLD"
+			s.customMode = 16
+			s.lat = p.HomeLat // 回到基地坐标
 			s.lng = p.HomeLng
-			s.relAlt = 30
-			s.alt = p.HomeAlt + 30
 			s.missionActive = false
 			mID := s.missionID
 			dID := s.droneID
 			s.missionID = 0
 			s.missionWaypoints = nil
 			s.missionWPIdx = 0
+			s.missionWPProg = 0
 			s.missionPhase = ""
 			if database != nil {
 				go func() {

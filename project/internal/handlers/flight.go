@@ -433,6 +433,10 @@ func containsChinese(s string) bool {
 // FlightMissionsDelete deletes a flight mission
 func (a *API) FlightMissionsDelete(c *gin.Context) {
 	id := c.Param("id")
+	// Stop any active feeder drone mission before deleting
+	if idInt, err := strconv.Atoi(id); err == nil && idInt > 0 {
+		StopMission(idInt)
+	}
 	a.db.Exec(`DELETE FROM mission_logs WHERE mission_id=?`, id)
 	_, err := a.db.Exec(`DELETE FROM flight_missions WHERE id=?`, id)
 	if err != nil {
@@ -675,7 +679,7 @@ func (a *API) FlightMissionsStats(c *gin.Context) {
 // FlightActiveMissions returns a compact list of active (non-completed) missions
 // with both drone_id (device_id) and gps_device_id. Used by GPS page to show flight status on map markers.
 func (a *API) FlightActiveMissions(c *gin.Context) {
-	rows, err := a.db.Query(`SELECT fm.id, fm.name, fm.device_id, COALESCE(d.linked_gps_device_id,0), fm.status, fm.current_phase, fm.progress
+	rows, err := a.db.Query(`SELECT fm.id, fm.name, fm.device_id, COALESCE(d.linked_gps_device_id,0), fm.status, fm.current_phase, fm.progress, COALESCE(fm.waypoints_json,'')
 		FROM flight_missions fm
 		LEFT JOIN drones d ON d.id = fm.device_id
 		WHERE fm.status != '已完成' AND fm.device_id > 0`)
@@ -687,12 +691,13 @@ func (a *API) FlightActiveMissions(c *gin.Context) {
 	items := []gin.H{}
 	for rows.Next() {
 		var id, deviceID, gpsDeviceID, progress int
-		var name, status, phase string
-		if err := rows.Scan(&id, &name, &deviceID, &gpsDeviceID, &status, &phase, &progress); err == nil {
+		var name, status, phase, wpJSON string
+		if err := rows.Scan(&id, &name, &deviceID, &gpsDeviceID, &status, &phase, &progress, &wpJSON); err == nil {
 			items = append(items, gin.H{
 				"id": id, "name": name, "device_id": deviceID,
 				"gps_device_id": gpsDeviceID,
 				"status": status, "current_phase": phase, "progress": progress,
+				"waypoints_json": wpJSON,
 			})
 		}
 	}

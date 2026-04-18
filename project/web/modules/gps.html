@@ -374,6 +374,8 @@
     let activeFilterName = '';
     let activeFilterStatus = '';
     let activeMissions = {}; // map device_id -> mission info
+    var droneTrails = {};     // device_id -> { points: [[lat,lng],...], polyline: L.polyline }
+    var droneRoutes = {};     // device_id -> L.polyline (planned route from mission waypoints)
     // TIANDITU_KEY, tdtImgLayer(), tdtCiaLayer() are provided by common.js
 
     // ========== Map Init ==========
@@ -530,25 +532,34 @@
           if (isDrone) { droneLayer.addLayer(m); } else { markerClusterGroup.addLayer(m); }
         }
 
-        // Accuracy circle
-        const acc = d.accuracy || 0;
-        if (acc > 30) {
-          let gpsQColor = '#94a3b8';
-          if (acc <= 5) gpsQColor = '#10b981';
-          else if (acc <= 15) gpsQColor = '#165dff';
-          else if (acc <= 50) gpsQColor = '#f59e0b';
-          else gpsQColor = '#ef4444';
-          accuracyCircles[d.id] = L.circle(newLatLng, {
-            radius: acc, color: gpsQColor, fillColor: gpsQColor,
-            fillOpacity: 0.06, weight: 1, dashArray: '4,4'
-          }).addTo(map);
-        }
+        // Accuracy circle and fence circle rendering removed for cleaner map view
 
-        if (d.fence_enabled && d.fence_radius > 0) {
-          fenceCircles[d.id] = L.circle([d.fence_lat, d.fence_lng], {
-            radius: d.fence_radius, color: '#6366f1', fillColor: '#6366f1',
-            fillOpacity: 0.08, weight: 2, dashArray: '6,4'
-          }).addTo(map);
+        // Draw planned route for drones with active missions
+        if (isDrone && mission && (mission.status === '飞行中' || mission.status === '返航中') && mission.waypoints_json) {
+          try {
+            const wps = JSON.parse(mission.waypoints_json);
+            if (wps && wps.length >= 2) {
+              // Remove old route if exists
+              if (droneRoutes[d.id]) { map.removeLayer(droneRoutes[d.id]); delete droneRoutes[d.id]; }
+              const routePts = wps.map(wp => [wp.lat, wp.lng || wp.lon]);
+              const displayRoute = (typeof smoothTrail === 'function' && routePts.length >= 3)
+                ? smoothTrail(routePts, {segPoints: 10})
+                : routePts;
+              droneRoutes[d.id] = L.polyline(displayRoute, {
+                color: '#6366f1', weight: 3, opacity: 0.5, dashArray: '8,6'
+              }).addTo(map);
+            }
+          } catch(e) {}
+        }
+      });
+
+      // Remove routes for drones that no longer have active missions
+      Object.keys(droneRoutes).forEach(id => {
+        const numId = Number(id);
+        const mission = activeMissions[numId];
+        if (!mission || (mission.status !== '飞行中' && mission.status !== '返航中')) {
+          map.removeLayer(droneRoutes[id]);
+          delete droneRoutes[id];
         }
       });
 
@@ -574,6 +585,23 @@
       if (!markers[id]) return;
       const newLL = [data.latitude, data.longitude];
       markers[id].setLatLng(newLL);
+
+      // Real-time flight trail tracking
+      if (!droneTrails[id]) {
+        droneTrails[id] = { points: [], polyline: L.polyline([], { color: '#f59e0b', weight: 2.5, opacity: 0.75 }).addTo(map) };
+      }
+      var trail = droneTrails[id];
+      // Only add point if moved meaningfully (> ~1m) to avoid clutter
+      var lastPt = trail.points.length > 0 ? trail.points[trail.points.length - 1] : null;
+      if (!lastPt || Math.abs(newLL[0] - lastPt[0]) > 0.000005 || Math.abs(newLL[1] - lastPt[1]) > 0.000005) {
+        trail.points.push(newLL);
+        if (trail.points.length > 600) trail.points.shift();
+        var displayPts = (typeof smoothTrail === 'function' && trail.points.length >= 3)
+          ? smoothTrail(trail.points, {segPoints: 3})
+          : trail.points;
+        trail.polyline.setLatLngs(displayPts);
+      }
+
       // Update cached device data for popup
       if (deviceDataCache[id]) {
         deviceDataCache[id].latitude = data.latitude;

@@ -1720,10 +1720,13 @@ async function refreshMap() {
         simMapObj.removeLayer(mapRoutes[drone.id]);
       }
       const routePts = drone.waypoints.map(wp => [wp.lat, wp.lng]);
+      // Prepend drone start position so the curve starts from origin (matching backend Catmull-Rom flight)
+      const startPt = drone.initial_lat && drone.initial_lng ? [drone.initial_lat, drone.initial_lng] : (routePts.length > 0 ? routePts[0] : null);
+      const fullRoutePts = startPt ? [startPt, ...routePts] : routePts;
       const useCurveRoute = document.getElementById('mapUseCurve').checked;
-      const displayRoutePts = (useCurveRoute && routePts.length >= 3)
-        ? smoothRoute(routePts, {segPoints: 12, tension: 0.3})
-        : routePts;
+      const displayRoutePts = (useCurveRoute && fullRoutePts.length >= 3)
+        ? smoothTrail(fullRoutePts, {segPoints: 12})
+        : fullRoutePts;
       mapRoutes[drone.id] = L.polyline(displayRoutePts, {color: color, weight: 1.5, opacity: 0.35, dashArray: '6,8', renderer: mapCanvasRenderer}).addTo(simMapObj);
 
       // Waypoint dots (only for first drone to avoid clutter, or if few drones)

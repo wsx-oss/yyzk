@@ -762,7 +762,7 @@
             <button class="btn btn-primary btn-action" onclick="viewDetail(${m.id})">详情</button>
             ${m.device_id > 0 && m.status === '待起飞' ? '<button class="btn btn-success btn-action" onclick="startMission('+m.id+')">开始</button>' : ''}
             <button class="btn btn-secondary btn-action" onclick="editMission(${m.id})" ${m.status==='已完成'||m.status==='飞行中'||m.status==='返航中'?'disabled':''}>编辑</button>
-            <button class="btn btn-danger btn-action" onclick="deleteMission(${m.id})" ${m.status==='飞行中'||m.status==='返航中'?'disabled':''}>删除</button>
+            <button class="btn btn-danger btn-action" onclick="deleteMission(${m.id})">删除</button>
           </td>
         </tr>
       `).join('');

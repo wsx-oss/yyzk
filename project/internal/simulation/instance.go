@@ -652,8 +652,6 @@ func (inst *Instance) updateFlight(dt float64) {
 		}
 
 		wp := wps[inst.wpIdx]
-		targetLat := wp.Lat
-		targetLng := wp.Lng
 		targetAlt := wp.Alt
 		if targetAlt < 5 {
 			targetAlt = 30
@@ -663,27 +661,70 @@ func (inst *Instance) updateFlight(dt float64) {
 			speed = wp.Speed
 		}
 
-		dist := inst.distTo(targetLat, targetLng)
-		if dist < 3 { // reached waypoint
-			// Handle waypoint action (hover/work)
-			if wp.Action != "" && wp.Action != "fly" {
-				inst.phase = PhaseWork
-				if wp.HoldSec > 0 {
-					// Simulate hold time via progress
-					holdProg := inst.wpProg + dt/float64(wp.HoldSec)
-					if holdProg >= 1.0 {
-						inst.wpIdx++
-						inst.wpProg = 0
-						inst.phase = PhaseCruise
-					} else {
-						inst.wpProg = holdProg
-						inst.gps.Speed = 0
-					}
-				} else {
+		// ---- PhaseWork: holding at a waypoint ----
+		if inst.phase == PhaseWork {
+			if wp.HoldSec > 0 {
+				inst.wpProg += dt / float64(wp.HoldSec)
+				if inst.wpProg >= 1.0 {
 					inst.wpIdx++
 					inst.wpProg = 0
 					inst.phase = PhaseCruise
+				} else {
+					inst.gps.Speed = 0
 				}
+			} else {
+				inst.wpIdx++
+				inst.wpProg = 0
+				inst.phase = PhaseCruise
+			}
+			return
+		}
+
+		// ---- PhaseCruise: fly along Catmull-Rom spline toward next waypoint ----
+
+		// Determine the "from" point (start of current segment)
+		var fromLat, fromLng, fromAlt float64
+		if inst.wpIdx == 0 {
+			fromLat = inst.config.InitialLat
+			fromLng = inst.config.InitialLng
+			fromAlt = wps[0].Alt
+			if fromAlt < 10 {
+				fromAlt = 30
+			}
+		} else {
+			prev := wps[inst.wpIdx-1]
+			fromLat = prev.Lat
+			fromLng = prev.Lng
+			fromAlt = prev.Alt
+			if fromAlt < 5 {
+				fromAlt = 30
+			}
+		}
+
+		// Segment length (meters) for speed-based progress advancement
+		cosLatR := math.Cos(fromLat * math.Pi / 180)
+		dLatM := (wp.Lat - fromLat) * 111000
+		dLngM := (wp.Lng - fromLng) * 111000 * cosLatR
+		segLen := math.Sqrt(dLatM*dLatM + dLngM*dLngM)
+		if segLen < 1 {
+			segLen = 1
+		}
+
+		// Advance progress along the segment
+		inst.wpProg += (speed * dt) / segLen
+
+		if inst.wpProg >= 1.0 {
+			// Arrived at waypoint
+			inst.gps.Latitude = wp.Lat
+			inst.gps.Longitude = wp.Lng
+			inst.gps.Altitude = targetAlt
+			inst.gps.Speed = speed
+
+			// Handle waypoint action (hover/work)
+			if wp.Action != "" && wp.Action != "fly" {
+				inst.phase = PhaseWork
+				inst.wpProg = 0 // reset for hold timer
+				inst.gps.Speed = 0
 			} else {
 				inst.wpIdx++
 				inst.wpProg = 0
@@ -691,13 +732,61 @@ func (inst *Instance) updateFlight(dt float64) {
 			return
 		}
 
-		// Fly toward waypoint
-		inst.flyToward(targetLat, targetLng, targetAlt, dt)
-		inst.gps.Speed = speed
-		segLen := inst.distTo(targetLat, targetLng)
-		if segLen+dist > 0 {
-			inst.wpProg = 1.0 - segLen/(segLen+1)
+		// ---- Catmull-Rom spline interpolation ----
+		// 4 control points: p0 (before from), p1 (from), p2 (target wp), p3 (after target)
+		var p0Lat, p0Lng, p0Alt float64
+		var p3Lat, p3Lng, p3Alt float64
+
+		// p0: point before the segment start
+		if inst.wpIdx >= 2 {
+			p0Lat = wps[inst.wpIdx-2].Lat
+			p0Lng = wps[inst.wpIdx-2].Lng
+			p0Alt = wps[inst.wpIdx-2].Alt
+		} else if inst.wpIdx == 1 {
+			p0Lat = inst.config.InitialLat
+			p0Lng = inst.config.InitialLng
+			p0Alt = fromAlt
+		} else {
+			// wpIdx == 0: extrapolate before start (mirror)
+			p0Lat = 2*fromLat - wp.Lat
+			p0Lng = 2*fromLng - wp.Lng
+			p0Alt = fromAlt
 		}
+
+		// p3: point after the segment end
+		if inst.wpIdx+1 < len(wps) {
+			p3Lat = wps[inst.wpIdx+1].Lat
+			p3Lng = wps[inst.wpIdx+1].Lng
+			p3Alt = wps[inst.wpIdx+1].Alt
+		} else {
+			// Last segment: extrapolate beyond end (mirror)
+			p3Lat = 2*wp.Lat - fromLat
+			p3Lng = 2*wp.Lng - fromLng
+			p3Alt = targetAlt
+		}
+
+		// Evaluate Catmull-Rom spline at t = wpProg
+		t := inst.wpProg
+		newLat := catmullRom(t, p0Lat, fromLat, wp.Lat, p3Lat)
+		newLng := catmullRom(t, p0Lng, fromLng, wp.Lng, p3Lng)
+		newAlt := catmullRom(t, p0Alt, fromAlt, targetAlt, p3Alt)
+
+		// Compute heading from current position to new interpolated position
+		hLatM := (newLat - inst.gps.Latitude) * 111000
+		hLngM := (newLng - inst.gps.Longitude) * 111000 * math.Cos(inst.gps.Latitude*math.Pi/180)
+		if math.Abs(hLatM) > 0.01 || math.Abs(hLngM) > 0.01 {
+			inst.gps.Heading = math.Mod(math.Atan2(hLngM, hLatM)*180/math.Pi+360, 360)
+		}
+
+		inst.gps.Latitude = newLat
+		inst.gps.Longitude = newLng
+		inst.gps.Altitude = newAlt
+		inst.gps.Speed = speed
+
+		// GPS noise
+		inst.gps.Latitude += (rand.Float64() - 0.5) * 0.0000005
+		inst.gps.Longitude += (rand.Float64() - 0.5) * 0.0000005
+		inst.gps.Accuracy = 1.0 + rand.Float64()*2.0
 
 	case PhaseReturn:
 		inst.flyToward(inst.config.InitialLat, inst.config.InitialLng, inst.config.InitialAlt+30, dt)
@@ -745,10 +834,10 @@ func (inst *Instance) updateFlight(dt float64) {
 func (inst *Instance) applyDeviation() {
 	for _, a := range inst.anomalies {
 		if a.Type == AnomalyDeviation && a.Active {
-			// Add random offset to GPS position
-			inst.gps.Latitude += (rand.Float64() - 0.5) * 0.0005
-			inst.gps.Longitude += (rand.Float64() - 0.5) * 0.0005
-			inst.gps.Accuracy = 10 + rand.Float64()*20 // degraded accuracy
+			// Add small random offset to GPS position (~±5m per tick)
+			inst.gps.Latitude += (rand.Float64() - 0.5) * 0.00005
+			inst.gps.Longitude += (rand.Float64() - 0.5) * 0.00005
+			inst.gps.Accuracy = 5 + rand.Float64()*10 // slightly degraded accuracy
 		}
 	}
 }
@@ -817,6 +906,13 @@ func (inst *Instance) distTo(lat, lng float64) float64 {
 	dLat := (lat - inst.gps.Latitude) * 111000
 	dLng := (lng - inst.gps.Longitude) * 111000 * math.Cos(inst.gps.Latitude*math.Pi/180)
 	return math.Sqrt(dLat*dLat + dLng*dLng)
+}
+
+// catmullRom evaluates a Catmull-Rom spline at parameter t ∈ [0,1] given 4 control points.
+func catmullRom(t, p0, p1, p2, p3 float64) float64 {
+	t2 := t * t
+	t3 := t2 * t
+	return 0.5 * ((2 * p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3)
 }
 
 // anomalyMessage generates a human-readable anomaly message.
