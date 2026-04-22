@@ -463,7 +463,7 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 
 	if err != nil {
 		log.Printf("[Backup] dump failed: %v", err)
-		b.db.Exec(`UPDATE backup_records SET status='failed', remark=CONCAT(remark, ' | 错误: ', ?), duration_ms=?, finished_at=NOW() WHERE id=?`,
+		b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | 错误: ' || ?, duration_ms=?, finished_at=datetime('now') WHERE id=?`,
 			err.Error(), elapsed, recordID)
 		// Send failure notification
 		b.db.Exec(`INSERT INTO notifications(type, title, message, source) VALUES(?,?,?,?)`,
@@ -475,7 +475,7 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 
 	fileSize := int64(len(sqlContent))
 
-	b.db.Exec(`UPDATE backup_records SET status='success', file_size=?, table_count=?, row_count=?, duration_ms=?, sql_content=?, finished_at=NOW() WHERE id=?`,
+	b.db.Exec(`UPDATE backup_records SET status='success', file_size=?, table_count=?, row_count=?, duration_ms=?, sql_content=?, finished_at=datetime('now') WHERE id=?`,
 		fileSize, tableCount, rowCount, elapsed, sqlContent, recordID)
 
 	log.Printf("[Backup] %s completed: %d tables, %d rows, %d bytes, %dms", backupType, tableCount, rowCount, fileSize, elapsed)
@@ -485,10 +485,10 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 func (b *BackupAPI) dumpToString() (string, int, int, error) {
 	raw := b.db.Raw()
 
-	// Get list of tables
-	rows, err := raw.Query("SHOW TABLES")
+	// Get list of tables (SQLite compatible)
+	rows, err := raw.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
 	if err != nil {
-		return "", 0, 0, fmt.Errorf("SHOW TABLES: %w", err)
+		return "", 0, 0, fmt.Errorf("query sqlite_master: %w", err)
 	}
 	var tables []string
 	for rows.Next() {
@@ -504,16 +504,15 @@ func (b *BackupAPI) dumpToString() (string, int, int, error) {
 	fmt.Fprintf(&buf, "-- 云翼智控 Database Backup\n")
 	fmt.Fprintf(&buf, "-- Generated at: %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(&buf, "-- Tables: %d\n", len(tables))
-	fmt.Fprintf(&buf, "SET NAMES utf8mb4;\n")
-	fmt.Fprintf(&buf, "SET FOREIGN_KEY_CHECKS = 0;\n\n")
+	fmt.Fprintf(&buf, "PRAGMA foreign_keys = OFF;\n\n")
 
 	totalRows := 0
 	tableCount := 0
 
 	for _, table := range tables {
 		// Get CREATE TABLE statement
-		var tblName, createSQL string
-		err := raw.QueryRow("SHOW CREATE TABLE `"+table+"`").Scan(&tblName, &createSQL)
+		var createSQL string
+		err := raw.QueryRow("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&createSQL)
 		if err != nil {
 			continue
 		}
@@ -598,7 +597,7 @@ func (b *BackupAPI) dumpToString() (string, int, int, error) {
 		fmt.Fprintf(&buf, "-- Rows: %d\n\n", rowCount)
 	}
 
-	fmt.Fprintf(&buf, "SET FOREIGN_KEY_CHECKS = 1;\n")
+	fmt.Fprintf(&buf, "PRAGMA foreign_keys = ON;\n")
 	fmt.Fprintf(&buf, "-- Backup complete: %d tables, %d rows\n", tableCount, totalRows)
 
 	return buf.String(), tableCount, totalRows, nil
@@ -609,10 +608,29 @@ func (b *BackupAPI) dumpToString() (string, int, int, error) {
 // ---------------------------------------------------------------------------
 
 func (b *BackupAPI) asyncRestore(sqlContent, description string, backupID int) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	now := time.Now()
+
+	// Bug 18: panic recover to prevent goroutine crash
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[Restore] PANIC recovered in asyncRestore: %v", r)
+			b.setProgress(restoreProgress{
+				Running:    false,
+				Phase:      "done",
+				Errors:     1,
+				Message:    fmt.Sprintf("恢复因异常崩溃而失败: %v", r),
+				StartedAt:  now.Format("2006-01-02 15:04:05"),
+				FinishedAt: time.Now().Format("2006-01-02 15:04:05"),
+			})
+			b.db.Exec(`INSERT INTO notifications(type, title, message, source) VALUES(?,?,?,?)`,
+				"backup", "数据恢复异常崩溃",
+				fmt.Sprintf("恢复操作因异常崩溃而失败: %v", r),
+				"backup-system")
+		}
+	}()
+
+	// Bug 19: acquire lock only for the critical DB section (pre-backup)
+	b.mu.Lock()
 
 	// Update progress: starting — pre-restore backup phase
 	b.setProgress(restoreProgress{
@@ -624,6 +642,7 @@ func (b *BackupAPI) asyncRestore(sqlContent, description string, backupID int) {
 
 	// Synchronous pre-restore safety backup (NOT in goroutine)
 	b.doBackupUnlocked("pre_restore", "system", fmt.Sprintf("恢复前自动备份 (%s)", description))
+	b.mu.Unlock() // Bug 19: release lock after pre-backup; restore loop does not need global lock
 
 	// Parse statements
 	b.setProgress(restoreProgress{
@@ -650,7 +669,7 @@ func (b *BackupAPI) asyncRestore(sqlContent, description string, backupID int) {
 
 	// Execute restore
 	raw := b.db.Raw()
-	raw.Exec("SET FOREIGN_KEY_CHECKS = 0")
+	raw.Exec("PRAGMA foreign_keys = OFF")
 
 	errCount := 0
 	done := 0
@@ -678,7 +697,7 @@ func (b *BackupAPI) asyncRestore(sqlContent, description string, backupID int) {
 		}
 	}
 
-	raw.Exec("SET FOREIGN_KEY_CHECKS = 1")
+	raw.Exec("PRAGMA foreign_keys = ON")
 
 	elapsed := time.Since(now)
 	// Re-run migration to ensure all tables exist after restore
@@ -736,13 +755,13 @@ func (b *BackupAPI) doBackupUnlocked(backupType, operator, remark string) {
 
 	if err != nil {
 		log.Printf("[Backup] dump failed: %v", err)
-		b.db.Exec(`UPDATE backup_records SET status='failed', remark=CONCAT(remark, ' | 错误: ', ?), duration_ms=?, finished_at=NOW() WHERE id=?`,
+		b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | 错误: ' || ?, duration_ms=?, finished_at=datetime('now') WHERE id=?`,
 			err.Error(), elapsed, recordID)
 		return
 	}
 
 	fileSize := int64(len(sqlContent))
-	b.db.Exec(`UPDATE backup_records SET status='success', file_size=?, table_count=?, row_count=?, duration_ms=?, sql_content=?, finished_at=NOW() WHERE id=?`,
+	b.db.Exec(`UPDATE backup_records SET status='success', file_size=?, table_count=?, row_count=?, duration_ms=?, sql_content=?, finished_at=datetime('now') WHERE id=?`,
 		fileSize, tableCount, rowCount, elapsed, sqlContent, recordID)
 	log.Printf("[Backup] %s completed: %d tables, %d rows, %d bytes, %dms", backupType, tableCount, rowCount, fileSize, elapsed)
 }

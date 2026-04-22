@@ -943,8 +943,29 @@
       if (iframe.contentDocument) {
         try { iframe.contentDocument.open(); iframe.contentDocument.write(''); iframe.contentDocument.close(); } catch(e) {}
       }
+
+      // Bug 21: SPA routing fault tolerance — detect load failures and retry/fallback
+      let loadTimer = setTimeout(() => {
+        console.warn('[Nav] page load timeout:', page);
+        try {
+          iframe.contentDocument.open();
+          iframe.contentDocument.write(`<div style="display:flex;align-items:center;justify-content:center;height:80vh;font-family:system-ui;color:#888;">
+            <div style="text-align:center"><p style="font-size:18px;">页面加载超时</p>
+            <button onclick="parent.navigateTo('${page}')" style="margin-top:12px;padding:8px 24px;border:none;border-radius:6px;background:#165dff;color:#fff;cursor:pointer;">重试</button></div></div>`);
+          iframe.contentDocument.close();
+        } catch(e) {}
+      }, 10000);
+
+      iframe.onload = function() { clearTimeout(loadTimer); iframe.onload = null; };
+      iframe.onerror = function() {
+        clearTimeout(loadTimer);
+        console.error('[Nav] iframe load error:', page);
+      };
+
       iframe.src = newSrc;
     }
+    // Expose for retry from inside iframe
+    window.navigateTo = navigateTo;
 
     document.querySelectorAll('.nav-item a[data-page], .nav-item-link[data-page]').forEach(item => {
       item.addEventListener('click', (e) => {

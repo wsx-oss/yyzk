@@ -420,6 +420,14 @@
       }
     });
     
+    // Bug 27: ensure Enter key triggers login from any input
+    document.getElementById('username').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); }
+    });
+    document.getElementById('password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); }
+    });
+
     // 如果已登录，直接跳转
     if (localStorage.getItem('token')) {
       window.location.href = '/app/dashboard.html';

@@ -179,6 +179,59 @@
       0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
       30% { opacity: 1; transform: scale(1); }
     }
+
+    /* Bug 24: Dark mode compatibility */
+    [data-theme="dark"] #ai-panel,
+    .dark #ai-panel {
+      background: rgba(30,41,59,0.92);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08);
+    }
+    [data-theme="dark"] .ai-messages,
+    .dark .ai-messages {
+      background: #0f172a;
+    }
+    [data-theme="dark"] .ai-messages::-webkit-scrollbar-thumb,
+    .dark .ai-messages::-webkit-scrollbar-thumb { background: #475569; }
+    [data-theme="dark"] .ai-msg.assistant .ai-msg-bubble,
+    .dark .ai-msg.assistant .ai-msg-bubble {
+      background: #1e293b; color: #e2e8f0;
+      border-color: #334155;
+    }
+    [data-theme="dark"] .ai-msg.user .ai-msg-avatar,
+    .dark .ai-msg.user .ai-msg-avatar {
+      background: #334155; color: #94a3b8; border-color: #475569;
+    }
+    [data-theme="dark"] .ai-msg-bubble .nav-link,
+    .dark .ai-msg-bubble .nav-link {
+      background: #1e293b; color: #38bdf8; border-color: #334155;
+    }
+    [data-theme="dark"] .ai-msg-bubble .nav-link:hover,
+    .dark .ai-msg-bubble .nav-link:hover { background: #334155; }
+    [data-theme="dark"] .ai-suggestions,
+    .dark .ai-suggestions { background: #1e293b; border-color: #334155; }
+    [data-theme="dark"] .ai-suggestions .sug-btn,
+    .dark .ai-suggestions .sug-btn {
+      background: #334155; color: #94a3b8; border-color: #475569;
+    }
+    [data-theme="dark"] .ai-suggestions .sug-btn:hover,
+    .dark .ai-suggestions .sug-btn:hover { background: #475569; color: #e2e8f0; }
+    [data-theme="dark"] .ai-quick-cmds,
+    .dark .ai-quick-cmds { background: #1e293b; border-color: #334155; }
+    [data-theme="dark"] .ai-quick-cmds .qcmd,
+    .dark .ai-quick-cmds .qcmd {
+      background: #1e293b; color: #38bdf8; border-color: #334155;
+    }
+    [data-theme="dark"] .ai-quick-cmds .qcmd:hover,
+    .dark .ai-quick-cmds .qcmd:hover { background: #334155; }
+    [data-theme="dark"] .ai-input-area,
+    .dark .ai-input-area { background: #1e293b; border-color: #334155; }
+    [data-theme="dark"] .ai-input-area input,
+    .dark .ai-input-area input {
+      background: #0f172a; color: #e2e8f0;
+      border-color: #334155;
+    }
+    [data-theme="dark"] .ai-input-area input:focus,
+    .dark .ai-input-area input:focus { border-color: #0ea5e9; }
   `;
   document.head.appendChild(style);
 
@@ -232,8 +285,24 @@
   const clearBtn = document.getElementById('aiClearBtn');
   const suggestionsEl = document.getElementById('aiSuggestions');
   const subtitleEl = document.getElementById('aiSubtitle');
+  const aiFabBadge = document.getElementById('aiFabBadge');
   let isOpen = false;
   let isSending = false;
+  let aiUnreadCount = 0;
+
+  // Bug 22: format badge count with overflow cap
+  function formatBadgeCount(n) {
+    if (n <= 0) return '';
+    if (n > 999) return '999+';
+    if (n > 99) return '99+';
+    return String(n);
+  }
+  function updateAiBadge() {
+    if (!aiFabBadge) return;
+    const text = formatBadgeCount(aiUnreadCount);
+    aiFabBadge.textContent = text;
+    aiFabBadge.style.display = text ? 'flex' : 'none';
+  }
 
   function positionPanelNearFab() {
     if (!isOpen) return;
@@ -277,6 +346,8 @@
       requestAnimationFrame(positionPanelNearFab);
       loadRAGStatus();
       input.focus();
+      aiUnreadCount = 0;
+      updateAiBadge();
       if (messagesEl.children.length === 0) {
         loadHistory();
       }
@@ -413,6 +484,12 @@
     `;
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // Bug 22: increment unread badge when panel is closed
+    if (!isOpen && role === 'assistant') {
+      aiUnreadCount++;
+      updateAiBadge();
+    }
 
     // Bind nav link clicks
     div.querySelectorAll('.nav-link').forEach(link => {

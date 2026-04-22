@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"smartcontrol/internal/cache"
@@ -40,6 +41,13 @@ func (a *AuthAPI) Register(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "用户名至少3位，密码至少6位"})
+		return
+	}
+
+	// Bug 20: trim spaces and re-validate to prevent space-only username bypass
+	req.Username = strings.TrimSpace(req.Username)
+	if len(req.Username) < 3 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "用户名至少3位（不含首尾空格）"})
 		return
 	}
 

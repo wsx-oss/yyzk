@@ -22,6 +22,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -123,8 +124,18 @@ func (a *API) DevicesCreate(c *gin.Context) {
 	if p.LogEnabled {
 		le = 1
 	}
+	// Bug 17: hash device password with bcrypt before storing
+	hashedPwd := ""
+	if p.Password != "" {
+		h, err := bcrypt.GenerateFromPassword([]byte(p.Password), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "密码加密失败"})
+			return
+		}
+		hashedPwd = string(h)
+	}
 	_, err := a.db.Exec(`INSERT INTO devices(name, ip, protocol, port, username, password, auto_connect, log_enabled, description, status, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`,
-		p.Name, p.IP, p.Protocol, p.Port, p.Username, p.Password, ac, le, p.Description, "offline")
+		p.Name, p.IP, p.Protocol, p.Port, p.Username, hashedPwd, ac, le, p.Description, "offline")
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return

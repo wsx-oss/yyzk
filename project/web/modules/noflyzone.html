@@ -93,6 +93,11 @@
       <div class="nfz-header-title">区域列表</div>
       <input class="search-input" id="searchName" type="text" placeholder="请输入要搜索的名称" oninput="filterAndRender()" />
       <input class="search-input" id="searchAddr" type="text" placeholder="请输入要搜索的地址" oninput="filterAndRender()" />
+      <select class="search-input" id="filterType" onchange="filterAndRender()" style="margin-bottom:0;">
+        <option value="">全部类型</option>
+        <option value="禁飞区">禁飞区</option>
+        <option value="警告区域">警告区域</option>
+      </select>
     </div>
     <div class="nfz-list-body" id="nfzListBody"><div class="nfz-empty">加载中...</div></div>
     <div class="nfz-pagination">
@@ -152,7 +157,10 @@
         启用高度限制
       </label>
       <div id="altLimitRow" style="display:none;">
-        <input id="altLimit" type="number" min="0" max="5000" placeholder="最大飞行高度（米，此高度以下禁飞）" />
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input id="altLimit" type="number" min="0" max="5000" placeholder="最大飞行高度" style="flex:1;" />
+          <span style="color:var(--cc-text-3);font-size:12px;white-space:nowrap;">米 (m)</span>
+        </div>
       </div>
     </div>
     <div class="modal-actions">
@@ -556,10 +564,12 @@
   function filterAndRender(){
     const nm=document.getElementById('searchName').value.trim().toLowerCase();
     const ad=document.getElementById('searchAddr').value.trim().toLowerCase();
+    const tp=document.getElementById('filterType').value;
     filteredZones=allZones.filter(z=>{
       const nameOk=!nm||z.name.toLowerCase().includes(nm);
       const addrOk=!ad||(z.address||'').toLowerCase().includes(ad);
-      return nameOk&&addrOk;
+      const typeOk=!tp||(z.zone_type||'')=== tp;
+      return nameOk&&addrOk&&typeOk;
     });
     currentPage=1;renderList();
   }

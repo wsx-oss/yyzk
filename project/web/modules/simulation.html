@@ -2333,10 +2333,31 @@ async function loadSimStats(force=false) {
   });
 }
 
-// ---- WebSocket for real-time updates ----
+// ---- WebSocket for real-time updates (Bug 28: exponential backoff + overlay) ----
+var _wsRetryCount = 0;
+var _wsMaxRetry = 8;
+var _wsOverlay = null;
+
+function _showWsOverlay(msg) {
+  if (!_wsOverlay) {
+    _wsOverlay = document.createElement('div');
+    _wsOverlay.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 20px;border-radius:10px;background:rgba(239,68,68,0.92);color:#fff;font-size:13px;font-family:system-ui;box-shadow:0 4px 16px rgba(0,0,0,0.25);backdrop-filter:blur(8px);transition:opacity 0.3s;';
+    document.body.appendChild(_wsOverlay);
+  }
+  _wsOverlay.textContent = msg;
+  _wsOverlay.style.opacity = '1';
+}
+function _hideWsOverlay() {
+  if (_wsOverlay) _wsOverlay.style.opacity = '0';
+}
+
 function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${proto}//${location.host}/api/sim/stream`);
+  ws.onopen = () => {
+    _wsRetryCount = 0;
+    _hideWsOverlay();
+  };
   ws.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
@@ -2345,7 +2366,16 @@ function connectWS() {
       }
     } catch(err) {}
   };
-  ws.onclose = () => setTimeout(connectWS, 3000);
+  ws.onclose = () => {
+    _wsRetryCount++;
+    if (_wsRetryCount > _wsMaxRetry) {
+      _showWsOverlay('⚠ WebSocket 连接断开，请刷新页面重试');
+      return;
+    }
+    const delay = Math.min(1000 * Math.pow(2, _wsRetryCount), 30000);
+    _showWsOverlay('🔄 连接断开，' + Math.round(delay/1000) + 's 后重连 (' + _wsRetryCount + '/' + _wsMaxRetry + ')');
+    setTimeout(connectWS, delay);
+  };
   ws.onerror = () => ws.close();
 }
 

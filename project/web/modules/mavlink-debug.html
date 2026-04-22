@@ -1420,6 +1420,22 @@
       document.getElementById('statUptime').textContent = m > 0 ? `${m}m${s}s` : `${s}s`;
     }, 1000);
 
+    // Bug 30: smart auto-scroll — detect user scroll position
+    function _initAutoScroll(el) {
+      el.addEventListener('scroll', () => {
+        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+        if (nearBottom && !autoScrollEnabled) {
+          autoScrollEnabled = true;
+          document.getElementById('autoScroll').value = 'on';
+        } else if (!nearBottom && autoScrollEnabled) {
+          autoScrollEnabled = false;
+          document.getElementById('autoScroll').value = 'off';
+        }
+      });
+    }
+    _initAutoScroll(document.getElementById('tab-stream'));
+    _initAutoScroll(document.getElementById('tab-frames'));
+
     // Auto-connect on load
     connectSSE();
   </script>
