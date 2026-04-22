@@ -308,6 +308,181 @@
       border-color: rgba(255,255,255,0.18);
       border-top-color: var(--cc-primary);
     }
+
+    /* ====== Dark-mode overrides for mission modal & related elements ====== */
+    html.dark .modal-box {
+      background: var(--cc-bg-2, #1e2228);
+      border: 1px solid var(--cc-border, #363b44);
+      color: var(--cc-text-1, #ced4da);
+    }
+    html.dark .modal-title { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .modal-form label { color: var(--cc-text-3, #8b949e); }
+    html.dark .modal-form input,
+    html.dark .modal-form select,
+    html.dark .modal-form textarea {
+      background: var(--cc-bg-3, #282c34);
+      border-color: var(--cc-border, #363b44);
+      color: var(--cc-text-1, #ced4da);
+    }
+    html.dark .modal-form input::placeholder,
+    html.dark .modal-form textarea::placeholder {
+      color: var(--cc-text-4, #545d68);
+    }
+    html.dark .modal-form input:focus,
+    html.dark .modal-form select:focus,
+    html.dark .modal-form textarea:focus {
+      border-color: var(--cc-primary, #165dff);
+      box-shadow: 0 0 0 2px rgba(22,93,255,0.25);
+    }
+    /* Step indicator inactive state */
+    html.dark #stepInd2[style*="background:#e2e8f0"] { background: #282c34 !important; color: #545d68 !important; }
+
+    /* Section boxes inside modal (起点/终点/禁飞区/CoT/multi-plan) */
+    html.dark .modal-form .full-width[style*="background:#f8fafc"],
+    html.dark .modal-form .full-width[style*="background:#fff7ed"],
+    html.dark .modal-form .full-width[style*="background:#f0f9ff"],
+    html.dark .modal-form .full-width[style*="background:#f0fdf4"] {
+      background: var(--cc-bg-3, #282c34) !important;
+      border-color: var(--cc-border, #363b44) !important;
+    }
+    html.dark .modal-form .full-width label[style*="color:#0f172a"] { color: var(--cc-text-1, #e1e4e8) !important; }
+    html.dark .modal-form .full-width label[style*="color:#9a3412"] { color: #fdba74 !important; }
+    html.dark .modal-form .full-width label[style*="color:#0c4a6e"] { color: #7dd3fc !important; }
+    html.dark .modal-form .full-width label[style*="color:#14532d"] { color: #86efac !important; }
+    html.dark .modal-form .full-width span[style*="color:#64748b"] { color: var(--cc-text-3, #8b949e) !important; }
+    html.dark .modal-form .full-width label[style*="color:#94a3b8"] { color: var(--cc-text-3, #8b949e) !important; }
+    html.dark .modal-form .full-width[style*="color:#64748b"] { color: var(--cc-text-3, #8b949e) !important; }
+    html.dark .modal-form .full-width > label[style*="color:#64748b"] { color: var(--cc-text-3, #8b949e) !important; }
+    html.dark .modal-form .full-width > span[style*="color:#64748b"] { color: var(--cc-text-3, #8b949e) !important; }
+
+    /* Detail modal */
+    html.dark .detail-label { color: var(--cc-text-3, #8b949e); }
+    html.dark .detail-value { color: var(--cc-text-1, #e1e4e8); }
+
+    /* Pagination */
+    html.dark .pagination-bar { color: var(--cc-text-3, #8b949e); }
+    html.dark .pagination-bar button {
+      background: var(--cc-bg-3, #282c34);
+      border-color: var(--cc-border, #363b44);
+      color: var(--cc-text-1, #ced4da);
+    }
+    html.dark .pagination-bar button:hover:not(:disabled) { background: var(--cc-bg-4, #363b44); }
+
+    /* Log timeline */
+    html.dark .log-item { border-bottom-color: var(--cc-border, #363b44); }
+    html.dark .log-time { color: var(--cc-text-3, #8b949e); }
+    html.dark .log-msg { color: var(--cc-text-2, #adbac7); }
+
+    /* Plan form */
+    html.dark .plan-form label { color: var(--cc-text-3, #8b949e); }
+    html.dark .plan-form input,
+    html.dark .plan-form select {
+      background: var(--cc-bg-3, #282c34);
+      border-color: var(--cc-border, #363b44);
+      color: var(--cc-text-1, #ced4da);
+    }
+
+    /* Plan action tags */
+    html.dark .plan-action-tag { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+
+    /* Plan result */
+    html.dark .plan-result-title { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .plan-waypoints th { background: var(--cc-bg-3, #282c34); color: var(--cc-text-2, #adbac7); }
+    html.dark .plan-waypoints td { border-top-color: var(--cc-border, #363b44); color: var(--cc-text-1, #ced4da); }
+    html.dark .plan-explanation { color: #7dd3fc; }
+    html.dark .plan-map-context { color: #86efac; }
+    html.dark .plan-map-context strong { color: #4ade80; }
+    html.dark .plan-est-label { color: var(--cc-text-3, #8b949e); }
+    html.dark .plan-est-value { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .plan-loading { color: var(--cc-text-3, #8b949e); }
+
+    /* Plan warnings */
+    html.dark .plan-warning-info { background: rgba(3,105,161,0.15); color: #7dd3fc; }
+    html.dark .plan-warning-warning { background: rgba(146,64,14,0.15); color: #fcd34d; }
+    html.dark .plan-warning-critical { background: rgba(153,27,27,0.15); color: #fca5a5; }
+
+    /* Multi-plan cards */
+    html.dark .multi-plan-card { border-color: var(--cc-border, #363b44); background: var(--cc-bg-3, #282c34); }
+    html.dark .multi-plan-card.selected { border-color: #10b981; background: rgba(16,185,129,0.08); }
+    html.dark .multi-plan-stat { border-bottom-color: var(--cc-border, #363b44); }
+    html.dark .multi-plan-stat .stat-label { color: var(--cc-text-3, #8b949e); }
+    html.dark .multi-plan-stat .stat-val { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .multi-plan-warn-ok { background: rgba(6,95,70,0.2); color: #6ee7b7; }
+    html.dark .multi-plan-warn-warn { background: rgba(133,77,14,0.2); color: #fcd34d; }
+    html.dark .multi-plan-warn-crit { background: rgba(153,27,27,0.2); color: #fca5a5; }
+    html.dark .multi-plan-map { background: var(--cc-bg-4, #363b44); }
+
+    /* Action cards */
+    html.dark .action-card { background: var(--cc-bg-3, #282c34); border-color: var(--cc-border, #363b44); }
+    html.dark .action-card-title { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .action-mode-tab { background: var(--cc-bg-3, #282c34); border-color: var(--cc-border, #363b44); color: var(--cc-text-3, #8b949e); }
+    html.dark .action-point-tag { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    html.dark .action-interval-row label { color: var(--cc-text-3, #8b949e); }
+    html.dark .action-interval-row input { background: var(--cc-bg-3, #282c34); border-color: var(--cc-border, #363b44); color: var(--cc-text-1, #ced4da); }
+    html.dark .action-summary { background: rgba(22,101,52,0.10); border-color: rgba(187,247,208,0.15); }
+    html.dark .action-summary-title { color: #86efac; }
+    html.dark .action-summary-item { color: var(--cc-text-2, #adbac7); border-bottom-color: var(--cc-border, #363b44); }
+    html.dark .asb-point { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    html.dark .asb-interval { background: rgba(251,191,36,0.12); color: #fcd34d; }
+
+    /* Action feedback in detail */
+    html.dark .action-feedback-body { background: var(--cc-bg-3, #282c34); }
+    html.dark .action-fb-item { background: var(--cc-bg-2, #1e2228); border-color: var(--cc-border, #363b44); }
+    html.dark .action-fb-name { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .action-fb-detail { color: var(--cc-text-2, #adbac7); }
+    html.dark .action-fb-detail .fb-label { color: var(--cc-text-3, #8b949e); }
+    html.dark .action-fb-progress { background: var(--cc-bg-4, #363b44); }
+    html.dark .action-fb-stats { background: rgba(22,101,52,0.10); border-color: rgba(187,247,208,0.15); }
+    html.dark .action-fb-stat .stat-num { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .action-fb-stat .stat-label { color: var(--cc-text-3, #8b949e); }
+    html.dark .afb-done { background: rgba(6,95,70,0.2); color: #6ee7b7; }
+    html.dark .afb-pending { background: rgba(146,64,14,0.15); color: #fcd34d; }
+    html.dark .afb-running { background: rgba(30,64,175,0.15); color: #93c5fd; }
+
+    /* CoT reasoning */
+    html.dark .cot-inline-header { background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08)); }
+    html.dark .cot-inline-header:hover { background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.12)); }
+    html.dark .cot-inline-title { color: #a5b4fc; }
+    html.dark .cot-step-q { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .cot-step-thought { color: var(--cc-text-2, #adbac7); }
+    html.dark .cot-step-answer { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    html.dark .cot-final { background: linear-gradient(135deg, rgba(22,93,255,0.08), rgba(99,102,241,0.06)); border-color: rgba(99,102,241,0.3); }
+    html.dark .cot-final-title { color: #a5b4fc; }
+    html.dark .cot-final-content { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .cot-confidence { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+
+    /* NFZ checkbox labels */
+    html.dark #nfzCheckboxList label { background: rgba(153,27,27,0.12) !important; color: #fca5a5 !important; }
+
+    /* Realtime card */
+    html.dark .realtime-card { border-color: var(--cc-border, #363b44); }
+    html.dark .realtime-card-title { color: #7dd3fc; }
+    html.dark .realtime-item .rt-label { color: var(--cc-text-3, #8b949e); }
+    html.dark .realtime-item .rt-value { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .realtime-addr { background: var(--cc-bg-3, #282c34); color: var(--cc-text-2, #adbac7); }
+    html.dark .realtime-update { color: var(--cc-text-4, #545d68); }
+
+    /* Location cells in table */
+    html.dark .loc-addr { color: var(--cc-text-1, #e1e4e8); }
+    html.dark .loc-meta { color: var(--cc-text-3, #8b949e); }
+    html.dark .loc-offline { color: var(--cc-text-3, #8b949e); }
+    html.dark .loc-none { color: var(--cc-text-4, #545d68); }
+
+    /* Phase control border */
+    html.dark .phase-control { border-top-color: var(--cc-border, #363b44); }
+
+    /* Route confirmed banner (step 2) */
+    html.dark #taskStep > div[style*="background:#f0fdf4"] { background: rgba(22,101,52,0.12) !important; border-color: rgba(187,247,208,0.15) !important; color: #86efac !important; }
+
+    /* POI items */
+    html.dark .plan-poi-item { background: rgba(146,64,14,0.15); color: #fcd34d; }
+
+    /* Geocode candidate rows */
+    html.dark #mStartCandidates div[style*="background:#e0e7ff"],
+    html.dark #mGoalCandidates div[style*="background:#e0e7ff"] {
+      background: rgba(99,102,241,0.12) !important;
+      color: var(--cc-text-1, #e1e4e8) !important;
+    }
   </style>
 </head>
 <body>
@@ -1589,12 +1764,13 @@
 
     // --- Step navigation for two-step wizard ---
     function showRouteStep() {
+      var _dk = document.documentElement.classList.contains('dark');
       $('#routeStep').style.display = '';
       $('#taskStep').style.display = 'none';
       $('#stepInd1').style.background = '#165dff';
       $('#stepInd1').style.color = '#fff';
-      $('#stepInd2').style.background = '#e2e8f0';
-      $('#stepInd2').style.color = '#94a3b8';
+      $('#stepInd2').style.background = _dk ? '#282c34' : '#e2e8f0';
+      $('#stepInd2').style.color = _dk ? '#545d68' : '#94a3b8';
     }
 
     function showTaskStep() {
