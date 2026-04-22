@@ -151,19 +151,19 @@ func (a *API) BatteryReport(c *gin.Context) {
 		}
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, alertType, msg)
-		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "critical", msg)
+		insertAlertDedup(a.db, "电池报警", "critical", msg)
 	}
 	if canAnomaly && p.Temperature >= 50 {
 		msg := fmt.Sprintf("无人机[%s]电池温度过高: %.1f°C", deviceName, p.Temperature)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, "温度过高", msg)
-		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
+		insertAlertDedup(a.db, "电池报警", "warning", msg)
 	}
 	if canAnomaly && p.Health <= 50 {
 		msg := fmt.Sprintf("无人机[%s]电池健康度低: %d%%，建议更换电池", deviceName, p.Health)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, "健康度低", msg)
-		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
+		insertAlertDedup(a.db, "电池报警", "warning", msg)
 	}
 
 	ThrottledBroadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": p.DeviceID, "status": status}})
@@ -405,19 +405,19 @@ func (a *API) BatteryPushByAgent(c *gin.Context) {
 		}
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, alertType, msg)
-		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "critical", msg)
+		insertAlertDedup(a.db, "电池报警", "critical", msg)
 	}
 	if canAnomaly && p.Temperature >= 50 {
 		msg := fmt.Sprintf("无人机[%s]电池温度过高: %.1f°C", deviceName, p.Temperature)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, "温度过高", msg)
-		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
+		insertAlertDedup(a.db, "电池报警", "warning", msg)
 	}
 	if canAnomaly && p.Health <= 50 {
 		msg := fmt.Sprintf("无人机[%s]电池健康度低: %d%%，建议更换电池", deviceName, p.Health)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, p.Level, p.Voltage, p.Temperature, "健康度低", msg)
-		a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
+		insertAlertDedup(a.db, "电池报警", "warning", msg)
 	}
 
 	ThrottledBroadcast("battery", WSEvent{Type: "battery_update", Data: gin.H{"device_id": deviceID, "status": status}})

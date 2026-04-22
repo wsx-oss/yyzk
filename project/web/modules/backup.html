@@ -30,6 +30,7 @@
     .status-success { background: #e8ffea; color: #009a29; }
     .status-failed  { background: #ffece8; color: #cb2634; }
     .status-running { background: #e8f3ff; color: #0e42d2; }
+    .status-timeout_failed { background: #fff7e8; color: #d25f00; }
 
     .type-auto        { background: #ede9fe; color: #5b21b6; }
     .type-manual      { background: #e0f2fe; color: #0369a1; }
@@ -47,6 +48,22 @@
     .btn-delete { background: var(--cc-danger, #f53f3f); color: #fff; }
     .btn-delete:hover { background: #cb2634; box-shadow: 0 2px 8px rgba(245,63,63,0.35); }
     .ops-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* Checkbox styling */
+    .row-checkbox {
+      width: 16px; height: 16px; cursor: pointer; accent-color: var(--cc-primary, #165dff);
+    }
+    /* Batch action bar */
+    .batch-bar {
+      display: none; align-items: center; gap: 12px;
+      padding: 10px 16px; margin-bottom: 12px;
+      background: var(--cc-primary-light, #e8f3ff); border-radius: 10px;
+      border: 1px solid rgba(22,93,255,0.2);
+      animation: fadeInUp 0.2s ease-out;
+    }
+    .batch-bar.show { display: flex; }
+    .batch-bar .batch-info { font-size: 13px; color: var(--cc-primary, #165dff); font-weight: 500; }
+    .batch-bar .batch-info strong { font-weight: 700; }
 
     /* Toggle switch */
     .toggle-row { display: flex; align-items: center; gap: 10px; }
@@ -197,10 +214,16 @@
   <!-- Backup list -->
   <div class="card">
     <div class="card-title">备份记录</div>
+    <div class="batch-bar" id="batchBar">
+      <span class="batch-info">已选择 <strong id="batchCount">0</strong> 条记录</span>
+      <button class="btn btn-danger btn-action" onclick="batchDelete()">批量删除</button>
+      <button class="btn btn-secondary btn-action" onclick="clearSelection()">取消选择</button>
+    </div>
     <div style="overflow-x:auto;">
       <table class="data-table" id="backupTable">
         <thead>
           <tr>
+            <th style="width:36px;"><input type="checkbox" class="row-checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
             <th>ID</th>
             <th>类型</th>
             <th>状态</th>
@@ -215,7 +238,7 @@
           </tr>
         </thead>
         <tbody id="backupBody">
-          <tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:32px;">加载中...</td></tr>
+          <tr><td colspan="12" style="text-align:center;color:#94a3b8;padding:32px;">加载中...</td></tr>
         </tbody>
       </table>
     </div>
@@ -288,11 +311,12 @@
         const items = d.items || [];
         const tbody = $('#backupBody');
         if (items.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:32px;">暂无备份记录</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#94a3b8;padding:32px;">暂无备份记录</td></tr>';
           return;
         }
         tbody.innerHTML = items.map(r => `
           <tr>
+            <td><input type="checkbox" class="row-checkbox" value="${r.id}" onchange="updateBatchBar()"></td>
             <td>${r.id}</td>
             <td><span class="status-badge type-${r.backup_type}">${typeLabel(r.backup_type)}</span></td>
             <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
@@ -314,6 +338,9 @@
             </td>
           </tr>
         `).join('');
+        // Reset select-all checkbox
+        $('#selectAll').checked = false;
+        updateBatchBar();
       } catch (e) {
         console.error('loadList', e);
       }
@@ -587,6 +614,54 @@
       window.open(`/api/backup/download/${id}?token=${encodeURIComponent(token)}`, '_blank');
     }
 
+    // ---- Multi-select / Batch delete ----
+
+    function getSelectedIds() {
+      return Array.from(document.querySelectorAll('#backupBody .row-checkbox:checked')).map(cb => parseInt(cb.value));
+    }
+
+    function updateBatchBar() {
+      const ids = getSelectedIds();
+      const bar = $('#batchBar');
+      const count = $('#batchCount');
+      count.textContent = ids.length;
+      bar.classList.toggle('show', ids.length > 0);
+      // Sync select-all state
+      const allCbs = document.querySelectorAll('#backupBody .row-checkbox');
+      $('#selectAll').checked = allCbs.length > 0 && ids.length === allCbs.length;
+      $('#selectAll').indeterminate = ids.length > 0 && ids.length < allCbs.length;
+    }
+
+    function toggleSelectAll(el) {
+      const checked = el.checked;
+      document.querySelectorAll('#backupBody .row-checkbox').forEach(cb => { cb.checked = checked; });
+      updateBatchBar();
+    }
+
+    function clearSelection() {
+      document.querySelectorAll('#backupBody .row-checkbox').forEach(cb => { cb.checked = false; });
+      $('#selectAll').checked = false;
+      updateBatchBar();
+    }
+
+    function batchDelete() {
+      const ids = getSelectedIds();
+      if (ids.length === 0) return;
+      pendingAction = async () => {
+        showToast('正在批量删除...', 'info');
+        try {
+          const res = await api('/backup/batch-delete', { method: 'POST', body: { ids } });
+          const d = await res.json();
+          showToast(`已删除 ${d.deleted || 0} 条备份记录`, 'success');
+          refreshAll();
+        } catch (e) { showToast('批量删除失败', 'error'); }
+      };
+      $('#modalTitle').textContent = '批量删除确认';
+      $('#modalMessage').textContent = `确定删除选中的 ${ids.length} 条备份记录吗？此操作不可撤销。`;
+      $('#modalConfirmBtn').textContent = '确认删除';
+      $('#confirmModal').classList.add('active');
+    }
+
     // ---- Helpers ----
 
     function typeLabel(t) {
@@ -594,7 +669,7 @@
       return m[t] || t;
     }
     function statusLabel(s) {
-      const m = { success: '成功', failed: '失败', running: '进行中' };
+      const m = { success: '成功', failed: '失败', running: '进行中', timeout_failed: '超时失败' };
       return m[s] || s;
     }
     function truncate(s, n) {

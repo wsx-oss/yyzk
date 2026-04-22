@@ -430,6 +430,7 @@
         const data = await res.json();
         const items = Array.isArray(data.items) ? data.items : [];
         renderLatestTable(items);
+        updateStatsFromData(items);
       } catch (e) { console.error('loadLatest error:', e); }
     }
 
@@ -452,23 +453,44 @@
       } catch (e) { console.error('loadRecords error:', e); }
     }
 
+    // Compute stats directly from the latest items to keep summary cards in sync with table
+    function updateStatsFromData(items) {
+      const total = items.length;
+      let normal = 0, low = 0, critical = 0, tempHigh = 0, healthLow = 0;
+      let sumLevel = 0, sumHealth = 0;
+      items.forEach(r => {
+        if (r.status === '正常') normal++;
+        else if (r.status === '电量低') low++;
+        else if (r.status === '严重不足') critical++;
+        else if (r.status === '温度过高') tempHigh++;
+        else if (r.status === '健康度低') healthLow++;
+        sumLevel += (r.level || 0);
+        sumHealth += (r.health || 0);
+      });
+      const avgLevel = total > 0 ? Math.round(sumLevel / total) : 0;
+      const avgHealth = total > 0 ? Math.round(sumHealth / total) : 0;
+
+      $('#statTotal').textContent = total;
+      $('#statNormal').textContent = normal;
+      $('#statLow').textContent = low + critical;
+      $('#statAvgLevel').textContent = avgLevel + '%';
+
+      if (statusChart) {
+        statusChart.data.datasets[0].data = [normal, low, critical, tempHigh, healthLow];
+        statusChart.update();
+      }
+      if (gaugeChart) {
+        gaugeChart.data.datasets[0].data = [avgLevel, avgHealth];
+        gaugeChart.update();
+      }
+    }
+
     async function loadStats() {
+      // Only fetch alert_count from API; device stats are computed from loadLatest data
       try {
         const res = await api('/battery/stats');
         const s = await res.json();
-        $('#statTotal').textContent = s.total_drones || 0;
-        $('#statNormal').textContent = s.normal || 0;
-        $('#statLow').textContent = (s.low || 0) + (s.critical || 0);
-        $('#statAvgLevel').textContent = (s.avg_level || 0) + '%';
         $('#statAlerts').textContent = s.alert_count || 0;
-        if (statusChart) {
-          statusChart.data.datasets[0].data = [s.normal||0, s.low||0, s.critical||0, s.temp_high||0, s.health_low||0];
-          statusChart.update();
-        }
-        if (gaugeChart) {
-          gaugeChart.data.datasets[0].data = [s.avg_level||0, s.avg_health||0];
-          gaugeChart.update();
-        }
       } catch (e) {}
     }
 

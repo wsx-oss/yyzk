@@ -178,13 +178,13 @@ func (p *SimTelemetryPusher) pushBatteryUpdate(snap simulation.TelemetrySnapshot
 		}
 		p.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, snap.Battery.Level, snap.Battery.Voltage, snap.Battery.Temperature, alertType, msg)
-		p.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "critical", msg)
+		insertAlertDedup(p.db, "电池报警", "critical", msg)
 	}
 	if snap.Battery.Temperature >= 50 {
 		msg := fmt.Sprintf("[模拟]无人机[%s]电池温度过高: %.1f°C", deviceName, snap.Battery.Temperature)
 		p.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, snap.Battery.Level, snap.Battery.Voltage, snap.Battery.Temperature, "温度过高", msg)
-		p.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`, "电池报警", "warning", msg)
+		insertAlertDedup(p.db, "电池报警", "warning", msg)
 	}
 
 	ThrottledBroadcast("battery", WSEvent{Type: "battery_update", Data: map[string]interface{}{"device_id": deviceID, "status": status, "simulated": true}})
@@ -224,8 +224,7 @@ func (p *SimTelemetryPusher) OnStateChange(id string, state simulation.InstanceS
 	if state == simulation.StateFailed {
 		p.db.Exec(`INSERT INTO sim_events(instance_id, event_type, level, message) VALUES(?,?,?,?)`,
 			id, "state_change", "紧急故障", fmt.Sprintf("实例 %s 进入故障状态", id))
-		p.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`,
-			"仿真告警", "critical", fmt.Sprintf("[模拟]实例 %s 异常崩溃，已自动隔离", id))
+		insertAlertDedup(p.db, "仿真告警", "critical", fmt.Sprintf("[模拟]实例 %s 异常崩溃，已自动隔离", id))
 	}
 
 	hub.Broadcast("sim", WSEvent{Type: "state_change", Data: map[string]interface{}{"id": id, "state": string(state)}})
@@ -246,8 +245,7 @@ func (p *SimTelemetryPusher) OnAnomaly(id string, event simulation.AnomalyEvent)
 	case simulation.AlertCritical:
 		severity = "critical"
 	}
-	p.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`,
-		"仿真异常", severity, "[模拟]"+event.Message)
+	insertAlertDedup(p.db, "仿真异常", severity, "[模拟]"+event.Message)
 
 	anomalyWSEvent := WSEvent{
 		Type: "anomaly_event",

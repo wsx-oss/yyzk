@@ -123,6 +123,7 @@ async function api(path, options = {}) {
 function formatDate(dateStr) {
   if (!dateStr) return "-";
   const d = new Date(dateStr);
+  if (isNaN(d.getTime()) || d.getFullYear() < 2000) return "-";
   return d.toLocaleString("zh-CN", {
     year: "numeric",
     month: "2-digit",

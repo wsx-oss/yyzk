@@ -275,8 +275,7 @@ func (a *API) GpsDevicesPush(c *gin.Context) {
 			a.db.Exec(`INSERT INTO gps_fence_alerts(device_id, device_name, latitude, longitude, fence_lat, fence_lng, fence_radius, distance, message) VALUES(?,?,?,?,?,?,?,?,?)`,
 				id, devName, p.Latitude, p.Longitude, fLat, fLng, fRadius, dist,
 				devName+" 已超出电子围栏范围，距离中心 "+strconv.FormatFloat(dist, 'f', 1, 64)+"m")
-			a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`,
-				"围栏报警", "warning", devName+" 超出电子围栏 (距离: "+strconv.FormatFloat(dist, 'f', 1, 64)+"m)")
+			insertAlertDedup(a.db, "围栏报警", "warning", devName+" 超出电子围栏 (距离: "+strconv.FormatFloat(dist, 'f', 1, 64)+"m)")
 		}
 	}
 
@@ -494,8 +493,7 @@ func (a *API) GpsPushByAgent(c *gin.Context) {
 			a.db.Exec(`INSERT INTO gps_fence_alerts(device_id, device_name, latitude, longitude, fence_lat, fence_lng, fence_radius, distance, message) VALUES(?,?,?,?,?,?,?,?,?)`,
 				deviceID, devName, p.Latitude, p.Longitude, fLat, fLng, fRadius, dist,
 				devName+" 已超出电子围栏范围，距离中心 "+strconv.FormatFloat(dist, 'f', 1, 64)+"m")
-			a.db.Exec(`INSERT INTO alerts(category, severity, message) VALUES(?,?,?)`,
-				"围栏报警", "warning", devName+" 超出电子围栏 (距离: "+strconv.FormatFloat(dist, 'f', 1, 64)+"m)")
+			insertAlertDedup(a.db, "围栏报警", "warning", devName+" 超出电子围栏 (距离: "+strconv.FormatFloat(dist, 'f', 1, 64)+"m)")
 		}
 	}
 

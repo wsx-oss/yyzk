@@ -15,7 +15,7 @@
   style.textContent = `
     #ai-fab {
       position: fixed; bottom: 28px; right: 28px; z-index: 10000;
-      width: 60px; height: 60px; border-radius: 50%;
+      width: 54px; height: 54px; border-radius: 50%;
       background: linear-gradient(135deg, #0ea5e9, #6366f1);
       color: #fff; border: none; cursor: pointer;
       box-shadow: 0 4px 20px rgba(14,165,233,0.4);
@@ -272,6 +272,7 @@
   function togglePanel() {
     isOpen = !isOpen;
     panel.classList.toggle('open', isOpen);
+    document.body.classList.toggle('ai-panel-open', isOpen);
     if (isOpen) {
       requestAnimationFrame(positionPanelNearFab);
       loadRAGStatus();

@@ -1514,3 +1514,14 @@ html.dark .modal-close-btn:hover {
   .stat-box { padding: 14px; }
   .btn { padding: 6px 14px; font-size: 13px; height: 32px; }
 }
+
+/* ---------- AI Panel Open — prevent overlapping table operations ---------- */
+body.ai-panel-open {
+  padding-right: 420px;
+  transition: padding-right 0.3s ease;
+}
+@media (max-width: 900px) {
+  body.ai-panel-open {
+    padding-right: 0;
+  }
+}

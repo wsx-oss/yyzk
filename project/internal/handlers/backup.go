@@ -72,11 +72,14 @@ func RegisterBackupRoutes(r *gin.Engine, database *db.DB) *BackupAPI {
 		g.POST("/restore-upload", api.RestoreFromUpload)
 		g.GET("/restore-progress", api.RestoreProgressAPI)
 		g.DELETE("/:id", api.DeleteBackup)
+		g.POST("/batch-delete", api.BatchDeleteBackups)
 		g.GET("/download/:id", api.DownloadBackup)
 		g.GET("/status", api.BackupStatus)
 		g.POST("/cleanup", api.CleanupOldBackups)
 		g.POST("/auto-toggle", api.ToggleAutoBackup)
 	}
+	// Start background cleaner for stale "running" backups
+	api.startStaleBackupCleaner()
 	return api
 }
 
@@ -303,6 +306,27 @@ func (b *BackupAPI) DeleteBackup(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 
+// BatchDeleteBackups removes multiple backup records by their IDs.
+func (b *BackupAPI) BatchDeleteBackups(c *gin.Context) {
+	var req struct {
+		IDs []int `json:"ids"`
+	}
+	if err := c.BindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(400, gin.H{"error": "请提供要删除的备份ID列表"})
+		return
+	}
+	deleted := 0
+	for _, id := range req.IDs {
+		result, err := b.db.Exec(`DELETE FROM backup_records WHERE id = ?`, id)
+		if err == nil {
+			if n, _ := result.RowsAffected(); n > 0 {
+				deleted++
+			}
+		}
+	}
+	c.JSON(200, gin.H{"ok": true, "deleted": deleted})
+}
+
 // DownloadBackup streams the SQL backup content from DB to the client.
 func (b *BackupAPI) DownloadBackup(c *gin.Context) {
 	idStr := c.Param("id")
@@ -366,6 +390,36 @@ func (b *BackupAPI) CleanupOldBackups(c *gin.Context) {
 // Core backup logic (pure-Go SQL dump)
 // ---------------------------------------------------------------------------
 
+// cleanupStaleBackups marks "running" backups older than 1 hour as "timeout_failed".
+// This prevents tasks from being stuck in "running" status forever.
+func (b *BackupAPI) cleanupStaleBackups() {
+	result, err := b.db.Exec(
+		`UPDATE backup_records SET status='timeout_failed', remark=COALESCE(remark,'') || ' | 超时自动标记失败' WHERE status='running' AND created_at < datetime('now', '-1 hour')`,
+	)
+	if err != nil {
+		log.Printf("[Backup] stale cleanup query error: %v", err)
+		return
+	}
+	affected, _ := result.RowsAffected()
+	if affected > 0 {
+		log.Printf("[Backup] cleaned up %d stale running backup(s)", affected)
+	}
+}
+
+// startStaleBackupCleaner launches a background goroutine that periodically
+// checks for and cleans up stale "running" backups.
+func (b *BackupAPI) startStaleBackupCleaner() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		// Run once at startup
+		b.cleanupStaleBackups()
+		for range ticker.C {
+			b.cleanupStaleBackups()
+		}
+	}()
+}
+
 func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -384,6 +438,20 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 		return
 	}
 	recordID, _ := res.LastInsertId()
+
+	// Panic recovery: ensure backup status is updated even if a panic occurs
+	defer func() {
+		if r := recover(); r != nil {
+			elapsed := time.Since(start).Milliseconds()
+			log.Printf("[Backup] PANIC recovered in doBackup: %v", r)
+			b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | panic: ' || ?, duration_ms=? WHERE id=?`,
+				fmt.Sprintf("%v", r), elapsed, recordID)
+			b.db.Exec(`INSERT INTO notifications(type, title, message, source) VALUES(?,?,?,?)`,
+				"backup", "备份异常崩溃",
+				fmt.Sprintf("[%s] %s 备份因异常崩溃而失败: %v", backupType, remark, r),
+				"backup-system")
+		}
+	}()
 
 	// Perform dump to string
 	sqlContent, tableCount, rowCount, err := b.dumpToString()
@@ -731,7 +799,13 @@ func (b *BackupAPI) pruneOldBackups(maxKeep int) int {
 		}
 	}
 
-	b.db.Exec(`DELETE FROM backup_records WHERE status='failed' AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)`)
+	// Clean up failed / timeout_failed / stale running records older than 7 days (SQLite syntax)
+	res, err := b.db.Exec(`DELETE FROM backup_records WHERE status IN ('failed','timeout_failed','running') AND created_at < datetime('now', '-7 days')`)
+	if err == nil {
+		if n, _ := res.RowsAffected(); n > 0 {
+			deleted += int(n)
+		}
+	}
 
 	if deleted > 0 {
 		log.Printf("[Backup] Pruned %d old backups (keeping latest %d)", deleted, maxKeep)
