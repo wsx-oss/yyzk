@@ -188,7 +188,7 @@
         container.innerHTML = d.items.map(drone => {
           const t = drone.telemetry || {};
           const hb = t.heartbeat || {};
-          const pos = t.global_position || {};
+          const pos = t.position || t.global_position || {};
           const bat = t.battery || {};
           const online = drone.online;
           const sel = drone.sys_id == selectedSysId ? 'selected' : '';

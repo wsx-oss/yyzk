@@ -70,7 +70,7 @@ const $$ = (q) => document.querySelectorAll(q);
 // ---- Tianditu Map Utilities ----
 let TIANDITU_KEY = '90aa13159977757fb5d9061bf4d8c22b';
  
-const DEFAULT_CAMPUS_MAP_CENTER = Object.freeze({ lat: 34.7930, lng: 113.6636, zoom: 15 });
+const DEFAULT_CAMPUS_MAP_CENTER = Object.freeze({ lat: 34.810201, lng: 113.533285, zoom: 17 });
 const DEFAULT_CAMPUS_ROUTE_START = Object.freeze({ name: '郑州大学主校区南门', lat: 34.793000, lng: 113.663600 });
 const DEFAULT_CAMPUS_ROUTE_GOAL = Object.freeze({ name: '郑州大学主校区北门', lat: 34.802000, lng: 113.664000 });
 

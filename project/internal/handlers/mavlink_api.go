@@ -434,6 +434,7 @@ func (m *MavlinkAPI) StreamTelemetry(c *gin.Context) {
 	defer ticker.Stop()
 
 	ctx := c.Request.Context()
+	keys := []string{"position", "attitude", "battery", "vfr_hud", "heartbeat", "gps_raw", "landed_state", "home_position", "sys_status"}
 	for {
 		select {
 		case <-ctx.Done():
@@ -441,15 +442,33 @@ func (m *MavlinkAPI) StreamTelemetry(c *gin.Context) {
 		case <-ticker.C:
 			data := map[string]interface{}{"sys_id": sysID, "ts": time.Now().UnixMilli()}
 
+			gotFromRedis := false
 			if cache.Available() {
-				keys := []string{"position", "attitude", "battery", "vfr_hud", "heartbeat", "gps_raw", "landed_state"}
 				for _, k := range keys {
 					if v, err := cache.Get(fmt.Sprintf("mavlink:drone:%s:%s", sysID, k)); err == nil {
 						var parsed interface{}
 						if json.Unmarshal([]byte(v), &parsed) == nil {
 							data[k] = parsed
+							gotFromRedis = true
 						}
 					}
+				}
+			}
+
+			// Fallback to DB when Redis has no data
+			if !gotFromRedis {
+				rows, err := m.db.Query(`SELECT msg_type, payload FROM mavlink_telemetry WHERE sys_id=?`, sysID)
+				if err == nil {
+					for rows.Next() {
+						var mt, pl string
+						if rows.Scan(&mt, &pl) == nil {
+							var parsed interface{}
+							if json.Unmarshal([]byte(pl), &parsed) == nil {
+								data[mt] = parsed
+							}
+						}
+					}
+					rows.Close()
 				}
 			}
 
@@ -599,6 +618,15 @@ func (m *MavlinkAPI) DebugStream(c *gin.Context) {
 				if cache.Available() {
 					if v, err := cache.Get(fmt.Sprintf("mavlink:drone:%d:online", sid)); err == nil && v == "1" {
 						drone["online"] = true
+					}
+				}
+				// Fallback: check DB updated_at within 15s
+				if !drone["online"].(bool) {
+					var updAt string
+					if m.db.QueryRow(`SELECT updated_at FROM mavlink_telemetry WHERE sys_id=? ORDER BY updated_at DESC LIMIT 1`, sid).Scan(&updAt) == nil {
+						if t, err := time.Parse("2006-01-02 15:04:05", updAt); err == nil && time.Since(t) < 15*time.Second {
+							drone["online"] = true
+						}
 					}
 				}
 

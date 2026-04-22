@@ -78,31 +78,32 @@ type MissionWaypoint struct {
 	Lat, Lng, Alt float64
 }
 
-// Base coordinates: 郑州大学东门 (Zhengzhou University East Gate)
+// Base coordinates: 无人机基地 (Drone Base)
 const (
-	baseLat = 34.8103
-	baseLng = 113.5310
+	baseLat = 34.810201
+	baseLng = 113.533285
 	baseAlt = 110.0
 )
 
 var (
+	// 五架无人机均匀排列在基地附近，东西方向排开，间距约15m
+	// 1° longitude ≈ 91,400m at lat 34.81 → 15m ≈ 0.000164°
 	feederProfiles = []DroneProfile{
 		{SysID: 1, Name: "翼龙-I", Model: "K9-四旋翼", AgentID: "UAV-K9-001",
 			IP: "10.21.30.101", SerialUID: "4A3F8B1C2D5E6F70A1B2", FWVersion: "1.17.83", BoardType: 5,
-			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
-		// 所有无人机基地统一设定为郑州大学主校区东门，无偏移
+			HomeLat: baseLat + 0.000045, HomeLng: baseLng - 0.000328, HomeAlt: baseAlt, FenceRadius: 2000},
 		{SysID: 2, Name: "天鹰-II", Model: "K9-六旋翼", AgentID: "UAV-K9-002",
 			IP: "10.21.30.102", SerialUID: "5B4G9C2D3E6F7180B2C3", FWVersion: "1.17.83", BoardType: 5,
-			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
+			HomeLat: baseLat - 0.000027, HomeLng: baseLng - 0.000164, HomeAlt: baseAlt, FenceRadius: 2000},
 		{SysID: 3, Name: "云雀-III", Model: "K9-四旋翼", AgentID: "UAV-K9-003",
 			IP: "10.21.30.103", SerialUID: "6C5H0D3E4F7G8290C3D4", FWVersion: "1.18.02", BoardType: 5,
-			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
+			HomeLat: baseLat + 0.000036, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
 		{SysID: 4, Name: "苍鹰-IV", Model: "K9-四旋翼", AgentID: "UAV-K9-004",
 			IP: "10.21.30.104", SerialUID: "7D6I1E4F5G8H93A0D4E5", FWVersion: "1.18.02", BoardType: 5,
-			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
+			HomeLat: baseLat - 0.000018, HomeLng: baseLng + 0.000164, HomeAlt: baseAlt, FenceRadius: 2000},
 		{SysID: 5, Name: "飞鸿-V", Model: "K9-六旋翼", AgentID: "UAV-K9-005",
 			IP: "10.21.30.105", SerialUID: "8E7J2F5G6H9I04B1E5F6", FWVersion: "1.18.02", BoardType: 5,
-			HomeLat: baseLat, HomeLng: baseLng, HomeAlt: baseAlt, FenceRadius: 2000},
+			HomeLat: baseLat + 0.000054, HomeLng: baseLng + 0.000328, HomeAlt: baseAlt, FenceRadius: 2000},
 	}
 
 	feederStates   []*droneState
@@ -434,6 +435,7 @@ func feederLoop(database *db.DB) {
 	tickAttitude := time.NewTicker(100 * time.Millisecond)
 	tickHeartbeat := time.NewTicker(1 * time.Second)
 	tickMavTelem := time.NewTicker(1 * time.Second)
+	tickRawFrame := time.NewTicker(2 * time.Second)
 	tickLog := time.NewTicker(30 * time.Second)
 	defer tickEvolve.Stop()
 	defer tickGPSPush.Stop()
@@ -442,6 +444,7 @@ func feederLoop(database *db.DB) {
 	defer tickAttitude.Stop()
 	defer tickHeartbeat.Stop()
 	defer tickMavTelem.Stop()
+	defer tickRawFrame.Stop()
 	defer tickLog.Stop()
 
 	for {
@@ -499,6 +502,12 @@ func feederLoop(database *db.DB) {
 				for i := range feederProfiles {
 					pushMavlinkRedis(feederProfiles[i], feederStates[i])
 				}
+			}()
+		case <-tickRawFrame.C:
+			// Push synthetic MAVLink v2 raw frames to device_tcp_log for debug console
+			go func() {
+				idx := rand.Intn(len(feederProfiles))
+				pushRawMavlinkFrame(database, feederProfiles[idx], feederStates[idx])
 			}()
 		case <-tickLog.C:
 			for i := range feederProfiles {
@@ -1089,4 +1098,151 @@ func pushMavlinkRedis(p DroneProfile, s *droneState) {
 		"satellites": s.satellites,
 	})
 	cache.Set(prefix+":gps_raw", string(gpsData), 30*time.Second)
+}
+
+// ---- Push synthetic MAVLink v2 raw frame to device_tcp_log ----
+
+// buildMavlinkV2Hex generates a realistic MAVLink v2 hex frame string.
+// MAVLink v2 format: FD <len> <incompat> <compat> <seq> <sysid> <compid> <msgid:3> <payload> <crc:2>
+func buildMavlinkV2Hex(sysID int, seq int, msgID int, payload []byte) string {
+	frameLen := 12 + len(payload) // header(10) + payload + crc(2)
+	frame := make([]byte, frameLen)
+	frame[0] = 0xFD
+	frame[1] = byte(len(payload))
+	frame[2] = 0x00 // incompat flags
+	frame[3] = 0x00 // compat flags
+	frame[4] = byte(seq & 0xFF)
+	frame[5] = byte(sysID)
+	frame[6] = 0x01 // comp_id = 1 (autopilot)
+	frame[7] = byte(msgID & 0xFF)
+	frame[8] = byte((msgID >> 8) & 0xFF)
+	frame[9] = byte((msgID >> 16) & 0xFF)
+	copy(frame[10:], payload)
+	// Simple CRC (X.25) — just produce plausible bytes
+	var crc uint16 = 0xFFFF
+	for i := 1; i < 10+len(payload); i++ {
+		tmp := uint16(frame[i]) ^ (crc & 0xFF)
+		tmp ^= (tmp << 4) & 0xFF
+		crc = (crc >> 8) ^ (tmp << 8) ^ (tmp << 3) ^ (tmp >> 4)
+	}
+	frame[10+len(payload)] = byte(crc & 0xFF)
+	frame[10+len(payload)+1] = byte((crc >> 8) & 0xFF)
+	hex := ""
+	for _, b := range frame {
+		hex += fmt.Sprintf("%02x", b)
+	}
+	return hex
+}
+
+func pushRawMavlinkFrame(database *db.DB, p DroneProfile, s *droneState) {
+	// Pick a random message type to generate
+	type frameGen struct {
+		msgID int
+		build func() []byte
+	}
+
+	int32Bytes := func(v int32) []byte {
+		return []byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)}
+	}
+	uint16Bytes := func(v uint16) []byte {
+		return []byte{byte(v), byte(v >> 8)}
+	}
+	float32Bytes := func(v float32) []byte {
+		bits := math.Float32bits(v)
+		return []byte{byte(bits), byte(bits >> 8), byte(bits >> 16), byte(bits >> 24)}
+	}
+
+	generators := []frameGen{
+		{0, func() []byte { // HEARTBEAT
+			p := make([]byte, 9)
+			cm := s.customMode
+			p[0] = byte(cm)
+			p[1] = byte(cm >> 8)
+			p[2] = byte(cm >> 16)
+			p[3] = byte(cm >> 24)
+			p[4] = 2 // MAV_TYPE_QUADROTOR
+			p[5] = 3 // AUTOPILOT_ARDUPILOT
+			bm := byte(0x41)
+			if s.armed {
+				bm = 0xC1
+			}
+			p[6] = bm
+			p[7] = 4 // MAV_STATE_ACTIVE
+			p[8] = 3 // MAVLink version
+			return p
+		}},
+		{33, func() []byte { // GLOBAL_POSITION_INT
+			p := make([]byte, 28)
+			copy(p[0:4], int32Bytes(int32(s.bootTimeMs)))
+			copy(p[4:8], int32Bytes(int32(s.lat*1e7)))
+			copy(p[8:12], int32Bytes(int32(s.lng*1e7)))
+			copy(p[12:16], int32Bytes(int32(s.alt*1000)))
+			copy(p[16:20], int32Bytes(int32(s.relAlt*1000)))
+			vx := int16(s.speed * math.Sin(s.heading*math.Pi/180) * 50)
+			vy := int16(s.speed * math.Cos(s.heading*math.Pi/180) * 50)
+			copy(p[20:22], uint16Bytes(uint16(vx)))
+			copy(p[22:24], uint16Bytes(uint16(vy)))
+			copy(p[24:26], uint16Bytes(0))
+			copy(p[26:28], uint16Bytes(uint16(s.heading*100)))
+			return p
+		}},
+		{30, func() []byte { // ATTITUDE
+			p := make([]byte, 28)
+			copy(p[0:4], int32Bytes(int32(s.bootTimeMs)))
+			copy(p[4:8], float32Bytes(float32(s.roll*math.Pi/180)))
+			copy(p[8:12], float32Bytes(float32(s.pitch*math.Pi/180)))
+			copy(p[12:16], float32Bytes(float32(s.yaw*math.Pi/180)))
+			copy(p[16:20], float32Bytes(float32((rand.Float64()-0.5)*0.1)))
+			copy(p[20:24], float32Bytes(float32((rand.Float64()-0.5)*0.1)))
+			copy(p[24:28], float32Bytes(float32((rand.Float64()-0.5)*0.05)))
+			return p
+		}},
+		{24, func() []byte { // GPS_RAW_INT
+			p := make([]byte, 30)
+			// time_usec at 0:8 (skip, leave zero)
+			copy(p[8:12], int32Bytes(int32(s.lat*1e7)))
+			copy(p[12:16], int32Bytes(int32(s.lng*1e7)))
+			copy(p[16:20], int32Bytes(int32(s.alt*1000)))
+			copy(p[20:22], uint16Bytes(uint16(80+rand.Intn(30))))  // eph
+			copy(p[22:24], uint16Bytes(uint16(120+rand.Intn(40)))) // epv
+			copy(p[24:26], uint16Bytes(uint16(s.speed*100)))
+			copy(p[26:28], uint16Bytes(uint16(s.heading*100)))
+			p[28] = byte(s.fixType)
+			p[29] = byte(s.satellites)
+			return p
+		}},
+		{74, func() []byte { // VFR_HUD
+			p := make([]byte, 20)
+			copy(p[0:4], float32Bytes(float32(s.speed)))
+			copy(p[4:8], float32Bytes(float32(s.speed)))
+			copy(p[8:12], float32Bytes(float32(s.alt)))
+			copy(p[12:16], float32Bytes(float32((rand.Float64()-0.5)*0.5)))
+			copy(p[16:18], uint16Bytes(uint16(int16(s.heading))))
+			copy(p[18:20], uint16Bytes(uint16(s.throttle)))
+			return p
+		}},
+	}
+
+	gen := generators[rand.Intn(len(generators))]
+	payload := gen.build()
+	hex := buildMavlinkV2Hex(p.SysID, s.seqNum, gen.msgID, payload)
+
+	frameJSON, _ := json.Marshal(map[string]interface{}{
+		"sys_id":      p.SysID,
+		"comp_id":     1,
+		"msg_id":      gen.msgID,
+		"seq":         s.seqNum,
+		"payload_len": len(payload),
+		"hex":         hex,
+	})
+
+	database.Exec(`INSERT INTO device_tcp_log(agent_id, msg_type, payload, received_at)
+		VALUES(?, 'mavlink_v2', ?, datetime('now'))`,
+		p.AgentID, string(frameJSON))
+
+	// Trim old frames to prevent table bloat (keep last 500)
+	var cutoffID int
+	if database.QueryRow(`SELECT id FROM device_tcp_log WHERE msg_type IN ('mavlink_v1','mavlink_v2') ORDER BY id DESC LIMIT 1 OFFSET 500`).Scan(&cutoffID) == nil {
+		database.Exec(`DELETE FROM device_tcp_log WHERE msg_type IN ('mavlink_v1','mavlink_v2') AND id <= ?`, cutoffID)
+	}
 }
