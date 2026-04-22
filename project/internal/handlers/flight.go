@@ -35,23 +35,23 @@ func (a *API) FlightMissionsList(c *gin.Context) {
 	where := []string{"1=1"}
 	args := []any{}
 	if name != "" {
-		where = append(where, "name LIKE ?")
+		where = append(where, "f.name LIKE ?")
 		args = append(args, "%"+name+"%")
 	}
 	if status != "" {
-		where = append(where, "status = ?")
+		where = append(where, "f.status = ?")
 		args = append(args, status)
 	}
 	if target != "" {
-		where = append(where, "target LIKE ?")
+		where = append(where, "f.target LIKE ?")
 		args = append(args, "%"+target+"%")
 	}
 	if dateFrom != "" {
-		where = append(where, "created_at >= ?")
+		where = append(where, "f.created_at >= ?")
 		args = append(args, dateFrom)
 	}
 	if dateTo != "" {
-		where = append(where, "created_at <= ?")
+		where = append(where, "f.created_at <= ?")
 		args = append(args, dateTo+" 23:59:59")
 	}
 
@@ -59,7 +59,7 @@ func (a *API) FlightMissionsList(c *gin.Context) {
 
 	// count
 	var total int
-	_ = a.db.QueryRow("SELECT COUNT(*) FROM flight_missions WHERE "+wc, args...).Scan(&total)
+	_ = a.db.QueryRow("SELECT COUNT(*) FROM flight_missions f WHERE "+wc, args...).Scan(&total)
 
 	// query — also fetch latest GPS position and battery level for each mission's device
 	offset := (page - 1) * pageSize

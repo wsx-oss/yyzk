@@ -1019,7 +1019,16 @@
           const res = await api('/hardware/items/live');
           const data = await res.json();
           if (data.items) {
-            renderLiveData(data.items);
+            let items = data.items;
+            const fName = document.getElementById('filterName').value.trim().toLowerCase();
+            const fType = document.getElementById('filterType').value;
+            const fIP = document.getElementById('filterIP').value.trim().toLowerCase();
+            const fStatus = document.getElementById('filterStatus').value;
+            if (fName) items = items.filter(i => i.name && i.name.toLowerCase().includes(fName));
+            if (fType && fType !== '全部') items = items.filter(i => i.type === fType);
+            if (fIP) items = items.filter(i => i.ip && i.ip.toLowerCase().includes(fIP));
+            if (fStatus && fStatus !== '全部') items = items.filter(i => i.status === fStatus);
+            renderLiveData(items);
           }
           // Update stats less frequently (every 5th tick or slow intervals)
           if (ms > 2000) {

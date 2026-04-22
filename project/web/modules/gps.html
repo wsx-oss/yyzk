@@ -673,6 +673,10 @@
         await loadActiveMissions();
         updateMapMarkers(items);
         updateFenceChart(items);
+        // Auto-locate to first search result
+        if (useInputFilters && items.length > 0 && items[0].latitude && items[0].longitude) {
+          map.setView([items[0].latitude, items[0].longitude], 16);
+        }
       } catch (e) {
         console.error('loadDevices error:', e);
       }

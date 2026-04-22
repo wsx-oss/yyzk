@@ -2047,6 +2047,7 @@
 
         // Drone control buttons (takeoff / return / land)
         const ctrlDiv = document.createElement('div');
+        ctrlDiv.id = 'droneCtrlDiv';
         ctrlDiv.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed #e2e8f0;';
         if (m.status !== '已完成' && m.device_id > 0) {
           const cPhase = m.current_phase || '待命';
@@ -2313,6 +2314,8 @@
     function closeDetailModal() {
       var rc = document.getElementById('realtimeCard');
       if (rc) rc.remove();
+      var droneCtrl = document.getElementById('droneCtrlDiv');
+      if (droneCtrl) droneCtrl.remove();
       $('#detailAISection').innerHTML = '';
       if (mDetailRouteMap) { mDetailRouteMap.remove(); mDetailRouteMap = null; }
       const routeMapDiv = document.getElementById('detailRouteMap');

@@ -352,14 +352,13 @@
         const data = await res.json();
         const drones = Array.isArray(data.items) ? data.items : [];
         // linked_gps_device_id is the device_id used by battery_records
-        droneList = drones.filter(d => d.linked_gps_device_id && d.linked_gps_device_id > 0)
-                         .map(d => ({ id: d.linked_gps_device_id, name: d.name }));
+        droneList = drones;
         // update filter dropdown
         const filterSel = $('#filterDevice');
-        filterSel.innerHTML = '<option value="">全部</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+        filterSel.innerHTML = '<option value="">全部</option>' + droneList.map(d => `<option value="${d.linked_gps_device_id || d.id}">${esc(d.name)}</option>`).join('');
         // update report dropdown
         const reportSel = $('#reportDevice');
-        reportSel.innerHTML = '<option value="0">请选择无人机</option>' + droneList.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+        reportSel.innerHTML = '<option value="0">请选择无人机</option>' + droneList.map(d => `<option value="${d.linked_gps_device_id || d.id}">${esc(d.name)}</option>`).join('');
         // show hint if no drones registered
         const hint = $('#reportDeviceHint');
         if (hint) hint.style.display = droneList.length === 0 ? 'block' : 'none';
@@ -428,7 +427,15 @@
       try {
         const res = await api('/battery/latest');
         const data = await res.json();
-        const items = Array.isArray(data.items) ? data.items : [];
+        let items = Array.isArray(data.items) ? data.items : [];
+        const filterDevice = $('#filterDevice').value;
+        const filterStatus = $('#filterStatus').value;
+        if (filterDevice) {
+          items = items.filter(r => String(r.device_id) === filterDevice);
+        }
+        if (filterStatus) {
+          items = items.filter(r => r.status === filterStatus);
+        }
         renderLatestTable(items);
         updateStatsFromData(items);
       } catch (e) { console.error('loadLatest error:', e); }
@@ -622,7 +629,7 @@
       $('#alertBtnNext').disabled = alertPage >= tp;
     }
     function changeAlertPage(d) { alertPage += d; loadAlerts(); }
-    function search() { currentPage = 1; loadRecords(); loadStats(); }
+    function search() { currentPage = 1; loadLatest(); loadRecords(); loadStats(); }
     function refreshAll() { loadLatest(); loadRecords(); loadStats(); loadAlerts(); loadDrones(); showToast('数据已刷新', 'success'); }
 
     // ========== Report Modal ==========
