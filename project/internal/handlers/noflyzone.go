@@ -54,6 +54,22 @@ func (a *API) NoFlyZoneCreate(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "禁飞区名称不能为空"})
 		return
 	}
+	if len([]rune(p.Name)) < 3 {
+		c.JSON(400, gin.H{"error": "禁飞区名称至少需要3个字符"})
+		return
+	}
+	// Reject pure-digit names
+	pureDigit := true
+	for _, r := range p.Name {
+		if r < '0' || r > '9' {
+			pureDigit = false
+			break
+		}
+	}
+	if pureDigit {
+		c.JSON(400, gin.H{"error": "禁飞区名称不能为纯数字"})
+		return
+	}
 	if p.ZoneType == "" {
 		p.ZoneType = "禁飞区"
 	}

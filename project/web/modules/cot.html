@@ -631,18 +631,26 @@
     }
 
     // Init
-    // Check if there's a chain_id in URL params (from flight planning)
-    const urlParams = new URLSearchParams(window.location.search);
-    const chainIdFromUrl = urlParams.get('chain_id');
-    
-    if (chainIdFromUrl) {
-      // Auto load and display the specific chain
-      loadChains().then(() => {
-        setTimeout(() => viewChainDetail(chainIdFromUrl), 300);
-      });
-    } else {
-      loadChains();
-    }
+    (async function init() {
+      try {
+        // Show loading state
+        $('#chainsTbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:40px;">加载中...</td></tr>';
+
+        // Check if there's a chain_id in URL params (from flight planning)
+        const urlParams = new URLSearchParams(window.location.search);
+        const chainIdFromUrl = urlParams.get('chain_id');
+
+        if (chainIdFromUrl) {
+          await loadChains();
+          setTimeout(() => viewChainDetail(chainIdFromUrl), 300);
+        } else {
+          await loadChains();
+        }
+      } catch (e) {
+        console.error('CoT init error:', e);
+        $('#chainsTbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:40px;">页面初始化失败: ' + (e.message || '未知错误') + '</td></tr>';
+      }
+    })();
   </script>
 </body>
 </html>

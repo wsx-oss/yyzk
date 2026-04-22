@@ -43,10 +43,12 @@
     html.dark .phase-return { background: rgba(251,146,60,0.12); color: #fdba74; }
     html.dark .phase-land { background: rgba(52,211,153,0.12); color: #6ee7b7; }
     html.dark .mission-progress .progress-text { color: var(--cc-text-3); }
+    html.dark .mission-progress .progress-bar { background: var(--cc-bg-4, #363b44); }
 
     /* Progress bar */
     .mission-progress { display: flex; align-items: center; gap: 8px; }
-    .mission-progress .progress-bar { flex: 1; height: 10px; }
+    .mission-progress .progress-bar { flex: 1; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden; }
+    .mission-progress .progress-bar .progress-fill { height: 100%; border-radius: 6px; transition: width 0.3s ease; }
     .mission-progress .progress-text { font-size: 12px; color: #64748b; min-width: 36px; text-align: right; }
 
     /* Modal */
@@ -918,7 +920,7 @@
       }
       tbody.innerHTML = items.map(m => `
         <tr>
-          <td><strong>${esc(m.name)}</strong></td>
+          <td style="max-width:180px;"><strong title="${esc(m.name)}" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(m.name)}</strong></td>
           <td>${m.drone_name ? esc(m.drone_name) : '<span style="color:#94a3b8;">未指定</span>'}</td>
           <td>${esc(m.target) || '-'}</td>
           <td class="flight-status-cell">
@@ -1959,8 +1961,8 @@
               <span class="progress-text">${m.progress}%</span>
             </div>
           </div>
-          <div class="detail-label">开始时间</div><div class="detail-value">${m.start_time || '-'}</div>
-          <div class="detail-label">结束时间</div><div class="detail-value">${m.end_time || '-'}</div>
+          <div class="detail-label">开始时间</div><div class="detail-value">${formatDate(m.start_time)}</div>
+          <div class="detail-label">结束时间</div><div class="detail-value">${formatDate(m.end_time)}</div>
           <div class="detail-label">任务描述</div><div class="detail-value">${esc(m.description) || '-'}</div>
           <div class="detail-label">创建时间</div><div class="detail-value">${formatDate(m.created_at)}</div>
         `;

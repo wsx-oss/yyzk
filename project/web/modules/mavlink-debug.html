@@ -291,16 +291,26 @@
       pink: 'var(--pink)', red: 'var(--red)',
     };
 
-    // Build filter checkboxes
+    // Build filter checkboxes (deduplicated by label)
     function buildFilterList() {
       const el = document.getElementById('filterList');
-      el.innerHTML = Object.entries(MSG_TYPES).map(([k, v]) => `
+      const seen = new Set();
+      const entries = Object.entries(MSG_TYPES).filter(([k, v]) => {
+        if (seen.has(v.label)) return false;
+        seen.add(v.label);
+        return true;
+      });
+      el.innerHTML = entries.map(([k, v]) => {
+        // Find all keys sharing the same label so toggling one toggles all
+        const sameKeys = Object.keys(MSG_TYPES).filter(mk => MSG_TYPES[mk].label === v.label);
+        const onchangeJS = sameKeys.map(sk => `MSG_TYPES['${sk}'].enabled=this.checked`).join(';');
+        return `
         <label class="filter-item">
-          <input type="checkbox" checked data-key="${k}" onchange="MSG_TYPES['${k}'].enabled=this.checked">
+          <input type="checkbox" checked data-key="${k}" onchange="${onchangeJS}">
           <span class="color-dot" style="background:${TAG_COLORS[v.color]||'var(--text-3)'}"></span>
           ${v.label}
-        </label>
-      `).join('');
+        </label>`;
+      }).join('');
     }
     buildFilterList();
 

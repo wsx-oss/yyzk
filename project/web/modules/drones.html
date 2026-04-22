@@ -451,6 +451,16 @@
 
     // ========== Search & Refresh ==========
     function search() { loadDrones(true); loadStats(); }
+    // Auto-restore full list when search input is cleared
+    $('#filterName').addEventListener('input', function() {
+      if (!this.value.trim() && activeFilterName) {
+        activeFilterName = '';
+        loadDrones(); loadStats();
+      }
+    });
+    $('#filterStatus').addEventListener('change', function() {
+      search();
+    });
     function refreshAll() {
       // Clear filters and reload all
       $('#filterName').value = '';

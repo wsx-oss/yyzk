@@ -171,23 +171,23 @@
   <div class="stats-grid" id="statsGrid">
     <div class="stat-box">
       <div class="stat-label">备份总数</div>
-      <div class="stat-value info" id="statTotal">-</div>
+      <div class="stat-value info" id="statTotal" style="color:#94a3b8;">0</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">成功备份</div>
-      <div class="stat-value success" id="statSuccess">-</div>
+      <div class="stat-value success" id="statSuccess" style="color:#94a3b8;">0</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">失败备份</div>
-      <div class="stat-value danger" id="statFailed">-</div>
+      <div class="stat-value danger" id="statFailed" style="color:#94a3b8;">0</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">占用空间</div>
-      <div class="stat-value info" id="statSize">-</div>
+      <div class="stat-value info" id="statSize" style="color:#94a3b8;">0 B</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">最近备份</div>
-      <div class="stat-value" id="statLast" style="font-size:15px;">-</div>
+      <div class="stat-value" id="statLast" style="font-size:15px;color:#94a3b8;">暂无</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">自动备份</div>
@@ -292,11 +292,11 @@
       try {
         const res = await api('/backup/status');
         const d = await res.json();
-        $('#statTotal').textContent = d.total ?? '-';
-        $('#statSuccess').textContent = d.success ?? '-';
-        $('#statFailed').textContent = d.failed ?? '-';
-        $('#statSize').textContent = formatBytes(d.total_size || 0);
-        $('#statLast').textContent = d.last_backup ? formatDate(d.last_backup) : '暂无';
+        const elTotal = $('#statTotal'); elTotal.textContent = d.total ?? 0; elTotal.style.color = '';
+        const elSuccess = $('#statSuccess'); elSuccess.textContent = d.success ?? 0; elSuccess.style.color = '';
+        const elFailed = $('#statFailed'); elFailed.textContent = d.failed ?? 0; elFailed.style.color = '';
+        const elSize = $('#statSize'); elSize.textContent = formatBytes(d.total_size || 0); elSize.style.color = '';
+        const elLast = $('#statLast'); elLast.textContent = d.last_backup ? formatDate(d.last_backup) : '暂无'; elLast.style.color = d.last_backup ? '' : '#94a3b8';
         autoEnabled = !!d.auto_enabled;
         updateAutoUI();
       } catch (e) {
@@ -387,7 +387,13 @@
 
     // ---- Manual backup ----
 
+    let _backupInProgress = false;
     async function manualBackup() {
+      if (_backupInProgress) return;
+      _backupInProgress = true;
+      const btn = document.querySelector('[onclick="manualBackup()"]');
+      const origText = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = '备份中...'; }
       const username = localStorage.getItem('username') || 'user';
       try {
         const res = await api('/backup/manual', {
@@ -402,6 +408,10 @@
           showToast(d.error || '备份失败', 'error');
         }
       } catch (e) { showToast('请求失败', 'error'); }
+      finally {
+        _backupInProgress = false;
+        if (btn) { btn.disabled = false; btn.textContent = origText; }
+      }
     }
 
     // ---- Restore from backup record ----

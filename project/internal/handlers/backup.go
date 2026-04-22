@@ -347,14 +347,17 @@ func (b *BackupAPI) DownloadBackup(c *gin.Context) {
 
 // BackupStatus returns a summary: total backups, last backup time, auto-backup status.
 func (b *BackupAPI) BackupStatus(c *gin.Context) {
-	var total int
-	b.db.QueryRow(`SELECT COUNT(*) FROM backup_records`).Scan(&total)
-
 	var successCount int
 	b.db.QueryRow(`SELECT COUNT(*) FROM backup_records WHERE status='success'`).Scan(&successCount)
 
 	var failCount int
-	b.db.QueryRow(`SELECT COUNT(*) FROM backup_records WHERE status='failed'`).Scan(&failCount)
+	b.db.QueryRow(`SELECT COUNT(*) FROM backup_records WHERE status IN ('failed','timeout_failed')`).Scan(&failCount)
+
+	var runningCount int
+	b.db.QueryRow(`SELECT COUNT(*) FROM backup_records WHERE status='running'`).Scan(&runningCount)
+
+	// total = success + failed + running so stats are always consistent
+	total := successCount + failCount + runningCount
 
 	var lastBackup sql.NullString
 	b.db.QueryRow(`SELECT created_at FROM backup_records WHERE status='success' ORDER BY created_at DESC LIMIT 1`).Scan(&lastBackup)
@@ -366,6 +369,7 @@ func (b *BackupAPI) BackupStatus(c *gin.Context) {
 		"total":        total,
 		"success":      successCount,
 		"failed":       failCount,
+		"running":      runningCount,
 		"last_backup":  lastBackup.String,
 		"total_size":   totalSize,
 		"storage":      "database",

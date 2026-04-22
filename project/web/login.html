@@ -350,7 +350,7 @@
     <h1>云翼智控</h1>
     <div class="login-subtitle">智能工具人机交互与远程控制系统</div>
     <div class="error-msg" id="errorMsg"></div>
-    <form id="loginForm">
+    <form id="loginForm" method="post" action="/api/auth/login" autocomplete="on" novalidate>
       <div class="form-group">
         <label for="username">用户名</label>
         <input type="text" id="username" name="username" required autocomplete="username" placeholder="请输入用户名" />

@@ -2366,20 +2366,26 @@ window.addEventListener('hashchange', handleHashNavigation);
 
 // ---- Init ----
 loadTdtConfig().then(() => {
-  loadOverview();
-  loadBatches();
+  loadOverview().catch(e => console.error('loadOverview failed:', e));
+  loadBatches().catch(e => console.error('loadBatches failed:', e));
   handleHashNavigation();
+}).catch(e => {
+  console.error('Simulation init failed:', e);
+  const content = document.querySelector('.content');
+  if (content) content.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>仿真引擎初始化失败，请检查网络连接后刷新页面</p><button class="btn btn-primary" onclick="location.reload()">重新加载</button></div>';
 });
-connectWS();
+try { connectWS(); } catch(e) { console.error('WS connect failed:', e); }
 refreshTimer = setInterval(() => {
-  loadMetrics();
-  const activePanel = document.querySelector('.panel.active');
-  if(activePanel) {
-    if(activePanel.id === 'panel-overview') loadOverview();
-    if(activePanel.id === 'panel-instances') loadInstances();
-    if(activePanel.id === 'panel-datascreen' && document.getElementById('analyticsAutoRefresh').checked) { loadSimStats(); updateDsStats(); }
-    if(activePanel.id === 'panel-rl') loadRLStatus();
-  }
+  try {
+    loadMetrics();
+    const activePanel = document.querySelector('.panel.active');
+    if(activePanel) {
+      if(activePanel.id === 'panel-overview') loadOverview();
+      if(activePanel.id === 'panel-instances') loadInstances();
+      if(activePanel.id === 'panel-datascreen' && document.getElementById('analyticsAutoRefresh').checked) { loadSimStats(); updateDsStats(); }
+      if(activePanel.id === 'panel-rl') loadRLStatus();
+    }
+  } catch(e) { console.error('refresh error:', e); }
 }, 5000);
 </script>
 </body>

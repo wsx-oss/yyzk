@@ -480,6 +480,8 @@
     const altEnabled=document.getElementById('altEnabled').checked;
     const altLimit=altEnabled?parseInt(document.getElementById('altLimit').value)||0:-1;
     if(!name){showToast('请输入区域名称','error');return;}
+    if(name.length<3){showToast('区域名称至少需要3个字符','error');return;}
+    if(/^\d+$/.test(name)){showToast('区域名称不能为纯数字','error');return;}
     if(!pendingShape){showToast('请先绘制区域','error');return;}
 
     let shapeJSON,areaM2=0;

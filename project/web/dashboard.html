@@ -938,7 +938,12 @@
         // Update breadcrumb
         bcCurrent.textContent = target.dataset.label || page;
       }
-      iframe.src = `/app/modules/${page}.html${hash}`;
+      // Clear old content before loading new page to prevent stale display
+      const newSrc = `/app/modules/${page}.html${hash}`;
+      if (iframe.contentDocument) {
+        try { iframe.contentDocument.open(); iframe.contentDocument.write(''); iframe.contentDocument.close(); } catch(e) {}
+      }
+      iframe.src = newSrc;
     }
 
     document.querySelectorAll('.nav-item a[data-page], .nav-item-link[data-page]').forEach(item => {
