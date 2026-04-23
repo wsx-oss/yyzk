@@ -586,7 +586,7 @@
     document.getElementById('btnPrev').disabled=currentPage<=1;
     document.getElementById('btnNext').disabled=currentPage>=totalPages;
     const body=document.getElementById('nfzListBody');
-    if(!page.length){body.innerHTML='<div class="nfz-empty">暂无禁飞区数据</div>';return;}
+    if(!page.length){var ft=document.getElementById('filterType').value;var emptyText=ft?'暂无'+ft+'数据':'暂无区域数据';body.innerHTML='<div class="nfz-empty">'+emptyText+'</div>';return;}
     body.innerHTML=page.map(z=>{
       const areaKm=(z.area_m2/1e6).toFixed(2);
       const shapeLabel=z.shape_type==='circle'?'圆形':'多边形';

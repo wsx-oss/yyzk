@@ -329,7 +329,7 @@
             <td>${formatDate(r.created_at)}</td>
             <td>
               <div class="ops-cell">
-                ${r.status === 'success' ? `
+                ${r.status !== 'running' ? `
                   <button class="btn-sm btn-restore" onclick="confirmRestore(${r.id})">恢复</button>
                   <button class="btn-sm btn-download" onclick="downloadBackup(${r.id})">下载</button>
                 ` : ''}

@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/app/modules/common.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
+    .module-container { padding: 20px 28px; max-width: 1600px; margin: 0 auto; }
     .module-title::before { content: "\1F4F6"; }
 
     /* Overview cards */
@@ -90,6 +91,16 @@
   <div class="module-container">
     <h2 class="module-title">MAVLink 遥测数据</h2>
     <p class="module-desc">实时查看通过 MAVLink 协议连接的无人机遥测数据，包括位置、姿态、电池、飞行状态等信息。</p>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;justify-content:flex-end;">
+      <span style="font-size:13px;color:var(--cc-text-3);">自动刷新:</span>
+      <select id="mavRefreshInterval" class="filter-group" style="width:auto;padding:5px 10px;border-radius:8px;font-size:13px;" onchange="changeMavRefresh()">
+        <option value="5000" selected>5秒</option>
+        <option value="2000">2秒</option>
+        <option value="10000">10秒</option>
+        <option value="0">关闭</option>
+      </select>
+      <button class="btn btn-secondary" style="padding:5px 14px;font-size:13px;border-radius:8px;" onclick="refresh()">立即刷新</button>
+    </div>
 
     <!-- Overview -->
     <div class="overview-row" id="overview">
@@ -122,25 +133,31 @@
 
     <!-- Tab: Messages -->
     <div class="tab-content" id="tab-messages">
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <select id="msgSysFilter" class="cc-select" style="width:160px;"><option value="">全部无人机</option></select>
-        <select id="msgSevFilter" class="cc-select" style="width:140px;">
-          <option value="">全部级别</option>
-          <option value="emergency">Emergency</option>
-          <option value="alert">Alert</option>
-          <option value="critical">Critical</option>
-          <option value="error">Error</option>
-          <option value="warning">Warning</option>
-          <option value="info">Info</option>
-        </select>
-        <button class="cc-btn" onclick="loadMessages()">刷新</button>
+      <div class="filter-row" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="filter-group">
+          <label>无人机</label>
+          <select id="msgSysFilter" style="width:160px;"><option value="">全部无人机</option></select>
+        </div>
+        <div class="filter-group">
+          <label>级别</label>
+          <select id="msgSevFilter" style="width:140px;">
+            <option value="">全部级别</option>
+            <option value="emergency">Emergency</option>
+            <option value="alert">Alert</option>
+            <option value="critical">Critical</option>
+            <option value="error">Error</option>
+            <option value="warning">Warning</option>
+            <option value="info">Info</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary" style="padding:5px 14px;font-size:13px;border-radius:8px;height:34px;" onclick="loadMessages()">刷新</button>
       </div>
       <table class="msg-table">
         <thead><tr><th>时间</th><th>无人机</th><th>级别</th><th>消息</th></tr></thead>
         <tbody id="msgBody"><tr><td colspan="4" style="text-align:center;color:var(--cc-text-3);">加载中...</td></tr></tbody>
       </table>
       <div style="margin-top:12px;text-align:center;">
-        <button class="cc-btn cc-btn-text" id="msgLoadMore" onclick="loadMessages(true)">加载更多</button>
+        <button class="btn btn-outline" style="padding:5px 16px;font-size:13px;" id="msgLoadMore" onclick="loadMessages(true)">加载更多</button>
       </div>
     </div>
   </div>
@@ -449,15 +466,27 @@
     }
 
     // ============ Auto-refresh ============
+    let mavRefreshTimer = null;
+    let msgRefreshTimer = null;
+
     async function refresh() {
       await loadOverview();
       await loadDrones();
     }
 
+    function changeMavRefresh() {
+      if (mavRefreshTimer) { clearInterval(mavRefreshTimer); mavRefreshTimer = null; }
+      if (msgRefreshTimer) { clearInterval(msgRefreshTimer); msgRefreshTimer = null; }
+      const ms = parseInt(document.getElementById('mavRefreshInterval').value);
+      if (ms > 0) {
+        mavRefreshTimer = setInterval(refresh, ms);
+        msgRefreshTimer = setInterval(() => loadMessages(), ms * 3);
+      }
+    }
+
     refresh();
-    setInterval(refresh, 5000);
     loadMessages();
-    setInterval(() => loadMessages(), 15000);
+    changeMavRefresh();
 
     // Cleanup SSE on unload
     window.addEventListener('beforeunload', () => { if (sseSource) sseSource.close(); });

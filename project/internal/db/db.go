@@ -45,6 +45,8 @@ func AdaptSQL(s string) string {
 	s = strings.ReplaceAll(s, "datetime('now', '-15 seconds')", "DATE_SUB(NOW(), INTERVAL 15 SECOND)")
 	s = strings.ReplaceAll(s, "datetime('now','-10 minutes')", "DATE_SUB(NOW(), INTERVAL 10 MINUTE)")
 	s = strings.ReplaceAll(s, "datetime('now', '-10 minutes')", "DATE_SUB(NOW(), INTERVAL 10 MINUTE)")
+	s = strings.ReplaceAll(s, "datetime('now','-1 hour')", "DATE_SUB(NOW(), INTERVAL 1 HOUR)")
+	s = strings.ReplaceAll(s, "datetime('now', '-1 hour')", "DATE_SUB(NOW(), INTERVAL 1 HOUR)")
 	s = strings.ReplaceAll(s, "datetime('now','-7 days')", "DATE_SUB(NOW(), INTERVAL 7 DAY)")
 	s = strings.ReplaceAll(s, "datetime('now', '-7 days')", "DATE_SUB(NOW(), INTERVAL 7 DAY)")
 	// datetime('now') -> NOW()
@@ -834,6 +836,10 @@ func migrateSQLite(db *sql.DB) error {
 	// add new columns to existing tables
 	db.Exec(`ALTER TABLE backup_records ADD COLUMN sql_content TEXT`)
 	db.Exec(`ALTER TABLE recordings ADD COLUMN file_data BLOB`)
+
+	// add indexes for backup_records
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_backup_records_status ON backup_records(status)`)
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_backup_records_created ON backup_records(created_at)`)
 
 	return nil
 }

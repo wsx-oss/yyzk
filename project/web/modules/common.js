@@ -96,27 +96,36 @@ function loadTdtConfig() {
 }
 
 // API helper with authentication
+var _apiActiveCount = 0;
 async function api(path, options = {}) {
-  const token = localStorage.getItem("token");
-  const headers = options.headers || {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  var _gl = document.getElementById('globalLoading');
+  _apiActiveCount++;
+  if (_gl && _apiActiveCount === 1) _gl.style.display = 'flex';
+  try {
+    const token = localStorage.getItem("token");
+    const headers = options.headers || {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    if (
+      options.body &&
+      typeof options.body === "object" &&
+      !(options.body instanceof FormData)
+    ) {
+      headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(options.body);
+    }
+    const res = await fetch("/api" + path, { ...options, headers });
+    if (res.status === 401) {
+      localStorage.removeItem("token");
+      window.top.location.href = "/app/login.html";
+      throw new Error("Unauthorized");
+    }
+    return res;
+  } finally {
+    _apiActiveCount--;
+    if (_gl && _apiActiveCount <= 0) { _gl.style.display = 'none'; _apiActiveCount = 0; }
   }
-  if (
-    options.body &&
-    typeof options.body === "object" &&
-    !(options.body instanceof FormData)
-  ) {
-    headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(options.body);
-  }
-  const res = await fetch("/api" + path, { ...options, headers });
-  if (res.status === 401) {
-    localStorage.removeItem("token");
-    window.top.location.href = "/app/login.html";
-    throw new Error("Unauthorized");
-  }
-  return res;
 }
 
 // Format date
