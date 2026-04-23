@@ -310,7 +310,7 @@
           maintainAspectRatio: false,
           cutout: '65%',
           plugins: {
-            legend: { position: 'right', labels: { font: { size: 12, weight: '500' }, padding: 14, usePointStyle: true, pointStyle: 'circle' } },
+            legend: { position: 'bottom', labels: { font: { size: 12, weight: '500' }, padding: 14, usePointStyle: true, pointStyle: 'circle' } },
             tooltip: { callbacks: { label: function(ctx){ var t=ctx.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(ctx.raw/t*100).toFixed(1):0; return ' '+ctx.label+': '+ctx.raw+'% (占比'+p+'%)'; } } }
           }
         }

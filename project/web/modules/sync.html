@@ -829,7 +829,7 @@
           maintainAspectRatio: false,
           cutout: '65%',
           plugins: {
-            legend: { position: 'right', labels: { padding: 14, usePointStyle: true, pointStyle: 'circle', font: { size: 12, weight: '500' } } },
+            legend: { position: 'bottom', labels: { padding: 14, usePointStyle: true, pointStyle: 'circle', font: { size: 12, weight: '500' } } },
             tooltip: { callbacks: { label: function(c){ var t=c.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(c.raw/t*100).toFixed(1):0; return ' '+c.label+': '+c.raw+' 个 ('+p+'%)'; } } }
           }
         }

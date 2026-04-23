@@ -230,12 +230,12 @@ func (b *BackupAPI) RestoreBackup(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "备份记录不存在"})
 		return
 	}
-	if status != "success" {
-		c.JSON(400, gin.H{"error": "该备份状态不是 success，无法恢复"})
+	if status == "running" {
+		c.JSON(400, gin.H{"error": "该备份正在进行中，无法恢复"})
 		return
 	}
 	if !sqlContent.Valid || sqlContent.String == "" {
-		c.JSON(400, gin.H{"error": "备份数据为空"})
+		c.JSON(400, gin.H{"error": "该备份无有效数据内容，无法恢复"})
 		return
 	}
 
@@ -398,7 +398,7 @@ func (b *BackupAPI) CleanupOldBackups(c *gin.Context) {
 // This prevents tasks from being stuck in "running" status forever.
 func (b *BackupAPI) cleanupStaleBackups() {
 	result, err := b.db.Exec(
-		`UPDATE backup_records SET status='timeout_failed', remark=COALESCE(remark,'') || ' | 超时自动标记失败' WHERE status='running' AND created_at < datetime('now', '-1 hour')`,
+		`UPDATE backup_records SET status='timeout_failed', remark=CONCAT(COALESCE(remark,''), ' | 超时自动标记失败') WHERE status='running' AND created_at < datetime('now', '-1 hour')`,
 	)
 	if err != nil {
 		log.Printf("[Backup] stale cleanup query error: %v", err)
@@ -448,7 +448,7 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 		if r := recover(); r != nil {
 			elapsed := time.Since(start).Milliseconds()
 			log.Printf("[Backup] PANIC recovered in doBackup: %v", r)
-			b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | panic: ' || ?, duration_ms=? WHERE id=?`,
+			b.db.Exec(`UPDATE backup_records SET status='failed', remark=CONCAT(COALESCE(remark,''), ' | panic: ', ?), duration_ms=? WHERE id=?`,
 				fmt.Sprintf("%v", r), elapsed, recordID)
 			b.db.Exec(`INSERT INTO notifications(type, title, message, source) VALUES(?,?,?,?)`,
 				"backup", "备份异常崩溃",
@@ -463,7 +463,7 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 
 	if err != nil {
 		log.Printf("[Backup] dump failed: %v", err)
-		b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | 错误: ' || ?, duration_ms=?, finished_at=datetime('now') WHERE id=?`,
+		b.db.Exec(`UPDATE backup_records SET status='failed', remark=CONCAT(COALESCE(remark,''), ' | 错误: ', ?), duration_ms=?, finished_at=datetime('now') WHERE id=?`,
 			err.Error(), elapsed, recordID)
 		// Send failure notification
 		b.db.Exec(`INSERT INTO notifications(type, title, message, source) VALUES(?,?,?,?)`,
@@ -484,11 +484,18 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 // dumpToString exports all user tables to a SQL string stored in DB. Returns (sqlContent, tableCount, totalRows, error).
 func (b *BackupAPI) dumpToString() (string, int, int, error) {
 	raw := b.db.Raw()
+	isMySQL := db.IsMySQL()
 
-	// Get list of tables (SQLite compatible)
-	rows, err := raw.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+	// Get list of tables
+	var tableQuery string
+	if isMySQL {
+		tableQuery = "SHOW TABLES"
+	} else {
+		tableQuery = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+	}
+	rows, err := raw.Query(tableQuery)
 	if err != nil {
-		return "", 0, 0, fmt.Errorf("query sqlite_master: %w", err)
+		return "", 0, 0, fmt.Errorf("query tables: %w", err)
 	}
 	var tables []string
 	for rows.Next() {
@@ -504,7 +511,11 @@ func (b *BackupAPI) dumpToString() (string, int, int, error) {
 	fmt.Fprintf(&buf, "-- 云翼智控 Database Backup\n")
 	fmt.Fprintf(&buf, "-- Generated at: %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(&buf, "-- Tables: %d\n", len(tables))
-	fmt.Fprintf(&buf, "PRAGMA foreign_keys = OFF;\n\n")
+	if isMySQL {
+		fmt.Fprintf(&buf, "SET FOREIGN_KEY_CHECKS = 0;\n\n")
+	} else {
+		fmt.Fprintf(&buf, "PRAGMA foreign_keys = OFF;\n\n")
+	}
 
 	totalRows := 0
 	tableCount := 0
@@ -512,7 +523,12 @@ func (b *BackupAPI) dumpToString() (string, int, int, error) {
 	for _, table := range tables {
 		// Get CREATE TABLE statement
 		var createSQL string
-		err := raw.QueryRow("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&createSQL)
+		if isMySQL {
+			var tblName string
+			err = raw.QueryRow("SHOW CREATE TABLE `"+table+"`").Scan(&tblName, &createSQL)
+		} else {
+			err = raw.QueryRow("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&createSQL)
+		}
 		if err != nil {
 			continue
 		}
@@ -597,7 +613,11 @@ func (b *BackupAPI) dumpToString() (string, int, int, error) {
 		fmt.Fprintf(&buf, "-- Rows: %d\n\n", rowCount)
 	}
 
-	fmt.Fprintf(&buf, "PRAGMA foreign_keys = ON;\n")
+	if isMySQL {
+		fmt.Fprintf(&buf, "SET FOREIGN_KEY_CHECKS = 1;\n")
+	} else {
+		fmt.Fprintf(&buf, "PRAGMA foreign_keys = ON;\n")
+	}
 	fmt.Fprintf(&buf, "-- Backup complete: %d tables, %d rows\n", tableCount, totalRows)
 
 	return buf.String(), tableCount, totalRows, nil
@@ -755,7 +775,7 @@ func (b *BackupAPI) doBackupUnlocked(backupType, operator, remark string) {
 
 	if err != nil {
 		log.Printf("[Backup] dump failed: %v", err)
-		b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | 错误: ' || ?, duration_ms=?, finished_at=datetime('now') WHERE id=?`,
+		b.db.Exec(`UPDATE backup_records SET status='failed', remark=CONCAT(COALESCE(remark,''), ' | 错误: ', ?), duration_ms=?, finished_at=datetime('now') WHERE id=?`,
 			err.Error(), elapsed, recordID)
 		return
 	}

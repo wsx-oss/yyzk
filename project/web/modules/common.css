@@ -1526,3 +1526,35 @@ body.ai-panel-open {
     padding-right: 0;
   }
 }
+
+/* Skeleton loading placeholder */
+.skeleton-loading {
+  background: linear-gradient(90deg, var(--cc-bg-3, #f2f3f5) 25%, var(--cc-border-light, #e5e6eb) 50%, var(--cc-bg-3, #f2f3f5) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 8px;
+  min-height: 40px;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Global loading overlay */
+.global-loading-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,0.45);
+  z-index: 99999;
+  justify-content: center;
+  align-items: center;
+}
+.global-loading-overlay .spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--cc-border, #e5e6eb);
+  border-top-color: var(--cc-primary, #165dff);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

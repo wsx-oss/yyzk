@@ -739,7 +739,7 @@ th,
     <input type="checkbox" id="mapAutoRefresh" checked style="display:none;">
     <input type="checkbox" id="mapShowRoutes" checked style="display:none;">
     <input type="checkbox" id="mapShowLabels" checked style="display:none;">
-    <input type="checkbox" id="mapShowZones" style="display:none;">
+    <input type="checkbox" id="mapShowZones" checked style="display:none;">
     <input type="checkbox" id="mapUseCurve" checked style="display:none;">
     <input type="checkbox" id="analyticsAutoRefresh" checked style="display:none;">
 
@@ -817,6 +817,7 @@ th,
               <label class="ds-map-opt"><input type="checkbox" id="dsMapShowRoutes" checked onchange="document.getElementById('mapShowRoutes').checked=this.checked;refreshMap();"> 航线</label>
               <label class="ds-map-opt"><input type="checkbox" id="dsMapShowLabels" checked onchange="document.getElementById('mapShowLabels').checked=this.checked;refreshMap();"> 标签</label>
               <label class="ds-map-opt"><input type="checkbox" id="dsMapCurve" checked onchange="document.getElementById('mapUseCurve').checked=this.checked;refreshMap();"> 曲线</label>
+              <label class="ds-map-opt"><input type="checkbox" id="dsMapShowZones" checked onchange="document.getElementById('mapShowZones').checked=this.checked;drawBatchZones(cachedBatches||[]);"> 区域</label>
               <span id="mapDroneCount" style="margin-left:auto;font-size:11px;color:#7ec7ff;"></span>
             </div>
             <div id="simMap"></div>
