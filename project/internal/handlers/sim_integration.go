@@ -169,10 +169,10 @@ func (p *SimTelemetryPusher) pushBatteryUpdate(snap simulation.TelemetrySnapshot
 	)
 
 	// Auto-generate alerts for sim drones too (skip level=0 as unknown)
-	if snap.Battery.Level > 0 && snap.Battery.Level <= 20 {
+	if snap.Battery.Level > 0 && snap.Battery.Level <= 10 {
 		msg := fmt.Sprintf("[模拟]无人机[%s]电量低: %d%%", deviceName, snap.Battery.Level)
 		alertType := "电量低"
-		if snap.Battery.Level <= 10 {
+		if snap.Battery.Level <= 5 {
 			msg = fmt.Sprintf("[模拟]无人机[%s]电量严重不足: %d%%，强制返航", deviceName, snap.Battery.Level)
 			alertType = "电量严重不足"
 		}
@@ -180,7 +180,7 @@ func (p *SimTelemetryPusher) pushBatteryUpdate(snap simulation.TelemetrySnapshot
 			deviceID, deviceName, snap.Battery.Level, snap.Battery.Voltage, snap.Battery.Temperature, alertType, msg)
 		insertAlertDedup(p.db, "电池报警", "critical", msg)
 	}
-	if snap.Battery.Temperature >= 50 {
+	if snap.Battery.Temperature >= 60 {
 		msg := fmt.Sprintf("[模拟]无人机[%s]电池温度过高: %.1f°C", deviceName, snap.Battery.Temperature)
 		p.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			deviceID, deviceName, snap.Battery.Level, snap.Battery.Voltage, snap.Battery.Temperature, "温度过高", msg)

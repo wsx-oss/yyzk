@@ -86,6 +86,7 @@
         <button class="btn btn-secondary" onclick="importAlerts()">导入</button>
         <button class="btn btn-secondary" onclick="exportAlerts()">导出</button>
         <button class="btn btn-danger" onclick="clearResolved()">清空已解决报警</button>
+        <button class="btn btn-danger" onclick="clearAllAlerts()">清空全部报警</button>
       </div>
     </div>
     <div class="filter-row">
@@ -587,6 +588,21 @@
         const data = await res.json();
         if (data.ok) {
           showToast(`已清空 ${data.deleted} 条已解决报警`, 'success');
+          loadAlerts();
+        } else {
+          showToast(data.error || '操作失败', 'error');
+        }
+      } catch (e) { showToast(e.message || '操作失败', 'error'); }
+    }
+
+    // ========== Clear All ==========
+    async function clearAllAlerts() {
+      if (!confirm('确定要永久删除全部报警记录吗？此操作不可恢复！')) return;
+      try {
+        const res = await api('/alerts/clear-all', { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`已清空 ${data.deleted} 条报警`, 'success');
           loadAlerts();
         } else {
           showToast(data.error || '操作失败', 'error');

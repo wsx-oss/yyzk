@@ -36,7 +36,7 @@ type API struct {
 func insertAlertDedup(database *db.DB, category, severity, message string) {
 	var count int
 	err := database.QueryRow(
-		`SELECT COUNT(*) FROM alerts WHERE category=? AND message=? AND created_at > datetime('now', '-2 hours')`,
+		`SELECT COUNT(*) FROM alerts WHERE category=? AND message=? AND created_at > datetime('now', '-8 hours')`,
 		category, message,
 	).Scan(&count)
 	if err != nil || count > 0 {
@@ -261,6 +261,7 @@ func RegisterRoutes(r *gin.Engine, database *db.DB) {
 		api.POST("/alerts/new", a.AlertNew)
 		api.POST("/alerts/import", a.AlertsImport)
 		api.DELETE("/alerts/clear-resolved", a.AlertsClearResolved)
+		api.DELETE("/alerts/clear-all", a.AlertsClearAll)
 		api.GET("/alerts/stats", a.AlertsStats)
 		api.POST("/alerts/resolve/:id", a.AlertResolve)
 
@@ -1419,6 +1420,16 @@ func (a *API) AlertsImport(c *gin.Context) {
 
 func (a *API) AlertsClearResolved(c *gin.Context) {
 	result, err := a.db.Exec(`DELETE FROM alerts WHERE status = '已解决'`)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	affected, _ := result.RowsAffected()
+	c.JSON(200, gin.H{"ok": true, "deleted": affected})
+}
+
+func (a *API) AlertsClearAll(c *gin.Context) {
+	result, err := a.db.Exec(`DELETE FROM alerts`)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return

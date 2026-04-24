@@ -456,8 +456,8 @@
     body.ds-page-fullscreen .layout-navbar,
     body.ds-page-fullscreen .layout-sidebar { display:none !important; }
     body.ds-page-fullscreen .layout-content { margin-left:0 !important; padding-top:0 !important; }
-    body.ds-page-fullscreen .content-area { border-radius:0; }
-    body.ds-page-fullscreen iframe { border-radius:0; }
+    body.ds-page-fullscreen .content-area { border-radius:0; padding:0 !important; }
+    body.ds-page-fullscreen iframe { border-radius:0; min-height:100vh !important; height:100vh !important; box-shadow:none !important; background:transparent !important; }
 
     /* ===== Animations ===== */
     @keyframes menuFadeIn {
@@ -760,7 +760,6 @@
           <div class="nav-item"><a class="active" data-page="drones" data-label="无人机管理"><span class="nav-icon">🛩</span><span class="nav-text">无人机管理</span></a></div>
           <div class="nav-item"><a data-page="gps" data-label="GPS/位置信息"><span class="nav-icon">📡</span><span class="nav-text">GPS/位置信息</span></a></div>
           <div class="nav-item"><a data-page="video" data-label="视频监控"><span class="nav-icon">🎥</span><span class="nav-text">视频监控</span></a></div>
-          <div class="nav-item"><a data-page="alerts" data-label="异常报警"><span class="nav-icon">🚨</span><span class="nav-text">异常报警</span></a></div>
           <div class="nav-item"><a data-page="battery" data-label="电池监控"><span class="nav-icon">🔋</span><span class="nav-text">电池监控</span></a></div>
         </div>
       </div>
@@ -803,10 +802,11 @@
           <div class="nav-item"><a data-page="sync" data-label="数据同步状态"><span class="nav-icon">🔗</span><span class="nav-text">数据同步状态</span></a></div>
           <div class="nav-item"><a data-page="monitor" data-label="系统状态监控"><span class="nav-icon">💻</span><span class="nav-text">系统状态监控</span></a></div>
           <div class="nav-item"><a data-page="performance" data-label="性能分析报告"><span class="nav-icon">📈</span><span class="nav-text">性能分析报告</span></a></div>
+          <div class="nav-item"><a data-page="alerts" data-label="异常报警"><span class="nav-icon">🚨</span><span class="nav-text">异常报警</span></a></div>
         </div>
       </div>
     </nav>
-    <div class="sidebar-footer">v2.0 © 云翼智控</div>
+    <div class="sidebar-footer">V9.4.2 © 云翼智控</div>
   </aside>
 
   <!-- ===== Content ===== -->

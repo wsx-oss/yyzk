@@ -142,10 +142,10 @@ func (a *API) BatteryReport(c *gin.Context) {
 	canAnomaly := a.isDeviceOnlineForAnomaly(p.DeviceID)
 
 	// auto-generate alerts for abnormal conditions (skip when level is unknown/0/-1)
-	if canAnomaly && p.Level > 0 && p.Level <= 20 {
+	if canAnomaly && p.Level > 0 && p.Level <= 10 {
 		msg := fmt.Sprintf("无人机[%s]电量低: %d%%", deviceName, p.Level)
 		alertType := "电量低"
-		if p.Level <= 10 {
+		if p.Level <= 5 {
 			msg = fmt.Sprintf("无人机[%s]电量严重不足: %d%%，请立即返航！", deviceName, p.Level)
 			alertType = "电量严重不足"
 		}
@@ -153,13 +153,13 @@ func (a *API) BatteryReport(c *gin.Context) {
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, alertType, msg)
 		insertAlertDedup(a.db, "电池报警", "critical", msg)
 	}
-	if canAnomaly && p.Temperature >= 50 {
+	if canAnomaly && p.Temperature >= 60 {
 		msg := fmt.Sprintf("无人机[%s]电池温度过高: %.1f°C", deviceName, p.Temperature)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, "温度过高", msg)
 		insertAlertDedup(a.db, "电池报警", "warning", msg)
 	}
-	if canAnomaly && p.Health <= 50 {
+	if canAnomaly && p.Health <= 30 {
 		msg := fmt.Sprintf("无人机[%s]电池健康度低: %d%%，建议更换电池", deviceName, p.Health)
 		a.db.Exec(`INSERT INTO battery_alerts(device_id, device_name, level, voltage, temperature, alert_type, message) VALUES(?,?,?,?,?,?,?)`,
 			p.DeviceID, deviceName, p.Level, p.Voltage, p.Temperature, "健康度低", msg)
