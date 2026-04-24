@@ -46,7 +46,7 @@
       box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3);
       display: none; flex-direction: column; overflow: hidden;
       animation: aiSlideUp 0.3s ease-out;
-      font-family: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
+      font-family: "Noto Sans SC", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
     }
     #ai-panel.open { display: flex; }
 

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&display=swap');
+
 /* ================================================================
    云翼智控 Design System — inspired by Arco Design Pro
    ================================================================ */
@@ -42,7 +44,7 @@
   --cc-radius-xl: 22px;
   --cc-radius-sm: 10px;
   --cc-radius-pill: 999px;
-  --cc-font: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
+  --cc-font: "Noto Sans SC", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
   --cc-transition: 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
   --cc-glass-bg: rgba(255,255,255,0.58);
   --cc-glass-bg-strong: rgba(255,255,255,0.76);

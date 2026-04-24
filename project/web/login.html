@@ -5,64 +5,94 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>登录 - 云翼智控</title>
   <link rel="icon" type="image/jpeg" href="/app/logo.jpg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&display=swap" rel="stylesheet" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
-      background:
-        linear-gradient(135deg, rgba(8, 15, 28, 0.92) 0%, rgba(10, 18, 34, 0.88) 100%),
-        url("/app/login-bg.png") center center / cover no-repeat fixed;
+      font-family: "Noto Sans SC", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
       min-height: 100vh;
       position: relative;
       overflow: hidden;
+      background: #060a14;
+      -webkit-font-smoothing: antialiased;
     }
-    /* 登录卡片 */
+
+    /* ---- Full-screen background image ---- */
+    .bg-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: url("/app/login-bg.png") center center / cover no-repeat;
+    }
+    /* Thin gradient veil — keeps text readable without hiding the image */
+    .bg-layer::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(105deg, rgba(4, 10, 22, 0.72) 0%, rgba(4, 10, 22, 0.38) 50%, rgba(4, 10, 22, 0.18) 100%);
+    }
+
+    /* ---- Main layout ---- */
     .login-shell {
       position: relative;
       z-index: 10;
-      width: min(1100px, 100%);
+      width: 100%;
+      max-width: 1200px;
       min-height: 100vh;
+      margin: 0 auto;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+      grid-template-columns: 1fr minmax(380px, 440px);
       align-items: center;
-      gap: clamp(24px, 5vw, 64px);
-      padding: 40px 48px 56px;
+      gap: clamp(32px, 6vw, 80px);
+      padding: 40px 56px 56px;
     }
+
+    /* ---- Left hero panel ---- */
     .hero-panel {
       color: #e2e8f0;
-      max-width: 560px;
-      padding-right: 24px;
+      max-width: 580px;
     }
     .hero-kicker {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 7px 14px;
+      padding: 7px 16px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.10);
-      color: rgba(226,232,240,0.80);
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(226,232,240,0.85);
       font-size: 13px;
       letter-spacing: 0.06em;
-      margin-bottom: 18px;
+      margin-bottom: 22px;
     }
     .hero-title {
-      font-size: clamp(32px, 4vw, 52px);
-      line-height: 1.12;
+      font-size: clamp(30px, 3.6vw, 48px);
+      line-height: 1.18;
       font-weight: 700;
-      letter-spacing: -0.03em;
-      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+      margin-bottom: 18px;
+      text-shadow: 0 2px 24px rgba(0,0,0,0.5);
     }
     .hero-title strong {
-      color: #7dd3fc;
+      background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 50%, #6ee7b7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
       font-weight: 700;
     }
     .hero-copy {
       font-size: 15px;
-      line-height: 1.8;
-      color: rgba(226,232,240,0.65);
+      line-height: 1.85;
+      color: rgba(226,232,240,0.62);
       max-width: 480px;
-      margin-bottom: 24px;
+      margin-bottom: 28px;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.4);
     }
     .hero-highlights {
       display: flex;
@@ -70,111 +100,148 @@
       flex-wrap: wrap;
     }
     .hero-chip {
-      padding: 10px 16px;
-      border-radius: 10px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.10);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .hero-chip:hover {
+      transform: translateY(-2px);
+      border-color: rgba(125,211,252,0.3);
     }
     .hero-chip-title {
       font-size: 11px;
-      color: rgba(148,163,184,0.80);
-      margin-bottom: 4px;
-      letter-spacing: 0.06em;
+      color: rgba(148,163,184,0.78);
+      margin-bottom: 5px;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
     }
     .hero-chip-value {
       font-size: 15px;
-      color: #f8fafc;
+      color: #f1f5f9;
       font-weight: 600;
     }
+
+    /* ---- Right: Glass login card ---- */
     .login-card {
-      background: rgba(12, 20, 36, 0.65);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(148, 197, 255, 0.12);
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-      padding: 40px 34px;
-      width: min(420px, 100%);
+      background: rgba(10, 18, 34, 0.42);
+      backdrop-filter: blur(32px) saturate(140%);
+      -webkit-backdrop-filter: blur(32px) saturate(140%);
+      border: 1px solid rgba(148, 197, 255, 0.16);
+      border-radius: 24px;
+      box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      padding: 44px 36px 38px;
+      width: 100%;
+      max-width: 440px;
       justify-self: end;
       position: relative;
+      overflow: hidden;
     }
+    /* Subtle top-edge glow */
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 20%; right: 20%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(125,211,252,0.5), transparent);
+    }
+
     .login-logo {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 12px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     .login-logo img {
-      width: 42px;
-      height: 42px;
-      border-radius: 10px;
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
       object-fit: cover;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
     .login-card h1 {
-      font-size: 21px;
-      color: #e2e8f0;
+      font-size: 22px;
+      color: #f1f5f9;
       text-align: center;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       font-weight: 700;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
     }
     .login-subtitle {
       text-align: center;
       font-size: 13px;
-      color: rgba(176, 197, 228, 0.60);
-      margin-bottom: 28px;
+      color: rgba(176, 197, 228, 0.55);
+      margin-bottom: 30px;
       line-height: 1.8;
     }
+
+    /* ---- Form ---- */
     .form-group {
       margin-bottom: 20px;
     }
     .form-group label {
       display: block;
       font-size: 13px;
-      color: #94a3b8;
+      color: rgba(176, 197, 228, 0.72);
       margin-bottom: 8px;
       font-weight: 500;
     }
     .form-group input {
       width: 100%;
-      padding: 12px 16px;
+      padding: 13px 16px;
       border: 1px solid rgba(148, 197, 255, 0.14);
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 14px;
-      background: rgba(8, 16, 30, 0.5);
+      font-family: inherit;
+      background: rgba(6, 14, 28, 0.45);
       color: #e2e8f0;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
     }
-    .form-group input::placeholder { color: rgba(132, 157, 194, 0.45); }
+    .form-group input::placeholder { color: rgba(132, 157, 194, 0.38); }
     .form-group input:focus {
       outline: none;
-      border-color: #165dff;
-      box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.12);
-      background: rgba(8, 16, 30, 0.7);
+      border-color: rgba(78, 159, 255, 0.6);
+      box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.15), 0 0 20px rgba(22, 93, 255, 0.08);
+      background: rgba(6, 14, 28, 0.65);
     }
+
     .btn-login {
       width: 100%;
-      padding: 13px;
-      background: #165dff;
+      padding: 14px;
+      background: linear-gradient(135deg, #165dff 0%, #1e80ff 100%);
       color: #fff;
       border: none;
-      border-radius: 12px;
+      border-radius: 14px;
       font-size: 15px;
       font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
-      transition: background 0.2s, box-shadow 0.2s;
-      margin-top: 8px;
-      letter-spacing: 0.5px;
+      transition: all 0.25s;
+      margin-top: 10px;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 20px rgba(22, 93, 255, 0.25);
     }
-    .btn-login:hover { background: #1e6fff; box-shadow: 0 4px 16px rgba(22, 93, 255, 0.35); }
-    .btn-login:active { background: #0e42d2; }
+    .btn-login:hover {
+      background: linear-gradient(135deg, #1e6fff 0%, #3b8bff 100%);
+      box-shadow: 0 6px 28px rgba(22, 93, 255, 0.4);
+      transform: translateY(-1px);
+    }
+    .btn-login:active {
+      background: #0e42d2;
+      transform: translateY(0);
+    }
+
     .register-link {
       text-align: center;
-      margin-top: 20px;
+      margin-top: 22px;
       font-size: 13px;
-      color: rgba(176, 197, 228, 0.55);
+      color: rgba(176, 197, 228, 0.50);
     }
     .register-link a {
       color: #6aa1ff;
@@ -183,6 +250,7 @@
       transition: color 0.2s;
     }
     .register-link a:hover { color: #94bfff; text-decoration: underline; }
+
     .error-msg {
       background: rgba(239, 68, 68, 0.12);
       color: #f87171;
@@ -192,33 +260,40 @@
       margin-bottom: 16px;
       display: none;
       border: 1px solid rgba(248, 113, 113, 0.18);
+      backdrop-filter: blur(8px);
     }
+
     .footer {
-      position: absolute;
-      bottom: 20px;
+      position: fixed;
+      bottom: 18px;
+      left: 0; right: 0;
       text-align: center;
-      width: 100%;
       font-size: 12px;
-      color: rgba(176, 197, 228, 0.50);
+      color: rgba(176, 197, 228, 0.40);
       z-index: 10;
       letter-spacing: 0.5px;
     }
+
+    /* ---- Responsive ---- */
     @media (max-width: 960px) {
       .login-shell {
         grid-template-columns: 1fr;
         gap: 28px;
-        padding: 32px 20px 64px;
+        padding: 32px 20px 72px;
       }
-      .hero-panel { max-width: none; padding-right: 0; }
-      .login-card { justify-self: stretch; width: 100%; }
+      .hero-panel { max-width: none; }
+      .login-card { justify-self: center; max-width: 480px; }
     }
     @media (max-width: 640px) {
-      .hero-title { font-size: 28px; }
-      .login-card { padding: 32px 22px; }
+      .login-shell { padding: 24px 16px 72px; }
+      .hero-title { font-size: 26px; }
+      .login-card { padding: 32px 22px 28px; border-radius: 20px; }
     }
   </style>
 </head>
 <body>
+  <div class="bg-layer"></div>
+
   <div class="login-shell">
     <section class="hero-panel">
       <div class="hero-kicker">云翼智控 · Unified Drone Ops Console</div>
@@ -242,7 +317,7 @@
 
     <div class="login-card">
       <div class="login-logo">
-        <img src="/app/logo.jpg" alt="项目Logo" />
+        <img src="/app/logo.jpg" alt="云翼智控" />
       </div>
       <h1>云翼智控</h1>
       <div class="login-subtitle">欢迎回到统一管控台<br>登录后继续查看飞行、遥测与系统运行状态</div>
@@ -264,7 +339,7 @@
     </div>
   </div>
 
-  <div class="footer">云翼智控 &copy; 2025 — 智能工具人机交互与协同管控系统</div>
+  <div class="footer">云翼智控 &copy; 2026 — 智能工具人机交互与协同管控系统</div>
 
   <script>
     const form = document.getElementById('loginForm');

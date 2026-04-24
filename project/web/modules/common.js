@@ -15,7 +15,7 @@ const $$ = (q) => document.querySelectorAll(q);
     var defaults = Chart.defaults;
     defaults.color = textColor;
     defaults.borderColor = gridColor;
-    defaults.font.family = "'Source Han Sans SC', 'Source Han Sans CN', 'Source Han Sans', '思源黑体', sans-serif";
+    defaults.font.family = "'Noto Sans SC', 'Source Han Sans SC', 'Source Han Sans CN', 'Source Han Sans', '思源黑体', sans-serif";
     defaults.animation.duration = 750;
     defaults.animation.easing = 'easeOutQuart';
     defaults.responsive = true;
