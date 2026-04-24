@@ -10,184 +10,94 @@
     body {
       font-family: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
       background:
-        linear-gradient(90deg, rgba(5, 12, 22, 0.84) 0%, rgba(6, 14, 26, 0.52) 42%, rgba(5, 12, 22, 0.86) 100%),
-        radial-gradient(circle at 18% 22%, rgba(22,93,255,0.28), transparent 28%),
-        radial-gradient(circle at 82% 26%, rgba(20,201,201,0.16), transparent 22%),
+        linear-gradient(135deg, rgba(8, 15, 28, 0.92) 0%, rgba(10, 18, 34, 0.88) 100%),
         url("/app/login-bg.png") center center / cover no-repeat fixed;
       min-height: 100vh;
       position: relative;
       overflow: hidden;
     }
-    /* 动态网格背景 */
-    body::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      width: 200%;
-      height: 200%;
-      background-image:
-        linear-gradient(90deg, rgba(99,102,241,.06) 1px, transparent 1px),
-        linear-gradient(rgba(99,102,241,.06) 1px, transparent 1px);
-      background-size: 60px 60px;
-      animation: gridMove 25s linear infinite;
-    }
-    @keyframes gridMove {
-      0% { transform: translate(0, 0); }
-      100% { transform: translate(60px, 60px); }
-    }
-    /* 光晕 */
-    .glow-orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(80px);
-      opacity: 0.35;
-      pointer-events: none;
-      z-index: 1;
-    }
-    .glow-orb.orb1 { width: 500px; height: 500px; background: #6366f1; top: -10%; left: -8%; animation: orbFloat1 12s ease-in-out infinite; }
-    .glow-orb.orb2 { width: 400px; height: 400px; background: #165dff; bottom: -12%; right: -6%; animation: orbFloat2 15s ease-in-out infinite; }
-    .glow-orb.orb3 { width: 300px; height: 300px; background: #22c55e; top: 60%; left: 55%; opacity: 0.18; animation: orbFloat1 18s ease-in-out infinite reverse; }
-    @keyframes orbFloat1 {
-      0%,100% { transform: translate(0, 0) scale(1); }
-      50% { transform: translate(30px, -20px) scale(1.08); }
-    }
-    @keyframes orbFloat2 {
-      0%,100% { transform: translate(0, 0) scale(1); }
-      50% { transform: translate(-25px, 15px) scale(1.05); }
-    }
-    /* 浮动无人机 */
-    .floating-drone {
-      position: absolute;
-      opacity: 0.12;
-      z-index: 2;
-      pointer-events: none;
-    }
-    .floating-drone svg { filter: drop-shadow(0 0 8px rgba(99,102,241,0.4)); }
-    .fd1 { top: 12%; left: 8%; animation: droneDrift1 20s ease-in-out infinite; }
-    .fd2 { top: 65%; right: 10%; animation: droneDrift2 24s ease-in-out infinite; }
-    .fd3 { bottom: 18%; left: 25%; animation: droneDrift3 18s ease-in-out infinite; }
-    .fd4 { top: 20%; right: 22%; animation: droneDrift1 22s ease-in-out infinite reverse; opacity: 0.08; }
-    @keyframes droneDrift1 {
-      0%,100% { transform: translate(0,0) rotate(0deg); }
-      25% { transform: translate(40px,-20px) rotate(5deg); }
-      50% { transform: translate(15px,-35px) rotate(-3deg); }
-      75% { transform: translate(-20px,-10px) rotate(2deg); }
-    }
-    @keyframes droneDrift2 {
-      0%,100% { transform: translate(0,0) rotate(0deg); }
-      33% { transform: translate(-30px,20px) rotate(-4deg); }
-      66% { transform: translate(20px,10px) rotate(3deg); }
-    }
-    @keyframes droneDrift3 {
-      0%,100% { transform: translate(0,0) rotate(0deg); }
-      50% { transform: translate(25px,-25px) rotate(6deg); }
-    }
-    /* 粒子 */
-    .particles { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
-    .particle {
-      position: absolute;
-      width: 3px; height: 3px;
-      background: rgba(99,102,241,0.5);
-      border-radius: 50%;
-      animation: particleFloat linear infinite;
-    }
-    @keyframes particleFloat {
-      0% { transform: translateY(100vh) scale(0); opacity: 0; }
-      10% { opacity: 1; }
-      90% { opacity: 1; }
-      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
-    }
     /* 登录卡片 */
     .login-shell {
       position: relative;
       z-index: 10;
-      width: min(1240px, 100%);
+      width: min(1100px, 100%);
       min-height: 100vh;
       display: grid;
-      grid-template-columns: minmax(0, 1.12fr) minmax(380px, 440px);
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
       align-items: center;
-      gap: clamp(24px, 5vw, 72px);
+      gap: clamp(24px, 5vw, 64px);
       padding: 40px 48px 56px;
     }
     .hero-panel {
       color: #e2e8f0;
-      max-width: 620px;
+      max-width: 560px;
       padding-right: 24px;
     }
     .hero-kicker {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 14px;
+      padding: 7px 14px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.10);
-      border: 1px solid rgba(255,255,255,0.14);
-      color: rgba(226,232,240,0.92);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: rgba(226,232,240,0.80);
       font-size: 13px;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
       margin-bottom: 18px;
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
     }
     .hero-title {
-      font-size: clamp(38px, 5vw, 68px);
-      line-height: 1.02;
-      font-weight: 800;
-      letter-spacing: -0.04em;
-      margin-bottom: 18px;
-      text-shadow: 0 12px 40px rgba(0,0,0,0.28);
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 1.12;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
     }
     .hero-title strong {
       color: #7dd3fc;
-      font-weight: 800;
+      font-weight: 700;
     }
     .hero-copy {
-      font-size: 16px;
-      line-height: 1.9;
-      color: rgba(226,232,240,0.80);
-      max-width: 540px;
-      margin-bottom: 26px;
+      font-size: 15px;
+      line-height: 1.8;
+      color: rgba(226,232,240,0.65);
+      max-width: 480px;
+      margin-bottom: 24px;
     }
     .hero-highlights {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      max-width: 620px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
     }
     .hero-chip {
-      padding: 14px 16px;
-      border-radius: 18px;
-      background: rgba(8, 15, 28, 0.38);
-      border: 1px solid rgba(255,255,255,0.12);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
     }
     .hero-chip-title {
-      font-size: 12px;
-      color: rgba(148,163,184,0.92);
-      margin-bottom: 6px;
-      letter-spacing: 0.08em;
+      font-size: 11px;
+      color: rgba(148,163,184,0.80);
+      margin-bottom: 4px;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
     }
     .hero-chip-value {
-      font-size: 18px;
+      font-size: 15px;
       color: #f8fafc;
-      font-weight: 700;
-      letter-spacing: -0.02em;
+      font-weight: 600;
     }
     .login-card {
-      background: rgba(8, 16, 30, 0.42);
-      backdrop-filter: blur(30px) saturate(180%);
-      -webkit-backdrop-filter: blur(30px) saturate(180%);
-      border: 1px solid rgba(191, 219, 254, 0.18);
-      border-radius: 26px;
-      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.10);
-      padding: 42px 36px;
-      width: min(440px, 100%);
+      background: rgba(12, 20, 36, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 197, 255, 0.12);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      padding: 40px 34px;
+      width: min(420px, 100%);
       justify-self: end;
       position: relative;
-      overflow: hidden;
     }
     .login-logo {
       display: flex;
@@ -197,24 +107,23 @@
       margin-bottom: 10px;
     }
     .login-logo img {
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       border-radius: 10px;
       object-fit: cover;
-      filter: drop-shadow(0 0 10px rgba(99,102,241,0.5));
     }
     .login-card h1 {
-      font-size: 22px;
+      font-size: 21px;
       color: #e2e8f0;
       text-align: center;
       margin-bottom: 6px;
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
     }
     .login-subtitle {
       text-align: center;
       font-size: 13px;
-      color: rgba(191, 219, 254, 0.76);
+      color: rgba(176, 197, 228, 0.60);
       margin-bottom: 28px;
       line-height: 1.8;
     }
@@ -231,52 +140,41 @@
     .form-group input {
       width: 100%;
       padding: 12px 16px;
-      border: 1px solid rgba(22, 93, 255, 0.25);
+      border: 1px solid rgba(148, 197, 255, 0.14);
       border-radius: 10px;
       font-size: 14px;
-      background: rgba(15, 23, 42, 0.6);
+      background: rgba(8, 16, 30, 0.5);
       color: #e2e8f0;
-      transition: all 0.3s;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .form-group input::placeholder { color: #475569; }
+    .form-group input::placeholder { color: rgba(132, 157, 194, 0.45); }
     .form-group input:focus {
       outline: none;
       border-color: #165dff;
-      box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.15);
-      background: rgba(15, 23, 42, 0.8);
+      box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.12);
+      background: rgba(8, 16, 30, 0.7);
     }
     .btn-login {
       width: 100%;
       padding: 13px;
-      background: linear-gradient(135deg, #165dff 0%, #0e42d2 100%);
+      background: #165dff;
       color: #fff;
       border: none;
       border-radius: 12px;
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: background 0.2s, box-shadow 0.2s;
       margin-top: 8px;
       letter-spacing: 0.5px;
-      position: relative;
-      overflow: hidden;
     }
-    .btn-login::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
-      transform: translateX(-100%);
-      transition: transform 0.5s;
-    }
-    .btn-login:hover { box-shadow: 0 4px 20px rgba(22, 93, 255, 0.4); transform: translateY(-1px); }
-    .btn-login:hover::before { transform: translateX(100%); }
-    .btn-login:active { transform: scale(0.98) translateY(0); }
+    .btn-login:hover { background: #1e6fff; box-shadow: 0 4px 16px rgba(22, 93, 255, 0.35); }
+    .btn-login:active { background: #0e42d2; }
     .register-link {
       text-align: center;
       margin-top: 20px;
       font-size: 13px;
-      color: #64748b;
+      color: rgba(176, 197, 228, 0.55);
     }
     .register-link a {
       color: #6aa1ff;
@@ -286,137 +184,24 @@
     }
     .register-link a:hover { color: #94bfff; text-decoration: underline; }
     .error-msg {
-      background: rgba(239, 68, 68, 0.15);
+      background: rgba(239, 68, 68, 0.12);
       color: #f87171;
       padding: 10px 14px;
       border-radius: 10px;
       font-size: 13px;
       margin-bottom: 16px;
       display: none;
-      border: 1px solid rgba(248, 113, 113, 0.22);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(248, 113, 113, 0.18);
     }
-    /* 底部版权 */
     .footer {
       position: absolute;
       bottom: 20px;
       text-align: center;
       width: 100%;
       font-size: 12px;
-      color: rgba(176, 197, 228, 0.70);
+      color: rgba(176, 197, 228, 0.50);
       z-index: 10;
       letter-spacing: 0.5px;
-    }
-    /* 雷达脉冲置形 */
-    .radar-pulse {
-      position: absolute;
-      border-radius: 50%;
-      border: 1px solid rgba(22, 93, 255, 0.15);
-      pointer-events: none;
-      z-index: 2;
-      animation: radarPulse 4s ease-out infinite;
-    }
-    .radar-pulse::after {
-      content: '';
-      position: absolute;
-      inset: 20%;
-      border-radius: 50%;
-      border: 1px solid rgba(22, 93, 255, 0.1);
-      animation: radarPulse 4s ease-out infinite 1s;
-    }
-    .rp1 { width: 500px; height: 500px; top: -5%; right: -8%; animation-delay: 0s; }
-    .rp2 { width: 400px; height: 400px; bottom: 5%; left: -6%; animation-delay: 2s; }
-    @keyframes radarPulse {
-      0% { transform: scale(0.6); opacity: 0.6; }
-      100% { transform: scale(1.4); opacity: 0; }
-    }
-    /* 航线 SVG */
-    .flight-paths {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      pointer-events: none;
-      overflow: hidden;
-    }
-    .flight-paths svg { width: 100%; height: 100%; }
-    .flight-line {
-      fill: none;
-      stroke-width: 1.5;
-      stroke-dasharray: 8 12;
-      animation: dashFlow 20s linear infinite;
-      opacity: 0.25;
-    }
-    @keyframes dashFlow {
-      to { stroke-dashoffset: -200; }
-    }
-    /* 功能展示条 */
-    .feature-strip {
-      position: absolute;
-      bottom: 56px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 28px;
-      z-index: 10;
-    }
-    .feature-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      font-size: 12px;
-      color: rgba(176, 197, 228, 0.55);
-      letter-spacing: 0.3px;
-    }
-    .feature-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: rgba(22, 93, 255, 0.6);
-      box-shadow: 0 0 8px rgba(22, 93, 255, 0.4);
-      animation: dotPulse 2s ease-in-out infinite;
-    }
-    .feature-item:nth-child(2) .feature-dot { background: rgba(34, 197, 94, 0.6); box-shadow: 0 0 8px rgba(34, 197, 94, 0.4); animation-delay: 0.4s; }
-    .feature-item:nth-child(3) .feature-dot { background: rgba(99, 102, 241, 0.6); box-shadow: 0 0 8px rgba(99, 102, 241, 0.4); animation-delay: 0.8s; }
-    .feature-item:nth-child(4) .feature-dot { background: rgba(14, 165, 233, 0.6); box-shadow: 0 0 8px rgba(14, 165, 233, 0.4); animation-delay: 1.2s; }
-    @keyframes dotPulse {
-      0%,100% { opacity: 0.5; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.4); }
-    }
-    .login-card {
-      background: rgba(9, 16, 32, 0.58);
-      border: 1px solid rgba(148, 197, 255, 0.22);
-      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55), 0 0 48px rgba(22, 93, 255, 0.10), inset 0 1px 0 rgba(255,255,255,0.10);
-      backdrop-filter: blur(28px) saturate(180%);
-      -webkit-backdrop-filter: blur(28px) saturate(180%);
-      overflow: hidden;
-    }
-    .login-card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: linear-gradient(135deg, rgba(255,255,255,0.16), transparent 34%, rgba(78,159,255,0.08));
-      pointer-events: none;
-    }
-    .login-subtitle,
-    .register-link {
-      color: rgba(176, 197, 228, 0.70);
-    }
-    .form-group input {
-      background: rgba(8, 16, 30, 0.46);
-      border-color: rgba(148, 197, 255, 0.18);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
-    }
-    .form-group input::placeholder {
-      color: rgba(132, 157, 194, 0.52);
-    }
-    .form-group input:focus {
-      background: rgba(8, 16, 30, 0.72);
-      box-shadow: 0 0 0 3px rgba(78, 159, 255, 0.16), inset 0 1px 0 rgba(255,255,255,0.08);
-    }
-    .btn-login {
-      box-shadow: 0 10px 30px rgba(22, 93, 255, 0.28), inset 0 1px 0 rgba(255,255,255,0.18);
     }
     @media (max-width: 960px) {
       .login-shell {
@@ -424,117 +209,16 @@
         gap: 28px;
         padding: 32px 20px 64px;
       }
-      .hero-panel {
-        max-width: none;
-        padding-right: 0;
-      }
-      .hero-highlights {
-        grid-template-columns: 1fr;
-      }
-      .login-card {
-        justify-self: stretch;
-        width: 100%;
-      }
+      .hero-panel { max-width: none; padding-right: 0; }
+      .login-card { justify-self: stretch; width: 100%; }
     }
     @media (max-width: 640px) {
-      .hero-title {
-        font-size: 34px;
-      }
-      .login-card {
-        padding: 32px 22px;
-      }
+      .hero-title { font-size: 28px; }
+      .login-card { padding: 32px 22px; }
     }
   </style>
 </head>
 <body>
-  <!-- 光晕装饰 -->
-  <div class="glow-orb orb1"></div>
-  <div class="glow-orb orb2"></div>
-  <div class="glow-orb orb3"></div>
-
-  <!-- 浮动无人机装饰 -->
-  <div class="floating-drone fd1">
-    <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-      <rect x="50" y="40" width="20" height="40" rx="6" fill="#818cf8" opacity="0.7"/>
-      <line x1="60" y1="48" x2="25" y2="22" stroke="#818cf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="48" x2="95" y2="22" stroke="#818cf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="72" x2="25" y2="98" stroke="#818cf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="72" x2="95" y2="98" stroke="#818cf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <circle cx="25" cy="22" r="14" fill="#818cf8" opacity="0.15" stroke="#818cf8" stroke-width="1.5"/>
-      <circle cx="95" cy="22" r="14" fill="#818cf8" opacity="0.15" stroke="#818cf8" stroke-width="1.5"/>
-      <circle cx="25" cy="98" r="14" fill="#818cf8" opacity="0.15" stroke="#818cf8" stroke-width="1.5"/>
-      <circle cx="95" cy="98" r="14" fill="#818cf8" opacity="0.15" stroke="#818cf8" stroke-width="1.5"/>
-      <circle cx="25" cy="22" r="4" fill="#c7d2fe" opacity="0.6"/>
-      <circle cx="95" cy="22" r="4" fill="#c7d2fe" opacity="0.6"/>
-      <circle cx="25" cy="98" r="4" fill="#c7d2fe" opacity="0.6"/>
-      <circle cx="95" cy="98" r="4" fill="#c7d2fe" opacity="0.6"/>
-    </svg>
-  </div>
-  <div class="floating-drone fd2">
-    <svg width="90" height="90" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-      <rect x="50" y="40" width="20" height="40" rx="6" fill="#38bdf8" opacity="0.7"/>
-      <line x1="60" y1="48" x2="25" y2="22" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="48" x2="95" y2="22" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="72" x2="25" y2="98" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="72" x2="95" y2="98" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <circle cx="25" cy="22" r="14" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1.5"/>
-      <circle cx="95" cy="22" r="14" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1.5"/>
-      <circle cx="25" cy="98" r="14" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1.5"/>
-      <circle cx="95" cy="98" r="14" fill="#38bdf8" opacity="0.15" stroke="#38bdf8" stroke-width="1.5"/>
-      <circle cx="25" cy="22" r="4" fill="#bae6fd" opacity="0.6"/>
-      <circle cx="95" cy="22" r="4" fill="#bae6fd" opacity="0.6"/>
-      <circle cx="25" cy="98" r="4" fill="#bae6fd" opacity="0.6"/>
-      <circle cx="95" cy="98" r="4" fill="#bae6fd" opacity="0.6"/>
-    </svg>
-  </div>
-  <div class="floating-drone fd3">
-    <svg width="70" height="70" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-      <rect x="50" y="40" width="20" height="40" rx="6" fill="#4ade80" opacity="0.7"/>
-      <line x1="60" y1="48" x2="25" y2="22" stroke="#4ade80" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="48" x2="95" y2="22" stroke="#4ade80" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="72" x2="25" y2="98" stroke="#4ade80" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <line x1="60" y1="72" x2="95" y2="98" stroke="#4ade80" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-      <circle cx="25" cy="22" r="14" fill="#4ade80" opacity="0.15" stroke="#4ade80" stroke-width="1.5"/>
-      <circle cx="95" cy="22" r="14" fill="#4ade80" opacity="0.15" stroke="#4ade80" stroke-width="1.5"/>
-      <circle cx="25" cy="98" r="14" fill="#4ade80" opacity="0.15" stroke="#4ade80" stroke-width="1.5"/>
-      <circle cx="95" cy="98" r="14" fill="#4ade80" opacity="0.15" stroke="#4ade80" stroke-width="1.5"/>
-    </svg>
-  </div>
-  <div class="floating-drone fd4">
-    <svg width="100" height="100" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-      <rect x="50" y="40" width="20" height="40" rx="6" fill="#a78bfa" opacity="0.6"/>
-      <line x1="60" y1="48" x2="25" y2="22" stroke="#a78bfa" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
-      <line x1="60" y1="48" x2="95" y2="22" stroke="#a78bfa" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
-      <line x1="60" y1="72" x2="25" y2="98" stroke="#a78bfa" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
-      <line x1="60" y1="72" x2="95" y2="98" stroke="#a78bfa" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
-      <circle cx="25" cy="22" r="14" fill="#a78bfa" opacity="0.12" stroke="#a78bfa" stroke-width="1.5"/>
-      <circle cx="95" cy="22" r="14" fill="#a78bfa" opacity="0.12" stroke="#a78bfa" stroke-width="1.5"/>
-      <circle cx="25" cy="98" r="14" fill="#a78bfa" opacity="0.12" stroke="#a78bfa" stroke-width="1.5"/>
-      <circle cx="95" cy="98" r="14" fill="#a78bfa" opacity="0.12" stroke="#a78bfa" stroke-width="1.5"/>
-    </svg>
-  </div>
-
-  <!-- 雷达脉冲 -->
-  <div class="radar-pulse rp1"></div>
-  <div class="radar-pulse rp2"></div>
-
-  <!-- 航线动画 -->
-  <div class="flight-paths">
-    <svg viewBox="0 0 1000 600" preserveAspectRatio="none">
-      <path class="flight-line" stroke="#165dff" d="M-20,120 Q250,80 400,200 T700,150 T1020,220" />
-      <path class="flight-line" stroke="#22c55e" d="M-20,400 Q200,350 450,420 T750,380 T1020,450" style="animation-delay:-7s" />
-      <path class="flight-line" stroke="#6366f1" d="M-20,260 Q300,200 500,300 T800,250 T1020,320" style="animation-delay:-13s" />
-      <!-- 航点标记 -->
-      <circle cx="400" cy="200" r="3" fill="#165dff" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" repeatCount="indefinite" /></circle>
-      <circle cx="700" cy="150" r="3" fill="#165dff" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" begin="1s" repeatCount="indefinite" /></circle>
-      <circle cx="450" cy="420" r="3" fill="#22c55e" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" begin="0.5s" repeatCount="indefinite" /></circle>
-      <circle cx="500" cy="300" r="3" fill="#6366f1" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" begin="1.5s" repeatCount="indefinite" /></circle>
-    </svg>
-  </div>
-
-  <!-- 粒子层 -->
-  <div class="particles" id="particles"></div>
-
   <div class="login-shell">
     <section class="hero-panel">
       <div class="hero-kicker">云翼智控 · Unified Drone Ops Console</div>
@@ -582,24 +266,6 @@
 
   <div class="footer">云翼智控 &copy; 2025 — 智能工具人机交互与协同管控系统</div>
 
-  <script>
-    // 生成浮动粒子
-    (function() {
-      const container = document.getElementById('particles');
-      const count = 30;
-      for (let i = 0; i < count; i++) {
-        const p = document.createElement('div');
-        p.className = 'particle';
-        p.style.left = Math.random() * 100 + '%';
-        p.style.animationDuration = (8 + Math.random() * 12) + 's';
-        p.style.animationDelay = (Math.random() * 10) + 's';
-        p.style.width = p.style.height = (2 + Math.random() * 3) + 'px';
-        const colors = ['rgba(99,102,241,0.5)', 'rgba(14,165,233,0.4)', 'rgba(34,197,94,0.3)', 'rgba(255,255,255,0.15)'];
-        p.style.background = colors[Math.floor(Math.random() * colors.length)];
-        container.appendChild(p);
-      }
-    })();
-  </script>
   <script>
     const form = document.getElementById('loginForm');
     const errorMsg = document.getElementById('errorMsg');

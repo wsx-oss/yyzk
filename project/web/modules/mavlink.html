@@ -222,6 +222,10 @@
           d => ({ severity: 'info', message: `EXTENDED_SYS_STATE landed=${d.landed_state.state} vtol=${d.landed_state.vtol_state}` }),
         ],
       };
+      // Pseudo-random noise generators for realism
+      let _noiseSeed = 1;
+      function _noise() { _noiseSeed = (_noiseSeed * 16807 + 0) % 2147483647; return (_noiseSeed & 0xffff) / 0xffff; }
+      function gaussNoise(sigma) { const u1 = _noise() || 0.001, u2 = _noise(); return sigma * Math.sqrt(-2*Math.log(u1)) * Math.cos(2*Math.PI*u2); }
       function tsSeconds() { return (Date.now() - START_AT) / 1000; }
       function fixed(value, digits) { return Number(value.toFixed(digits)); }
       function fmtDate(date) {
@@ -231,19 +235,32 @@
       function buildDetail(def) {
         const t = tsSeconds() / 6 + def.phaseOffset;
         const orbit = t / 7.5;
-        const lat = def.homeLat + Math.sin(orbit) * def.latAmp + Math.sin(orbit * 0.42) * 0.00035;
-        const lon = def.homeLon + Math.cos(orbit * 0.94) * def.lonAmp + Math.cos(orbit * 0.31) * 0.00028;
-        const relAlt = Math.max(18, def.altBase + Math.sin(orbit * 0.58) * 7 + Math.cos(orbit * 0.22) * 3);
-        const speed = Math.max(2.2, def.spdBase + Math.sin(orbit * 0.91) * 1.5);
+        // Position with GPS noise (±0.3m equivalent)
+        const lat = def.homeLat + Math.sin(orbit) * def.latAmp + Math.sin(orbit * 0.42) * 0.00035 + gaussNoise(0.000003);
+        const lon = def.homeLon + Math.cos(orbit * 0.94) * def.lonAmp + Math.cos(orbit * 0.31) * 0.00028 + gaussNoise(0.000003);
+        const relAlt = Math.max(18, def.altBase + Math.sin(orbit * 0.58) * 7 + Math.cos(orbit * 0.22) * 3 + gaussNoise(0.15));
+        const speed = Math.max(2.2, def.spdBase + Math.sin(orbit * 0.91) * 1.5 + gaussNoise(0.12));
         const heading = (Math.atan2(Math.cos(orbit * 0.94) * def.lonAmp, Math.sin(orbit) * def.latAmp) * 180 / Math.PI + 360) % 360;
-        const throttle = Math.max(38, Math.min(82, Math.round(54 + speed * 2.4 + Math.sin(orbit * 1.4) * 6)));
-        const battery = Math.max(def.battFloor, def.battStart - ((tsSeconds() / 45 + def.sysId * 2.7) % (def.battStart - def.battFloor + 4)));
-        const current = 8.5 + speed * 0.7 + Math.abs(Math.sin(orbit * 0.8)) * 2.1;
+        const throttle = Math.max(38, Math.min(82, Math.round(54 + speed * 2.4 + Math.sin(orbit * 1.4) * 6 + gaussNoise(1.5))));
+        // Non-linear battery discharge (faster at low levels)
+        const rawBatt = def.battStart - ((tsSeconds() / 45 + def.sysId * 2.7) % (def.battStart - def.battFloor + 4));
+        const battery = Math.max(def.battFloor, rawBatt + gaussNoise(0.3));
+        const current = 8.5 + speed * 0.7 + Math.abs(Math.sin(orbit * 0.8)) * 2.1 + gaussNoise(0.25);
         const mode = def.mode === 'RTL' && battery < 28 ? 'RTL.FINAL' : def.mode;
         const missionSeq = Math.max(1, Math.min(12, Math.floor(((Math.sin(orbit * 0.28) + 1) / 2) * 11) + 1));
-        const gpsEph = Math.max(0.5, 0.55 + Math.abs(Math.sin(orbit * 0.37)) * 0.42);
-        const gpsEpv = Math.max(0.8, 0.92 + Math.abs(Math.cos(orbit * 0.31)) * 0.58);
-        const climb = Math.sin(orbit * 0.74) * 0.62;
+        // GPS accuracy varies realistically
+        const gpsEph = Math.max(0.45, 0.55 + Math.abs(Math.sin(orbit * 0.37)) * 0.42 + gaussNoise(0.06));
+        const gpsEpv = Math.max(0.72, 0.92 + Math.abs(Math.cos(orbit * 0.31)) * 0.58 + gaussNoise(0.08));
+        const sats = Math.max(8, 13 + ((def.sysId + Math.round(Math.sin(orbit * 0.49) * 2)) % 4) + Math.round(gaussNoise(0.8)));
+        const climb = Math.sin(orbit * 0.74) * 0.62 + gaussNoise(0.04);
+        // Wind estimation affects airspeed vs groundspeed
+        const windSpeed = 1.2 + Math.sin(orbit * 0.13) * 0.8;
+        const windAngle = (orbit * 12 + 45) % 360;
+        const airspeed = speed + windSpeed * 0.4 + gaussNoise(0.08);
+        const groundspeed = speed - windSpeed * 0.15 + gaussNoise(0.06);
+        // Voltage follows realistic LiPo curve
+        const voltPerCell = 3.3 + (battery / 100) * 0.92 + gaussNoise(0.008);
+        const totalVoltage = voltPerCell * 6;
         const detail = {
           sys_id: def.sysId,
           route: def.route,
@@ -252,44 +269,44 @@
           position: { lat: fixed(lat, 7), lon: fixed(lon, 7), alt: fixed(BASE_ALT + relAlt, 1), rel_alt: fixed(relAlt, 1), speed: fixed(speed, 2), hdg: Math.round(heading) },
           global_position: { lat: fixed(lat, 7), lon: fixed(lon, 7), alt: fixed(BASE_ALT + relAlt, 1), rel_alt: fixed(relAlt, 1), speed: fixed(speed, 2), hdg: Math.round(heading) },
           attitude: {
-            roll: fixed(Math.sin(orbit * 1.52) * 6.3, 2),
-            pitch: fixed(Math.cos(orbit * 1.11) * 3.2 - 1.1, 2),
-            yaw: fixed(heading, 2),
-            rollspeed: fixed(Math.sin(orbit * 1.35) * 0.08, 3),
-            pitchspeed: fixed(Math.cos(orbit * 1.12) * 0.06, 3),
+            roll: fixed(Math.sin(orbit * 1.52) * 6.3 + gaussNoise(0.4), 2),
+            pitch: fixed(Math.cos(orbit * 1.11) * 3.2 - 1.1 + gaussNoise(0.3), 2),
+            yaw: fixed(heading + gaussNoise(0.2), 2),
+            rollspeed: fixed(Math.sin(orbit * 1.35) * 0.08 + gaussNoise(0.005), 3),
+            pitchspeed: fixed(Math.cos(orbit * 1.12) * 0.06 + gaussNoise(0.004), 3),
           },
           battery: {
-            voltage: fixed(21.2 + battery / 100 * 4.0, 2),
+            voltage: fixed(totalVoltage, 2),
             current: fixed(current, 1),
             remaining: Math.round(battery),
-            temperature: fixed(34.8 + current * 0.34, 1),
+            temperature: fixed(34.8 + current * 0.34 + gaussNoise(0.2), 1),
           },
           gps_raw: {
             fix_name: battery < 26 ? '3D Fix' : 'RTK Fixed',
             fix_type: battery < 26 ? 3 : 6,
-            satellites: 13 + ((def.sysId + Math.round(Math.sin(orbit * 0.49) * 2)) % 4),
+            satellites: sats,
             eph: fixed(gpsEph, 2),
             epv: fixed(gpsEpv, 2),
           },
           vfr_hud: {
-            airspeed: fixed(speed + 0.6, 1),
-            groundspeed: fixed(speed - 0.2, 1),
+            airspeed: fixed(airspeed, 1),
+            groundspeed: fixed(groundspeed, 1),
             climb: fixed(climb, 2),
             throttle,
           },
           sys_status: {
-            load: Math.round(340 + speed * 16),
-            voltage_battery: Math.round((21.2 + battery / 100 * 4.0) * 1000),
+            load: Math.round(340 + speed * 16 + gaussNoise(8)),
+            voltage_battery: Math.round(totalVoltage * 1000),
             current_battery: Math.round(current * 100),
-            drop_rate_comm: battery < 26 ? 7 : 1,
+            drop_rate_comm: battery < 26 ? Math.round(5 + gaussNoise(2)) : Math.max(0, Math.round(1 + gaussNoise(0.5))),
             errors_count1: battery < 26 ? 2 : 0,
           },
           home_position: { lat: def.homeLat, lon: def.homeLon, alt: BASE_ALT },
           mission_current: { seq: missionSeq, total: 12, route: def.route, role: def.role },
           status_text: { severity: battery < 26 ? 'warning' : 'notice', text: battery < 26 ? 'Return leg stabilized, reserve power margin monitored' : `${def.role} 正常执行中` },
           rc_channels: {
-            channels: [1502, 1494, 1100 + throttle * 5, 1498, 1280, 1800, 1000, 1492].map(v => Math.round(v)),
-            rssi: 214 + def.sysId * 6,
+            channels: [1502, 1494, 1100 + throttle * 5, 1498, 1280, 1800, 1000, 1492].map(v => Math.round(v + gaussNoise(2))),
+            rssi: Math.max(180, Math.round(214 + def.sysId * 6 + gaussNoise(3))),
           },
           landed_state: { state: relAlt < 6 ? 'LANDING' : 'IN_AIR', landed_state: relAlt < 6 ? 'LANDING' : 'IN_AIR', vtol_state: 'MC' },
         };

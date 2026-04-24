@@ -332,6 +332,11 @@
       });
     }
 
+    // Pseudo-random noise for realistic sensor data
+    let _dbgNoiseSeed = 42;
+    function _dbgNoise() { _dbgNoiseSeed = (_dbgNoiseSeed * 16807 + 0) % 2147483647; return (_dbgNoiseSeed & 0xffff) / 0xffff; }
+    function dbgGauss(sigma) { const u1 = _dbgNoise() || 0.001, u2 = _dbgNoise(); return sigma * Math.sqrt(-2*Math.log(u1)) * Math.cos(2*Math.PI*u2); }
+
     const DebugSim = (() => {
       const BOOT_AT = Date.now();
       const defs = [
@@ -349,34 +354,55 @@
       function createSnapshot(def) {
         const t = seconds() / 6 + def.phase;
         const orbit = t / 7.4;
-        const lat = def.homeLat + Math.sin(orbit) * def.latAmp + Math.sin(orbit * 0.41) * 0.00034;
-        const lon = def.homeLon + Math.cos(orbit * 0.95) * def.lonAmp + Math.cos(orbit * 0.28) * 0.00026;
-        const relAlt = Math.max(14, def.altBase + Math.sin(orbit * 0.61) * 8 + Math.cos(orbit * 0.19) * 3);
-        const speed = Math.max(1.9, def.spdBase + Math.sin(orbit * 0.92) * 1.4);
+        // Position with GPS noise (±0.3m equivalent)
+        const lat = def.homeLat + Math.sin(orbit) * def.latAmp + Math.sin(orbit * 0.41) * 0.00034 + dbgGauss(0.000003);
+        const lon = def.homeLon + Math.cos(orbit * 0.95) * def.lonAmp + Math.cos(orbit * 0.28) * 0.00026 + dbgGauss(0.000003);
+        const relAlt = Math.max(14, def.altBase + Math.sin(orbit * 0.61) * 8 + Math.cos(orbit * 0.19) * 3 + dbgGauss(0.15));
+        const speed = Math.max(1.9, def.spdBase + Math.sin(orbit * 0.92) * 1.4 + dbgGauss(0.1));
         const heading = (Math.atan2(Math.cos(orbit * 0.95) * def.lonAmp, Math.sin(orbit) * def.latAmp) * 180 / Math.PI + 360) % 360;
-        const battery = Math.max(def.battFloor, def.battStart - ((seconds() / 45 + def.sysId * 3.1) % (def.battStart - def.battFloor + 5)));
-        const current = 8.1 + speed * 0.68 + Math.abs(Math.sin(orbit * 0.79)) * 2.2;
-        const throttle = Math.max(36, Math.min(84, Math.round(52 + speed * 2.6 + Math.sin(orbit * 1.33) * 7)));
+        const rawBatt = def.battStart - ((seconds() / 45 + def.sysId * 3.1) % (def.battStart - def.battFloor + 5));
+        const battery = Math.max(def.battFloor, rawBatt + dbgGauss(0.3));
+        const current = 8.1 + speed * 0.68 + Math.abs(Math.sin(orbit * 0.79)) * 2.2 + dbgGauss(0.2);
+        const throttle = Math.max(36, Math.min(84, Math.round(52 + speed * 2.6 + Math.sin(orbit * 1.33) * 7 + dbgGauss(1.2))));
         const missionSeq = Math.max(1, Math.min(12, Math.floor(((Math.sin(orbit * 0.27) + 1) / 2) * 11) + 1));
         const ackProgress = Math.min(100, Math.round(missionSeq / 12 * 100));
         const unixUsec = (BigInt(Date.now()) * 1000n).toString();
+        // Realistic LiPo voltage curve
+        const voltPerCell = 3.3 + (battery / 100) * 0.92 + dbgGauss(0.008);
+        const totalVoltage = voltPerCell * 6;
+        // Wind effects on airspeed vs groundspeed
+        const windSpd = 1.1 + Math.sin(orbit * 0.13) * 0.7;
+        const airspeed = speed + windSpd * 0.4 + dbgGauss(0.08);
+        const groundspeed = speed - windSpd * 0.15 + dbgGauss(0.06);
+        // GPS accuracy with noise
+        const sats1 = Math.max(8, 13 + ((def.sysId + Math.round(Math.sin(orbit * 0.44) * 2)) % 4) + Math.round(dbgGauss(0.8)));
+        const sats2 = Math.max(6, 11 + ((def.sysId + Math.round(Math.cos(orbit * 0.38) * 2)) % 4) + Math.round(dbgGauss(0.8)));
+        const eph1 = Math.max(0.4, 0.58 + Math.abs(Math.sin(orbit * 0.35)) * 0.44 + dbgGauss(0.05));
+        const epv1 = Math.max(0.65, 0.92 + Math.abs(Math.cos(orbit * 0.29)) * 0.55 + dbgGauss(0.07));
+        const climb = Math.sin(orbit * 0.73) * 0.58 + dbgGauss(0.04);
         const statusPool1 = [
           `WP${missionSeq} reached, alt=${fixed(relAlt,1)}m spd=${fixed(speed,1)}m/s`,
           `EKF2 IMU0 healthy, yaw aligned, mag OK`,
-          `GPS RTK ${battery<28?'3D':'fixed'} sats=${13+((def.sysId+Math.round(Math.sin(orbit*0.44)*2))%4)} HDOP=${fixed(0.58+Math.abs(Math.sin(orbit*0.35))*0.44,2)}`,
-          `Throttle ${throttle}% airspeed=${fixed(speed+0.5,1)}m/s climb=${fixed(Math.sin(orbit*0.73)*0.58,2)}m/s`,
+          `GPS RTK ${battery<28?'3D':'fixed'} sats=${sats1} HDOP=${fixed(eph1,2)}`,
+          `Throttle ${throttle}% airspeed=${fixed(airspeed,1)}m/s climb=${fixed(climb,2)}m/s`,
+          `EKF3 origin set lat=${fixed(lat,7)} lon=${fixed(lon,7)}`,
+          `PreArm: Compass calibrated, mag field ${Math.round(380+dbgGauss(12))}mG`,
         ];
         const statusPool2 = [
           `Survey strip ${missionSeq}/${12} GSD=2.4cm/px overlap=78%`,
           `Camera trigger synced, shutter lag <6ms`,
           `Terrain-follow AGL=${fixed(relAlt,1)}m rangefinder OK`,
           `NAV XTE=0.${Math.floor(Math.abs(Math.sin(orbit*1.2))*9)+1}m bearing=${Math.round(heading)}deg`,
+          `IMU temperature stable: ${fixed(42.3+dbgGauss(0.5),1)}°C gyro bias OK`,
+          `Baro alt=${fixed(relAlt,1)}m press=${fixed(1013.25-relAlt*0.12+dbgGauss(0.3),2)}hPa`,
         ];
         const statusPool3 = [
           `RTL dist-home=${Math.max(80,Math.round(800-missionSeq*62))}m ETA=${Math.max(12,Math.round(90-missionSeq*7))}s`,
-          `Battery ${Math.round(battery)}% ${fixed(21.1+battery/100*4.0,2)}V ${fixed(current,1)}A`,
+          `Battery ${Math.round(battery)}% ${fixed(totalVoltage,2)}V ${fixed(current,1)}A`,
           `Landing detector: AGL=${fixed(relAlt,1)}m vibe=OK approach stable`,
           `Home vector lat=${def.homeLat.toFixed(7)} lon=${def.homeLon.toFixed(7)}`,
+          `Wind est: spd=${fixed(windSpd,1)}m/s dir=${Math.round((orbit*12+45)%360)}deg`,
+          `GeoFence: radius=500m alt_max=120m status=INSIDE`,
         ];
         const pools = { 1: statusPool1, 2: statusPool2, 3: statusPool3 };
         const pool = pools[def.sysId] || statusPool1;
@@ -390,24 +416,24 @@
           position: { lat: fixed(lat, 7), lon: fixed(lon, 7), alt: fixed(485 + relAlt, 1), rel_alt: fixed(relAlt, 1), speed: fixed(speed, 2), hdg: Math.round(heading) },
           global_position: { lat: fixed(lat, 7), lon: fixed(lon, 7), alt: fixed(485 + relAlt, 1), rel_alt: fixed(relAlt, 1), speed: fixed(speed, 2), hdg: Math.round(heading) },
           attitude: {
-            roll: fixed(Math.sin(orbit * 1.48) * 6.0, 2),
-            pitch: fixed(Math.cos(orbit * 1.16) * 3.1 - 1.0, 2),
-            yaw: fixed(heading, 2),
-            rollspeed: fixed(Math.sin(orbit * 1.31) * 0.08, 3),
-            pitchspeed: fixed(Math.cos(orbit * 1.09) * 0.06, 3),
-            yawspeed: fixed(Math.sin(orbit * 0.67) * 0.05, 3),
+            roll: fixed(Math.sin(orbit * 1.48) * 6.0 + dbgGauss(0.35), 2),
+            pitch: fixed(Math.cos(orbit * 1.16) * 3.1 - 1.0 + dbgGauss(0.25), 2),
+            yaw: fixed(heading + dbgGauss(0.2), 2),
+            rollspeed: fixed(Math.sin(orbit * 1.31) * 0.08 + dbgGauss(0.004), 3),
+            pitchspeed: fixed(Math.cos(orbit * 1.09) * 0.06 + dbgGauss(0.003), 3),
+            yawspeed: fixed(Math.sin(orbit * 0.67) * 0.05 + dbgGauss(0.003), 3),
           },
-          battery: { voltage: fixed(21.1 + battery / 100 * 4.0, 2), current: fixed(current, 1), remaining: Math.round(battery), temperature: fixed(35.1 + current * 0.33, 1) },
-          gps_raw: { fix_name: battery < 28 ? '3D Fix' : 'RTK Fixed', fix_type: battery < 28 ? 3 : 6, satellites: 13 + ((def.sysId + Math.round(Math.sin(orbit * 0.44) * 2)) % 4), eph: fixed(0.58 + Math.abs(Math.sin(orbit * 0.35)) * 0.44, 2), epv: fixed(0.92 + Math.abs(Math.cos(orbit * 0.29)) * 0.55, 2) },
-          gps2_raw: { fix_name: battery < 28 ? '3D Fix' : 'RTK Float', fix_type: battery < 28 ? 3 : 5, satellites: 11 + ((def.sysId + Math.round(Math.cos(orbit * 0.38) * 2)) % 4), eph: fixed(0.86 + Math.abs(Math.sin(orbit * 0.42)) * 0.48, 2), epv: fixed(1.14 + Math.abs(Math.cos(orbit * 0.31)) * 0.62, 2) },
-          vfr_hud: { airspeed: fixed(speed + 0.5, 1), groundspeed: fixed(speed - 0.2, 1), climb: fixed(Math.sin(orbit * 0.73) * 0.58, 2), throttle },
-          rc_channels: { channels: [1502, 1494, 1100 + throttle * 5, 1498, 1280, 1800, 1000, 1490].map(v => Math.round(v)), rssi: 214 + def.sysId * 7 },
-          sys_status: { load: Math.round(332 + speed * 17), voltage_battery: Math.round((21.1 + battery / 100 * 4.0) * 1000), current_battery: Math.round(current * 100), drop_rate_comm: battery < 28 ? 6 : 1, errors_count1: battery < 28 ? 2 : 0, remaining: Math.round(battery) },
+          battery: { voltage: fixed(totalVoltage, 2), current: fixed(current, 1), remaining: Math.round(battery), temperature: fixed(35.1 + current * 0.33 + dbgGauss(0.2), 1) },
+          gps_raw: { fix_name: battery < 28 ? '3D Fix' : 'RTK Fixed', fix_type: battery < 28 ? 3 : 6, satellites: sats1, eph: fixed(eph1, 2), epv: fixed(epv1, 2) },
+          gps2_raw: { fix_name: battery < 28 ? '3D Fix' : 'RTK Float', fix_type: battery < 28 ? 3 : 5, satellites: sats2, eph: fixed(0.86 + Math.abs(Math.sin(orbit * 0.42)) * 0.48 + dbgGauss(0.06), 2), epv: fixed(1.14 + Math.abs(Math.cos(orbit * 0.31)) * 0.62 + dbgGauss(0.08), 2) },
+          vfr_hud: { airspeed: fixed(airspeed, 1), groundspeed: fixed(groundspeed, 1), climb: fixed(climb, 2), throttle },
+          rc_channels: { channels: [1502, 1494, 1100 + throttle * 5, 1498, 1280, 1800, 1000, 1490].map(v => Math.round(v + dbgGauss(2))), rssi: Math.max(180, Math.round(214 + def.sysId * 7 + dbgGauss(3))) },
+          sys_status: { load: Math.round(332 + speed * 17 + dbgGauss(6)), voltage_battery: Math.round(totalVoltage * 1000), current_battery: Math.round(current * 100), drop_rate_comm: battery < 28 ? Math.round(5 + dbgGauss(2)) : Math.max(0, Math.round(1 + dbgGauss(0.5))), errors_count1: battery < 28 ? 2 : 0, remaining: Math.round(battery) },
           mission_current: { seq: missionSeq, total: 12, route: def.route, role: def.role },
           home_position: { lat: def.homeLat, lon: def.homeLon, alt: 485 },
           extended_sys_state: { vtol_state: 'MC', landed_state: relAlt < 6 ? 'LANDING' : 'IN_AIR' },
           landed_state: { state: relAlt < 6 ? 'LANDING' : 'IN_AIR', landed_state: relAlt < 6 ? 'LANDING' : 'IN_AIR', vtol_state: 'MC' },
-          vibration: { x: fixed(0.012 + Math.abs(Math.sin(orbit * 2.1)) * 0.021, 4), y: fixed(0.015 + Math.abs(Math.cos(orbit * 1.7)) * 0.018, 4), z: fixed(0.019 + Math.abs(Math.sin(orbit * 1.3)) * 0.027, 4), clip0: battery < 28 ? 3 : 0, clip1: battery < 28 ? 1 : 0, clip2: battery < 28 ? 2 : 0 },
+          vibration: { x: fixed(0.012 + Math.abs(Math.sin(orbit * 2.1)) * 0.021 + dbgGauss(0.003), 4), y: fixed(0.015 + Math.abs(Math.cos(orbit * 1.7)) * 0.018 + dbgGauss(0.003), 4), z: fixed(0.019 + Math.abs(Math.sin(orbit * 1.3)) * 0.027 + dbgGauss(0.004), 4), clip0: battery < 28 ? 3 : 0, clip1: battery < 28 ? 1 : 0, clip2: battery < 28 ? 2 : 0 },
           command_ack: { command: def.route === 'R03' ? 'NAV_RETURN_TO_LAUNCH' : 'NAV_WAYPOINT', result: battery < 28 ? 'IN_PROGRESS' : 'ACCEPTED', progress: ackProgress },
           status_text: { severity: battery < 28 ? 'warning' : 'notice', text: statusText },
         };

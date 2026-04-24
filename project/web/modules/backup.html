@@ -499,9 +499,12 @@
       } catch (e) {
         // API failed or timed out — frontend still simulates success
       }
-      setTimeout(() => { completeLocalManualBackup(localId); refreshAll(); }, completionDelay);
-      _backupInProgress = false;
-      if (btn) { btn.disabled = false; btn.textContent = origText; }
+      setTimeout(() => {
+        completeLocalManualBackup(localId);
+        refreshAll();
+        _backupInProgress = false;
+        if (btn) { btn.disabled = false; btn.textContent = origText; }
+      }, completionDelay);
     }
 
     // ---- Restore from backup record ----

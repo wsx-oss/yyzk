@@ -614,8 +614,8 @@
     return res.json();
   }
 
-  // Periodically refresh suggestions when panel is open (reduced frequency)
+  // Periodically refresh suggestions when panel is open (low frequency to reduce noise)
   setInterval(() => {
     if (isOpen) loadSuggestions();
-  }, 120000);
+  }, 300000);
 })();

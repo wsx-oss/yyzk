@@ -697,10 +697,10 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 		})
 	}
 
-	// Check unread alerts
+	// Check unread alerts (only warn when many accumulate)
 	var alertCnt int
 	a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE acknowledged=0").Scan(&alertCnt)
-	if alertCnt > 2 {
+	if alertCnt > 8 {
 		suggestions = append(suggestions, gin.H{
 			"text":   fmt.Sprintf("⚠️ 有 %d 条未处理告警待确认", alertCnt),
 			"action": "查看告警摘要",
@@ -708,22 +708,22 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 		})
 	}
 
-	// Check low battery
+	// Check low battery (only warn when multiple devices are low)
 	var lowBatt int
 	a.db.QueryRow(`SELECT COUNT(DISTINCT device_id) FROM battery_records 
-		WHERE level < 20 AND created_at > datetime('now', '-10 minutes')`).Scan(&lowBatt)
-	if lowBatt > 1 {
+		WHERE level < 15 AND created_at > datetime('now', '-10 minutes')`).Scan(&lowBatt)
+	if lowBatt > 2 {
 		suggestions = append(suggestions, gin.H{
-			"text":   fmt.Sprintf("🔋 %d 台设备电量持续偏低", lowBatt),
+			"text":   fmt.Sprintf("🔋 %d 台设备电量偏低", lowBatt),
 			"action": "查看电池详情",
 			"nav":    "battery",
 		})
 	}
 
-	// Check offline drones
+	// Check offline drones (only warn when several are offline)
 	var offlineDrones int
 	a.db.QueryRow("SELECT COUNT(*) FROM drones WHERE status='offline'").Scan(&offlineDrones)
-	if offlineDrones > 1 {
+	if offlineDrones > 3 {
 		suggestions = append(suggestions, gin.H{
 			"text":   fmt.Sprintf("🔴 %d 架无人机离线", offlineDrones),
 			"action": "查看无人机状态",
@@ -731,10 +731,10 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 		})
 	}
 
-	// Unread notifications
+	// Unread notifications (only show when many pile up)
 	var unreadNotif int
 	a.db.QueryRow("SELECT COUNT(*) FROM notifications WHERE is_read=0").Scan(&unreadNotif)
-	if unreadNotif > 4 {
+	if unreadNotif > 10 {
 		suggestions = append(suggestions, gin.H{
 			"text":   fmt.Sprintf("🔔 有 %d 条未读通知待查看", unreadNotif),
 			"action": "查看通知中心",
@@ -742,8 +742,8 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 		})
 	}
 
-	if len(suggestions) > 2 {
-		suggestions = suggestions[:2]
+	if len(suggestions) > 1 {
+		suggestions = suggestions[:1]
 	}
 
 	c.JSON(200, gin.H{"suggestions": suggestions})

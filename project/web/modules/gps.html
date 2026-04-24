@@ -591,9 +591,9 @@
         droneTrails[id] = { points: [], polyline: L.polyline([], { color: '#f59e0b', weight: 2.5, opacity: 0.75 }).addTo(map) };
       }
       var trail = droneTrails[id];
-      // Only add point if moved meaningfully (> ~2m) to avoid clutter
+      // Only add point if moved meaningfully (> ~5m) to avoid jitter
       var lastPt = trail.points.length > 0 ? trail.points[trail.points.length - 1] : null;
-      if (!lastPt || Math.abs(newLL[0] - lastPt[0]) > 0.00002 || Math.abs(newLL[1] - lastPt[1]) > 0.00002) {
+      if (!lastPt || Math.abs(newLL[0] - lastPt[0]) > 0.00005 || Math.abs(newLL[1] - lastPt[1]) > 0.00005) {
         trail.points.push(newLL);
         if (trail.points.length > 400) trail.points.shift();
         var displayPts = (typeof smoothTrail === 'function' && trail.points.length >= 3)
@@ -937,8 +937,8 @@
         const prev = deduped[deduped.length - 1];
         const current = raw[i];
         const dist = historyDistanceMeters(prev, current);
-        if (dist < 3) continue;   // skip micro-jitter (<3m)
-        if (dist > 800) continue;  // skip GPS jumps (>800m)
+        if (dist < 5) continue;   // skip micro-jitter (<5m)
+        if (dist > 500) continue;  // skip GPS jumps (>500m)
         deduped.push(current);
       }
       if (deduped.length <= 3) return deduped;
@@ -952,12 +952,24 @@
         const bc = Math.atan2(c[1] - b[1], c[0] - b[0]);
         let angleDiff = Math.abs(bc - ab);
         if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-        // skip if nearly 180° reversal AND short segment (zigzag noise)
-        if (angleDiff > 2.6 && historyDistanceMeters(b, c) < 30) {
+        // skip if sharp reversal (>135°) AND short segment (zigzag noise)
+        if (angleDiff > 2.35 && historyDistanceMeters(b, c) < 50) {
           smooth[smooth.length - 1] = c; // replace last point instead of adding
           continue;
         }
         smooth.push(c);
+      }
+      // Pass 3: moving-average smoothing for remaining jitter
+      if (smooth.length >= 5) {
+        const averaged = [smooth[0], smooth[1]];
+        for (let i = 2; i < smooth.length - 2; i++) {
+          averaged.push([
+            (smooth[i-2][0] + smooth[i-1][0] + smooth[i][0] + smooth[i+1][0] + smooth[i+2][0]) / 5,
+            (smooth[i-2][1] + smooth[i-1][1] + smooth[i][1] + smooth[i+1][1] + smooth[i+2][1]) / 5,
+          ]);
+        }
+        averaged.push(smooth[smooth.length - 2], smooth[smooth.length - 1]);
+        return averaged;
       }
       return smooth;
     }
