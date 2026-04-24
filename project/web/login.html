@@ -15,7 +15,7 @@
       font-family: "Noto Sans SC", "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
       min-height: 100vh;
       position: relative;
-      overflow: hidden;
+      overflow-x: hidden;
       background: #060a14;
       -webkit-font-smoothing: antialiased;
     }
@@ -27,13 +27,62 @@
       z-index: 0;
       background: url("/app/login-bg.png") center center / cover no-repeat;
     }
-    /* Thin gradient veil — keeps text readable without hiding the image */
     .bg-layer::after {
       content: '';
       position: absolute;
       inset: 0;
       background:
-        linear-gradient(105deg, rgba(4, 10, 22, 0.72) 0%, rgba(4, 10, 22, 0.38) 50%, rgba(4, 10, 22, 0.18) 100%);
+        linear-gradient(105deg, rgba(4, 10, 22, 0.78) 0%, rgba(4, 10, 22, 0.42) 50%, rgba(4, 10, 22, 0.22) 100%);
+    }
+
+    /* ---- Top logo bar ---- */
+    .top-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 40px;
+    }
+    .top-bar-logo {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    .top-bar-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .top-bar-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f1f5f9;
+      letter-spacing: 2px;
+    }
+    .top-bar-sub {
+      font-size: 10px;
+      color: rgba(176,197,228,0.5);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    /* ---- Decorative grid dots (top-right) ---- */
+    .deco-grid {
+      position: fixed;
+      top: 20px; right: 20px;
+      z-index: 50;
+      display: grid;
+      grid-template-columns: repeat(4, 6px);
+      gap: 5px;
+      opacity: 0.35;
+    }
+    .deco-grid span {
+      width: 6px; height: 6px;
+      border-radius: 1.5px;
+      background: rgba(148,197,255,0.5);
     }
 
     /* ---- Main layout ---- */
@@ -41,183 +90,247 @@
       position: relative;
       z-index: 10;
       width: 100%;
-      max-width: 1340px;
-      min-height: 100vh;
+      max-width: 1400px;
+      height: 100vh;
       margin: 0 auto;
       display: grid;
-      grid-template-columns: 1fr minmax(380px, 440px);
+      grid-template-columns: 1fr 380px;
+      grid-template-rows: 1fr auto;
       align-items: end;
-      gap: clamp(32px, 6vw, 80px);
-      padding: 40px 56px 56px;
+      gap: 40px;
+      padding: 72px 48px 0;
     }
 
     /* ---- Left hero panel ---- */
     .hero-panel {
       color: #e2e8f0;
-      max-width: 420px;
+      max-width: 620px;
       align-self: end;
-      padding-bottom: 48px;
+      padding-bottom: 0;
       justify-self: start;
-    }
-    .hero-kicker {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 16px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.07);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: rgba(226,232,240,0.85);
-      font-size: 13px;
-      letter-spacing: 0.06em;
-      margin-bottom: 22px;
+      grid-row: 1 / 2;
     }
     .hero-title {
-      font-size: clamp(30px, 3.6vw, 48px);
-      line-height: 1.18;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 18px;
-      text-shadow: 0 2px 24px rgba(0,0,0,0.5);
+      font-size: clamp(26px, 3.2vw, 42px);
+      line-height: 1.25;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      margin-bottom: 14px;
+      text-shadow: 0 2px 32px rgba(0,0,0,0.5);
     }
-    .hero-title strong {
-      background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 50%, #6ee7b7 100%);
+    .hero-title .highlight {
+      background: linear-gradient(135deg, #60b8ff 0%, #3b8bff 40%, #7dd3fc 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      font-weight: 700;
+      font-weight: 800;
     }
     .hero-copy {
-      font-size: 15px;
-      line-height: 1.85;
-      color: rgba(226,232,240,0.62);
-      max-width: 420px;
-      margin-bottom: 28px;
+      font-size: 13.5px;
+      line-height: 1.8;
+      color: rgba(226,232,240,0.58);
+      max-width: 520px;
+      margin-bottom: 0;
       text-shadow: 0 1px 8px rgba(0,0,0,0.4);
     }
-    .hero-highlights {
+
+    /* ---- Feature cards row ---- */
+    .hero-features {
+      grid-column: 1 / -1;
+      grid-row: 2 / 3;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      padding-bottom: 36px;
+    }
+    .feature-card {
+      padding: 16px 14px 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(148,197,255,0.10);
+      transition: transform 0.25s, border-color 0.25s, background 0.25s;
+      text-align: center;
+    }
+    .feature-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(125,211,252,0.28);
+      background: rgba(255,255,255,0.07);
+    }
+    .feature-icon {
+      width: 38px; height: 38px;
+      margin: 0 auto 8px;
       display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .hero-chip {
-      padding: 12px 18px;
+      align-items: center;
+      justify-content: center;
       border-radius: 12px;
-      background: rgba(255,255,255,0.05);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.10);
-      transition: transform 0.2s, border-color 0.2s;
+      background: rgba(59,139,255,0.12);
     }
-    .hero-chip:hover {
-      transform: translateY(-2px);
-      border-color: rgba(125,211,252,0.3);
+    .feature-icon svg {
+      width: 20px; height: 20px;
+      stroke: #60b8ff;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
-    .hero-chip-title {
-      font-size: 11px;
-      color: rgba(148,163,184,0.78);
-      margin-bottom: 5px;
-      letter-spacing: 0.08em;
+    .feature-label {
+      font-size: 10px;
+      color: rgba(148,163,184,0.7);
+      letter-spacing: 0.1em;
       text-transform: uppercase;
+      margin-bottom: 4px;
+      font-weight: 500;
     }
-    .hero-chip-value {
-      font-size: 15px;
-      color: #f1f5f9;
+    .feature-desc {
+      font-size: 13px;
+      color: #e2e8f0;
       font-weight: 600;
     }
 
     /* ---- Right: Glass login card ---- */
     .login-card {
-      background: rgba(10, 18, 34, 0.42);
-      backdrop-filter: blur(32px) saturate(140%);
-      -webkit-backdrop-filter: blur(32px) saturate(140%);
-      border: 1px solid rgba(148, 197, 255, 0.16);
+      background: rgba(10, 18, 38, 0.55);
+      backdrop-filter: blur(36px) saturate(140%);
+      -webkit-backdrop-filter: blur(36px) saturate(140%);
+      border: 1px solid rgba(148, 197, 255, 0.14);
       border-radius: 24px;
       box-shadow:
-        0 24px 80px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 rgba(255,255,255,0.06);
-      padding: 44px 36px 38px;
-      margin-bottom: 36px;
+        0 24px 80px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255,255,255,0.05);
+      padding: 32px 30px 26px;
       width: 100%;
-      max-width: 440px;
+      max-width: 380px;
       justify-self: end;
+      align-self: center;
       position: relative;
       overflow: hidden;
+      grid-row: 1 / 2;
     }
-    /* Subtle top-edge glow */
     .login-card::before {
       content: '';
       position: absolute;
-      top: 0; left: 20%; right: 20%;
+      top: 0; left: 15%; right: 15%;
       height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(125,211,252,0.5), transparent);
+      background: linear-gradient(90deg, transparent, rgba(125,211,252,0.45), transparent);
     }
 
-    .login-logo {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 12px;
+    .card-header {
+      margin-bottom: 20px;
     }
-    .login-logo img {
-      width: 46px;
-      height: 46px;
-      border-radius: 12px;
-      object-fit: cover;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-    }
-    .login-card h1 {
+    .card-header h1 {
       font-size: 22px;
       color: #f1f5f9;
-      text-align: center;
-      margin-bottom: 4px;
       font-weight: 700;
       letter-spacing: 1px;
+      margin-bottom: 6px;
     }
-    .login-subtitle {
-      text-align: center;
+    .card-header .sub {
       font-size: 13px;
-      color: rgba(176, 197, 228, 0.55);
-      margin-bottom: 30px;
-      line-height: 1.8;
+      color: rgba(176,197,228,0.50);
     }
 
     /* ---- Form ---- */
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 14px;
     }
     .form-group label {
       display: block;
-      font-size: 13px;
+      font-size: 12.5px;
       color: rgba(176, 197, 228, 0.72);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       font-weight: 500;
     }
-    .form-group input {
+    .input-wrap {
+      position: relative;
+    }
+    .input-wrap .input-icon {
+      position: absolute;
+      left: 14px; top: 50%; transform: translateY(-50%);
+      width: 18px; height: 18px;
+      color: rgba(148,163,184,0.45);
+      pointer-events: none;
+    }
+    .input-wrap .input-icon svg {
+      width: 18px; height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .input-wrap input {
       width: 100%;
-      padding: 13px 16px;
+      padding: 11px 14px 11px 40px;
       border: 1px solid rgba(148, 197, 255, 0.14);
       border-radius: 12px;
       font-size: 14px;
       font-family: inherit;
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.06);
       color: #e2e8f0;
       transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
     }
-    .form-group input::placeholder { color: rgba(132, 157, 194, 0.38); }
-    .form-group input:focus {
+    .input-wrap input::placeholder { color: rgba(132, 157, 194, 0.38); }
+    .input-wrap input:focus {
       outline: none;
       border-color: rgba(78, 159, 255, 0.6);
       box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.15), 0 0 20px rgba(22, 93, 255, 0.08);
-      background: rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.10);
     }
+    .toggle-pwd {
+      position: absolute;
+      right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none;
+      color: rgba(148,163,184,0.45);
+      cursor: pointer;
+      padding: 2px;
+      transition: color 0.2s;
+    }
+    .toggle-pwd:hover { color: rgba(148,163,184,0.75); }
+    .toggle-pwd svg {
+      width: 18px; height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .form-options {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      margin-top: -2px;
+    }
+    .remember-me {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+    .remember-me input[type="checkbox"] {
+      width: 15px; height: 15px;
+      accent-color: #3b8bff;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .remember-me span {
+      font-size: 13px;
+      color: rgba(176,197,228,0.58);
+    }
+    .forgot-link {
+      font-size: 13px;
+      color: rgba(176,197,228,0.58);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .forgot-link:hover { color: #6aa1ff; }
 
     .btn-login {
       width: 100%;
-      padding: 14px;
+      padding: 12px;
       background: linear-gradient(135deg, #165dff 0%, #1e80ff 100%);
       color: #fff;
       border: none;
@@ -227,23 +340,54 @@
       font-family: inherit;
       cursor: pointer;
       transition: all 0.25s;
-      margin-top: 10px;
-      letter-spacing: 1px;
-      box-shadow: 0 4px 20px rgba(22, 93, 255, 0.25);
+      letter-spacing: 3px;
+      box-shadow: 0 4px 24px rgba(22, 93, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .btn-login svg {
+      width: 18px; height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.25s;
     }
     .btn-login:hover {
       background: linear-gradient(135deg, #1e6fff 0%, #3b8bff 100%);
-      box-shadow: 0 6px 28px rgba(22, 93, 255, 0.4);
+      box-shadow: 0 6px 32px rgba(22, 93, 255, 0.45);
       transform: translateY(-1px);
     }
+    .btn-login:hover svg { transform: translateX(3px); }
     .btn-login:active {
       background: #0e42d2;
       transform: translateY(0);
     }
 
+    .security-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 14px;
+      font-size: 12px;
+      color: rgba(148,163,184,0.40);
+    }
+    .security-note svg {
+      width: 14px; height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
     .register-link {
       text-align: center;
-      margin-top: 22px;
+      margin-top: 10px;
       font-size: 13px;
       color: rgba(176, 197, 228, 0.50);
     }
@@ -269,7 +413,7 @@
 
     .footer {
       position: fixed;
-      bottom: 18px;
+      bottom: 10px;
       left: 0; right: 0;
       text-align: center;
       font-size: 12px;
@@ -279,66 +423,131 @@
     }
 
     /* ---- Responsive ---- */
+    @media (max-width: 1100px) {
+      .hero-features { grid-template-columns: repeat(2, 1fr); }
+    }
     @media (max-width: 960px) {
       .login-shell {
         grid-template-columns: 1fr;
         gap: 28px;
-        padding: 32px 20px 72px;
+        padding: 100px 20px 72px;
       }
       .hero-panel { max-width: none; }
-      .login-card { justify-self: center; max-width: 480px; }
+      .login-card { justify-self: center; max-width: 480px; align-self: end; }
+      .hero-features { grid-column: 1; }
     }
     @media (max-width: 640px) {
-      .login-shell { padding: 24px 16px 72px; }
-      .hero-title { font-size: 26px; }
+      .login-shell { padding: 90px 16px 72px; }
+      .hero-title { font-size: 28px; }
       .login-card { padding: 32px 22px 28px; border-radius: 20px; }
+      .hero-features { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .top-bar { padding: 16px 20px; }
     }
   </style>
 </head>
 <body>
   <div class="bg-layer"></div>
 
+  <!-- Top logo bar -->
+  <div class="top-bar">
+    <img class="top-bar-logo" src="/app/logo.jpg" alt="云翼智控" />
+    <div class="top-bar-text">
+      <span class="top-bar-title">云翼智控</span>
+      <span class="top-bar-sub">Unified Drone Ops Console</span>
+    </div>
+  </div>
+
+  <!-- Decorative grid dots -->
+  <div class="deco-grid">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+  </div>
+
   <div class="login-shell">
+    <!-- Left hero -->
     <section class="hero-panel">
-      <div class="hero-kicker">云翼智控 · Unified Drone Ops Console</div>
-      <h2 class="hero-title">让飞行、遥测与<strong>决策闭环</strong>在同一控制台完成。</h2>
-      <p class="hero-copy">从多机协同、MAVLink 遥测到任务回放与数据备份，你现在进入的是整套无人机管控链路的统一入口。登录后即可查看实时状态、任务进度与系统健康概况。</p>
-      <div class="hero-highlights">
-        <div class="hero-chip">
-          <div class="hero-chip-title">Flight Ops</div>
-          <div class="hero-chip-value">多机协同调度</div>
-        </div>
-        <div class="hero-chip">
-          <div class="hero-chip-title">Telemetry</div>
-          <div class="hero-chip-value">MAVLink 实时链路</div>
-        </div>
-        <div class="hero-chip">
-          <div class="hero-chip-title">Mission Loop</div>
-          <div class="hero-chip-value">任务闭环与回放</div>
-        </div>
-      </div>
+      <h2 class="hero-title">让<span class="highlight">飞行、遥测与决策</span><br>闭环在同一控制台完成</h2>
+      <p class="hero-copy">从多机协同、MAVLink 遥测到任务回放与数据备份，<br>进的是整套无人机管控链路的统一入口。<br>登录后即可查看实时状态、任务进度与系统健康概况。</p>
     </section>
 
+    <!-- Right login card -->
     <div class="login-card">
-      <div class="login-logo">
-        <img src="/app/logo.jpg" alt="云翼智控" />
+      <div class="card-header">
+        <h1>欢迎登录</h1>
+        <span class="sub">云翼智控统一管控台</span>
       </div>
-      <h1>云翼智控</h1>
-      <div class="login-subtitle">欢迎回到统一管控台<br>登录后继续查看飞行、遥测与系统运行状态</div>
       <div class="error-msg" id="errorMsg"></div>
       <form id="loginForm" method="post" action="/api/auth/login" autocomplete="on" novalidate>
         <div class="form-group">
           <label for="username">用户名</label>
-          <input type="text" id="username" name="username" required autocomplete="username" placeholder="请输入用户名" />
+          <div class="input-wrap">
+            <span class="input-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+            <input type="text" id="username" name="username" required autocomplete="username" placeholder="请输入用户名" />
+          </div>
         </div>
         <div class="form-group">
           <label for="password">密码</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="请输入密码" />
+          <div class="input-wrap">
+            <span class="input-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="请输入密码" />
+            <button type="button" class="toggle-pwd" id="togglePwd" tabindex="-1" aria-label="显示密码">
+              <svg id="eyeOff" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg id="eyeOn" viewBox="0 0 24 24" style="display:none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
         </div>
-        <button type="submit" class="btn-login">登 录</button>
+        <div class="form-options">
+          <label class="remember-me">
+            <input type="checkbox" id="rememberMe" />
+            <span>记住我</span>
+          </label>
+          <a href="javascript:void(0)" class="forgot-link">忘记密码?</a>
+        </div>
+        <button type="submit" class="btn-login">
+          登 录
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
       </form>
+      <div class="security-note">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        安全连接已启用
+      </div>
       <div class="register-link" id="registerLink">
         还没有账号？<a href="/app/register.html">立即注册</a>
+      </div>
+    </div>
+
+    <!-- Bottom feature cards -->
+    <div class="hero-features">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="feature-label">Flight Ops</div>
+        <div class="feature-desc">多机协同调度</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div class="feature-label">Telemetry</div>
+        <div class="feature-desc">MAVLink 实时链路</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></svg>
+        </div>
+        <div class="feature-label">Mission Loop</div>
+        <div class="feature-desc">任务闭环与回放</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        </div>
+        <div class="feature-label">Data Hub</div>
+        <div class="feature-desc">数据备份与管理</div>
       </div>
     </div>
   </div>
@@ -385,6 +594,18 @@
     });
     document.getElementById('password').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); }
+    });
+
+    // Password visibility toggle
+    const togglePwd = document.getElementById('togglePwd');
+    const pwdInput = document.getElementById('password');
+    const eyeOff = document.getElementById('eyeOff');
+    const eyeOn = document.getElementById('eyeOn');
+    togglePwd.addEventListener('click', () => {
+      const isPassword = pwdInput.type === 'password';
+      pwdInput.type = isPassword ? 'text' : 'password';
+      eyeOff.style.display = isPassword ? 'none' : '';
+      eyeOn.style.display = isPassword ? '' : 'none';
     });
 
     // 如果已登录，直接跳转
