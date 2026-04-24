@@ -228,6 +228,81 @@
       z-index: 10;
       letter-spacing: 0.5px;
     }
+    /* 雷达脉冲置形 */
+    .radar-pulse {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(22, 93, 255, 0.15);
+      pointer-events: none;
+      z-index: 2;
+      animation: radarPulse 4s ease-out infinite;
+    }
+    .radar-pulse::after {
+      content: '';
+      position: absolute;
+      inset: 20%;
+      border-radius: 50%;
+      border: 1px solid rgba(22, 93, 255, 0.1);
+      animation: radarPulse 4s ease-out infinite 1s;
+    }
+    .rp1 { width: 500px; height: 500px; top: -5%; right: -8%; animation-delay: 0s; }
+    .rp2 { width: 400px; height: 400px; bottom: 5%; left: -6%; animation-delay: 2s; }
+    @keyframes radarPulse {
+      0% { transform: scale(0.6); opacity: 0.6; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    /* 航线 SVG */
+    .flight-paths {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .flight-paths svg { width: 100%; height: 100%; }
+    .flight-line {
+      fill: none;
+      stroke-width: 1.5;
+      stroke-dasharray: 8 12;
+      animation: dashFlow 20s linear infinite;
+      opacity: 0.25;
+    }
+    @keyframes dashFlow {
+      to { stroke-dashoffset: -200; }
+    }
+    /* 功能展示条 */
+    .feature-strip {
+      position: absolute;
+      bottom: 56px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 28px;
+      z-index: 10;
+    }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: rgba(176, 197, 228, 0.55);
+      letter-spacing: 0.3px;
+    }
+    .feature-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(22, 93, 255, 0.6);
+      box-shadow: 0 0 8px rgba(22, 93, 255, 0.4);
+      animation: dotPulse 2s ease-in-out infinite;
+    }
+    .feature-item:nth-child(2) .feature-dot { background: rgba(34, 197, 94, 0.6); box-shadow: 0 0 8px rgba(34, 197, 94, 0.4); animation-delay: 0.4s; }
+    .feature-item:nth-child(3) .feature-dot { background: rgba(99, 102, 241, 0.6); box-shadow: 0 0 8px rgba(99, 102, 241, 0.4); animation-delay: 0.8s; }
+    .feature-item:nth-child(4) .feature-dot { background: rgba(14, 165, 233, 0.6); box-shadow: 0 0 8px rgba(14, 165, 233, 0.4); animation-delay: 1.2s; }
+    @keyframes dotPulse {
+      0%,100% { opacity: 0.5; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.4); }
+    }
     body {
       background:
         radial-gradient(circle at 15% 20%, rgba(78,159,255,0.20), transparent 26%),
@@ -339,6 +414,24 @@
     </svg>
   </div>
 
+  <!-- 雷达脉冲 -->
+  <div class="radar-pulse rp1"></div>
+  <div class="radar-pulse rp2"></div>
+
+  <!-- 航线动画 -->
+  <div class="flight-paths">
+    <svg viewBox="0 0 1000 600" preserveAspectRatio="none">
+      <path class="flight-line" stroke="#165dff" d="M-20,120 Q250,80 400,200 T700,150 T1020,220" />
+      <path class="flight-line" stroke="#22c55e" d="M-20,400 Q200,350 450,420 T750,380 T1020,450" style="animation-delay:-7s" />
+      <path class="flight-line" stroke="#6366f1" d="M-20,260 Q300,200 500,300 T800,250 T1020,320" style="animation-delay:-13s" />
+      <!-- 航点标记 -->
+      <circle cx="400" cy="200" r="3" fill="#165dff" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" repeatCount="indefinite" /></circle>
+      <circle cx="700" cy="150" r="3" fill="#165dff" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" begin="1s" repeatCount="indefinite" /></circle>
+      <circle cx="450" cy="420" r="3" fill="#22c55e" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" begin="0.5s" repeatCount="indefinite" /></circle>
+      <circle cx="500" cy="300" r="3" fill="#6366f1" opacity="0.4"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" begin="1.5s" repeatCount="indefinite" /></circle>
+    </svg>
+  </div>
+
   <!-- 粒子层 -->
   <div class="particles" id="particles"></div>
 
@@ -364,6 +457,14 @@
     <div class="register-link" id="registerLink">
       还没有账号？<a href="/app/register.html">立即注册</a>
     </div>
+  </div>
+
+  <!-- 功能展示 -->
+  <div class="feature-strip">
+    <div class="feature-item"><div class="feature-dot"></div>多机协同管控</div>
+    <div class="feature-item"><div class="feature-dot"></div>实时遥测监控</div>
+    <div class="feature-item"><div class="feature-dot"></div>AI 智能决策</div>
+    <div class="feature-item"><div class="feature-dot"></div>语音交互控制</div>
   </div>
 
   <div class="footer">云翼智控 &copy; 2025 — 智能工具人机交互与远程控制系统</div>

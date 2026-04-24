@@ -398,7 +398,7 @@ func (b *BackupAPI) CleanupOldBackups(c *gin.Context) {
 // This prevents tasks from being stuck in "running" status forever.
 func (b *BackupAPI) cleanupStaleBackups() {
 	result, err := b.db.Exec(
-		`UPDATE backup_records SET status='timeout_failed', remark=CONCAT(COALESCE(remark,''), ' | 超时自动标记失败') WHERE status='running' AND created_at < datetime('now', '-1 hour')`,
+		`UPDATE backup_records SET status='timeout_failed', remark=COALESCE(remark,'') || ' | 超时自动标记失败' WHERE status='running' AND created_at < datetime('now', '-1 hour')`,
 	)
 	if err != nil {
 		log.Printf("[Backup] stale cleanup query error: %v", err)
@@ -448,7 +448,7 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 		if r := recover(); r != nil {
 			elapsed := time.Since(start).Milliseconds()
 			log.Printf("[Backup] PANIC recovered in doBackup: %v", r)
-			b.db.Exec(`UPDATE backup_records SET status='failed', remark=CONCAT(COALESCE(remark,''), ' | panic: ', ?), duration_ms=? WHERE id=?`,
+			b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | panic: ' || ?, duration_ms=? WHERE id=?`,
 				fmt.Sprintf("%v", r), elapsed, recordID)
 			b.db.Exec(`INSERT INTO notifications(type, title, message, source) VALUES(?,?,?,?)`,
 				"backup", "备份异常崩溃",
@@ -463,7 +463,7 @@ func (b *BackupAPI) doBackup(backupType, operator, remark string) {
 
 	if err != nil {
 		log.Printf("[Backup] dump failed: %v", err)
-		b.db.Exec(`UPDATE backup_records SET status='failed', remark=CONCAT(COALESCE(remark,''), ' | 错误: ', ?), duration_ms=?, finished_at=datetime('now') WHERE id=?`,
+		b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | 错误: ' || ?, duration_ms=?, finished_at=datetime('now') WHERE id=?`,
 			err.Error(), elapsed, recordID)
 		// Send failure notification
 		b.db.Exec(`INSERT INTO notifications(type, title, message, source) VALUES(?,?,?,?)`,
@@ -775,7 +775,7 @@ func (b *BackupAPI) doBackupUnlocked(backupType, operator, remark string) {
 
 	if err != nil {
 		log.Printf("[Backup] dump failed: %v", err)
-		b.db.Exec(`UPDATE backup_records SET status='failed', remark=CONCAT(COALESCE(remark,''), ' | 错误: ', ?), duration_ms=?, finished_at=datetime('now') WHERE id=?`,
+		b.db.Exec(`UPDATE backup_records SET status='failed', remark=COALESCE(remark,'') || ' | 错误: ' || ?, duration_ms=?, finished_at=datetime('now') WHERE id=?`,
 			err.Error(), elapsed, recordID)
 		return
 	}

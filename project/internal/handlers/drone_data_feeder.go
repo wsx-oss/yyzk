@@ -123,11 +123,11 @@ func StartDroneDataFeeder(database *db.DB) {
 
 		for i, prof := range feederProfiles {
 			gpsID, dID := ensureDroneRegistered(database, prof)
-				// 初始状态：停在基地地面，未解锁，保持静止
+			// 初始状态：停在基地地面，未解锁，保持静止
 			feederStates[i] = &droneState{
 				lat: prof.HomeLat, lng: prof.HomeLng, alt: prof.HomeAlt,
 				relAlt: 0, speed: 0, heading: 0,
-				battLevel: 85 + rand.Intn(16),
+				battLevel:   85 + rand.Intn(16),
 				battVoltage: 24.0 + rand.Float64()*1.2,
 				battCurrent: 0.3 + rand.Float64()*0.2, battTemp: 25.0 + rand.Float64()*3,
 				battHealth: 92 + rand.Intn(9), battCycles: 20 + rand.Intn(60),
@@ -523,9 +523,9 @@ func feederLoop(database *db.DB) {
 // ---- Position evolution (idle drift / mission following) ----
 
 const (
-	missionSpeed  = 0.00012 // ≈ 13 m per 200ms tick (roughly 15 m/s cruising)
-	returnSpeed   = 0.00006 // ≈ 7 m per 200ms tick (roughly 8 m/s slow return)
-	takeoffSpeed  = 0.00003 // slow horizontal drift toward WP1 during climb
+	missionSpeed = 0.00012 // ≈ 13 m per 200ms tick (roughly 15 m/s cruising)
+	returnSpeed  = 0.00006 // ≈ 7 m per 200ms tick (roughly 8 m/s slow return)
+	takeoffSpeed = 0.00003 // slow horizontal drift toward WP1 during climb
 )
 
 // catmullRomFeeder evaluates a Catmull-Rom spline at parameter t ∈ [0,1] given 4 control points.
@@ -831,8 +831,8 @@ func evolveMission(s *droneState, p DroneProfile, database *db.DB) {
 func evolveBattery(s *droneState) {
 	if s.landedState == 2 { // in flight: discharge
 		s.battLevel -= rand.Intn(2) // slow drain
-		if s.battLevel < 15 {
-			s.battLevel = 15
+		if s.battLevel < 30 {
+			s.battLevel = 30 // auto-return threshold: never reach low-battery zone (≤20%)
 		}
 		s.battVoltage = 22.0 + float64(s.battLevel)*0.03
 		s.battCurrent = 8.0 + rand.Float64()*4.0
@@ -851,14 +851,22 @@ func evolveBattery(s *droneState) {
 // ---- Attitude evolution ----
 
 func evolveAttitude(s *droneState) {
-	if s.landedState == 2 { // flying
-		s.roll = (rand.Float64() - 0.5) * 10   // ±5°
-		s.pitch = (rand.Float64() - 0.5) * 8    // ±4°
-		s.yaw = s.heading                         // follows heading
-		s.throttle = 45 + rand.Intn(20)          // 45-65%
-	} else { // ground
-		s.roll = (rand.Float64() - 0.5) * 1.0    // ±0.5°
-		s.pitch = (rand.Float64() - 0.5) * 1.0
+	if s.landedState == 2 { // flying — smooth with inertia + turbulence
+		targetRoll := (rand.Float64() - 0.5) * 12  // ±6° target
+		targetPitch := (rand.Float64() - 0.5) * 10 // ±5° target
+		// Smooth with 70% inertia from previous value
+		s.roll = s.roll*0.7 + targetRoll*0.3
+		s.pitch = s.pitch*0.7 + targetPitch*0.3
+		s.yaw = s.heading
+		// Throttle correlates with altitude changes
+		baseThrottle := 48 + rand.Intn(8) // 48-56% cruise
+		if s.alt > s.relAlt+2 {
+			baseThrottle += 10 // climbing
+		}
+		s.throttle = baseThrottle
+	} else { // ground — minimal sensor noise
+		s.roll = s.roll*0.9 + (rand.Float64()-0.5)*0.2
+		s.pitch = s.pitch*0.9 + (rand.Float64()-0.5)*0.2
 		s.yaw = s.heading
 		s.throttle = 0
 	}
@@ -958,78 +966,193 @@ func pushBatteryData(database *db.DB, p DroneProfile, s *droneState) {
 
 func pushMavlinkTelemetry(database *db.DB, p DroneProfile, s *droneState) {
 	now := time.Now().Format("2006-01-02 15:04:05")
+	timeBoot := time.Now().UnixMilli() % 86400000 // ms since midnight
 
 	// Heartbeat
 	hbJSON, _ := json.Marshal(map[string]interface{}{
 		"custom_mode": s.customMode, "mav_type": "QUADROTOR", "mav_type_id": 2,
-		"autopilot": 8, "base_mode": func() int { if s.armed { return 0xC1 }; return 0x41 }(),
-		"system_status": "ACTIVE", "armed": s.armed, "mode": s.mode,
+		"autopilot": 8, "autopilot_name": "PX4",
+		"base_mode": func() int {
+			if s.armed {
+				return 0xC1
+			}
+			return 0x41
+		}(),
+		"system_status": func() string {
+			if s.armed {
+				return "ACTIVE"
+			}
+			return "STANDBY"
+		}(),
+		"armed": s.armed, "mode": s.mode, "mavlink_version": 3,
 	})
 	upsertTelemetry(database, p.SysID, 1, "heartbeat", string(hbJSON), now)
 
-	// Position
+	// Velocity decomposition (realistic NED frame)
+	headRad := s.heading * math.Pi / 180
+	vx := s.speed * math.Cos(headRad) * 100 // cm/s north
+	vy := s.speed * math.Sin(headRad) * 100 // cm/s east
+	vz := (rand.Float64() - 0.5) * 30       // cm/s down (light oscillation)
+	if s.landedState == 1 {
+		vx, vy, vz = 0, 0, 0
+	}
+
+	// Position (GLOBAL_POSITION_INT)
 	posJSON, _ := json.Marshal(map[string]interface{}{
-		"lat": s.lat, "lon": s.lng, "alt": s.alt, "rel_alt": s.relAlt,
-		"vx": s.speed * math.Sin(s.heading*math.Pi/180) * 0.5,
-		"vy": s.speed * math.Cos(s.heading*math.Pi/180) * 0.5,
-		"vz": 0.0, "speed": s.speed, "hdg": s.heading,
+		"lat": int(s.lat * 1e7), "lon": int(s.lng * 1e7),
+		"alt": int(s.alt * 1000), "relative_alt": int(s.relAlt * 1000),
+		"lat_deg": s.lat, "lon_deg": s.lng, "alt_m": s.alt, "rel_alt_m": s.relAlt,
+		"vx": int(vx), "vy": int(vy), "vz": int(vz),
+		"hdg": int(s.heading * 100), "hdg_deg": s.heading,
+		"time_boot_ms": timeBoot,
 	})
 	upsertTelemetry(database, p.SysID, 1, "position", string(posJSON), now)
 
-	// Attitude
+	// Attitude (radians as per MAVLink spec)
+	rollRad := s.roll * math.Pi / 180
+	pitchRad := s.pitch * math.Pi / 180
+	yawRad := s.yaw * math.Pi / 180
 	attJSON, _ := json.Marshal(map[string]interface{}{
-		"roll": s.roll, "pitch": s.pitch, "yaw": s.yaw,
-		"rollspeed": (rand.Float64() - 0.5) * 0.1,
-		"pitchspeed": (rand.Float64() - 0.5) * 0.1,
-		"yawspeed": (rand.Float64() - 0.5) * 0.05,
+		"roll":         math.Round(rollRad*1000) / 1000,
+		"pitch":        math.Round(pitchRad*1000) / 1000,
+		"yaw":          math.Round(yawRad*1000) / 1000,
+		"roll_deg":     math.Round(s.roll*100) / 100,
+		"pitch_deg":    math.Round(s.pitch*100) / 100,
+		"yaw_deg":      math.Round(s.yaw*100) / 100,
+		"rollspeed":    math.Round((rand.Float64()-0.5)*0.08*1000) / 1000,
+		"pitchspeed":   math.Round((rand.Float64()-0.5)*0.06*1000) / 1000,
+		"yawspeed":     math.Round((rand.Float64()-0.5)*0.03*1000) / 1000,
+		"time_boot_ms": timeBoot,
 	})
 	upsertTelemetry(database, p.SysID, 1, "attitude", string(attJSON), now)
 
-	// GPS raw
+	// GPS raw (GPS_RAW_INT) — realistic noise
+	ephBase := 0.65 + rand.Float64()*0.25 // HDOP 0.65-0.90 for RTK
+	epvBase := 1.0 + rand.Float64()*0.35
+	satBase := s.satellites + rand.Intn(3) - 1
+	if satBase < 8 {
+		satBase = 8
+	}
 	gpsJSON, _ := json.Marshal(map[string]interface{}{
-		"lat": s.lat, "lon": s.lng, "alt": s.alt,
-		"eph": 0.8 + rand.Float64()*0.3, "epv": 1.2 + rand.Float64()*0.4,
-		"vel": s.speed, "fix_type": s.fixType, "fix_name": "RTK_FIXED",
-		"satellites": s.satellites,
+		"lat": int(s.lat * 1e7), "lon": int(s.lng * 1e7), "alt": int(s.alt * 1000),
+		"lat_deg": s.lat, "lon_deg": s.lng, "alt_m": s.alt,
+		"eph": int(ephBase * 100), "epv": int(epvBase * 100),
+		"hdop": math.Round(ephBase*100) / 100, "vdop": math.Round(epvBase*100) / 100,
+		"vel": int(s.speed * 100), "cog": int(s.heading * 100),
+		"fix_type": s.fixType, "fix_name": func() string {
+			switch s.fixType {
+			case 6:
+				return "RTK_FIXED"
+			case 5:
+				return "RTK_FLOAT"
+			default:
+				return "3D_FIX"
+			}
+		}(),
+		"satellites_visible": satBase,
+		"time_boot_ms":       timeBoot,
 	})
 	upsertTelemetry(database, p.SysID, 1, "gps_raw", string(gpsJSON), now)
 
-	// Battery
+	// Battery (BATTERY_STATUS)
+	voltPerCell := s.battVoltage / 6.0 // assume 6S LiPo
 	batJSON, _ := json.Marshal(map[string]interface{}{
-		"voltage": s.battVoltage, "current": s.battCurrent,
-		"remaining": s.battLevel, "temperature": s.battTemp,
-		"current_consumed": (100 - s.battLevel) * 50, "energy_consumed": (100 - s.battLevel) * 120,
+		"voltage":   math.Round(s.battVoltage*100) / 100,
+		"current":   math.Round(s.battCurrent*100) / 100,
+		"remaining": s.battLevel, "temperature": math.Round(s.battTemp*10) / 10,
+		"current_consumed": (100 - s.battLevel) * 52, "energy_consumed": (100 - s.battLevel) * 125,
+		"cell_count": 6, "voltage_per_cell": math.Round(voltPerCell*1000) / 1000,
+		"charge_state": func() string {
+			if s.battLevel > 80 {
+				return "OK"
+			}
+			if s.battLevel > 50 {
+				return "LOW"
+			}
+			return "CRITICAL"
+		}(),
+		"time_remaining": s.battLevel * 120, // seconds estimate
 	})
 	upsertTelemetry(database, p.SysID, 1, "battery", string(batJSON), now)
 
 	// VFR HUD
+	climbRate := (rand.Float64() - 0.5) * 0.4
+	if s.landedState == 1 {
+		climbRate = 0
+	}
+	airspeed := s.speed + (rand.Float64()-0.5)*0.8 // slight airspeed-groundspeed difference
+	if airspeed < 0 {
+		airspeed = 0
+	}
 	hudJSON, _ := json.Marshal(map[string]interface{}{
-		"airspeed": s.speed, "groundspeed": s.speed,
-		"alt": s.alt, "climb": (rand.Float64() - 0.5) * 0.5,
-		"heading": int(s.heading), "throttle": s.throttle,
+		"airspeed":    math.Round(airspeed*100) / 100,
+		"groundspeed": math.Round(s.speed*100) / 100,
+		"alt":         math.Round(s.alt*100) / 100,
+		"climb":       math.Round(climbRate*100) / 100,
+		"heading":     int(s.heading), "throttle": s.throttle,
 	})
 	upsertTelemetry(database, p.SysID, 1, "vfr_hud", string(hudJSON), now)
 
-	// Sys status
+	// Sys status (SYS_STATUS)
+	cpuLoad := 12.0 + rand.Float64()*8 // 12-20%
+	if s.landedState == 2 {
+		cpuLoad += 5 + rand.Float64()*5 // higher load when flying
+	}
 	sysJSON, _ := json.Marshal(map[string]interface{}{
-		"load": 15.0 + rand.Float64()*10,
-		"voltage_battery": int(s.battVoltage * 1000),
-		"current_battery": int(s.battCurrent * 100),
+		"load":              math.Round(cpuLoad*10) / 10,
+		"voltage_battery":   int(s.battVoltage * 1000),
+		"current_battery":   int(s.battCurrent * 100),
 		"battery_remaining": s.battLevel,
-		"drop_rate_comm": rand.Intn(3),
+		"drop_rate_comm":    rand.Intn(2),
+		"errors_comm":       0,
+		"sensors_present":   0x1FF7F, // typical sensor bitmap
+		"sensors_enabled":   0x1FF7F,
+		"sensors_health":    0x1FF7F,
 	})
 	upsertTelemetry(database, p.SysID, 1, "sys_status", string(sysJSON), now)
 
-	// Landed state
+	// Landed state (EXTENDED_SYS_STATE)
 	lsJSON, _ := json.Marshal(map[string]interface{}{
 		"vtol_state": 0, "landed_state": s.landedState,
-		"state": func() string { if s.landedState == 1 { return "ON_GROUND" }; return "IN_AIR" }(),
+		"state": func() string {
+			if s.landedState == 1 {
+				return "ON_GROUND"
+			}
+			return "IN_AIR"
+		}(),
 	})
 	upsertTelemetry(database, p.SysID, 1, "landed_state", string(lsJSON), now)
 
+	// Vibration (VIBRATION)
+	vibBase := 5.0
+	if s.landedState == 2 {
+		vibBase = 12.0 + rand.Float64()*8 // higher vibration in flight
+	}
+	vibJSON, _ := json.Marshal(map[string]interface{}{
+		"vibration_x": math.Round((vibBase+rand.Float64()*3)*100) / 100,
+		"vibration_y": math.Round((vibBase+rand.Float64()*3)*100) / 100,
+		"vibration_z": math.Round((vibBase+rand.Float64()*4)*100) / 100,
+		"clipping_0":  0, "clipping_1": 0, "clipping_2": 0,
+	})
+	upsertTelemetry(database, p.SysID, 1, "vibration", string(vibJSON), now)
+
+	// Wind estimation (WIND_COV)
+	windSpeed := 1.5 + rand.Float64()*3.0 // 1.5-4.5 m/s
+	windDir := rand.Float64() * 360
+	windJSON, _ := json.Marshal(map[string]interface{}{
+		"wind_x":         math.Round(windSpeed*math.Cos(windDir*math.Pi/180)*100) / 100,
+		"wind_y":         math.Round(windSpeed*math.Sin(windDir*math.Pi/180)*100) / 100,
+		"wind_z":         math.Round((rand.Float64()-0.5)*0.3*100) / 100,
+		"wind_speed":     math.Round(windSpeed*100) / 100,
+		"wind_direction": math.Round(windDir*10) / 10,
+	})
+	upsertTelemetry(database, p.SysID, 1, "wind", string(windJSON), now)
+
 	// Home position
 	homeJSON, _ := json.Marshal(map[string]interface{}{
-		"lat": p.HomeLat, "lon": p.HomeLng, "alt": p.HomeAlt,
+		"lat": int(p.HomeLat * 1e7), "lon": int(p.HomeLng * 1e7), "alt": int(p.HomeAlt * 1000),
+		"lat_deg": p.HomeLat, "lon_deg": p.HomeLng, "alt_m": p.HomeAlt,
+		"approach_x": 0, "approach_y": 0, "approach_z": 1,
 	})
 	upsertTelemetry(database, p.SysID, 1, "home_position", string(homeJSON), now)
 
@@ -1037,8 +1160,32 @@ func pushMavlinkTelemetry(database *db.DB, p DroneProfile, s *droneState) {
 	avJSON, _ := json.Marshal(map[string]interface{}{
 		"serial_uid": p.SerialUID, "firmware_version": p.FWVersion,
 		"board_type": p.BoardType, "board_name": "K9",
+		"os_custom_version": "PX4 v1.14.3",
+		"flight_sw_version": 0x011403FF,
 	})
 	upsertTelemetry(database, p.SysID, 1, "autopilot_version", string(avJSON), now)
+
+	// RC Channels (RC_CHANNELS)
+	rcJSON, _ := json.Marshal(map[string]interface{}{
+		"chancount": 16, "rssi": 220 + rand.Intn(36),
+		"chan1_raw": 1500 + rand.Intn(10) - 5, // roll centered
+		"chan2_raw": 1500 + rand.Intn(10) - 5, // pitch centered
+		"chan3_raw": func() int {
+			if s.armed {
+				return 1300 + s.throttle*4
+			}
+			return 1000
+		}(), // throttle
+		"chan4_raw": 1500 + rand.Intn(10) - 5, // yaw centered
+		"chan5_raw": func() int {
+			if s.armed {
+				return 1800
+			}
+			return 1000
+		}(), // arm switch
+		"chan6_raw": 1500, "chan7_raw": 1500, "chan8_raw": 1500,
+	})
+	upsertTelemetry(database, p.SysID, 1, "rc_channels", string(rcJSON), now)
 }
 
 func upsertTelemetry(database *db.DB, sysID, compID int, msgType, payload, updatedAt string) {

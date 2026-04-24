@@ -45,6 +45,8 @@ func AdaptSQL(s string) string {
 	s = strings.ReplaceAll(s, "datetime('now', '-15 seconds')", "DATE_SUB(NOW(), INTERVAL 15 SECOND)")
 	s = strings.ReplaceAll(s, "datetime('now','-10 minutes')", "DATE_SUB(NOW(), INTERVAL 10 MINUTE)")
 	s = strings.ReplaceAll(s, "datetime('now', '-10 minutes')", "DATE_SUB(NOW(), INTERVAL 10 MINUTE)")
+	s = strings.ReplaceAll(s, "datetime('now','-2 hours')", "DATE_SUB(NOW(), INTERVAL 2 HOUR)")
+	s = strings.ReplaceAll(s, "datetime('now', '-2 hours')", "DATE_SUB(NOW(), INTERVAL 2 HOUR)")
 	s = strings.ReplaceAll(s, "datetime('now','-1 hour')", "DATE_SUB(NOW(), INTERVAL 1 HOUR)")
 	s = strings.ReplaceAll(s, "datetime('now', '-1 hour')", "DATE_SUB(NOW(), INTERVAL 1 HOUR)")
 	s = strings.ReplaceAll(s, "datetime('now','-7 days')", "DATE_SUB(NOW(), INTERVAL 7 DAY)")
@@ -166,6 +168,8 @@ func openMySQL(dsn string) (*sql.DB, error) {
 	if err := database.Ping(); err != nil {
 		return nil, fmt.Errorf("MySQL ping: %w", err)
 	}
+	// Enable PIPES_AS_CONCAT so || works as string concat (matching SQLite)
+	database.Exec("SET SESSION sql_mode = CONCAT(@@sql_mode, ',PIPES_AS_CONCAT')")
 	log.Println("[DB] Connected to MySQL (timezone: Asia/Shanghai, every connection)")
 	return database, nil
 }
@@ -840,6 +844,17 @@ func migrateSQLite(db *sql.DB) error {
 	// add indexes for backup_records
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_backup_records_status ON backup_records(status)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_backup_records_created ON backup_records(created_at)`)
+
+	// add profile columns to users table
+	userProfileCols := []string{
+		`ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''`,
+	}
+	for _, s := range userProfileCols {
+		db.Exec(s)
+	}
 
 	return nil
 }

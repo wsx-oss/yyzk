@@ -852,7 +852,7 @@
             x: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: _fdk ? 'rgba(56,132,255,0.08)' : 'rgba(0,0,0,0.04)' } },
             y: { grid: { display: false }, ticks: { font: { size: 12, weight: '500' } } }
           },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return ' ' + c.parsed.x + ' 个'; } } } }
+          plugins: { legend: { display: true, position: 'top', labels: { font: { size: 12, weight: '500' }, padding: 10, usePointStyle: true, pointStyle: 'circle' } }, tooltip: { callbacks: { label: function(c){ return ' ' + c.parsed.x + ' 个'; } } } }
         }
       });
     }

@@ -117,11 +117,11 @@ func (a *API) BatteryReport(c *gin.Context) {
 		return
 	}
 
-	// determine status (level=-1 means unknown — treat as normal)
+	// determine status (level<=0 means unknown/not reported — treat as normal)
 	status := "正常"
-	if p.Level >= 0 && p.Level <= 10 {
+	if p.Level > 0 && p.Level <= 10 {
 		status = "严重不足"
-	} else if p.Level >= 0 && p.Level <= 20 {
+	} else if p.Level > 0 && p.Level <= 20 {
 		status = "电量低"
 	} else if p.Temperature >= 50 {
 		status = "温度过高"
@@ -141,8 +141,8 @@ func (a *API) BatteryReport(c *gin.Context) {
 
 	canAnomaly := a.isDeviceOnlineForAnomaly(p.DeviceID)
 
-	// auto-generate alerts for abnormal conditions (skip when level is unknown/-1)
-	if canAnomaly && p.Level >= 0 && p.Level <= 20 {
+	// auto-generate alerts for abnormal conditions (skip when level is unknown/0/-1)
+	if canAnomaly && p.Level > 0 && p.Level <= 20 {
 		msg := fmt.Sprintf("无人机[%s]电量低: %d%%", deviceName, p.Level)
 		alertType := "电量低"
 		if p.Level <= 10 {

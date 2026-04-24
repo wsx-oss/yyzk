@@ -29,6 +29,9 @@ func RegisterAuthRoutes(r *gin.Engine, database *db.DB) {
 		auth.POST("/login", a.Login)
 		auth.POST("/logout", a.Logout)
 		auth.GET("/validate", a.ValidateToken)
+		auth.GET("/profile", a.GetProfile)
+		auth.PUT("/profile", a.UpdateProfile)
+		auth.POST("/change-password", a.ChangePassword)
 	}
 	// Start background cleanup of expired sessions
 	go a.cleanupExpiredSessions()
@@ -225,6 +228,160 @@ func (a *AuthAPI) ValidateToken(c *gin.Context) {
 	cacheSession(token, userID, username, expires)
 
 	c.JSON(http.StatusOK, gin.H{"valid": true, "username": username, "expires_at": expires.Unix()})
+}
+
+// getUserIDFromToken extracts user ID from Authorization header token.
+func (a *AuthAPI) getUserIDFromToken(c *gin.Context) (int, string, bool) {
+	token := c.GetHeader("Authorization")
+	if token == "" {
+		token = c.Query("token")
+	}
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "请先登录"})
+		return 0, "", false
+	}
+	if len(token) > 7 && token[:7] == "Bearer " {
+		token = token[7:]
+	}
+
+	// Try Redis cache first
+	if sess, ok := getSessionCache(token); ok {
+		return sess.UserID, sess.Username, true
+	}
+
+	// Fallback to DB
+	var userID int
+	var expiresAt string
+	err := a.db.QueryRow(`SELECT user_id, expires_at FROM sessions WHERE token = ?`, token).Scan(&userID, &expiresAt)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "登录已过期，请重新登录"})
+		return 0, "", false
+	}
+	expires, err := time.Parse("2006-01-02 15:04:05", expiresAt)
+	if err != nil || time.Now().After(expires) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "登录已过期，请重新登录"})
+		return 0, "", false
+	}
+	var username string
+	a.db.QueryRow(`SELECT username FROM users WHERE id = ?`, userID).Scan(&username)
+	return userID, username, true
+}
+
+// GetProfile returns the current user's profile information.
+func (a *AuthAPI) GetProfile(c *gin.Context) {
+	userID, _, ok := a.getUserIDFromToken(c)
+	if !ok {
+		return
+	}
+
+	var username, email, phone, avatar, nickname, createdAt string
+	err := a.db.QueryRow(
+		`SELECT username, COALESCE(email,''), COALESCE(phone,''), COALESCE(avatar,''), COALESCE(nickname,''), created_at FROM users WHERE id = ?`,
+		userID,
+	).Scan(&username, &email, &phone, &avatar, &nickname, &createdAt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取用户信息失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":         userID,
+		"username":   username,
+		"email":      email,
+		"phone":      phone,
+		"avatar":     avatar,
+		"nickname":   nickname,
+		"created_at": createdAt,
+	})
+}
+
+// UpdateProfile updates the current user's profile fields.
+func (a *AuthAPI) UpdateProfile(c *gin.Context) {
+	userID, _, ok := a.getUserIDFromToken(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Nickname string `json:"nickname"`
+		Email    string `json:"email"`
+		Phone    string `json:"phone"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求数据"})
+		return
+	}
+
+	// Validate email format if provided
+	req.Email = strings.TrimSpace(req.Email)
+	if req.Email != "" && !strings.Contains(req.Email, "@") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "邮箱格式不正确"})
+		return
+	}
+
+	// Validate phone format if provided
+	req.Phone = strings.TrimSpace(req.Phone)
+	if req.Phone != "" && len(req.Phone) < 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "手机号格式不正确"})
+		return
+	}
+
+	req.Nickname = strings.TrimSpace(req.Nickname)
+
+	_, err := a.db.Exec(
+		`UPDATE users SET nickname=?, email=?, phone=? WHERE id=?`,
+		req.Nickname, req.Email, req.Phone, userID,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "个人信息已更新"})
+}
+
+// ChangePassword changes the current user's password.
+func (a *AuthAPI) ChangePassword(c *gin.Context) {
+	userID, _, ok := a.getUserIDFromToken(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		OldPassword string `json:"old_password" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required,min=6"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "原密码不能为空，新密码至少6位"})
+		return
+	}
+
+	// Verify old password
+	var passwordHash string
+	err := a.db.QueryRow(`SELECT password_hash FROM users WHERE id = ?`, userID).Scan(&passwordHash)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取用户信息失败"})
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.OldPassword)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "原密码错误"})
+		return
+	}
+
+	// Hash new password
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+		return
+	}
+
+	_, err = a.db.Exec(`UPDATE users SET password_hash = ? WHERE id = ?`, string(newHash), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "密码修改失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "密码修改成功，请重新登录"})
 }
 
 func (a *AuthAPI) cleanupExpiredSessions() {

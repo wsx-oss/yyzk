@@ -168,8 +168,8 @@ func (p *SimTelemetryPusher) pushBatteryUpdate(snap simulation.TelemetrySnapshot
 		status, snap.Battery.ChargeCycles, estimateRemaining(snap.Battery.Level),
 	)
 
-	// Auto-generate alerts for sim drones too
-	if snap.Battery.Level >= 0 && snap.Battery.Level <= 20 {
+	// Auto-generate alerts for sim drones too (skip level=0 as unknown)
+	if snap.Battery.Level > 0 && snap.Battery.Level <= 20 {
 		msg := fmt.Sprintf("[模拟]无人机[%s]电量低: %d%%", deviceName, snap.Battery.Level)
 		alertType := "电量低"
 		if snap.Battery.Level <= 10 {

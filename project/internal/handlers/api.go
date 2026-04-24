@@ -32,11 +32,11 @@ type API struct {
 }
 
 // insertAlertDedup inserts an alert only if no similar alert (same category + message) exists within
-// the last 10 minutes. This prevents alert storms from repeated abnormal data reports.
+// the last 2 hours. This prevents alert storms from repeated abnormal data reports.
 func insertAlertDedup(database *db.DB, category, severity, message string) {
 	var count int
 	err := database.QueryRow(
-		`SELECT COUNT(*) FROM alerts WHERE category=? AND message=? AND created_at > datetime('now', '-10 minutes')`,
+		`SELECT COUNT(*) FROM alerts WHERE category=? AND message=? AND created_at > datetime('now', '-2 hours')`,
 		category, message,
 	).Scan(&count)
 	if err != nil || count > 0 {

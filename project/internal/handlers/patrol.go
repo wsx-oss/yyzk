@@ -90,18 +90,86 @@ func wrapWithHealthCheck(database *db.DB, fn func(ctx context.Context) error) fu
 // given worker pool. Each patrol runs on its own schedule via the pool's
 // SchedulePeriodic mechanism instead of raw goroutines.
 func StartPatrolInspection(database *db.DB, pool *taskpool.Pool) {
+	// Startup cleanup: prune old alerts and notifications to prevent unbounded growth
+	pruneOldData(database)
+
 	pool.SchedulePeriodic("patrol:battery", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolBatteryTask(database)))
 	pool.SchedulePeriodic("patrol:drones", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolDronesTask(database)))
 	pool.SchedulePeriodic("patrol:alerts", "patrol", 60*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolAlertsTask(database)))
 	pool.SchedulePeriodic("patrol:hardware", "patrol", 60*time.Second, taskpool.PriorityLow, wrapWithHealthCheck(database, patrolHardwareTask(database)))
 	pool.SchedulePeriodic("patrol:logs", "patrol", 120*time.Second, taskpool.PriorityLow, wrapWithHealthCheck(database, patrolLogsTask(database)))
 	pool.SchedulePeriodic("patrol:missions", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolMissionsTask(database)))
+	pool.SchedulePeriodic("patrol:prune", "maintenance", 6*time.Hour, taskpool.PriorityLow, func(ctx context.Context) error {
+		pruneOldData(database)
+		return nil
+	})
 	log.Println("[Patrol] AI inspection tasks registered in pool (with health checks)")
 }
 
-// insertNotification is a helper to create a notification record
+// pruneOldData removes alerts and notifications older than 7 days, keeping at most 500 of each.
+func pruneOldData(database *db.DB) {
+	// Remove alerts older than 7 days
+	res, _ := database.Exec(`DELETE FROM alerts WHERE created_at < datetime('now', '-7 days')`)
+	if res != nil {
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			log.Printf("[Prune] Deleted %d old alerts (>7 days)", n)
+		}
+	}
+	// Keep at most 500 alerts
+	res, _ = database.Exec(`DELETE FROM alerts WHERE id NOT IN (SELECT id FROM alerts ORDER BY created_at DESC LIMIT 500)`)
+	if res != nil {
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			log.Printf("[Prune] Trimmed %d excess alerts (keeping 500)", n)
+		}
+	}
+	// Remove notifications older than 7 days
+	res, _ = database.Exec(`DELETE FROM notifications WHERE created_at < datetime('now', '-7 days')`)
+	if res != nil {
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			log.Printf("[Prune] Deleted %d old notifications (>7 days)", n)
+		}
+	}
+	// Keep at most 500 notifications
+	res, _ = database.Exec(`DELETE FROM notifications WHERE id NOT IN (SELECT id FROM notifications ORDER BY created_at DESC LIMIT 500)`)
+	if res != nil {
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			log.Printf("[Prune] Trimmed %d excess notifications (keeping 500)", n)
+		}
+	}
+	// Prune old battery_records (keep last 7 days)
+	res, _ = database.Exec(`DELETE FROM battery_records WHERE created_at < datetime('now', '-7 days')`)
+	if res != nil {
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			log.Printf("[Prune] Deleted %d old battery_records (>7 days)", n)
+		}
+	}
+	// Prune old battery_alerts (keep last 7 days)
+	res, _ = database.Exec(`DELETE FROM battery_alerts WHERE created_at < datetime('now', '-7 days')`)
+	if res != nil {
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			log.Printf("[Prune] Deleted %d old battery_alerts (>7 days)", n)
+		}
+	}
+}
+
+// insertNotification is a helper to create a notification record with dedup.
+// Skips insertion if same title+source notification exists within the last 2 hours.
 func insertNotification(db *db.DB, nType, title, message, source, link string) {
-	_, err := db.Exec(
+	var count int
+	err := db.QueryRow(
+		`SELECT COUNT(*) FROM notifications WHERE title=? AND source=? AND created_at > datetime('now', '-2 hours')`,
+		title, source,
+	).Scan(&count)
+	if err == nil && count > 0 {
+		return
+	}
+	_, err = db.Exec(
 		"INSERT INTO notifications(type, title, message, source, link) VALUES(?,?,?,?,?)",
 		nType, title, message, source, link,
 	)

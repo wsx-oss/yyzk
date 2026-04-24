@@ -174,6 +174,51 @@ var CC_CHART_COLORS = {
 var CC_PIE_PALETTE = ['#165dff', '#14c9c9', '#00b42a', '#722ed1', '#f7ba1e', '#ff7d00', '#eb2f96', '#f53f3f'];
 var CC_PIE_PALETTE_DARK = ['#4e9fff', '#36d6d6', '#34d399', '#9b7cee', '#fcd34d', '#fbbf24', '#f472b6', '#f87171'];
 
+// ---- Bar Chart Data Labels Plugin ----
+var ccBarDataLabelsPlugin = {
+  id: 'ccBarDataLabels',
+  afterDatasetsDraw: function(chart) {
+    if (chart.config.type !== 'bar') return;
+    if (chart.options.plugins && chart.options.plugins.ccBarDataLabels && chart.options.plugins.ccBarDataLabels.display === false) return;
+    var ctx = chart.ctx;
+    var dk = document.documentElement.classList.contains('dark');
+    var isHorizontal = chart.options.indexAxis === 'y';
+    chart.data.datasets.forEach(function(dataset, i) {
+      var meta = chart.getDatasetMeta(i);
+      if (meta.hidden) return;
+      meta.data.forEach(function(bar, index) {
+        var value = dataset.data[index];
+        if (value == null || value === 0) return;
+        var displayVal = Number.isInteger(value) ? value : value.toFixed(1);
+        // Append unit if configured
+        var unit = (chart.options.plugins && chart.options.plugins.ccBarDataLabels && chart.options.plugins.ccBarDataLabels.unit) || '';
+        ctx.save();
+        ctx.fillStyle = dk ? 'rgba(224,235,255,0.88)' : '#4e5969';
+        ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif';
+        if (isHorizontal) {
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(displayVal + unit, bar.x + 6, bar.y);
+        } else {
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(displayVal + unit, bar.x, bar.y - 4);
+        }
+        ctx.restore();
+      });
+    });
+  }
+};
+
+// Register the plugin globally so all Chart instances get it
+if (typeof Chart !== 'undefined') {
+  Chart.register(ccBarDataLabelsPlugin);
+} else {
+  window.addEventListener('load', function() {
+    if (typeof Chart !== 'undefined') Chart.register(ccBarDataLabelsPlugin);
+  });
+}
+
 // Create chart (using Chart.js) with enhanced defaults
 function createChart(canvas, config) {
   if (typeof Chart === "undefined") {
@@ -193,10 +238,22 @@ function createChart(canvas, config) {
     var opts = config.options = config.options || {};
     if (!opts.cutout && config.type === 'doughnut') opts.cutout = '62%';
   }
-  // Auto-enhance bar charts
+  // Auto-enhance bar charts: rounded corners, legend, hover effect
   if (config.type === 'bar') {
     var ds = config.data && config.data.datasets && config.data.datasets[0];
     if (ds && !ds.borderRadius && ds.borderRadius !== 0) ds.borderRadius = 6;
+    if (ds && !ds.hoverBackgroundColor) {
+      ds.hoverBackgroundColor = ds.backgroundColor;
+      ds.hoverBorderWidth = 2;
+      ds.hoverBorderColor = isDark ? 'rgba(224,235,255,0.5)' : 'rgba(0,0,0,0.15)';
+    }
+    // Auto-show legend for multi-label bar charts (categorical bars with distinct colors)
+    var opts = config.options = config.options || {};
+    var plugins = opts.plugins = opts.plugins || {};
+    // Add animation easing
+    if (!opts.animation) opts.animation = {};
+    if (!opts.animation.duration) opts.animation.duration = 900;
+    if (!opts.animation.easing) opts.animation.easing = 'easeOutQuart';
   }
   return new Chart(canvas, config);
 }

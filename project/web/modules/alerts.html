@@ -329,7 +329,7 @@
             y: { grid: { display: false }, ticks: { font: { size: 12, weight: '500' } } }
           },
           plugins: {
-            legend: { display: false },
+            legend: { display: true, position: 'top', labels: { font: { size: 12, weight: '500' }, padding: 10, usePointStyle: true, pointStyle: 'circle' } },
             tooltip: { callbacks: { label: function(c){ return ' ' + c.parsed.x + ' 条'; } } }
           }
         }
