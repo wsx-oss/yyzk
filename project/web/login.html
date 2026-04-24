@@ -41,12 +41,12 @@
       position: relative;
       z-index: 10;
       width: 100%;
-      max-width: 1200px;
+      max-width: 1340px;
       min-height: 100vh;
       margin: 0 auto;
       display: grid;
       grid-template-columns: 1fr minmax(380px, 440px);
-      align-items: center;
+      align-items: end;
       gap: clamp(32px, 6vw, 80px);
       padding: 40px 56px 56px;
     }
@@ -54,9 +54,10 @@
     /* ---- Left hero panel ---- */
     .hero-panel {
       color: #e2e8f0;
-      max-width: 580px;
+      max-width: 420px;
       align-self: end;
       padding-bottom: 48px;
+      justify-self: start;
     }
     .hero-kicker {
       display: inline-flex;
@@ -92,7 +93,7 @@
       font-size: 15px;
       line-height: 1.85;
       color: rgba(226,232,240,0.62);
-      max-width: 480px;
+      max-width: 420px;
       margin-bottom: 28px;
       text-shadow: 0 1px 8px rgba(0,0,0,0.4);
     }
@@ -138,6 +139,7 @@
         0 24px 80px rgba(0, 0, 0, 0.45),
         inset 0 1px 0 rgba(255,255,255,0.06);
       padding: 44px 36px 38px;
+      margin-bottom: 36px;
       width: 100%;
       max-width: 440px;
       justify-self: end;
@@ -201,7 +203,7 @@
       border-radius: 12px;
       font-size: 14px;
       font-family: inherit;
-      background: rgba(6, 14, 28, 0.45);
+      background: rgba(255, 255, 255, 0.08);
       color: #e2e8f0;
       transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
     }
@@ -210,7 +212,7 @@
       outline: none;
       border-color: rgba(78, 159, 255, 0.6);
       box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.15), 0 0 20px rgba(22, 93, 255, 0.08);
-      background: rgba(6, 14, 28, 0.65);
+      background: rgba(255, 255, 255, 0.14);
     }
 
     .btn-login {
