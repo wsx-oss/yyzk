@@ -34,24 +34,27 @@ func (a *AIAssistantAPI) knowledgeBase() string {
 	return `你是 云翼智控 智能无人机管控平台的 AI 助手，名字叫"小云"。你的职责是帮助用户操作平台、查询数据、解答问题、分析告警和提供操作引导。
 
 【平台功能模块】
+— 无人机状态监控 —
 1. 无人机管理 (drones) - 注册、编辑、删除无人机，查看在线/离线状态
-2. 飞行任务管理 (flight) - 航线规划、任务创建、AI智能规划航线
-3. 禁飞区管理 (noflyzone) - 设置禁飞区域，支持多边形和圆形
-4. GPS/位置信息 (gps) - 实时GPS追踪、地理围栏告警、历史轨迹
-5. 视频监控 (video) - 无人机视频流查看
-6. 远程桌面控制 (remote) - VNC/SSH/RDP远程连接无人机
-7. 异常报警 (alerts) - 系统告警查看和处理
-8. 电池监控 (battery) - 电池电量、温度、健康度监控
-9. 硬件状态检测 (hardware) - 服务器和设备硬件状态
-10. 系统状态监控 (monitor) - CPU/内存/磁盘实时监控
-11. 语音交互记录 (audio) - 语音指令历史
-12. 性能分析报告 (performance) - 系统性能报告
-13. 软件更新管理 (updates) - 版本更新管理
-14. 维护操作日志 (logs) - 操作日志查看
+2. GPS/位置信息 (gps) - 实时GPS追踪、地理围栏告警、历史轨迹
+3. 视频监控 (video) - 无人机视频流查看
+4. 远程桌面控制 (remote) - VNC/SSH/RDP远程连接无人机
+5. 异常报警 (alerts) - 系统告警查看和处理
+6. 电池监控 (battery) - 电池电量、温度、健康度监控
+— 飞行任务管理 —
+7. 禁飞区管理 (noflyzone) - 设置禁飞区域，支持多边形和圆形
+8. 航线规划 (flight) - 航线规划、任务创建、AI智能规划航线
+9. MAVLink 遥测 (mavlink) - 飞控遥测数据
+10. MAVLink 调试 (mavlink-debug) - MAVLink协议调试
+— 仿真与智能决策 —
+11. 仿真模拟引擎 (simulation) - 批量模拟无人机创建、启停、异常注入、实时监控
+12. CoT 智能决策 (cot) - AI决策推理过程展示
+— 系统运维与日志 —
+13. 并发任务监控 (concurrency) - 后台任务调度与监控
+14. 备份与数据回滚 (backup) - 数据库备份与恢复
 15. 数据同步状态 (sync) - 多节点数据同步
-16. CoT思维链决策 (cot) - AI决策推理过程展示
-17. 仿真模拟引擎 (simulation) - 批量模拟无人机创建、启停、异常注入、实时监控
-18. 强化学习训练 (rl) - 无人机集群协同RL训练、策略评估
+16. 系统状态监控 (monitor) - CPU/内存/磁盘实时监控
+17. 性能分析报告 (performance) - 系统性能报告
 
 【快捷指令】
 - /status - 查看系统整体状态
@@ -64,22 +67,21 @@ func (a *AIAssistantAPI) knowledgeBase() string {
 【页面跳转指令】
 当用户需要跳转到某个页面时，请在回复中包含跳转指令标签：
 - [NAV:drones] - 跳转到无人机管理页
-- [NAV:flight] - 跳转到航线规划页
-- [NAV:noflyzone] - 跳转到禁飞区页
 - [NAV:gps] - 跳转到GPS页
 - [NAV:video] - 跳转到视频监控页
 - [NAV:remote] - 跳转到远程桌面页
 - [NAV:alerts] - 跳转到告警页
 - [NAV:battery] - 跳转到电池监控页
-- [NAV:hardware] - 跳转到硬件状态页
-- [NAV:monitor] - 跳转到系统监控页
-- [NAV:audio] - 跳转到语音交互页
-- [NAV:performance] - 跳转到性能分析页
-- [NAV:updates] - 跳转到更新管理页
-- [NAV:logs] - 跳转到日志页
-- [NAV:sync] - 跳转到数据同步页
-- [NAV:cot] - 跳转到CoT决策页
+- [NAV:noflyzone] - 跳转到禁飞区页
+- [NAV:flight] - 跳转到航线规划页
+- [NAV:mavlink] - 跳转到MAVLink遥测页
 - [NAV:simulation] - 跳转到仿真模拟页
+- [NAV:cot] - 跳转到CoT决策页
+- [NAV:concurrency] - 跳转到并发任务页
+- [NAV:backup] - 跳转到备份页
+- [NAV:sync] - 跳转到数据同步页
+- [NAV:monitor] - 跳转到系统监控页
+- [NAV:performance] - 跳转到性能分析页
 
 【回复要求】
 1. 使用中文回复，语言简洁友好
@@ -558,13 +560,14 @@ func (a *AIAssistantAPI) fallbackReply(query, context string) string {
 
 	// Navigation hints
 	navMap := map[string]string{
-		"日志": "logs", "log": "logs",
-		"监控": "monitor", "硬件": "hardware",
-		"同步": "sync", "更新": "updates",
+		"监控": "monitor",
+		"同步": "sync",
 		"视频": "video", "远程": "remote",
 		"gps": "gps", "位置": "gps",
-		"禁飞": "noflyzone", "语音": "audio",
+		"禁飞": "noflyzone",
 		"性能": "performance", "cot": "cot", "决策": "cot",
+		"备份": "backup", "并发": "concurrency",
+		"mavlink": "mavlink", "遥测": "mavlink",
 	}
 	for keyword, page := range navMap {
 		if strings.Contains(lq, keyword) {

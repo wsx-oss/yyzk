@@ -747,11 +747,20 @@
   <aside class="layout-sidebar" id="sidebar">
     <nav class="sidebar-nav">
 
-      <div class="nav-item">
-        <a class="active" data-page="drones" data-label="无人机管理">
-          <span class="nav-icon">🛩</span>
-          <span class="nav-text">无人机管理</span>
-        </a>
+      <div class="nav-group">
+        <div class="nav-group-toggle open" data-group="status" data-label="无人机状态监控">
+          <span class="nav-icon">📺</span>
+          <span class="nav-text">无人机状态监控</span>
+          <span class="nav-group-arrow">▶</span>
+        </div>
+        <div class="nav-group-children open">
+          <div class="nav-item"><a class="active" data-page="drones" data-label="无人机管理"><span class="nav-icon">🛩</span><span class="nav-text">无人机管理</span></a></div>
+          <div class="nav-item"><a data-page="gps" data-label="GPS/位置信息"><span class="nav-icon">📡</span><span class="nav-text">GPS/位置信息</span></a></div>
+          <div class="nav-item"><a data-page="video" data-label="视频监控"><span class="nav-icon">🎥</span><span class="nav-text">视频监控</span></a></div>
+          <div class="nav-item"><a data-page="remote" data-label="远程桌面控制"><span class="nav-icon">🖥</span><span class="nav-text">远程桌面控制</span></a></div>
+          <div class="nav-item"><a data-page="alerts" data-label="异常报警"><span class="nav-icon">🚨</span><span class="nav-text">异常报警</span></a></div>
+          <div class="nav-item"><a data-page="battery" data-label="电池监控"><span class="nav-icon">🔋</span><span class="nav-text">电池监控</span></a></div>
+        </div>
       </div>
 
       <div class="nav-group">
@@ -763,7 +772,6 @@
         <div class="nav-group-children open">
           <div class="nav-item"><a data-page="noflyzone" data-label="禁飞区"><span class="nav-icon">⛔</span><span class="nav-text">禁飞区</span></a></div>
           <div class="nav-item"><a data-page="flight" data-label="航线规划"><span class="nav-icon">✈</span><span class="nav-text">航线规划</span></a></div>
-          <div class="nav-item"><a data-page="gps" data-label="GPS/位置信息"><span class="nav-icon">📡</span><span class="nav-text">GPS/位置信息</span></a></div>
           <div class="nav-item"><a data-page="mavlink" data-label="MAVLink 遥测"><span class="nav-icon">📶</span><span class="nav-text">MAVLink 遥测</span></a></div>
           <div class="nav-item"><a data-page="mavlink-debug" data-label="MAVLink 调试"><span class="nav-icon">🛠</span><span class="nav-text">MAVLink 调试</span></a></div>
         </div>
@@ -782,44 +790,17 @@
       </div>
 
       <div class="nav-group">
-        <div class="nav-group-toggle open" data-group="ops" data-label="系统调度与运维">
+        <div class="nav-group-toggle open" data-group="ops" data-label="系统运维与日志">
           <span class="nav-icon">⚙</span>
-          <span class="nav-text">系统调度与运维</span>
+          <span class="nav-text">系统运维与日志</span>
           <span class="nav-group-arrow">▶</span>
         </div>
         <div class="nav-group-children open">
           <div class="nav-item"><a data-page="concurrency" data-label="并发任务监控"><span class="nav-icon">📊</span><span class="nav-text">并发任务监控</span></a></div>
           <div class="nav-item"><a data-page="backup" data-label="备份与数据回滚"><span class="nav-icon">💾</span><span class="nav-text">备份与数据回滚</span></a></div>
-        </div>
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-group-toggle open" data-group="status" data-label="无人机状态监控">
-          <span class="nav-icon">📺</span>
-          <span class="nav-text">无人机状态监控</span>
-          <span class="nav-group-arrow">▶</span>
-        </div>
-        <div class="nav-group-children open">
-          <div class="nav-item"><a data-page="video" data-label="视频监控"><span class="nav-icon">🎥</span><span class="nav-text">视频监控</span></a></div>
-          <div class="nav-item"><a data-page="remote" data-label="远程桌面控制"><span class="nav-icon">🖥</span><span class="nav-text">远程桌面控制</span></a></div>
-          <div class="nav-item"><a data-page="alerts" data-label="异常报警"><span class="nav-icon">🚨</span><span class="nav-text">异常报警</span></a></div>
-          <div class="nav-item"><a data-page="battery" data-label="电池监控"><span class="nav-icon">🔋</span><span class="nav-text">电池监控</span></a></div>
-          <div class="nav-item"><a data-page="hardware" data-label="硬件状态检测"><span class="nav-icon">🔧</span><span class="nav-text">硬件状态检测</span></a></div>
-        </div>
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-group-toggle open" data-group="logs" data-label="日志管理">
-          <span class="nav-icon">📋</span>
-          <span class="nav-text">日志管理</span>
-          <span class="nav-group-arrow">▶</span>
-        </div>
-        <div class="nav-group-children open">
+          <div class="nav-item"><a data-page="sync" data-label="数据同步状态"><span class="nav-icon">🔗</span><span class="nav-text">数据同步状态</span></a></div>
           <div class="nav-item"><a data-page="monitor" data-label="系统状态监控"><span class="nav-icon">💻</span><span class="nav-text">系统状态监控</span></a></div>
           <div class="nav-item"><a data-page="performance" data-label="性能分析报告"><span class="nav-icon">📈</span><span class="nav-text">性能分析报告</span></a></div>
-          <div class="nav-item"><a data-page="updates" data-label="软件更新管理"><span class="nav-icon">🔄</span><span class="nav-text">软件更新管理</span></a></div>
-          <div class="nav-item"><a data-page="logs" data-label="维护操作日志"><span class="nav-icon">📝</span><span class="nav-text">维护操作日志</span></a></div>
-          <div class="nav-item"><a data-page="sync" data-label="数据同步状态"><span class="nav-icon">🔗</span><span class="nav-text">数据同步状态</span></a></div>
         </div>
       </div>
     </nav>
@@ -992,7 +973,7 @@
     if (savedPage) {
       navigateTo(savedPage);
     } else {
-      navigateTo('monitor');
+      navigateTo('drones');
     }
 
     // ---- Theme System ----
