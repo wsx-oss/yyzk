@@ -138,16 +138,11 @@
   <!-- Charts -->
   <div class="card" style="padding-bottom:24px;">
     <div class="card-title">统计概览</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;">
+    <div style="display:grid;grid-template-columns:1fr;gap:24px;align-items:start;">
       <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
         <div style="font-weight:600;margin-bottom:12px;text-align:center;">状态分布</div>
         <div style="width:100%;max-width:240px;position:relative;aspect-ratio:1/1;"><canvas id="statusChart"></canvas></div>
         <div id="statusLegend" style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-top:16px;font-size:12px;font-weight:500;color:#475569;"></div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;width:100%;">
-        <div style="font-weight:600;margin-bottom:12px;text-align:center;">协议分布</div>
-        <div style="width:100%;max-width:240px;position:relative;aspect-ratio:1/1;"><canvas id="protocolChart"></canvas></div>
-        <div id="protocolLegend" style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-top:16px;font-size:12px;font-weight:500;color:#475569;"></div>
       </div>
     </div>
   </div>
@@ -188,58 +183,15 @@
           <textarea id="fDesc" placeholder="简要描述该无人机的用途"></textarea>
         </div>
 
-        <!-- Connection Info -->
-        <div class="form-section">
-          <div class="form-section-title">&#x1F517; 远程连接信息</div>
-        </div>
-        <div>
-          <label>IP地址 <span class="req">*</span></label>
-          <input id="fIP" type="text" placeholder="例如: 192.168.1.100" />
-        </div>
-        <div>
-          <label>默认协议 <span class="req">*</span></label>
-          <select id="fProtocol">
-            <option value="SSH">SSH</option>
-            <option value="VNC">VNC</option>
-            <option value="RDP">RDP</option>
-          </select>
-        </div>
-        <div class="col-3">
-          <div>
-            <label>SSH端口</label>
-            <input id="fSSHPort" type="number" value="22" />
-          </div>
-          <div>
-            <label>VNC端口</label>
-            <input id="fVNCPort" type="number" value="5900" />
-          </div>
-          <div>
-            <label>RDP端口</label>
-            <input id="fRDPPort" type="number" value="3389" />
-          </div>
-        </div>
-        <div>
-          <label>用户名</label>
-          <input id="fUsername" type="text" placeholder="远程连接用户名" />
-        </div>
-        <div>
-          <label>密码</label>
-          <input id="fPassword" type="password" placeholder="远程连接密码" />
-        </div>
-        <div>
-          <label>自动连接</label>
-          <div class="fence-toggle" style="margin-top:4px;">
-            <label class="toggle-switch"><input type="checkbox" id="fAutoConnect" /><span class="toggle-slider"></span></label>
-            <span style="font-size:13px;color:#475569;">启用</span>
-          </div>
-        </div>
-        <div>
-          <label>记录日志</label>
-          <div class="fence-toggle" style="margin-top:4px;">
-            <label class="toggle-switch"><input type="checkbox" id="fLogEnabled" /><span class="toggle-slider"></span></label>
-            <span style="font-size:13px;color:#475569;">启用</span>
-          </div>
-        </div>
+        <input id="fIP" type="hidden" />
+        <input id="fProtocol" type="hidden" value="SSH" />
+        <input id="fSSHPort" type="hidden" value="22" />
+        <input id="fVNCPort" type="hidden" value="5900" />
+        <input id="fRDPPort" type="hidden" value="3389" />
+        <input id="fUsername" type="hidden" />
+        <input id="fPassword" type="hidden" />
+        <input id="fAutoConnect" type="checkbox" style="display:none;" />
+        <input id="fLogEnabled" type="checkbox" style="display:none;" />
 
         <!-- GPS Info -->
         <div class="form-section">
@@ -318,7 +270,7 @@
   <script>
     let allDrones = [];
     let editingId = null;
-    let statusChart = null, protocolChart = null;
+    let statusChart = null;
     // Track the last applied search params so auto-refresh reuses them
     let activeFilterName = '';
     let activeFilterStatus = '';
@@ -346,15 +298,6 @@
         } }
       });
       renderLegend(statusChart, $('#statusLegend'));
-      protocolChart = createChart($('#protocolChart'), {
-        type: 'doughnut',
-        data: { labels: ['SSH', 'VNC', 'RDP'], datasets: [{ data: [0, 0, 0], backgroundColor: dk ? ['#9b7cee','#4e9fff','#36d6d6'] : ['#722ed1','#165dff','#14c9c9'], hoverOffset: 10 }] },
-        options: { maintainAspectRatio: false, cutout: '68%', plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: function(ctx){ var t=ctx.dataset.data.reduce(function(a,b){return a+b},0); var p=t>0?(ctx.raw/t*100).toFixed(1):0; return ' '+ctx.label+': '+ctx.raw+' 台 ('+p+'%)'; } } }
-        } }
-      });
-      renderLegend(protocolChart, $('#protocolLegend'));
     }
 
     // ========== Load Data ==========
@@ -401,13 +344,6 @@
     }
 
     function updateCharts(items) {
-      if (protocolChart) {
-        let pc = { SSH: 0, VNC: 0, RDP: 0 };
-        items.forEach(d => { let p = (d.protocol||'').toUpperCase(); if (pc[p] !== undefined) pc[p]++; });
-        protocolChart.data.datasets[0].data = [pc.SSH, pc.VNC, pc.RDP];
-        protocolChart.update();
-        renderLegend(protocolChart, $('#protocolLegend'));
-      }
       if (statusChart) {
         renderLegend(statusChart, $('#statusLegend'));
       }
@@ -568,7 +504,7 @@
 
     // ========== Delete ==========
     function deleteDrone(id, name) {
-      if (!confirm('确定要删除无人机"' + name + '"吗？\n关联的远程设备、GPS设备及其历史数据将一同被删除，此操作不可恢复。')) return;
+      if (!confirm('确定要删除无人机"' + name + '"吗？\n关联设备、GPS设备及其历史数据将一同被删除，此操作不可恢复。')) return;
       api('/drones/' + id, { method: 'DELETE' }).then(r => r.json()).then(data => {
         if (data.error) { showToast(data.error, 'error'); return; }
         showToast('无人机已删除', 'success');
@@ -579,41 +515,6 @@
         activeFilterStatus = '';
         loadDrones(); loadStats();
       }).catch(e => showToast('删除失败', 'error'));
-    }
-
-    // ========== Connect ==========
-    function doConnect(id) {
-      const drone = allDrones.find(d => d.id === id);
-      if (!drone) return;
-      const protocol = (drone.protocol || 'SSH').toUpperCase();
-      const ip = drone.ip || '';
-      let port = drone.ssh_port || 22;
-      if (protocol === 'VNC') port = drone.vnc_port || 5900;
-      if (protocol === 'RDP') port = drone.rdp_port || 3389;
-      const username = drone.username || '';
-
-      if (protocol === 'VNC') {
-        const target = ip + ':' + port;
-        window.open('/app/vnc.html?target=' + encodeURIComponent(target) + '&deviceId=' + encodeURIComponent(drone.linked_device_id), '_blank');
-      } else if (protocol === 'SSH') {
-        const pass = prompt('请输入 ' + username + '@' + ip + ' 的 SSH 密码：');
-        if (pass === null) return;
-        window.open('/app/ssh.html?host=' + encodeURIComponent(ip) + '&port=' + encodeURIComponent(port) + '&user=' + encodeURIComponent(username) + '&pass=' + encodeURIComponent(pass) + '&name=' + encodeURIComponent(drone.name), '_blank');
-      } else if (protocol === 'RDP') {
-        const rdpContent = 'full address:s:' + ip + ':' + port + '\r\nusername:s:' + username + '\r\nprompt for credentials:i:1\r\nscreen mode id:i:2\r\n';
-        const blob = new Blob([rdpContent], { type: 'application/x-rdp' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = (drone.name || 'remote') + '.rdp';
-        a.click();
-        URL.revokeObjectURL(a.href);
-        showToast('已下载 RDP 文件', 'success');
-      }
-
-      // Set device online
-      if (drone.linked_device_id) {
-        api('/devices/' + drone.linked_device_id + '/status', { method: 'POST', body: { Status: 'online' } }).catch(() => {});
-      }
     }
 
     // ========== Detail ==========
@@ -634,7 +535,7 @@
           <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">视频监控</div><div></div>
           <div class="detail-label">视频流</div><div class="detail-value">${d.video_url ? '<code style="word-break:break-all;">' + esc(d.video_url) + '</code>' : '<span style="color:#94a3b8;">未配置</span>'}</div>
           <div class="detail-label" style="grid-column:1/-1;text-align:left;color:#1e3a5f;font-weight:600;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">关联信息</div><div></div>
-          <div class="detail-label">远程设备ID</div><div class="detail-value">${d.linked_device_id || '-'}</div>
+          <div class="detail-label">关联设备ID</div><div class="detail-value">${d.linked_device_id || '-'}</div>
           <div class="detail-label">GPS设备ID</div><div class="detail-value">${d.linked_gps_device_id || '-'}</div>
           <div class="detail-label">创建时间</div><div class="detail-value">${formatDate(d.created_at)}</div>
           <div class="detail-label">更新时间</div><div class="detail-value">${formatDate(d.updated_at)}</div>

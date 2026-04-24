@@ -45,6 +45,8 @@ func AdaptSQL(s string) string {
 	s = strings.ReplaceAll(s, "datetime('now', '-15 seconds')", "DATE_SUB(NOW(), INTERVAL 15 SECOND)")
 	s = strings.ReplaceAll(s, "datetime('now','-10 minutes')", "DATE_SUB(NOW(), INTERVAL 10 MINUTE)")
 	s = strings.ReplaceAll(s, "datetime('now', '-10 minutes')", "DATE_SUB(NOW(), INTERVAL 10 MINUTE)")
+	s = strings.ReplaceAll(s, "datetime('now','-6 hours')", "DATE_SUB(NOW(), INTERVAL 6 HOUR)")
+	s = strings.ReplaceAll(s, "datetime('now', '-6 hours')", "DATE_SUB(NOW(), INTERVAL 6 HOUR)")
 	s = strings.ReplaceAll(s, "datetime('now','-2 hours')", "DATE_SUB(NOW(), INTERVAL 2 HOUR)")
 	s = strings.ReplaceAll(s, "datetime('now', '-2 hours')", "DATE_SUB(NOW(), INTERVAL 2 HOUR)")
 	s = strings.ReplaceAll(s, "datetime('now','-1 hour')", "DATE_SUB(NOW(), INTERVAL 1 HOUR)")
@@ -161,7 +163,7 @@ func openMySQL(dsn string) (*sql.DB, error) {
 		return nil, fmt.Errorf("mysql connector: %w", err)
 	}
 	database := sql.OpenDB(connector)
-	database.SetMaxOpenConns(100)
+	database.SetMaxOpenConns(50)
 	database.SetMaxIdleConns(25)
 	database.SetConnMaxLifetime(5 * time.Minute)
 	database.SetConnMaxIdleTime(2 * time.Minute)

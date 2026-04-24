@@ -14,7 +14,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
 :root { --primary: var(--cc-primary, #165dff); --primary-light: var(--cc-primary-hover, #4080ff); --success: var(--cc-success, #00b42a); --warning: var(--cc-warning, #ff7d00); --danger: var(--cc-danger, #f53f3f); --info: var(--cc-info, #165dff); --bg: var(--cc-bg-1, #f7f8fa); --card: var(--cc-bg-2, #ffffff); --border: var(--cc-border, #e5e6eb); --text: var(--cc-text-1, #1d2129); --text-dim: var(--cc-text-3, #86909c); }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: var(--cc-font, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif); background: var(--bg); color: var(--text); min-height:100vh; }
+body { font-family: var(--cc-font, "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif); background: var(--bg); color: var(--text); min-height:100vh; }
 .header { background: var(--cc-bg-2, #fff); padding: 20px 30px; display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid var(--border); box-shadow: var(--cc-shadow-1, 0 0 1px rgba(0,0,0,.3)); }
 .header h1 { font-size: 22px; font-weight: 600; color: var(--text); }
 .header h1 span { color: var(--primary); }
@@ -145,7 +145,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   width:100%; height:calc(100vh - 100px); min-height:0;
   background: radial-gradient(ellipse at 50% 0%, #0a1628 0%, #040b18 100%);
   display:flex; flex-direction:column; overflow:hidden; position:relative; color:#e2e8f0;
-  font-family: 'Noto Sans SC', 'Segoe UI', sans-serif;
+  font-family: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
 }
 /* Animated grid background */
 .ds-container::before {
@@ -172,7 +172,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
 }
 .ds-header-ct > * { pointer-events:auto; }
 .ds-header-title {
-  font-family:'Orbitron','Noto Sans SC',sans-serif; font-size:24px; font-weight:900; letter-spacing:6px;
+  font-family:'Orbitron',"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif; font-size:24px; font-weight:900; letter-spacing:6px;
   background:linear-gradient(90deg,#05e8fe 0%,#38bdf8 30%,#a5f3fc 50%,#38bdf8 70%,#05e8fe 100%);
   background-size:200% 100%;
   background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
@@ -192,7 +192,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   padding:4px 16px; border-radius:20px;
   border:1px solid rgba(34,197,94,0.25);
   letter-spacing:1px; white-space:nowrap;
-  font-family:'Noto Sans SC',sans-serif;
+  font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
   text-shadow:0 0 8px rgba(34,197,94,0.25);
   backdrop-filter:blur(4px);
 }
@@ -202,13 +202,13 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   cursor:pointer; border:1px solid rgba(41,252,255,0.35); border-radius:4px;
   background:linear-gradient(180deg,rgba(5,60,100,0.5),rgba(4,11,24,0.7));
   transition:all .25s; letter-spacing:2px;
-  font-family:'Noto Sans SC',sans-serif;
+  font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
   text-shadow:0 0 8px rgba(5,232,254,0.3);
 }
 .ds-header-btn:hover { background:rgba(5,232,254,0.18); border-color:#05e8fe; box-shadow:0 0 20px rgba(5,232,254,0.25),inset 0 0 12px rgba(5,232,254,0.08); transform:translateY(-1px); }
 .ds-header-time {
   font-size:14px; color:#7ec7ff; white-space:nowrap; letter-spacing:1px;
-  font-family:'Orbitron','Noto Sans SC',sans-serif; font-weight:500;
+  font-family:'Orbitron',"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif; font-weight:500;
   text-shadow:0 0 6px rgba(126,199,255,0.3);
 }
 
@@ -247,7 +247,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   font-size:15px; font-weight:700; letter-spacing:2px;
   background:linear-gradient(90deg,#ffffff,#a5f3fc);
   background-clip:text; -webkit-background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
-  font-family:'Noto Sans SC',sans-serif;
+  font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
   text-shadow:none;
   filter:drop-shadow(0 0 4px rgba(5,232,254,0.2));
 }
@@ -288,7 +288,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   padding:3px 12px; font-size:11px; font-weight:600; color:#fff; border:none;
   border-radius:14px; cursor:pointer; white-space:nowrap;
   box-shadow:0 2px 8px rgba(0,0,0,0.3); transition:transform .15s, box-shadow .15s;
-  font-family:'Noto Sans SC',sans-serif;
+  font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
 }
 .ds-batch-bar .ds-batch-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.4); }
 .ds-map-area #simMap { width:100%; height:100%; border-radius:0; border:none; }
@@ -297,7 +297,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   background:linear-gradient(90deg,rgba(5,232,254,0.3),rgba(5,232,254,0.05),transparent);
   padding:5px 20px 5px 12px; border-radius:4px; letter-spacing:4px; font-weight:700;
   border-left:3px solid #05e8fe;
-  font-family:'Noto Sans SC',sans-serif;
+  font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
   text-shadow:0 0 10px rgba(5,232,254,0.3), 0 1px 2px rgba(0,0,0,0.5);
 }
 .ds-map-toolbar {
@@ -339,7 +339,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   box-shadow:0 0 8px rgba(5,232,254,0.1);
 }
 .ds-digit:last-child {
-  font-family:'Noto Sans SC',sans-serif; font-size:13px; width:26px; color:#7ec7ff;
+  font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif; font-size:13px; width:26px; color:#7ec7ff;
   text-shadow:none;
 }
 /* Liquid fill animation */
@@ -437,7 +437,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
 .ds-rank-idx.top2 { background:linear-gradient(135deg,#94a3b8,#64748b); color:#fff; }
 .ds-rank-idx.top3 { background:linear-gradient(135deg,#d97706,#b45309); color:#fff; }
 .ds-rank-idx.normal { background:rgba(5,232,254,0.08); color:#7ec7ff; }
-.ds-rank-name { flex:1; font-size:11px; color:#cbd5e1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:'Noto Sans SC',sans-serif; }
+.ds-rank-name { flex:1; font-size:11px; color:#cbd5e1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif; }
 .ds-rank-bar-wrap { flex:0 0 90px; height:14px; background:rgba(255,255,255,0.04); border-radius:7px; overflow:hidden; position:relative; }
 .ds-rank-bar {
   height:100%; border-radius:7px; transition:width 0.8s ease;
@@ -457,7 +457,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   padding:4px 20px; height:32px;
   background:linear-gradient(90deg, rgba(5,30,61,0.6) 0%, rgba(4,11,24,0.4) 100%);
   border-bottom:1px solid rgba(5,232,254,0.1);
-  font-family:'Noto Sans SC',sans-serif;
+  font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
 }
 .ds-filter-label {
   font-size:11px; color:rgba(126,199,255,0.6); letter-spacing:1px; white-space:nowrap;
@@ -466,7 +466,7 @@ body.ds-fullscreen #panel-datascreen .ds-container { height:100vh; min-height:10
   padding:3px 14px; font-size:11px; font-weight:600; color:#7ec7ff;
   background:rgba(5,232,254,0.06); border:1px solid rgba(5,232,254,0.15);
   border-radius:14px; cursor:pointer; transition:all 0.2s; white-space:nowrap;
-  font-family:'Noto Sans SC',sans-serif; letter-spacing:0.5px;
+  font-family:"Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif; letter-spacing:0.5px;
 }
 .ds-filter-btn:hover { background:rgba(5,232,254,0.12); border-color:rgba(5,232,254,0.3); }
 .ds-filter-btn.active {
@@ -2003,7 +2003,7 @@ async function loadSimStats(force=false) {
   const atEl = document.getElementById('analyticsTime');
   if(atEl) atEl.textContent = '';
 
-  const baseFont = {family: "'PingFang SC', 'Microsoft YaHei', sans-serif", size: 11};
+  const baseFont = {family: "'Source Han Sans SC', 'Source Han Sans CN', 'Source Han Sans', '思源黑体', sans-serif", size: 11};
   const commonOpts = {
     responsive: true,
     maintainAspectRatio: false,
@@ -2342,7 +2342,7 @@ var _wsOverlay = null;
 function _showWsOverlay(msg) {
   if (!_wsOverlay) {
     _wsOverlay = document.createElement('div');
-    _wsOverlay.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 20px;border-radius:10px;background:rgba(239,68,68,0.92);color:#fff;font-size:13px;font-family:system-ui;box-shadow:0 4px 16px rgba(0,0,0,0.25);backdrop-filter:blur(8px);transition:opacity 0.3s;';
+    _wsOverlay.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;padding:12px 20px;border-radius:10px;background:rgba(239,68,68,0.92);color:#fff;font-size:13px;font-family:\"Source Han Sans SC\",\"Source Han Sans CN\",\"Source Han Sans\",\"思源黑体\",sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.25);backdrop-filter:blur(8px);transition:opacity 0.3s;';
     document.body.appendChild(_wsOverlay);
   }
   _wsOverlay.textContent = msg;

@@ -54,7 +54,7 @@ func loadEnvFile(filename string) {
 	count := 0
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
 			continue
 		}
 		parts := strings.SplitN(line, "=", 2)

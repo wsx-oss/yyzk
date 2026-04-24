@@ -8,12 +8,13 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-      background: radial-gradient(ellipse at 20% 50%, #0c1929 0%, #0a0f1a 50%, #060b14 100%);
+      font-family: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
+      background:
+        linear-gradient(90deg, rgba(5, 12, 22, 0.84) 0%, rgba(6, 14, 26, 0.52) 42%, rgba(5, 12, 22, 0.86) 100%),
+        radial-gradient(circle at 18% 22%, rgba(22,93,255,0.28), transparent 28%),
+        radial-gradient(circle at 82% 26%, rgba(20,201,201,0.16), transparent 22%),
+        url("/app/login-bg.png") center center / cover no-repeat fixed;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       position: relative;
       overflow: hidden;
     }
@@ -97,18 +98,96 @@
       100% { transform: translateY(-10vh) scale(1); opacity: 0; }
     }
     /* 登录卡片 */
-    .login-card {
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(22, 93, 255, 0.2);
-      border-radius: 22px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(22, 93, 255, 0.08);
-      padding: 48px 40px;
-      width: 420px;
-      max-width: 90%;
+    .login-shell {
       position: relative;
       z-index: 10;
+      width: min(1240px, 100%);
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(0, 1.12fr) minmax(380px, 440px);
+      align-items: center;
+      gap: clamp(24px, 5vw, 72px);
+      padding: 40px 48px 56px;
+    }
+    .hero-panel {
+      color: #e2e8f0;
+      max-width: 620px;
+      padding-right: 24px;
+    }
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.14);
+      color: rgba(226,232,240,0.92);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      margin-bottom: 18px;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .hero-title {
+      font-size: clamp(38px, 5vw, 68px);
+      line-height: 1.02;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      margin-bottom: 18px;
+      text-shadow: 0 12px 40px rgba(0,0,0,0.28);
+    }
+    .hero-title strong {
+      color: #7dd3fc;
+      font-weight: 800;
+    }
+    .hero-copy {
+      font-size: 16px;
+      line-height: 1.9;
+      color: rgba(226,232,240,0.80);
+      max-width: 540px;
+      margin-bottom: 26px;
+    }
+    .hero-highlights {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      max-width: 620px;
+    }
+    .hero-chip {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(8, 15, 28, 0.38);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .hero-chip-title {
+      font-size: 12px;
+      color: rgba(148,163,184,0.92);
+      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hero-chip-value {
+      font-size: 18px;
+      color: #f8fafc;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .login-card {
+      background: rgba(8, 16, 30, 0.42);
+      backdrop-filter: blur(30px) saturate(180%);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      border: 1px solid rgba(191, 219, 254, 0.18);
+      border-radius: 26px;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.10);
+      padding: 42px 36px;
+      width: min(440px, 100%);
+      justify-self: end;
+      position: relative;
+      overflow: hidden;
     }
     .login-logo {
       display: flex;
@@ -135,8 +214,9 @@
     .login-subtitle {
       text-align: center;
       font-size: 13px;
-      color: #64748b;
-      margin-bottom: 32px;
+      color: rgba(191, 219, 254, 0.76);
+      margin-bottom: 28px;
+      line-height: 1.8;
     }
     .form-group {
       margin-bottom: 20px;
@@ -303,12 +383,6 @@
       0%,100% { opacity: 0.5; transform: scale(1); }
       50% { opacity: 1; transform: scale(1.4); }
     }
-    body {
-      background:
-        radial-gradient(circle at 15% 20%, rgba(78,159,255,0.20), transparent 26%),
-        radial-gradient(circle at 82% 72%, rgba(20,201,201,0.14), transparent 24%),
-        linear-gradient(180deg, #07101d 0%, #0a1324 52%, #060b14 100%);
-    }
     .login-card {
       background: rgba(9, 16, 32, 0.58);
       border: 1px solid rgba(148, 197, 255, 0.22);
@@ -343,6 +417,32 @@
     }
     .btn-login {
       box-shadow: 0 10px 30px rgba(22, 93, 255, 0.28), inset 0 1px 0 rgba(255,255,255,0.18);
+    }
+    @media (max-width: 960px) {
+      .login-shell {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        padding: 32px 20px 64px;
+      }
+      .hero-panel {
+        max-width: none;
+        padding-right: 0;
+      }
+      .hero-highlights {
+        grid-template-columns: 1fr;
+      }
+      .login-card {
+        justify-self: stretch;
+        width: 100%;
+      }
+    }
+    @media (max-width: 640px) {
+      .hero-title {
+        font-size: 34px;
+      }
+      .login-card {
+        padding: 32px 22px;
+      }
     }
   </style>
 </head>
@@ -435,39 +535,52 @@
   <!-- 粒子层 -->
   <div class="particles" id="particles"></div>
 
-  <!-- 登录卡片 -->
-  <div class="login-card">
-    <div class="login-logo">
-      <img src="/app/logo.jpg" alt="项目Logo" />
-    </div>
-    <h1>云翼智控</h1>
-    <div class="login-subtitle">智能工具人机交互与远程控制系统</div>
-    <div class="error-msg" id="errorMsg"></div>
-    <form id="loginForm" method="post" action="/api/auth/login" autocomplete="on" novalidate>
-      <div class="form-group">
-        <label for="username">用户名</label>
-        <input type="text" id="username" name="username" required autocomplete="username" placeholder="请输入用户名" />
+  <div class="login-shell">
+    <section class="hero-panel">
+      <div class="hero-kicker">云翼智控 · Unified Drone Ops Console</div>
+      <h2 class="hero-title">让飞行、遥测与<strong>决策闭环</strong>在同一控制台完成。</h2>
+      <p class="hero-copy">从多机协同、MAVLink 遥测到任务回放与数据备份，你现在进入的是整套无人机管控链路的统一入口。登录后即可查看实时状态、任务进度与系统健康概况。</p>
+      <div class="hero-highlights">
+        <div class="hero-chip">
+          <div class="hero-chip-title">Flight Ops</div>
+          <div class="hero-chip-value">多机协同调度</div>
+        </div>
+        <div class="hero-chip">
+          <div class="hero-chip-title">Telemetry</div>
+          <div class="hero-chip-value">MAVLink 实时链路</div>
+        </div>
+        <div class="hero-chip">
+          <div class="hero-chip-title">Mission Loop</div>
+          <div class="hero-chip-value">任务闭环与回放</div>
+        </div>
       </div>
-      <div class="form-group">
-        <label for="password">密码</label>
-        <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="请输入密码" />
+    </section>
+
+    <div class="login-card">
+      <div class="login-logo">
+        <img src="/app/logo.jpg" alt="项目Logo" />
       </div>
-      <button type="submit" class="btn-login">登 录</button>
-    </form>
-    <div class="register-link" id="registerLink">
-      还没有账号？<a href="/app/register.html">立即注册</a>
+      <h1>云翼智控</h1>
+      <div class="login-subtitle">欢迎回到统一管控台<br>登录后继续查看飞行、遥测与系统运行状态</div>
+      <div class="error-msg" id="errorMsg"></div>
+      <form id="loginForm" method="post" action="/api/auth/login" autocomplete="on" novalidate>
+        <div class="form-group">
+          <label for="username">用户名</label>
+          <input type="text" id="username" name="username" required autocomplete="username" placeholder="请输入用户名" />
+        </div>
+        <div class="form-group">
+          <label for="password">密码</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="请输入密码" />
+        </div>
+        <button type="submit" class="btn-login">登 录</button>
+      </form>
+      <div class="register-link" id="registerLink">
+        还没有账号？<a href="/app/register.html">立即注册</a>
+      </div>
     </div>
   </div>
 
-  <!-- 功能展示 -->
-  <div class="feature-strip">
-    <div class="feature-item"><div class="feature-dot"></div>多机协同管控</div>
-    <div class="feature-item"><div class="feature-dot"></div>实时遥测监控</div>
-    <div class="feature-item"><div class="feature-dot"></div>AI 智能决策</div>
-    <div class="feature-item"><div class="feature-dot"></div>语音交互控制</div>
-  </div>
-
-  <div class="footer">云翼智控 &copy; 2025 — 智能工具人机交互与远程控制系统</div>
+  <div class="footer">云翼智控 &copy; 2025 — 智能工具人机交互与协同管控系统</div>
 
   <script>
     // 生成浮动粒子

@@ -181,12 +181,14 @@ func NewStatsCache(interval time.Duration, computeFn func() interface{}) *StatsC
 	ctx, cancel := context.WithCancel(context.Background())
 	sc := &StatsCache{ctx: ctx, cancel: cancel}
 
-	// compute once synchronously so cache is warm from the start
-	sc.data = computeFn()
-
 	sc.wg.Add(1)
 	go func() {
 		defer sc.wg.Done()
+		// compute once immediately so cache warms up quickly (but non-blocking)
+		sc.mu.Lock()
+		sc.data = computeFn()
+		sc.mu.Unlock()
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {

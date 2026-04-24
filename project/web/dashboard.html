@@ -31,7 +31,7 @@
       --cc-sidebar-active-text: #165dff;
       --cc-sidebar-section: #86909c;
       --cc-sidebar-footer: #c9cdd4;
-      --cc-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+      --cc-font: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
       --cc-shadow-1: 0 10px 30px rgba(15, 23, 42, 0.08);
       --cc-shadow-2: 0 24px 60px rgba(15, 23, 42, 0.10);
       --cc-glass-bg: rgba(255,255,255,0.58);
@@ -757,7 +757,6 @@
           <div class="nav-item"><a class="active" data-page="drones" data-label="无人机管理"><span class="nav-icon">🛩</span><span class="nav-text">无人机管理</span></a></div>
           <div class="nav-item"><a data-page="gps" data-label="GPS/位置信息"><span class="nav-icon">📡</span><span class="nav-text">GPS/位置信息</span></a></div>
           <div class="nav-item"><a data-page="video" data-label="视频监控"><span class="nav-icon">🎥</span><span class="nav-text">视频监控</span></a></div>
-          <div class="nav-item"><a data-page="remote" data-label="远程桌面控制"><span class="nav-icon">🖥</span><span class="nav-text">远程桌面控制</span></a></div>
           <div class="nav-item"><a data-page="alerts" data-label="异常报警"><span class="nav-icon">🚨</span><span class="nav-text">异常报警</span></a></div>
           <div class="nav-item"><a data-page="battery" data-label="电池监控"><span class="nav-icon">🔋</span><span class="nav-text">电池监控</span></a></div>
         </div>
@@ -912,6 +911,10 @@
         page = parts[0];
         hash = '#' + parts[1];
       }
+      if (page === 'remote') {
+        page = 'drones';
+        localStorage.setItem('cc-active-page', 'drones');
+      }
       // Clear active
       document.querySelectorAll('.nav-item a, .nav-item-link').forEach(i => i.classList.remove('active'));
       // Set active
@@ -939,7 +942,7 @@
         console.warn('[Nav] page load timeout:', page);
         try {
           iframe.contentDocument.open();
-          iframe.contentDocument.write(`<div style="display:flex;align-items:center;justify-content:center;height:80vh;font-family:system-ui;color:#888;">
+          iframe.contentDocument.write(`<div style="display:flex;align-items:center;justify-content:center;height:80vh;font-family:'Source Han Sans SC','Source Han Sans CN','Source Han Sans','思源黑体',sans-serif;color:#888;">
             <div style="text-align:center"><p style="font-size:18px;">页面加载超时</p>
             <button onclick="parent.navigateTo('${page}')" style="margin-top:12px;padding:8px 24px;border:none;border-radius:6px;background:#165dff;color:#fff;cursor:pointer;">重试</button></div></div>`);
           iframe.contentDocument.close();
@@ -1350,7 +1353,7 @@
             <li><strong>飞行任务管理</strong> — 禁飞区设置、航线规划、GPS 追踪、MAVLink 遥测</li>
             <li><strong>仿真与智能决策</strong> — 仿真引擎运行、CoT 思维链分析</li>
             <li><strong>系统调度与运维</strong> — 并发任务监控、数据备份与回滚</li>
-            <li><strong>无人机状态监控</strong> — 视频监控、远程控制、报警、电池、硬件检测</li>
+            <li><strong>无人机状态监控</strong> — 视频监控、GPS 追踪、报警、电池、硬件检测</li>
             <li><strong>日志管理</strong> — 系统监控、性能分析、更新管理、操作日志</li>
           </ul>
         </div>

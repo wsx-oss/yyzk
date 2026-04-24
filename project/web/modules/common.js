@@ -15,7 +15,7 @@ const $$ = (q) => document.querySelectorAll(q);
     var defaults = Chart.defaults;
     defaults.color = textColor;
     defaults.borderColor = gridColor;
-    defaults.font.family = "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif";
+    defaults.font.family = "'Source Han Sans SC', 'Source Han Sans CN', 'Source Han Sans', '思源黑体', sans-serif";
     defaults.animation.duration = 750;
     defaults.animation.easing = 'easeOutQuart';
     defaults.responsive = true;
@@ -194,7 +194,7 @@ var ccBarDataLabelsPlugin = {
         var unit = (chart.options.plugins && chart.options.plugins.ccBarDataLabels && chart.options.plugins.ccBarDataLabels.unit) || '';
         ctx.save();
         ctx.fillStyle = dk ? 'rgba(224,235,255,0.88)' : '#4e5969';
-        ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.font = 'bold 11px "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif';
         if (isHorizontal) {
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';

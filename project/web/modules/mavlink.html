@@ -167,6 +167,7 @@
     let selectedSysId = null;
     let sseSource = null;
     let msgPage = 1;
+    let usingSimulatedFleet = false;
     let altitudeChart = null, speedChart = null;
     let altData = [], spdData = [], chartLabels = [];
 
@@ -180,16 +181,214 @@
       });
     });
 
+    // ============ Realistic Telemetry Simulator ============
+    const SimTelem = (() => {
+      const BASE_ALT = 485.0;
+      const START_AT = Date.now();
+      const FLEET = [
+        { sysId: 1, name: '巡检机-Alpha', route: 'A12', role: '电力廊道巡检', mode: 'AUTO.MISSION', homeLat: 30.5728, homeLon: 104.0668, latAmp: 0.0024, lonAmp: 0.0036, altBase: 62, spdBase: 9.8, battStart: 89, battFloor: 61, phaseOffset: 0.1 },
+        { sysId: 2, name: '测绘机-Bravo', route: 'B07', role: '正射测绘采集', mode: 'AUTO.SURVEY', homeLat: 30.5699, homeLon: 104.0714, latAmp: 0.0018, lonAmp: 0.0028, altBase: 88, spdBase: 6.3, battStart: 76, battFloor: 48, phaseOffset: 1.7 },
+        { sysId: 3, name: '返航机-Charlie', route: 'R03', role: '载荷返航回收', mode: 'RTL', homeLat: 30.5763, homeLon: 104.0631, latAmp: 0.0012, lonAmp: 0.0019, altBase: 34, spdBase: 7.1, battStart: 42, battFloor: 22, phaseOffset: 3.2 },
+      ];
+      const MESSAGE_FACTORIES = {
+        1: [
+          d => ({ severity: 'info', message: `EKF2 IMU0 is using GPS, yaw aligned, mag health OK` }),
+          d => ({ severity: 'notice', message: `Mission #${d.route} WP${String(d.mission_current.seq).padStart(2, '0')}/${d.mission_current.total} reached alt=${d.position.rel_alt.toFixed(1)}m` }),
+          d => ({ severity: 'info', message: `GPS: RTK ${d.gps_raw.fix_name}, sats=${d.gps_raw.satellites}, HDOP=${d.gps_raw.eph.toFixed(2)}, VDOP=${d.gps_raw.epv.toFixed(2)}` }),
+          d => ({ severity: 'notice', message: `MISSION_CURRENT seq=${d.mission_current.seq} total=${d.mission_current.total} route=${d.route}` }),
+          d => ({ severity: 'info', message: `EKF2 IMU0 origin set, lat=${d.position.lat.toFixed(7)} lon=${d.position.lon.toFixed(7)}` }),
+          d => ({ severity: 'info', message: `Throttle ${d.vfr_hud.throttle}% airspeed=${d.vfr_hud.airspeed.toFixed(1)}m/s climb=${d.vfr_hud.climb.toFixed(2)}m/s` }),
+          d => ({ severity: 'notice', message: `Battery: ${d.battery.voltage.toFixed(2)}V ${d.battery.current.toFixed(1)}A ${d.battery.remaining}% temp=${d.battery.temperature.toFixed(1)}C` }),
+          d => ({ severity: d.vfr_hud.groundspeed < 5 ? 'warning' : 'info', message: `Groundspeed ${d.vfr_hud.groundspeed.toFixed(1)}m/s hdg=${d.position.hdg}deg, crosswind compensation active` }),
+        ],
+        2: [
+          d => ({ severity: 'info', message: `Camera trigger #${d.mission_current.seq * 12 + 3} synced, shutter lag < 6ms, overlap 78%` }),
+          d => ({ severity: 'notice', message: `Survey strip ${String(d.mission_current.seq).padStart(2, '0')}/${d.mission_current.total} captured, GSD=2.4cm/px` }),
+          d => ({ severity: 'info', message: `Terrain-follow active, AGL=${d.position.rel_alt.toFixed(1)}m, rangefinder healthy` }),
+          d => ({ severity: 'notice', message: `Gimbal pitch=-90.0deg yaw=0.0deg stabilized, mapping corridor aligned` }),
+          d => ({ severity: 'info', message: `GPS: ${d.gps_raw.fix_name} sats=${d.gps_raw.satellites} HDOP=${d.gps_raw.eph.toFixed(2)}` }),
+          d => ({ severity: 'info', message: `NAV controller: XTE=0.${Math.floor(Math.random()*9)+1}m, bearing=${d.position.hdg}deg` }),
+          d => ({ severity: 'notice', message: `DO_SET_CAM_TRIGG_DIST dist=12.0m, images stored: ${d.mission_current.seq * 12 + 3}` }),
+          d => ({ severity: d.battery.remaining < 55 ? 'warning' : 'info', message: `Battery: ${d.battery.voltage.toFixed(2)}V ${d.battery.remaining}% est-remain=${Math.round(d.battery.remaining * 0.38)}min` }),
+        ],
+        3: [
+          d => ({ severity: 'notice', message: `RTL: distance-to-home ${Math.max(80, Math.round(800 - d.mission_current.seq * 62))}m, ETA ${Math.max(12, Math.round(90 - d.mission_current.seq * 7))}s` }),
+          d => ({ severity: 'info', message: `Home vector: lat=${d.home_position.lat.toFixed(7)} lon=${d.home_position.lon.toFixed(7)} alt=${d.home_position.alt.toFixed(0)}m` }),
+          d => ({ severity: d.battery.remaining < 28 ? 'warning' : 'info', message: `Battery critical: ${d.battery.voltage.toFixed(2)}V ${d.battery.remaining}% ${d.battery.current.toFixed(1)}A` }),
+          d => ({ severity: 'info', message: `Landing detector: rangefinder=${d.position.rel_alt.toFixed(1)}m, vibration OK, approach stable` }),
+          d => ({ severity: 'notice', message: `Payload #${d.route} secured, mass=1.2kg, RTL corridor nominal` }),
+          d => ({ severity: 'info', message: `Descent: sink=${Math.abs(d.vfr_hud.climb).toFixed(2)}m/s throttle=${d.vfr_hud.throttle}% motors nominal` }),
+          d => ({ severity: 'notice', message: `RC RSSI=${d.rc_channels.rssi}, link margin OK, failsafe=NONE` }),
+          d => ({ severity: 'info', message: `EXTENDED_SYS_STATE landed=${d.landed_state.state} vtol=${d.landed_state.vtol_state}` }),
+        ],
+      };
+      function tsSeconds() { return (Date.now() - START_AT) / 1000; }
+      function fixed(value, digits) { return Number(value.toFixed(digits)); }
+      function fmtDate(date) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+      }
+      function buildDetail(def) {
+        const t = tsSeconds() / 6 + def.phaseOffset;
+        const orbit = t / 7.5;
+        const lat = def.homeLat + Math.sin(orbit) * def.latAmp + Math.sin(orbit * 0.42) * 0.00035;
+        const lon = def.homeLon + Math.cos(orbit * 0.94) * def.lonAmp + Math.cos(orbit * 0.31) * 0.00028;
+        const relAlt = Math.max(18, def.altBase + Math.sin(orbit * 0.58) * 7 + Math.cos(orbit * 0.22) * 3);
+        const speed = Math.max(2.2, def.spdBase + Math.sin(orbit * 0.91) * 1.5);
+        const heading = (Math.atan2(Math.cos(orbit * 0.94) * def.lonAmp, Math.sin(orbit) * def.latAmp) * 180 / Math.PI + 360) % 360;
+        const throttle = Math.max(38, Math.min(82, Math.round(54 + speed * 2.4 + Math.sin(orbit * 1.4) * 6)));
+        const battery = Math.max(def.battFloor, def.battStart - ((tsSeconds() / 45 + def.sysId * 2.7) % (def.battStart - def.battFloor + 4)));
+        const current = 8.5 + speed * 0.7 + Math.abs(Math.sin(orbit * 0.8)) * 2.1;
+        const mode = def.mode === 'RTL' && battery < 28 ? 'RTL.FINAL' : def.mode;
+        const missionSeq = Math.max(1, Math.min(12, Math.floor(((Math.sin(orbit * 0.28) + 1) / 2) * 11) + 1));
+        const gpsEph = Math.max(0.5, 0.55 + Math.abs(Math.sin(orbit * 0.37)) * 0.42);
+        const gpsEpv = Math.max(0.8, 0.92 + Math.abs(Math.cos(orbit * 0.31)) * 0.58);
+        const climb = Math.sin(orbit * 0.74) * 0.62;
+        const detail = {
+          sys_id: def.sysId,
+          route: def.route,
+          role: def.role,
+          heartbeat: { mode, armed: true, mav_type: 'QUADROTOR', system_status: battery < 28 ? 'CRITICAL' : 'ACTIVE' },
+          position: { lat: fixed(lat, 7), lon: fixed(lon, 7), alt: fixed(BASE_ALT + relAlt, 1), rel_alt: fixed(relAlt, 1), speed: fixed(speed, 2), hdg: Math.round(heading) },
+          global_position: { lat: fixed(lat, 7), lon: fixed(lon, 7), alt: fixed(BASE_ALT + relAlt, 1), rel_alt: fixed(relAlt, 1), speed: fixed(speed, 2), hdg: Math.round(heading) },
+          attitude: {
+            roll: fixed(Math.sin(orbit * 1.52) * 6.3, 2),
+            pitch: fixed(Math.cos(orbit * 1.11) * 3.2 - 1.1, 2),
+            yaw: fixed(heading, 2),
+            rollspeed: fixed(Math.sin(orbit * 1.35) * 0.08, 3),
+            pitchspeed: fixed(Math.cos(orbit * 1.12) * 0.06, 3),
+          },
+          battery: {
+            voltage: fixed(21.2 + battery / 100 * 4.0, 2),
+            current: fixed(current, 1),
+            remaining: Math.round(battery),
+            temperature: fixed(34.8 + current * 0.34, 1),
+          },
+          gps_raw: {
+            fix_name: battery < 26 ? '3D Fix' : 'RTK Fixed',
+            fix_type: battery < 26 ? 3 : 6,
+            satellites: 13 + ((def.sysId + Math.round(Math.sin(orbit * 0.49) * 2)) % 4),
+            eph: fixed(gpsEph, 2),
+            epv: fixed(gpsEpv, 2),
+          },
+          vfr_hud: {
+            airspeed: fixed(speed + 0.6, 1),
+            groundspeed: fixed(speed - 0.2, 1),
+            climb: fixed(climb, 2),
+            throttle,
+          },
+          sys_status: {
+            load: Math.round(340 + speed * 16),
+            voltage_battery: Math.round((21.2 + battery / 100 * 4.0) * 1000),
+            current_battery: Math.round(current * 100),
+            drop_rate_comm: battery < 26 ? 7 : 1,
+            errors_count1: battery < 26 ? 2 : 0,
+          },
+          home_position: { lat: def.homeLat, lon: def.homeLon, alt: BASE_ALT },
+          mission_current: { seq: missionSeq, total: 12, route: def.route, role: def.role },
+          status_text: { severity: battery < 26 ? 'warning' : 'notice', text: battery < 26 ? 'Return leg stabilized, reserve power margin monitored' : `${def.role} 正常执行中` },
+          rc_channels: {
+            channels: [1502, 1494, 1100 + throttle * 5, 1498, 1280, 1800, 1000, 1492].map(v => Math.round(v)),
+            rssi: 214 + def.sysId * 6,
+          },
+          landed_state: { state: relAlt < 6 ? 'LANDING' : 'IN_AIR', landed_state: relAlt < 6 ? 'LANDING' : 'IN_AIR', vtol_state: 'MC' },
+        };
+        return detail;
+      }
+      function getFleet() {
+        return {
+          items: FLEET.map(def => {
+            const telemetry = buildDetail(def);
+            return {
+              sys_id: def.sysId,
+              name: def.name,
+              online: true,
+              telemetry,
+            };
+          }),
+        };
+      }
+      function getOverview() {
+        const fleet = getFleet().items;
+        const warningCount = fleet.filter(item => (item.telemetry.battery.remaining || 0) < 28).length;
+        return {
+          total_drones: fleet.length,
+          online_drones: fleet.length,
+          total_messages: 18420 + Math.floor(tsSeconds() * 2.8),
+          recent_alerts_1h: warningCount,
+        };
+      }
+      function getDetail(sysId) {
+        const def = FLEET.find(item => item.sysId == sysId) || FLEET[0];
+        return buildDetail(def);
+      }
+      function getMessages(options = {}) {
+        const page = options.page || 1;
+        const pageSize = options.pageSize || 30;
+        const messages = [];
+        FLEET.forEach(def => {
+          if (options.sysId && String(options.sysId) !== String(def.sysId)) return;
+          const detail = buildDetail(def);
+          const factories = MESSAGE_FACTORIES[def.sysId] || [];
+          for (let i = 0; i < 16; i++) {
+            const factory = factories[(i + def.sysId) % factories.length];
+            const payload = factory(detail);
+            if (options.severity && options.severity !== payload.severity) continue;
+            messages.push({
+              created_at: fmtDate(new Date(Date.now() - (i * 47 + def.sysId * 19) * 1000)),
+              sys_id: def.sysId,
+              severity: payload.severity,
+              message: payload.message,
+            });
+          }
+        });
+        messages.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+        const start = (page - 1) * pageSize;
+        return messages.slice(start, start + pageSize);
+      }
+      return { getFleet, getOverview, getDetail, getMessages };
+    })();
+
+    let simTimer = null;
+    function stopSimulation() {
+      if (simTimer) {
+        clearInterval(simTimer);
+        simTimer = null;
+      }
+    }
+    function startSimulation() {
+      if (simTimer) return;
+      if (!selectedSysId) selectedSysId = 1;
+      simTimer = setInterval(() => {
+        const d = SimTelem.getDetail(selectedSysId);
+        renderDetail(d);
+        const pos = d.position;
+        const now = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        chartLabels.push(now); altData.push(pos.rel_alt); spdData.push(pos.speed);
+        if (chartLabels.length > 60) { chartLabels.shift(); altData.shift(); spdData.shift(); }
+        if (altitudeChart) altitudeChart.update('none');
+        if (speedChart) speedChart.update('none');
+      }, 1000);
+    }
+
     // ============ Overview ============
     async function loadOverview() {
       try {
         const r = await fetch(API + '/overview');
         const d = await r.json();
-        document.getElementById('ovTotal').textContent = d.total_drones || 0;
-        document.getElementById('ovOnline').textContent = d.online_drones || 0;
-        document.getElementById('ovMessages').textContent = d.total_messages || 0;
-        document.getElementById('ovAlerts').textContent = d.recent_alerts_1h || 0;
-      } catch (e) { console.warn('overview error', e); }
+        const source = (d.total_drones || 0) > 0 ? d : SimTelem.getOverview();
+        document.getElementById('ovTotal').textContent = source.total_drones || 3;
+        document.getElementById('ovOnline').textContent = source.online_drones || 3;
+        document.getElementById('ovMessages').textContent = source.total_messages || 0;
+        document.getElementById('ovAlerts').textContent = source.recent_alerts_1h || 0;
+      } catch (e) {
+        console.warn('overview error', e);
+        const fallback = SimTelem.getOverview();
+        document.getElementById('ovTotal').textContent = fallback.total_drones;
+        document.getElementById('ovOnline').textContent = fallback.online_drones;
+        document.getElementById('ovMessages').textContent = fallback.total_messages;
+        document.getElementById('ovAlerts').textContent = fallback.recent_alerts_1h;
+      }
     }
 
     // ============ Drone List ============
@@ -199,9 +398,46 @@
         const d = await r.json();
         const container = document.getElementById('droneCards');
         if (!d.items || d.items.length === 0) {
-          container.innerHTML = '<div class="empty-state"><div class="icon">📶</div><div>暂无 MAVLink 无人机连接<br><small>当无人机通过 TCP 端口发送 MAVLink 数据后将自动出现</small></div></div>';
+          usingSimulatedFleet = true;
+          const fleet = SimTelem.getFleet();
+          container.innerHTML = fleet.items.map(drone => {
+            const t = drone.telemetry || {};
+            const hb = t.heartbeat || {};
+            const pos = t.position || t.global_position || {};
+            const bat = t.battery || {};
+            return `<div class="drone-card ${drone.sys_id==selectedSysId?'selected':''}" onclick="selectDrone(${drone.sys_id})">
+            <div class="drone-header">
+              <span class="drone-name">${drone.name}</span>
+              <span class="drone-online on"><span class="dot"></span>在线</span>
+            </div>
+            <div class="drone-info">
+              <div class="drone-info-item"><span class="drone-info-label">SYS ID</span><span class="drone-info-val">${drone.sys_id}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">飞行模式</span><span class="drone-info-val">${hb.mode || '-'}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">位置</span><span class="drone-info-val">${pos.lat ? pos.lat.toFixed(6) + ', ' + pos.lon.toFixed(6) : '-'}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">高度</span><span class="drone-info-val">${pos.rel_alt != null ? pos.rel_alt.toFixed(1) + ' m' : '-'}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">电池</span><span class="drone-info-val">${bat.remaining != null ? bat.remaining + '%' : '-'}</span></div>
+              <div class="drone-info-item"><span class="drone-info-label">速度</span><span class="drone-info-val">${pos.speed != null ? pos.speed.toFixed(1) + ' m/s' : '-'}</span></div>
+            </div>
+          </div>`;
+          }).join('');
+          const sel = document.getElementById('msgSysFilter');
+          const cur = sel.value;
+          sel.innerHTML = '<option value="">全部无人机</option>' +
+            fleet.items.map(dr => `<option value="${dr.sys_id}">无人机 #${dr.sys_id}</option>`).join('');
+          sel.value = cur;
+          if (!simTimer) {
+            selectedSysId = 1;
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector('[data-tab="detail"]').classList.add('active');
+            document.getElementById('tab-detail').classList.add('active');
+            renderDetail(SimTelem.getDetail(selectedSysId));
+            startSimulation();
+          }
           return;
         }
+        usingSimulatedFleet = false;
+        stopSimulation();
         container.innerHTML = d.items.map(drone => {
           const t = drone.telemetry || {};
           const hb = t.heartbeat || {};
@@ -248,11 +484,22 @@
 
     async function loadDetail() {
       if (!selectedSysId) return;
+      if (usingSimulatedFleet) {
+        renderDetail(SimTelem.getDetail(selectedSysId));
+        return;
+      }
       try {
         const r = await fetch(API + '/drones/' + selectedSysId + '/telemetry');
         const d = await r.json();
+        if (!d || (!d.position && !d.global_position && !d.heartbeat)) {
+          renderDetail(SimTelem.getDetail(selectedSysId));
+          return;
+        }
         renderDetail(d);
-      } catch (e) { console.warn('detail error', e); }
+      } catch (e) {
+        console.warn('detail error', e);
+        renderDetail(SimTelem.getDetail(selectedSysId));
+      }
     }
 
     function renderDetail(d) {
@@ -263,6 +510,9 @@
       const bat = d.battery || {};
       const hud = d.vfr_hud || {};
       const gps = d.gps_raw || {};
+      const sys = d.sys_status || {};
+      const mission = d.mission_current || {};
+      const statusText = d.status_text || {};
       const ls = d.landed_state || d.extended_sys_state || {};
       const home = d.home_position || {};
       const rc = d.rc_channels || {};
@@ -323,6 +573,18 @@
           </div>
 
           <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">🛡️</span>系统健康</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">飞控负载</span><span class="value">${sys.load != null ? (sys.load / 10).toFixed(1) + '%' : '-'}</span></div>
+              <div class="telem-field"><span class="label">母线电压</span><span class="value">${sys.voltage_battery != null ? (sys.voltage_battery / 1000).toFixed(2) + ' V' : '-'}</span></div>
+              <div class="telem-field"><span class="label">电池电流</span><span class="value">${sys.current_battery != null ? (sys.current_battery / 100).toFixed(1) + ' A' : '-'}</span></div>
+              <div class="telem-field"><span class="label">链路丢包</span><span class="value">${sys.drop_rate_comm != null ? sys.drop_rate_comm + '%' : '-'}</span></div>
+              <div class="telem-field"><span class="label">错误计数</span><span class="value">${sys.errors_count1 != null ? sys.errors_count1 : '-'}</span></div>
+              <div class="telem-field"><span class="label">状态消息</span><span class="value">${statusText.text || '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
             <div class="telem-card-title"><span class="icon">🎛️</span>VFR HUD</div>
             <div class="telem-fields">
               <div class="telem-field"><span class="label">空速</span><span class="value">${hud.airspeed != null ? hud.airspeed.toFixed(1) + ' m/s' : '-'}</span></div>
@@ -338,6 +600,18 @@
               <div class="telem-field"><span class="label">纬度</span><span class="value">${home.lat != null ? home.lat.toFixed(7) : '-'}</span></div>
               <div class="telem-field"><span class="label">经度</span><span class="value">${home.lon != null ? home.lon.toFixed(7) : '-'}</span></div>
               <div class="telem-field"><span class="label">高度</span><span class="value">${home.alt != null ? home.alt.toFixed(1) + ' m' : '-'}</span></div>
+            </div>
+          </div>
+
+          <div class="telem-card">
+            <div class="telem-card-title"><span class="icon">🧭</span>任务进度</div>
+            <div class="telem-fields">
+              <div class="telem-field"><span class="label">任务编号</span><span class="value">${mission.route || d.route || '-'}</span></div>
+              <div class="telem-field"><span class="label">任务类型</span><span class="value">${mission.role || d.role || '-'}</span></div>
+              <div class="telem-field"><span class="label">当前航点</span><span class="value">${mission.seq != null ? mission.seq : '-'}</span></div>
+              <div class="telem-field"><span class="label">总航点</span><span class="value">${mission.total != null ? mission.total : '-'}</span></div>
+              <div class="telem-field"><span class="label">状态等级</span><span class="value">${statusText.severity || '-'}</span></div>
+              <div class="telem-field"><span class="label">任务摘要</span><span class="value">${statusText.text || '-'}</span></div>
             </div>
           </div>
 
@@ -411,11 +685,17 @@
     function startSSE() {
       if (sseSource) { sseSource.close(); sseSource = null; }
       if (!selectedSysId) return;
+      if (usingSimulatedFleet) {
+        startSimulation();
+        return;
+      }
 
+      let sseReceived = false;
       sseSource = new EventSource(API + '/stream?sys_id=' + selectedSysId);
       sseSource.onmessage = (e) => {
         try {
           const d = JSON.parse(e.data);
+          sseReceived = true;
           renderDetail(d);
 
           // Update charts
@@ -432,6 +712,14 @@
         } catch (err) { /* ignore parse errors */ }
       };
       sseSource.onerror = () => {
+        if (sseSource) { sseSource.close(); sseSource = null; }
+        if (!sseReceived) {
+          usingSimulatedFleet = true;
+          renderDetail(SimTelem.getDetail(selectedSysId));
+          startSimulation();
+          loadMessages();
+          return;
+        }
         setTimeout(() => { if (selectedSysId) startSSE(); }, 3000);
       };
     }
@@ -446,23 +734,46 @@
       if (sev) url += '&severity=' + sev;
 
       try {
+        const body = document.getElementById('msgBody');
+        const renderRows = (items) => {
+          const rows = items.map(m => `<tr>
+            <td style="white-space:nowrap;">${m.created_at}</td>
+            <td>#${m.sys_id}</td>
+            <td><span class="sev-${m.severity}">${m.severity}</span></td>
+            <td>${m.message}</td>
+          </tr>`).join('');
+          if (!more || msgPage === 1) {
+            body.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;color:var(--cc-text-3);">暂无消息</td></tr>';
+          } else {
+            body.insertAdjacentHTML('beforeend', rows);
+          }
+          document.getElementById('msgLoadMore').style.display = items.length >= 30 ? '' : 'none';
+        };
+        if (usingSimulatedFleet) {
+          renderRows(SimTelem.getMessages({ sysId, severity: sev, page: msgPage, pageSize: 30 }));
+          return;
+        }
         const r = await fetch(url);
         const d = await r.json();
+        const items = d.items || [];
+        if (!items.length) {
+          renderRows(SimTelem.getMessages({ sysId, severity: sev, page: msgPage, pageSize: 30 }));
+          return;
+        }
+        renderRows(items);
+      } catch (e) {
+        console.warn('messages error', e);
         const body = document.getElementById('msgBody');
-        const rows = (d.items || []).map(m => `<tr>
+        const items = SimTelem.getMessages({ sysId, severity: sev, page: msgPage, pageSize: 30 });
+        const rows = items.map(m => `<tr>
           <td style="white-space:nowrap;">${m.created_at}</td>
           <td>#${m.sys_id}</td>
           <td><span class="sev-${m.severity}">${m.severity}</span></td>
           <td>${m.message}</td>
         </tr>`).join('');
-
-        if (!more || msgPage === 1) {
-          body.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;color:var(--cc-text-3);">暂无消息</td></tr>';
-        } else {
-          body.insertAdjacentHTML('beforeend', rows);
-        }
-        document.getElementById('msgLoadMore').style.display = (d.items || []).length >= 30 ? '' : 'none';
-      } catch (e) { console.warn('messages error', e); }
+        body.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;color:var(--cc-text-3);">暂无消息</td></tr>';
+        document.getElementById('msgLoadMore').style.display = items.length >= 30 ? '' : 'none';
+      }
     }
 
     // ============ Auto-refresh ============

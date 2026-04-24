@@ -591,11 +591,11 @@
         droneTrails[id] = { points: [], polyline: L.polyline([], { color: '#f59e0b', weight: 2.5, opacity: 0.75 }).addTo(map) };
       }
       var trail = droneTrails[id];
-      // Only add point if moved meaningfully (> ~1m) to avoid clutter
+      // Only add point if moved meaningfully (> ~2m) to avoid clutter
       var lastPt = trail.points.length > 0 ? trail.points[trail.points.length - 1] : null;
-      if (!lastPt || Math.abs(newLL[0] - lastPt[0]) > 0.000005 || Math.abs(newLL[1] - lastPt[1]) > 0.000005) {
+      if (!lastPt || Math.abs(newLL[0] - lastPt[0]) > 0.00002 || Math.abs(newLL[1] - lastPt[1]) > 0.00002) {
         trail.points.push(newLL);
-        if (trail.points.length > 600) trail.points.shift();
+        if (trail.points.length > 400) trail.points.shift();
         var displayPts = (typeof smoothTrail === 'function' && trail.points.length >= 3)
           ? smoothTrail(trail.points, {segPoints: 3})
           : trail.points;
@@ -915,6 +915,164 @@
     function closeDetailModal() { $('#detailModal').classList.remove('active'); if (detailMap) { detailMap.remove(); detailMap = null; } }
 
     // ========== History ==========
+    function isValidLatLng(lat, lng) {
+      return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
+    }
+    function historyDistanceMeters(a, b) {
+      const toRad = n => n * Math.PI / 180;
+      const R = 6371000;
+      const dLat = toRad(b[0] - a[0]);
+      const dLng = toRad(b[1] - a[1]);
+      const lat1 = toRad(a[0]);
+      const lat2 = toRad(b[0]);
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    }
+    function sanitizeHistoryCoords(items) {
+      const raw = items.map(h => [Number(h.latitude), Number(h.longitude)]).filter(([lat, lng]) => isValidLatLng(lat, lng)).reverse();
+      if (raw.length <= 1) return raw;
+      // Pass 1: distance-based dedup & outlier removal
+      const deduped = [raw[0]];
+      for (let i = 1; i < raw.length; i++) {
+        const prev = deduped[deduped.length - 1];
+        const current = raw[i];
+        const dist = historyDistanceMeters(prev, current);
+        if (dist < 3) continue;   // skip micro-jitter (<3m)
+        if (dist > 800) continue;  // skip GPS jumps (>800m)
+        deduped.push(current);
+      }
+      if (deduped.length <= 3) return deduped;
+      // Pass 2: angle-based zigzag filter — remove points that cause sharp reversals
+      const smooth = [deduped[0], deduped[1]];
+      for (let i = 2; i < deduped.length; i++) {
+        const a = smooth[smooth.length - 2];
+        const b = smooth[smooth.length - 1];
+        const c = deduped[i];
+        const ab = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        const bc = Math.atan2(c[1] - b[1], c[0] - b[0]);
+        let angleDiff = Math.abs(bc - ab);
+        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+        // skip if nearly 180° reversal AND short segment (zigzag noise)
+        if (angleDiff > 2.6 && historyDistanceMeters(b, c) < 30) {
+          smooth[smooth.length - 1] = c; // replace last point instead of adding
+          continue;
+        }
+        smooth.push(c);
+      }
+      return smooth;
+    }
+    function resolveBasePoint(device, coords) {
+      const candidates = [
+        [Number(device.fence_lat), Number(device.fence_lng)],
+        [Number(device.home_lat), Number(device.home_lng)],
+        [Number(device.latitude), Number(device.longitude)],
+        coords[0],
+      ];
+      for (const point of candidates) {
+        if (point && isValidLatLng(point[0], point[1])) {
+          return { point, fallback: point === coords[0] };
+        }
+      }
+      return { point: [DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], fallback: true };
+    }
+    function clearHistoryLayers() {
+      (window._histLayers || []).forEach(layer => {
+        try { historyMap.removeLayer(layer); } catch (e) {}
+      });
+      window._histLayers = [];
+      window._histTrailLayer = null;
+    }
+    function addHistoryLayer(layer) {
+      layer.addTo(historyMap);
+      window._histLayers.push(layer);
+      return layer;
+    }
+    function renderHistoryTrail(options = {}) {
+      if (!historyMap || !window._histState) return;
+      const state = window._histState;
+      const coords = state.coords || [];
+      clearHistoryLayers();
+      if (!coords.length) return;
+
+      const startPoint = coords[0];
+      const endPoint = coords[coords.length - 1];
+      const basePoint = state.basePoint || startPoint;
+      const useCurve = document.getElementById('histCurveToggle').checked;
+      const missionDisplay = (useCurve && coords.length >= 3) ? smoothTrail(coords, { segPoints: 5 }) : coords;
+
+      const baseToStart = historyDistanceMeters(basePoint, startPoint);
+      const endToBase = historyDistanceMeters(endPoint, basePoint);
+      if (baseToStart > 2) {
+        addHistoryLayer(L.polyline([basePoint, startPoint], {
+          color: '#10b981', weight: 3, opacity: 0.88, dashArray: '10,8'
+        }));
+      }
+
+      window._histTrailLayer = addHistoryLayer(L.polyline(missionDisplay, {
+        color: '#ef4444', weight: 3.5, opacity: 0.95
+      }));
+
+      if (missionDisplay.length >= 3) {
+        const arrowInterval = Math.max(1, Math.floor(missionDisplay.length / 6));
+        for (let i = arrowInterval; i < missionDisplay.length - 1; i += arrowInterval) {
+          const p1 = missionDisplay[i - 1];
+          const p2 = missionDisplay[i];
+          const angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI;
+          addHistoryLayer(L.marker(missionDisplay[i], {
+            icon: L.divIcon({
+              className: '',
+              html: `<div style="color:#ef4444;font-size:14px;font-weight:bold;transform:rotate(${90 - angle}deg);text-shadow:0 0 3px rgba(0,0,0,0.5);">▶</div>`,
+              iconSize: [14, 14], iconAnchor: [7, 7]
+            })
+          }));
+        }
+      }
+
+      if (endToBase > 2) {
+        addHistoryLayer(L.polyline([endPoint, basePoint], {
+          color: '#165dff', weight: 3, opacity: 0.88, dashArray: '10,8'
+        }));
+      }
+
+      const baseLabel = state.baseFallback ? '基地 (使用起点回退)' : '基地 (起降点)';
+      addHistoryLayer(L.marker(basePoint, {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="display:flex;flex-direction:column;align-items:center;">
+            <div style="width:28px;height:28px;background:#165dff;border:3px solid #fff;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">H</div>
+            <div style="background:rgba(255,255,255,0.92);padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;color:#165dff;margin-top:2px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.15);">${baseLabel}</div>
+          </div>`,
+          iconSize: [110, 50], iconAnchor: [55, 14]
+        })
+      }).bindPopup('🏠 ' + baseLabel));
+
+      addHistoryLayer(L.circleMarker(startPoint, {
+        radius: 8, color: '#fff', weight: 3, fillColor: '#10b981', fillOpacity: 1
+      }).bindPopup('🟢 起点'));
+      addHistoryLayer(L.marker(startPoint, {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="background:rgba(255,255,255,0.92);padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;color:#10b981;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.15);margin-top:18px;text-align:center;">起点</div>`,
+          iconSize: [40, 30], iconAnchor: [20, 0]
+        })
+      }));
+
+      addHistoryLayer(L.circleMarker(endPoint, {
+        radius: 8, color: '#fff', weight: 3, fillColor: '#ef4444', fillOpacity: 1
+      }).bindPopup('🔴 终点'));
+      addHistoryLayer(L.marker(endPoint, {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="background:rgba(255,255,255,0.92);padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;color:#ef4444;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.15);margin-top:18px;text-align:center;">终点</div>`,
+          iconSize: [40, 30], iconAnchor: [20, 0]
+        })
+      }));
+
+      if (!options.preserveView) {
+        const allPoints = [basePoint, ...coords];
+        historyMap.fitBounds(allPoints, { padding: [40, 40] });
+      }
+    }
     async function viewHistory(id) {
       if (!id) return;
       closeDetailModal();
@@ -922,40 +1080,56 @@
         const res = await api('/gps/devices/' + id + '/history?limit=500');
         const data = await res.json();
         const items = Array.isArray(data.items) ? data.items : [];
+        const coords = sanitizeHistoryCoords(items);
+        const device = allDevices.find(d => d.id === id) || {};
+        const baseResolved = coords.length ? resolveBasePoint(device, coords) : null;
         $('#historyModal').classList.add('active');
         setTimeout(() => {
           if (historyMap) { historyMap.remove(); historyMap = null; }
           historyMap = L.map('historyMap').setView([DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
           tdtImgLayer().addTo(historyMap);
           tdtCiaLayer().addTo(historyMap);
-          if (items.length) {
-            const coords = items.map(h => [h.latitude, h.longitude]).reverse();
-            window._histRawCoords = coords;
-            const useCurve = document.getElementById('histCurveToggle').checked;
-            const displayCoords = (useCurve && coords.length >= 3) ? smoothTrail(coords, {segPoints: 5}) : coords;
-            window._histTrailLayer = L.polyline(displayCoords, { color: '#165dff', weight: 3 }).addTo(historyMap);
-            L.circleMarker(coords[0], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 1 }).addTo(historyMap).bindPopup('起点');
-            L.circleMarker(coords[coords.length-1], { radius: 6, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).addTo(historyMap).bindPopup('最新位置');
-            historyMap.fitBounds(coords, { padding: [30, 30] });
+          window._histState = {
+            deviceId: id,
+            items,
+            coords,
+            basePoint: baseResolved ? baseResolved.point : null,
+            baseFallback: baseResolved ? baseResolved.fallback : false,
+          };
+          window._histLayers = [];
+          if (coords.length) {
+            renderHistoryTrail();
           }
-          $('#historyList').innerHTML = items.length ? items.map(h =>
+          const legendHtml = `<div style="padding:8px 12px;margin-bottom:8px;background:rgba(255,255,255,0.95);border-radius:8px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:24px;height:3px;background:#165dff;border-top:2px dashed #165dff;"></span> 返航航线 (终点→基地)</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:24px;height:3px;background:#ef4444;"></span> 任务航线 (起点→终点)</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:24px;height:3px;background:#10b981;border-top:2px dashed #10b981;"></span> 去程航线 (基地→起点)</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;background:#165dff;border-radius:3px;color:#fff;font-size:8px;font-weight:900;display:flex;align-items:center;justify-content:center;">H</span> 基地</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#10b981;border-radius:50%;"></span> 起点</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#ef4444;border-radius:50%;"></span> 终点</span>
+          </div>`;
+          const listHtml = items.length ? items.map(h =>
             `<div style="padding:4px 0;border-bottom:1px solid #f1f5f9;display:flex;gap:16px;">
               <span style="color:#94a3b8;min-width:140px;">${formatDate(h.created_at)}</span>
-              <span>经度: ${h.longitude.toFixed(6)}</span>
-              <span>纬度: ${h.latitude.toFixed(6)}</span>
-              <span>速度: ${h.speed.toFixed(1)} m/s</span>
+              <span>经度: ${Number(h.longitude).toFixed(6)}</span>
+              <span>纬度: ${Number(h.latitude).toFixed(6)}</span>
+              <span>速度: ${Number(h.speed || 0).toFixed(1)} m/s</span>
             </div>`
           ).join('') : '<div style="color:#94a3b8;text-align:center;padding:16px;">暂无轨迹数据</div>';
+          $('#historyList').innerHTML = coords.length ? legendHtml + listHtml : '<div style="color:#94a3b8;text-align:center;padding:16px;">轨迹点无效或已被异常跳点过滤</div>';
         }, 100);
       } catch (e) { showToast('加载轨迹失败', 'error'); }
     }
-    function closeHistoryModal() { $('#historyModal').classList.remove('active'); if (historyMap) { historyMap.remove(); historyMap = null; } }
+    function closeHistoryModal() {
+      $('#historyModal').classList.remove('active');
+      window._histState = null;
+      window._histLayers = [];
+      window._histTrailLayer = null;
+      if (historyMap) { historyMap.remove(); historyMap = null; }
+    }
     function redrawHistoryTrail() {
-      if (!historyMap || !window._histRawCoords || !window._histTrailLayer) return;
-      const coords = window._histRawCoords;
-      const useCurve = document.getElementById('histCurveToggle').checked;
-      const displayCoords = (useCurve && coords.length >= 3) ? smoothTrail(coords, {segPoints: 5}) : coords;
-      window._histTrailLayer.setLatLngs(displayCoords);
+      if (!historyMap || !window._histState || !(window._histState.coords || []).length) return;
+      renderHistoryTrail({ preserveView: true });
     }
 
     // ========== Ack Alert ==========

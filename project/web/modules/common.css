@@ -2,6 +2,16 @@
    云翼智控 Design System — inspired by Arco Design Pro
    ================================================================ */
 
+@font-face {
+  font-family: "Source Han Sans";
+  src:
+    local("Source Han Sans SC"),
+    local("Source Han Sans CN"),
+    local("Source Han Sans"),
+    local("思源黑体");
+  font-display: swap;
+}
+
 /* ---------- CSS Variables (Theming) ---------- */
 :root {
   --cc-bg-1: #f7f8fa;
@@ -32,7 +42,7 @@
   --cc-radius-xl: 22px;
   --cc-radius-sm: 10px;
   --cc-radius-pill: 999px;
-  --cc-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --cc-font: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
   --cc-transition: 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
   --cc-glass-bg: rgba(255,255,255,0.58);
   --cc-glass-bg-strong: rgba(255,255,255,0.76);
@@ -79,6 +89,15 @@ html.dark {
 html.dark body {
   background: var(--cc-page-bg, var(--cc-bg-1));
   color: var(--cc-text-1);
+}
+
+html,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--cc-font);
 }
 
 html.dark ::-webkit-scrollbar-thumb { background: rgba(60,130,255,0.2); }

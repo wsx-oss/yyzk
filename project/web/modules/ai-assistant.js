@@ -46,7 +46,7 @@
       box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.3);
       display: none; flex-direction: column; overflow: hidden;
       animation: aiSlideUp 0.3s ease-out;
-      font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-family: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
     }
     #ai-panel.open { display: flex; }
 
@@ -262,7 +262,6 @@
       <div class="ai-quick-cmds">
         <span class="qcmd" data-cmd="/status">📊 系统状态</span>
         <span class="qcmd" data-cmd="/drones">🚁 无人机</span>
-        <span class="qcmd" data-cmd="/alerts">⚠️ 告警</span>
         <span class="qcmd" data-cmd="/battery">🔋 电池</span>
         <span class="qcmd" data-cmd="/tasks">✈️ 任务</span>
         <span class="qcmd" data-cmd="/help">❓ 帮助</span>
@@ -512,7 +511,7 @@
     // Convert [NAV:xxx] to clickable links
     const navLabels = {
       drones: '🚁 无人机管理', flight: '✈️ 航线规划', noflyzone: '🚫 禁飞区',
-      gps: '📍 GPS定位', video: '📹 视频监控', remote: '🖥️ 远程桌面',
+      gps: '📍 GPS定位', video: '📹 视频监控',
       alerts: '⚠️ 异常报警', battery: '🔋 电池监控', hardware: '💻 硬件状态',
       monitor: '📊 系统监控', audio: '🎤 语音交互', performance: '📈 性能分析',
       updates: '📦 软件更新', logs: '📋 操作日志', sync: '🔄 数据同步',
@@ -550,13 +549,8 @@
 
   function showWelcome() {
     appendMessage('assistant',
-      '👋 你好！我是 **小云**，云翼智控 平台的 AI 助手。\n\n' +
-      '我可以帮你：\n' +
-      '• 📊 查询系统状态和数据\n' +
-      '• ⚠️ 分析告警和异常\n' +
-      '• 🔋 解读电池状态\n' +
-      '• ✈️ 了解飞行任务\n' +
-      '• 🗺️ 快速跳转到各模块页面\n\n' +
+      '👋 你好！我是 **小云**，云翼智控平台的 AI 助手。\n\n' +
+      '我可以帮你查询系统状态、解读遥测与电池数据、了解飞行任务进展。\n' +
       '试试下方的快捷指令，或直接问我任何问题！'
     );
   }
@@ -620,8 +614,8 @@
     return res.json();
   }
 
-  // Periodically refresh suggestions when panel is open
+  // Periodically refresh suggestions when panel is open (reduced frequency)
   setInterval(() => {
     if (isOpen) loadSuggestions();
-  }, 30000);
+  }, 120000);
 })();

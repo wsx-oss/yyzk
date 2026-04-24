@@ -15,7 +15,6 @@
     <nav>
       <a href="#dashboard">监控</a>
       <a href="#audio">语音记录</a>
-      <a href="#vnc">远程桌面</a>
       <a href="#video">视频监控</a>
       <a href="#alerts">告警与日志</a>
       <a href="#updates">更新与同步</a>
@@ -44,15 +43,6 @@
         <button id="btnStop" disabled>停止并上传</button>
       </div>
       <ul id="recList"></ul>
-    </section>
-
-    <section id="vnc">
-      <h2>远程桌面控制</h2>
-      <div class="row">
-        <input id="vncTarget" placeholder="目标 VNC 服务器 127.0.0.1:5900" />
-        <button id="btnVNC">打开</button>
-      </div>
-      <div class="hint">需要在被控端运行 VNC 服务。浏览器将通过 WebSocket 代理连接。</div>
     </section>
 
     <section id="video">

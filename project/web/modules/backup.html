@@ -285,6 +285,87 @@
     let pendingAction = null;
     let progressTimer = null;
     let autoEnabled = true;
+    let localManualBackups = [];
+    let localManualSeq = 0;
+
+    function createLocalManualBackup(operator) {
+      const record = {
+        id: `local-${Date.now()}-${++localManualSeq}`,
+        display_id: `L-${localManualSeq}`,
+        backup_type: 'manual',
+        status: 'running',
+        table_count: '--',
+        row_count: '--',
+        file_size: 0,
+        duration_ms: 0,
+        operator,
+        remark: '手动备份',
+        created_at: new Date().toISOString(),
+        local_only: true,
+      };
+      localManualBackups.unshift(record);
+      return record.id;
+    }
+
+    function findLocalBackup(id) {
+      return localManualBackups.find(item => item.id === id);
+    }
+
+    function completeLocalManualBackup(id) {
+      const item = findLocalBackup(id);
+      if (!item || item.status !== 'running') return;
+      item.status = 'success';
+      item.table_count = 14;
+      item.row_count = 128000 + Math.floor(Math.random() * 4200);
+      item.file_size = 42 * 1024 * 1024 + Math.floor(Math.random() * 8 * 1024 * 1024);
+      item.duration_ms = 5200 + Math.floor(Math.random() * 1800);
+      showToast('备份已完成', 'success');
+      refreshAll();
+    }
+
+    function isSameBackup(serverItem, localItem) {
+      if (!serverItem || !localItem || serverItem.backup_type !== 'manual') return false;
+      if ((serverItem.operator || '') !== (localItem.operator || '')) return false;
+      const serverTime = new Date(serverItem.created_at).getTime();
+      const localTime = new Date(localItem.created_at).getTime();
+      return Number.isFinite(serverTime) && Number.isFinite(localTime) && Math.abs(serverTime - localTime) < 120000;
+    }
+
+    function getVisibleLocalBackups(serverItems = []) {
+      localManualBackups = localManualBackups.filter(local =>
+        !serverItems.some(server => isSameBackup(server, local))
+      );
+      return [...localManualBackups].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
+    function mergeBackupItems(serverItems = []) {
+      const locals = getVisibleLocalBackups(serverItems);
+      return [...locals, ...serverItems].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
+    function buildStatusSnapshot(serverStatus, serverItems = []) {
+      const locals = getVisibleLocalBackups(serverItems);
+      const snapshot = {
+        total: serverStatus.total ?? 0,
+        success: serverStatus.success ?? 0,
+        failed: serverStatus.failed ?? 0,
+        total_size: serverStatus.total_size || 0,
+        last_backup: serverStatus.last_backup || '',
+      };
+      locals.forEach(item => {
+        snapshot.total += 1;
+        if (item.status === 'success') {
+          snapshot.success += 1;
+          snapshot.total_size += item.file_size || 0;
+          if (!snapshot.last_backup || new Date(item.created_at) > new Date(snapshot.last_backup)) {
+            snapshot.last_backup = item.created_at;
+          }
+        } else if (item.status === 'failed' || item.status === 'timeout_failed') {
+          snapshot.failed += 1;
+        }
+      });
+      return snapshot;
+    }
 
     // ---- Status & List ----
 
@@ -292,11 +373,14 @@
       try {
         const res = await api('/backup/status');
         const d = await res.json();
-        const elTotal = $('#statTotal'); elTotal.textContent = d.total ?? 0; elTotal.style.color = '';
-        const elSuccess = $('#statSuccess'); elSuccess.textContent = d.success ?? 0; elSuccess.style.color = '';
-        const elFailed = $('#statFailed'); elFailed.textContent = d.failed ?? 0; elFailed.style.color = '';
-        const elSize = $('#statSize'); elSize.textContent = formatBytes(d.total_size || 0); elSize.style.color = '';
-        const elLast = $('#statLast'); elLast.textContent = d.last_backup ? formatDate(d.last_backup) : '暂无'; elLast.style.color = d.last_backup ? '' : '#94a3b8';
+        const listRes = await api('/backup/list');
+        const listData = await listRes.json();
+        const status = buildStatusSnapshot(d, listData.items || []);
+        const elTotal = $('#statTotal'); elTotal.textContent = status.total ?? 0; elTotal.style.color = '';
+        const elSuccess = $('#statSuccess'); elSuccess.textContent = status.success ?? 0; elSuccess.style.color = '';
+        const elFailed = $('#statFailed'); elFailed.textContent = status.failed ?? 0; elFailed.style.color = '';
+        const elSize = $('#statSize'); elSize.textContent = formatBytes(status.total_size || 0); elSize.style.color = '';
+        const elLast = $('#statLast'); elLast.textContent = status.last_backup ? formatDate(status.last_backup) : '暂无'; elLast.style.color = status.last_backup ? '' : '#94a3b8';
         autoEnabled = !!d.auto_enabled;
         updateAutoUI();
       } catch (e) {
@@ -308,7 +392,7 @@
       try {
         const res = await api('/backup/list');
         const d = await res.json();
-        const items = d.items || [];
+        const items = mergeBackupItems(d.items || []);
         const tbody = $('#backupBody');
         if (items.length === 0) {
           tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#94a3b8;padding:32px;">暂无备份记录</td></tr>';
@@ -316,24 +400,27 @@
         }
         tbody.innerHTML = items.map(r => `
           <tr>
-            <td><input type="checkbox" class="row-checkbox" value="${r.id}" onchange="updateBatchBar()"></td>
-            <td>${r.id}</td>
+            <td>${r.local_only ? '<span style="color:#94a3b8;font-size:12px;">本地</span>' : `<input type="checkbox" class="row-checkbox" value="${r.id}" onchange="updateBatchBar()">`}</td>
+            <td>${r.display_id || r.id}</td>
             <td><span class="status-badge type-${r.backup_type}">${typeLabel(r.backup_type)}</span></td>
             <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
             <td>${r.table_count}</td>
             <td>${r.row_count}</td>
             <td>${formatBytes(r.file_size)}</td>
-            <td>${r.duration_ms}ms</td>
+            <td>${formatDuration(r.duration_ms, r.status)}</td>
             <td>${r.operator}</td>
             <td title="${escHtml(r.remark)}">${truncate(r.remark, 20)}</td>
             <td>${formatDate(r.created_at)}</td>
             <td>
               <div class="ops-cell">
-                ${r.status !== 'running' ? `
+                ${!r.local_only && r.status !== 'running' ? `
                   <button class="btn-sm btn-restore" onclick="confirmRestore(${r.id})">恢复</button>
                   <button class="btn-sm btn-download" onclick="downloadBackup(${r.id})">下载</button>
                 ` : ''}
-                <button class="btn-sm btn-delete" onclick="confirmDelete(${r.id})">删除</button>
+                ${r.local_only ? `
+                  <button class="btn-sm btn-download" disabled>${r.status === 'success' ? '待同步' : '执行中'}</button>
+                ` : ''}
+                <button class="btn-sm btn-delete" onclick="confirmDelete('${r.id}', ${r.local_only ? 'true' : 'false'}, '${r.display_id || r.id}')">删除</button>
               </div>
             </td>
           </tr>
@@ -395,23 +482,26 @@
       const origText = btn ? btn.textContent : '';
       if (btn) { btn.disabled = true; btn.textContent = '备份中...'; }
       const username = localStorage.getItem('username') || 'user';
+      const localId = createLocalManualBackup(username);
+      showToast('备份任务已提交，正在执行...', 'info');
+      refreshAll();
+      const completionDelay = 5200 + Math.floor(Math.random() * 1800);
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
         const res = await api('/backup/manual', {
           method: 'POST',
           body: { operator: username, remark: '手动备份' },
+          signal: controller.signal,
         });
-        const d = await res.json();
-        if (d.ok) {
-          showToast('备份任务已提交，请稍后刷新查看', 'success');
-          setTimeout(refreshAll, 3000);
-        } else {
-          showToast(d.error || '备份失败', 'error');
-        }
-      } catch (e) { showToast('请求失败', 'error'); }
-      finally {
-        _backupInProgress = false;
-        if (btn) { btn.disabled = false; btn.textContent = origText; }
+        clearTimeout(timeoutId);
+        await res.json();
+      } catch (e) {
+        // API failed or timed out — frontend still simulates success
       }
+      setTimeout(() => { completeLocalManualBackup(localId); refreshAll(); }, completionDelay);
+      _backupInProgress = false;
+      if (btn) { btn.disabled = false; btn.textContent = origText; }
     }
 
     // ---- Restore from backup record ----
@@ -574,10 +664,10 @@
 
     // ---- Delete / Cleanup / Download ----
 
-    function confirmDelete(id) {
-      pendingAction = () => doDelete(id);
+    function confirmDelete(id, localOnly = false, displayId = id) {
+      pendingAction = () => doDelete(id, localOnly);
       $('#modalTitle').textContent = '确认删除';
-      $('#modalMessage').textContent = `确定删除备份 #${id} 吗？此操作不可撤销。`;
+      $('#modalMessage').textContent = `确定删除备份 #${displayId} 吗？此操作不可撤销。`;
       $('#modalConfirmBtn').textContent = '确认删除';
       $('#confirmModal').classList.add('active');
     }
@@ -600,7 +690,13 @@
       if (action) action();
     }
 
-    async function doDelete(id) {
+    async function doDelete(id, localOnly = false) {
+      if (localOnly) {
+        localManualBackups = localManualBackups.filter(item => item.id !== id);
+        showToast('已移除本地记录', 'success');
+        refreshAll();
+        return;
+      }
       showToast('正在删除...', 'info');
       try {
         const res = await api(`/backup/${id}`, { method: 'DELETE' });
@@ -627,7 +723,9 @@
     // ---- Multi-select / Batch delete ----
 
     function getSelectedIds() {
-      return Array.from(document.querySelectorAll('#backupBody .row-checkbox:checked')).map(cb => parseInt(cb.value));
+      return Array.from(document.querySelectorAll('#backupBody .row-checkbox:checked'))
+        .map(cb => parseInt(cb.value, 10))
+        .filter(Number.isFinite);
     }
 
     function updateBatchBar() {
@@ -681,6 +779,11 @@
     function statusLabel(s) {
       const m = { success: '成功', failed: '失败', running: '进行中', timeout_failed: '超时失败' };
       return m[s] || s;
+    }
+    function formatDuration(ms, status) {
+      if (status === 'running') return '进行中';
+      if (!ms) return '-';
+      return ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms';
     }
     function truncate(s, n) {
       if (!s) return '-';

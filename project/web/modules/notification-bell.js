@@ -46,7 +46,7 @@
       background: #fff; box-shadow: 0 8px 40px rgba(0,0,0,0.18);
       display: none; flex-direction: column; overflow: hidden;
       animation: notifSlideDown 0.25s ease-out;
-      font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-family: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif;
     }
     #notif-panel.open { display: flex; }
 
@@ -420,7 +420,7 @@
 
   function startPolling() {
     stopPolling();
-    pollTimer = setInterval(updateBadge, 15000);
+    pollTimer = setInterval(updateBadge, 60000);
   }
   function stopPolling() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }

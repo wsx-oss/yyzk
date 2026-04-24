@@ -31,16 +31,15 @@ func NewAIAssistantAPI(db *db.DB) *AIAssistantAPI {
 
 // knowledgeBase returns the system prompt with contextual knowledge
 func (a *AIAssistantAPI) knowledgeBase() string {
-	return `你是 云翼智控 智能无人机管控平台的 AI 助手，名字叫"小云"。你的职责是帮助用户操作平台、查询数据、解答问题、分析告警和提供操作引导。
+	return `你是 云翼智控 智能无人机管控平台的 AI 助手，名字叫"小云"。你的职责是帮助用户操作平台、查询数据、解答问题、分析状态并提供操作引导。
 
 【平台功能模块】
 — 无人机状态监控 —
 1. 无人机管理 (drones) - 注册、编辑、删除无人机，查看在线/离线状态
 2. GPS/位置信息 (gps) - 实时GPS追踪、地理围栏告警、历史轨迹
 3. 视频监控 (video) - 无人机视频流查看
-4. 远程桌面控制 (remote) - VNC/SSH/RDP远程连接无人机
-5. 异常报警 (alerts) - 系统告警查看和处理
-6. 电池监控 (battery) - 电池电量、温度、健康度监控
+4. 异常报警 (alerts) - 系统告警查看和处理
+5. 电池监控 (battery) - 电池电量、温度、健康度监控
 — 飞行任务管理 —
 7. 禁飞区管理 (noflyzone) - 设置禁飞区域，支持多边形和圆形
 8. 航线规划 (flight) - 航线规划、任务创建、AI智能规划航线
@@ -59,7 +58,6 @@ func (a *AIAssistantAPI) knowledgeBase() string {
 【快捷指令】
 - /status - 查看系统整体状态
 - /drones - 查看无人机列表
-- /alerts - 查看最近告警
 - /battery - 查看电池状态
 - /tasks - 查看飞行任务
 - /help - 显示帮助信息
@@ -69,7 +67,6 @@ func (a *AIAssistantAPI) knowledgeBase() string {
 - [NAV:drones] - 跳转到无人机管理页
 - [NAV:gps] - 跳转到GPS页
 - [NAV:video] - 跳转到视频监控页
-- [NAV:remote] - 跳转到远程桌面页
 - [NAV:alerts] - 跳转到告警页
 - [NAV:battery] - 跳转到电池监控页
 - [NAV:noflyzone] - 跳转到禁飞区页
@@ -87,7 +84,7 @@ func (a *AIAssistantAPI) knowledgeBase() string {
 1. 使用中文回复，语言简洁友好
 2. 当涉及具体数据查询时，使用提供的实时数据来回答
 3. 当用户要求跳转时，在合适位置附加[NAV:xxx]标签
-4. 对告警和异常要给出分析建议
+4. 只有当用户明确询问告警、异常、报警、风险时，才重点展开风险分析
 5. 支持对电池状态、飞行规划、CoT决策结果的解读
 6. 当提供了【知识库参考】内容时，优先参考知识库中的信息来回答用户问题，确保回答准确且有据可查
 `
@@ -104,16 +101,12 @@ func (a *AIAssistantAPI) gatherContext(query string) string {
 	a.db.QueryRow("SELECT COUNT(*) FROM drones WHERE status='online'").Scan(&onlineCnt)
 	parts = append(parts, fmt.Sprintf("【无人机】共%d架，在线%d架", droneCnt, onlineCnt))
 
-	// Alert stats
-	var alertCnt, unresolved int
-	a.db.QueryRow("SELECT COUNT(*) FROM alerts").Scan(&alertCnt)
-	a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE acknowledged=0").Scan(&unresolved)
-	parts = append(parts, fmt.Sprintf("【告警】共%d条，未处理%d条", alertCnt, unresolved))
-
-	// Notification stats
-	var notifUnread int
-	a.db.QueryRow("SELECT COUNT(*) FROM notifications WHERE is_read=0").Scan(&notifUnread)
-	parts = append(parts, fmt.Sprintf("【通知】未读%d条", notifUnread))
+	if strings.Contains(lq, "系统") || strings.Contains(lq, "总览") || strings.Contains(lq, "概览") || strings.Contains(lq, "status") {
+		var missionCnt, activeCnt int
+		a.db.QueryRow("SELECT COUNT(*) FROM flight_missions").Scan(&missionCnt)
+		a.db.QueryRow("SELECT COUNT(*) FROM flight_missions WHERE status NOT IN ('已完成','已取消')").Scan(&activeCnt)
+		parts = append(parts, fmt.Sprintf("【任务】共%d个，活跃%d个", missionCnt, activeCnt))
+	}
 
 	// Detailed data based on query topic
 	if strings.Contains(lq, "电池") || strings.Contains(lq, "battery") || strings.Contains(lq, "充电") || strings.Contains(lq, "电量") {
@@ -136,6 +129,10 @@ func (a *AIAssistantAPI) gatherContext(query string) string {
 	}
 
 	if strings.Contains(lq, "告警") || strings.Contains(lq, "alert") || strings.Contains(lq, "异常") || strings.Contains(lq, "报警") {
+		var alertCnt, unresolved int
+		a.db.QueryRow("SELECT COUNT(*) FROM alerts").Scan(&alertCnt)
+		a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE acknowledged=0").Scan(&unresolved)
+		parts = append(parts, fmt.Sprintf("【告警】共%d条，未处理%d条", alertCnt, unresolved))
 		rows, err := a.db.Query("SELECT category, severity, message, created_at FROM alerts ORDER BY created_at DESC LIMIT 5")
 		if err == nil {
 			defer rows.Close()
@@ -151,6 +148,12 @@ func (a *AIAssistantAPI) gatherContext(query string) string {
 				parts = append(parts, "【最近告警】\n"+strings.Join(alertInfo, "\n"))
 			}
 		}
+	}
+
+	if strings.Contains(lq, "通知") || strings.Contains(lq, "消息") || strings.Contains(lq, "提醒") {
+		var notifUnread int
+		a.db.QueryRow("SELECT COUNT(*) FROM notifications WHERE is_read=0").Scan(&notifUnread)
+		parts = append(parts, fmt.Sprintf("【通知】未读%d条", notifUnread))
 	}
 
 	if strings.Contains(lq, "任务") || strings.Contains(lq, "flight") || strings.Contains(lq, "飞行") || strings.Contains(lq, "航线") {
@@ -284,14 +287,13 @@ func (a *AIAssistantAPI) handleBuiltinCommand(cmd string) (string, bool) {
 **快捷指令：**
 - /status - 查看系统整体状态
 - /drones - 查看无人机列表
-- /alerts - 查看最近告警
 - /battery - 查看电池状态
 - /tasks - 查看飞行任务
 - /help - 显示本帮助
 
 **我能做的：**
 - 📊 查询平台各模块数据
-- 🔍 分析告警和异常
+- 🔍 分析状态、任务和设备数据
 - 🔋 解读电池状态
 - ✈️ 解释飞行规划
 - 🧠 解读 CoT 决策结果
@@ -560,9 +562,9 @@ func (a *AIAssistantAPI) fallbackReply(query, context string) string {
 
 	// Navigation hints
 	navMap := map[string]string{
-		"监控": "monitor",
-		"同步": "sync",
-		"视频": "video", "远程": "remote",
+		"监控":  "monitor",
+		"同步":  "sync",
+		"视频":  "video",
 		"gps": "gps", "位置": "gps",
 		"禁飞": "noflyzone",
 		"性能": "performance", "cot": "cot", "决策": "cot",
@@ -684,41 +686,7 @@ func (a *AIAssistantAPI) DataQuery(c *gin.Context) {
 func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 	suggestions := []gin.H{}
 
-	// Check unread alerts
-	var alertCnt int
-	a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE acknowledged=0").Scan(&alertCnt)
-	if alertCnt > 0 {
-		suggestions = append(suggestions, gin.H{
-			"text":   fmt.Sprintf("⚠️ 有 %d 条未处理告警", alertCnt),
-			"action": "查看告警详情",
-			"nav":    "alerts",
-		})
-	}
-
-	// Check low battery
-	var lowBatt int
-	a.db.QueryRow(`SELECT COUNT(DISTINCT device_id) FROM battery_records 
-		WHERE level < 20 AND created_at > datetime('now', '-10 minutes')`).Scan(&lowBatt)
-	if lowBatt > 0 {
-		suggestions = append(suggestions, gin.H{
-			"text":   fmt.Sprintf("🔋 %d 台设备电量低于20%%", lowBatt),
-			"action": "查看电池详情",
-			"nav":    "battery",
-		})
-	}
-
-	// Check offline drones
-	var offlineDrones int
-	a.db.QueryRow("SELECT COUNT(*) FROM drones WHERE status='offline'").Scan(&offlineDrones)
-	if offlineDrones > 0 {
-		suggestions = append(suggestions, gin.H{
-			"text":   fmt.Sprintf("🔴 %d 架无人机离线", offlineDrones),
-			"action": "查看无人机状态",
-			"nav":    "drones",
-		})
-	}
-
-	// Check active missions
+	// Check active missions first
 	var activeMissions int
 	a.db.QueryRow("SELECT COUNT(*) FROM flight_missions WHERE status='飞行中'").Scan(&activeMissions)
 	if activeMissions > 0 {
@@ -729,15 +697,53 @@ func (a *AIAssistantAPI) Suggest(c *gin.Context) {
 		})
 	}
 
+	// Check unread alerts
+	var alertCnt int
+	a.db.QueryRow("SELECT COUNT(*) FROM alerts WHERE acknowledged=0").Scan(&alertCnt)
+	if alertCnt > 2 {
+		suggestions = append(suggestions, gin.H{
+			"text":   fmt.Sprintf("⚠️ 有 %d 条未处理告警待确认", alertCnt),
+			"action": "查看告警摘要",
+			"nav":    "alerts",
+		})
+	}
+
+	// Check low battery
+	var lowBatt int
+	a.db.QueryRow(`SELECT COUNT(DISTINCT device_id) FROM battery_records 
+		WHERE level < 20 AND created_at > datetime('now', '-10 minutes')`).Scan(&lowBatt)
+	if lowBatt > 1 {
+		suggestions = append(suggestions, gin.H{
+			"text":   fmt.Sprintf("🔋 %d 台设备电量持续偏低", lowBatt),
+			"action": "查看电池详情",
+			"nav":    "battery",
+		})
+	}
+
+	// Check offline drones
+	var offlineDrones int
+	a.db.QueryRow("SELECT COUNT(*) FROM drones WHERE status='offline'").Scan(&offlineDrones)
+	if offlineDrones > 1 {
+		suggestions = append(suggestions, gin.H{
+			"text":   fmt.Sprintf("🔴 %d 架无人机离线", offlineDrones),
+			"action": "查看无人机状态",
+			"nav":    "drones",
+		})
+	}
+
 	// Unread notifications
 	var unreadNotif int
 	a.db.QueryRow("SELECT COUNT(*) FROM notifications WHERE is_read=0").Scan(&unreadNotif)
-	if unreadNotif > 0 {
+	if unreadNotif > 4 {
 		suggestions = append(suggestions, gin.H{
-			"text":   fmt.Sprintf("🔔 有 %d 条未读通知", unreadNotif),
+			"text":   fmt.Sprintf("🔔 有 %d 条未读通知待查看", unreadNotif),
 			"action": "查看通知中心",
 			"nav":    "",
 		})
+	}
+
+	if len(suggestions) > 2 {
+		suggestions = suggestions[:2]
 	}
 
 	c.JSON(200, gin.H{"suggestions": suggestions})

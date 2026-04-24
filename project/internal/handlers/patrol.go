@@ -93,12 +93,12 @@ func StartPatrolInspection(database *db.DB, pool *taskpool.Pool) {
 	// Startup cleanup: prune old alerts and notifications to prevent unbounded growth
 	pruneOldData(database)
 
-	pool.SchedulePeriodic("patrol:battery", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolBatteryTask(database)))
-	pool.SchedulePeriodic("patrol:drones", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolDronesTask(database)))
-	pool.SchedulePeriodic("patrol:alerts", "patrol", 60*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolAlertsTask(database)))
-	pool.SchedulePeriodic("patrol:hardware", "patrol", 60*time.Second, taskpool.PriorityLow, wrapWithHealthCheck(database, patrolHardwareTask(database)))
-	pool.SchedulePeriodic("patrol:logs", "patrol", 120*time.Second, taskpool.PriorityLow, wrapWithHealthCheck(database, patrolLogsTask(database)))
-	pool.SchedulePeriodic("patrol:missions", "patrol", 30*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolMissionsTask(database)))
+	pool.SchedulePeriodic("patrol:battery", "patrol", 120*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolBatteryTask(database)))
+	pool.SchedulePeriodic("patrol:drones", "patrol", 120*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolDronesTask(database)))
+	pool.SchedulePeriodic("patrol:alerts", "patrol", 180*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolAlertsTask(database)))
+	pool.SchedulePeriodic("patrol:hardware", "patrol", 300*time.Second, taskpool.PriorityLow, wrapWithHealthCheck(database, patrolHardwareTask(database)))
+	pool.SchedulePeriodic("patrol:logs", "patrol", 300*time.Second, taskpool.PriorityLow, wrapWithHealthCheck(database, patrolLogsTask(database)))
+	pool.SchedulePeriodic("patrol:missions", "patrol", 90*time.Second, taskpool.PriorityNormal, wrapWithHealthCheck(database, patrolMissionsTask(database)))
 	pool.SchedulePeriodic("patrol:prune", "maintenance", 6*time.Hour, taskpool.PriorityLow, func(ctx context.Context) error {
 		pruneOldData(database)
 		return nil
@@ -159,11 +159,11 @@ func pruneOldData(database *db.DB) {
 }
 
 // insertNotification is a helper to create a notification record with dedup.
-// Skips insertion if same title+source notification exists within the last 2 hours.
+// Skips insertion if same title+source notification exists within the last 6 hours.
 func insertNotification(db *db.DB, nType, title, message, source, link string) {
 	var count int
 	err := db.QueryRow(
-		`SELECT COUNT(*) FROM notifications WHERE title=? AND source=? AND created_at > datetime('now', '-2 hours')`,
+		`SELECT COUNT(*) FROM notifications WHERE title=? AND source=? AND created_at > datetime('now', '-6 hours')`,
 		title, source,
 	).Scan(&count)
 	if err == nil && count > 0 {

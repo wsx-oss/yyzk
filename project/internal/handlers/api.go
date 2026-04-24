@@ -2804,7 +2804,6 @@ func (a *API) PerfCollect(c *gin.Context) {
 		Endpoint string
 	}
 	targets := []probeTarget{
-		{"远程桌面控制", "/api/devices"},
 		{"语音交互", "/api/audio/list"},
 		{"异常报警", "/api/alerts/list"},
 		{"操作日志", "/api/logs/list"},

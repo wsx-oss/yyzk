@@ -7,7 +7,7 @@
   <link rel="icon" type="image/jpeg" href="/app/logo.jpg" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; background: #0f172a; color: #fff; padding: 20px; }
+    body { font-family: "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif; background: #0f172a; color: #fff; padding: 20px; }
     .container { max-width: 1400px; margin: 0 auto; }
     .header { background: #1e293b; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
     .header h1 { font-size: 24px; margin-bottom: 16px; }
@@ -253,11 +253,11 @@ function initCanvas() {
   ctx.fillStyle = '#1e293b';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#10b981';
-  ctx.font = '24px system-ui';
+  ctx.font = '24px "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('VNC连接已建立', canvas.width / 2, canvas.height / 2 - 20);
   ctx.fillStyle = '#64748b';
-  ctx.font = '14px system-ui';
+  ctx.font = '14px "Source Han Sans SC", "Source Han Sans CN", "Source Han Sans", "思源黑体", sans-serif';
   ctx.fillText('正在等待远程桌面画面...', canvas.width / 2, canvas.height / 2 + 10);
   ctx.fillText('(完整的VNC画面渲染需要实现RFB协议解析)', canvas.width / 2, canvas.height / 2 + 30);
 }
