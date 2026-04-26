@@ -69,15 +69,73 @@ const $$ = (q) => document.querySelectorAll(q);
 
 // ---- Tianditu Map Utilities ----
 let TIANDITU_KEY = '90aa13159977757fb5d9061bf4d8c22b';
- 
+
 const DEFAULT_CAMPUS_MAP_CENTER = Object.freeze({ lat: 34.810201, lng: 113.533285, zoom: 17 });
 const DEFAULT_CAMPUS_ROUTE_START = Object.freeze({ name: '郑州大学主校区南门', lat: 34.793000, lng: 113.663600 });
 const DEFAULT_CAMPUS_ROUTE_GOAL = Object.freeze({ name: '郑州大学主校区北门', lat: 34.802000, lng: 113.664000 });
 
+const TDT_COMPLIANCE_TEXT = '天地图 | 审图号：GS(2025)1508号';
+let _tdtComplianceStyleInjected = false;
+
+function ensureTdtComplianceStyle() {
+  if (_tdtComplianceStyleInjected || typeof document === 'undefined') return;
+  const style = document.createElement('style');
+  style.id = 'tdtComplianceStyle';
+  style.textContent = `
+    .leaflet-control.tdt-compliance-control {
+      margin: 0 0 10px 10px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(15,23,42,0.12);
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(15,23,42,0.12);
+    }
+    .leaflet-control.tdt-compliance-control .tdt-compliance-label {
+      display: inline-block;
+      padding: 6px 10px;
+      color: #0f172a;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .dark .leaflet-control.tdt-compliance-control {
+      background: rgba(8,16,30,0.82);
+      border-color: rgba(148,163,184,0.2);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.28);
+    }
+    .dark .leaflet-control.tdt-compliance-control .tdt-compliance-label {
+      color: rgba(226,232,240,0.96);
+    }
+  `;
+  document.head.appendChild(style);
+  _tdtComplianceStyleInjected = true;
+}
+
+function applyTdtCompliance(map, text) {
+  if (!map || typeof L === 'undefined') return null;
+  ensureTdtComplianceStyle();
+  if (map._tdtComplianceControl) return map._tdtComplianceControl;
+  const TdtComplianceControl = L.Control.extend({
+    options: { position: 'bottomleft' },
+    onAdd: function() {
+      const container = L.DomUtil.create('div', 'leaflet-control tdt-compliance-control');
+      const label = L.DomUtil.create('div', 'tdt-compliance-label', container);
+      label.textContent = text || TDT_COMPLIANCE_TEXT;
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.disableScrollPropagation(container);
+      return container;
+    }
+  });
+  map._tdtComplianceControl = new TdtComplianceControl();
+  map.addControl(map._tdtComplianceControl);
+  return map._tdtComplianceControl;
+}
+
 function tdtImgLayer() {
   return L.tileLayer(
     `https://t{s}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${TIANDITU_KEY}`,
-    { subdomains: ['0','1','2','3','4','5','6','7'], attribution: '© 天地图', maxZoom: 18 }
+    { subdomains: ['0','1','2','3','4','5','6','7'], attribution: '', maxZoom: 18 }
   );
 }
 

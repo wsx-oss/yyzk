@@ -383,6 +383,7 @@
       map = L.map('mapContainer').setView([DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
       tdtImgLayer().addTo(map);
       tdtCiaLayer().addTo(map);
+      applyTdtCompliance(map);
       // MarkerCluster: handles overlapping markers — click cluster to spiderfy (fan out)
       markerClusterGroup = L.markerClusterGroup({
         maxClusterRadius: 45,
@@ -903,6 +904,7 @@
           detailMap = L.map('detailMap').setView([d.latitude || DEFAULT_CAMPUS_MAP_CENTER.lat, d.longitude || DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
           tdtImgLayer().addTo(detailMap);
           tdtCiaLayer().addTo(detailMap);
+          applyTdtCompliance(detailMap);
           if (d.latitude !== 0 || d.longitude !== 0) {
             L.marker([d.latitude, d.longitude]).addTo(detailMap).bindPopup(d.name).openPopup();
             if (d.fence_enabled && d.fence_radius > 0) {
@@ -1101,6 +1103,7 @@
           historyMap = L.map('historyMap').setView([DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], DEFAULT_CAMPUS_MAP_CENTER.zoom);
           tdtImgLayer().addTo(historyMap);
           tdtCiaLayer().addTo(historyMap);
+          applyTdtCompliance(historyMap);
           window._histState = {
             deviceId: id,
             items,

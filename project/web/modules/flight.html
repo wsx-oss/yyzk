@@ -1183,6 +1183,7 @@
         mPickerMap = L.map('mPickerMap', { center: [DEFAULT_CAMPUS_MAP_CENTER.lat, DEFAULT_CAMPUS_MAP_CENTER.lng], zoom: DEFAULT_CAMPUS_MAP_CENTER.zoom });
         tdtImgLayer().addTo(mPickerMap);
         tdtCiaLayer().addTo(mPickerMap);
+        applyTdtCompliance(mPickerMap);
         addNoFlyZonesToMap(mPickerMap, mPickerNFZLayers);
         mPickerMap.on('click', function(e) {
           const lat = e.latlng.lat, lon = e.latlng.lng;
@@ -1448,6 +1449,7 @@
       actionConfigMap = L.map('actionConfigMap', { center: [cLat, cLon], zoom: 14 });
       tdtImgLayer().addTo(actionConfigMap);
       tdtCiaLayer().addTo(actionConfigMap);
+      applyTdtCompliance(actionConfigMap);
 
       // Draw route polyline (smooth curve when available)
       var acDisplay = (typeof smoothRoute==='function' && coords.length>=3) ? smoothRoute(coords, {segPoints:12,tension:0.3}) : coords;
@@ -2099,6 +2101,7 @@
               });
               tdtImgLayer().addTo(mDetailRouteMap);
               tdtCiaLayer().addTo(mDetailRouteMap);
+              applyTdtCompliance(mDetailRouteMap);
               addNoFlyZonesToMap(mDetailRouteMap, []);
               var detailDisplay = (typeof smoothRoute==='function' && coords.length>=3) ? smoothRoute(coords, {segPoints:12,tension:0.3}) : coords;
               L.polyline(detailDisplay, { color: '#6366f1', weight: 4, opacity: 0.85 }).addTo(mDetailRouteMap);
@@ -2893,6 +2896,7 @@
             });
             tdtImgLayer().addTo(m);
             tdtCiaLayer().addTo(m);
+            applyTdtCompliance(m);
 
             // NFZ layers
             const nfzLayersBuf = [];
@@ -3007,6 +3011,7 @@
         mResultMap = L.map('mResultMapContainer', { center: [cLat, cLon], zoom: 13 });
         tdtImgLayer().addTo(mResultMap);
         tdtCiaLayer().addTo(mResultMap);
+        applyTdtCompliance(mResultMap);
 
         // Draw no-fly zones
         addNoFlyZonesToMap(mResultMap, mResultNFZLayers);
