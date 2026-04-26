@@ -349,6 +349,8 @@
       updateAiBadge();
       if (messagesEl.children.length === 0) {
         loadHistory();
+      } else {
+        loadSuggestions();
       }
     }
   }

@@ -11,19 +11,29 @@
       align-items: center;
     }
     #notif-bell-btn {
-      position: relative; background: rgba(255,255,255,0.2);
-      border: none; color: #fff; width: 38px; height: 38px;
-      border-radius: 50%; cursor: pointer; font-size: 18px;
+      position: relative;
+      width: 36px; height: 36px;
+      border: 1px solid var(--cc-glass-border, rgba(255,255,255,0.56));
+      border-radius: 50%;
+      background: var(--cc-glass-bg-soft, rgba(255,255,255,0.38));
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
+      color: var(--cc-text-2, #4e5969);
+      cursor: pointer; font-size: 18px;
       display: flex; align-items: center; justify-content: center;
       transition: all 0.2s;
     }
-    #notif-bell-btn:hover { background: rgba(255,255,255,0.35); }
+    #notif-bell-btn:hover {
+      border-color: var(--cc-primary, #165dff);
+      color: var(--cc-primary, #165dff);
+      background: rgba(22,93,255,0.12);
+    }
     #notif-bell-btn .bell-badge {
       position: absolute; top: -2px; right: -4px;
       background: #ef4444; color: #fff; font-size: 10px;
       min-width: 18px; height: 18px; border-radius: 9px;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; padding: 0 4px; border: 2px solid #0ea5e9;
+      font-weight: 700; padding: 0 4px; border: 2px solid var(--cc-bg-2, #fff);
     }
     #notif-bell-btn .bell-badge.hidden { display: none; }
 
@@ -142,6 +152,47 @@
     }
     #notif-offline-badge.show { display: inline-flex; }
     @keyframes offlinePulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+    /* Dark mode */
+    html.dark #notif-panel,
+    [data-theme="dark"] #notif-panel {
+      background: rgba(14,21,37,0.95);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(56,132,255,0.12);
+    }
+    html.dark .notif-header,
+    [data-theme="dark"] .notif-header { border-color: rgba(56,132,255,0.12); }
+    html.dark .notif-header h3,
+    [data-theme="dark"] .notif-header h3 { color: var(--cc-text-1); }
+    html.dark .notif-header-actions button,
+    [data-theme="dark"] .notif-header-actions button {
+      background: var(--cc-bg-3); border-color: var(--cc-border); color: var(--cc-text-2);
+    }
+    html.dark .notif-header-actions button:hover,
+    [data-theme="dark"] .notif-header-actions button:hover { background: rgba(40,100,255,0.12); color: var(--cc-text-1); }
+    html.dark .notif-filters,
+    [data-theme="dark"] .notif-filters { border-color: rgba(56,132,255,0.12); }
+    html.dark .notif-filters .nf-btn,
+    [data-theme="dark"] .notif-filters .nf-btn { background: var(--cc-bg-3); color: var(--cc-text-3); border-color: var(--cc-border); }
+    html.dark .notif-filters .nf-btn:hover,
+    [data-theme="dark"] .notif-filters .nf-btn:hover { background: rgba(40,100,255,0.1); }
+    html.dark .notif-filters .nf-btn.active,
+    [data-theme="dark"] .notif-filters .nf-btn.active { background: var(--cc-primary); color: #fff; border-color: var(--cc-primary); }
+    html.dark .notif-item,
+    [data-theme="dark"] .notif-item { border-color: rgba(56,132,255,0.06); }
+    html.dark .notif-item:hover,
+    [data-theme="dark"] .notif-item:hover { background: rgba(40,100,255,0.06); }
+    html.dark .notif-item.unread,
+    [data-theme="dark"] .notif-item.unread { background: rgba(40,100,255,0.1); }
+    html.dark .notif-item.unread:hover,
+    [data-theme="dark"] .notif-item.unread:hover { background: rgba(40,100,255,0.15); }
+    html.dark .notif-title,
+    [data-theme="dark"] .notif-title { color: var(--cc-text-1); }
+    html.dark .notif-desc,
+    [data-theme="dark"] .notif-desc { color: var(--cc-text-3); }
+    html.dark .notif-time,
+    [data-theme="dark"] .notif-time { color: var(--cc-text-4); }
+    html.dark .notif-list::-webkit-scrollbar-thumb,
+    [data-theme="dark"] .notif-list::-webkit-scrollbar-thumb { background: #475569; }
   `;
   document.head.appendChild(style);
 
@@ -177,18 +228,24 @@
   `;
 
   // ===================== Inject into top-bar =====================
-  // This widget needs to be inserted into the parent dashboard's top-bar user-info area.
-  // We'll look for the user-info element and prepend the bell there.
-  // If running inside iframe, we inject into parent. If top-level, inject locally.
+  // This widget needs to be inserted into the parent dashboard's navbar-right area.
+  // We wrap it in an <li> to match the navbar list structure.
   function injectBell() {
-    let target;
-    // Check if we're in the dashboard page directly
-    target = document.querySelector('.user-info');
-    if (!target) {
-      // Might be called before DOM ready
+    // Look for the navbar-right <ul> in the dashboard
+    const navRight = document.querySelector('.navbar-right');
+    if (!navRight) {
       return false;
     }
-    target.insertBefore(root, target.firstChild);
+    // Wrap root in an <li> to fit into the <ul> structure
+    const li = document.createElement('li');
+    li.appendChild(root);
+    // Insert before the user dropdown (last <li>)
+    const userDropdownLi = navRight.querySelector('#userDropdown');
+    if (userDropdownLi && userDropdownLi.parentElement) {
+      navRight.insertBefore(li, userDropdownLi.parentElement);
+    } else {
+      navRight.appendChild(li);
+    }
     return true;
   }
 
