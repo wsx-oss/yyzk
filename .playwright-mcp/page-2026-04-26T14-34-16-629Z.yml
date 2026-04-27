@@ -1,0 +1,60 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - textbox "搜索位置" [active] [ref=e12]
+          - img [ref=e14]:
+            - img [ref=e15]
+        - button "search" [ref=e17] [cursor=pointer]:
+          - img "search" [ref=e18]:
+            - img [ref=e19]
+    - navigation [ref=e21]:
+      - generic [ref=e23] [cursor=pointer]:
+        - text: 中国
+        - img "caret-down" [ref=e24]:
+          - img [ref=e25]
+      - generic [ref=e29] [cursor=pointer]:
+        - text: 工具
+        - img "caret-down" [ref=e30]:
+          - img [ref=e31]
+      - img [ref=e34] [cursor=pointer]:
+        - img [ref=e35]
+      - img [ref=e38] [cursor=pointer]:
+        - img [ref=e39]
+  - generic [ref=e42]:
+    - generic [ref=e44] [cursor=pointer]:
+      - checkbox "山影" [ref=e46]
+      - generic [ref=e48]: 山影
+    - generic "Map" [ref=e49]
+    - generic [ref=e50]: 500 km
+  - img [ref=e52] [cursor=pointer]:
+    - img [ref=e53]
+  - list [ref=e55]:
+    - listitem [ref=e56]:
+      - img [ref=e57]:
+        - img [ref=e58]
+    - listitem [ref=e60]:
+      - img [ref=e61]:
+        - img [ref=e62]
+    - listitem [ref=e64]:
+      - img [ref=e65]:
+        - img [ref=e66]
+    - listitem [ref=e68]:
+      - img [ref=e69]:
+        - img [ref=e70]
+    - listitem [ref=e72]:
+      - img [ref=e73]:
+        - img [ref=e74]
+    - listitem [ref=e76]:
+      - img [ref=e77]:
+        - img [ref=e78]
+    - listitem [ref=e80]:
+      - img [ref=e81]:
+        - img [ref=e82]
+  - list [ref=e84]:
+    - listitem [ref=e85]:
+      - img [ref=e86]:
+        - img [ref=e87]
