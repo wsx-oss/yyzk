@@ -1,3 +1,8 @@
+// AI辅助生成：DeepSeek v3.2, API调用, 2026-03-14 09:00-11:20
+// 环节：强化学习模块设计
+// 关键提示词：Q-learning无人机路径优化
+// AI回复：状态空间、动作空间、ε-greedy策略
+// 人工修改说明：扩展为11维状态+7动作+JSON导出
 package simulation
 
 import (
