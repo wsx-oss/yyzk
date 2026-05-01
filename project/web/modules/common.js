@@ -112,12 +112,12 @@ function ensureTdtComplianceStyle() {
   _tdtComplianceStyleInjected = true;
 }
 
-function applyTdtCompliance(map, text) {
+function applyTdtCompliance(map, text, position) {
   if (!map || typeof L === 'undefined') return null;
   ensureTdtComplianceStyle();
   if (map._tdtComplianceControl) return map._tdtComplianceControl;
   const TdtComplianceControl = L.Control.extend({
-    options: { position: 'bottomleft' },
+    options: { position: position || 'bottomleft' },
     onAdd: function() {
       const container = L.DomUtil.create('div', 'leaflet-control tdt-compliance-control');
       const label = L.DomUtil.create('div', 'tdt-compliance-label', container);
