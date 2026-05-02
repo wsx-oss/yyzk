@@ -1,6 +1,6 @@
 # Environment config (contains API keys)
-# .env
-# project/.env
+.env
+project/.env
 
 # Build output
 *.exe
