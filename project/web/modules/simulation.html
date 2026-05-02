@@ -1631,7 +1631,7 @@ function initMap() {
   tdtImgLayer().addTo(simMapObj);
   const ciaLayer = tdtCiaLayer();
   ciaLayer.addTo(simMapObj);
-  applyTdtCompliance(simMapObj);
+  applyTdtCompliance(simMapObj, null, 'bottomright');
   // Apply dark-mode filter to annotation layer for visual harmony
   ciaLayer.on('load', function(){ try { ciaLayer.getContainer().classList.add('tdt-cia-dark'); } catch(e){} });
   try { if(ciaLayer.getContainer()) ciaLayer.getContainer().classList.add('tdt-cia-dark'); } catch(e){}
