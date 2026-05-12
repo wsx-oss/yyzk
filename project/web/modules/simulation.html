@@ -972,6 +972,26 @@ th,
         <input type="number" id="batchSpread" value="500" min="10">
       </div>
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>巡航速度(m/s)</label>
+        <input type="number" id="batchSpeed" value="15" min="1" max="30" step="0.5">
+      </div>
+      <div class="form-group">
+        <label>最大高度(m)</label>
+        <input type="number" id="batchMaxAlt" value="120" min="10" max="500">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="batchLoop" checked>
+        <label for="batchLoop" style="margin:0">循环航线</label>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="batchAutoStart" checked>
+        <label for="batchAutoStart" style="margin:0">创建后自动启动</label>
+      </div>
+    </div>
     <div class="form-group">
       <label>航点（JSON，可选）</label>
       <textarea id="batchWaypoints" rows="4" placeholder='[{"lat":34.793000,"lng":113.663600,"alt":50,"speed":10,"action":"fly","hold_sec":0,"name":"郑州大学主校区南门"}]'></textarea>

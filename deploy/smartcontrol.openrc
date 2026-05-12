@@ -1,0 +1,75 @@
+#!/sbin/openrc-run
+# ============================================================
+# SmartControl OpenRC 服务脚本 (Alpine Linux)
+# 安装: cp smartcontrol.openrc /etc/init.d/smartcontrol && chmod +x /etc/init.d/smartcontrol
+# 启用: rc-update add smartcontrol default
+# 启动: rc-service smartcontrol start
+# ============================================================
+
+name="smartcontrol"
+description="SmartControl Drone Management Platform"
+
+command="/opt/smartcontrol/smartcontrol"
+command_background="yes"
+directory="/opt/smartcontrol"
+
+pidfile="/run/${name}.pid"
+output_log="/opt/smartcontrol/logs/stdout.log"
+error_log="/opt/smartcontrol/logs/stderr.log"
+
+depend() {
+    need net mariadb redis
+}
+
+start_pre() {
+    # 加载环境变量
+    if [ -f /opt/smartcontrol/.env ]; then
+        while IFS='=' read -r key value; do
+            case "$key" in
+                \#*|"") continue ;;
+            esac
+            key=$(echo "$key" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            if [ -n "$key" ] && [ -n "$value" ]; then
+                export "$key=$value"
+            fi
+        done < /opt/smartcontrol/.env
+    fi
+
+    mkdir -p /opt/smartcontrol/logs
+    checkpath --file --owner root:root "$output_log"
+    checkpath --file --owner root:root "$error_log"
+}
+
+start() {
+    ebegin "Starting ${name}"
+    start_pre
+    start-stop-daemon --start \
+        --background \
+        --make-pidfile \
+        --pidfile "${pidfile}" \
+        --chdir "${directory}" \
+        --stdout "${output_log}" \
+        --stderr "${error_log}" \
+        --exec "${command}"
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping ${name}"
+    start-stop-daemon --stop \
+        --pidfile "${pidfile}" \
+        --signal TERM \
+        --retry "TERM/30/KILL/5"
+    eend $?
+}
+
+status() {
+    if [ -f "${pidfile}" ] && kill -0 "$(cat "${pidfile}")" 2>/dev/null; then
+        einfo "${name} is running (PID: $(cat "${pidfile}"))"
+        return 0
+    else
+        einfo "${name} is not running"
+        return 3
+    fi
+}

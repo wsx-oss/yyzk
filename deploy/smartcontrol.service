@@ -1,0 +1,10 @@
+# ============================================================
+# 此文件已弃用 (deprecated)
+# 服务器是 Alpine Linux，使用 OpenRC 而非 systemd
+# 请使用 smartcontrol.openrc 文件
+# ============================================================
+# 安装方式:
+#   cp smartcontrol.openrc /etc/init.d/smartcontrol
+#   chmod +x /etc/init.d/smartcontrol
+#   rc-update add smartcontrol default
+#   rc-service smartcontrol start

@@ -640,7 +640,10 @@
 
         <!-- No-fly zone selection -->
         <div class="full-width" style="background:#fff7ed;padding:12px;border-radius:8px;border:1px solid #fed7aa;">
-          <label style="font-weight:600;color:#9a3412;">禁飞区约束（选择适用的禁飞区，AI规划将自动绕行）</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <label style="font-weight:600;color:#9a3412;">禁飞区约束（选择适用的禁飞区，AI规划将自动绕行）</label>
+            <a href="javascript:void(0)" onclick="goToNoFlyZonePage()" style="font-size:12px;color:#165dff;text-decoration:none;font-weight:500;">前往管理禁飞区 →</a>
+          </div>
           <div id="nfzCheckboxList" style="margin-top:8px;max-height:100px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px;">
             <span style="font-size:12px;color:#94a3b8;">加载中...</span>
           </div>
@@ -820,6 +823,7 @@
           datasets: [{
             data: [0, 0, 0, 0],
             backgroundColor: _fdk ? ['#818cf8', '#4e9fff', '#fcd34d', '#34d399'] : ['#6366f1', '#165dff', '#ff7d00', '#00b42a'],
+            borderWidth: 0,
             hoverOffset: 10
           }]
         },
@@ -1090,6 +1094,14 @@
         } catch(e) {}
         return false;
       });
+    }
+
+    function goToNoFlyZonePage() {
+      if (window.parent && window.parent.navigateTo) {
+        window.parent.navigateTo('noflyzone');
+      } else {
+        window.location.href = '/app/modules/noflyzone.html';
+      }
     }
 
     async function loadNoFlyZones() {

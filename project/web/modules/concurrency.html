@@ -176,22 +176,22 @@
     <div class="pool-bar-row">
       <div class="pool-bar-label">IO Workers</div>
       <div class="pool-bar-track"><div class="pool-bar-fill io" id="barIO" style="width:0%"></div></div>
-      <div class="pool-bar-num" id="numIO">0/0</div>
+      <div class="pool-bar-num"><span id="numIO">0/16</span> <span id="ioThru" style="font-size:11px;color:var(--text-dim);margin-left:6px;"></span></div>
     </div>
     <div class="pool-bar-row">
       <div class="pool-bar-label">CPU Workers</div>
       <div class="pool-bar-track"><div class="pool-bar-fill cpu" id="barCPU" style="width:0%"></div></div>
-      <div class="pool-bar-num" id="numCPU">0/0</div>
+      <div class="pool-bar-num"><span id="numCPU">0/4</span> <span id="cpuThru" style="font-size:11px;color:var(--text-dim);margin-left:6px;"></span></div>
     </div>
     <div class="pool-bar-row">
       <div class="pool-bar-label">IO 队列</div>
       <div class="pool-bar-track"><div class="pool-bar-fill queue" id="barIOQ" style="width:0%"></div></div>
-      <div class="pool-bar-num" id="numIOQ">0/0</div>
+      <div class="pool-bar-num" id="numIOQ">0/1024</div>
     </div>
     <div class="pool-bar-row">
       <div class="pool-bar-label">CPU 队列</div>
       <div class="pool-bar-track"><div class="pool-bar-fill queue" id="barCPUQ" style="width:0%"></div></div>
-      <div class="pool-bar-num" id="numCPUQ">0/0</div>
+      <div class="pool-bar-num" id="numCPUQ">0/513</div>
     </div>
   </div>
 
@@ -324,6 +324,14 @@
       $('#barIO').style.width = ioPct + '%';
       $('#barIO').style.background = barColor(ioPct);
       $('#numIO').textContent = (m.io_active || 0) + '/' + (m.io_workers || 0);
+      // Show cumulative throughput for simulation group
+      const simGrp = (m.groups && m.groups['simulation']) || {};
+      const cotGrp = (m.groups && m.groups['cot_analysis']) || {};
+      const routeGrp = (m.groups && m.groups['route_planning']) || {};
+      const ioTotal = (simGrp.completed || 0) + (simGrp.failed || 0);
+      const cpuTotal = (cotGrp.completed || 0) + (routeGrp.completed || 0) + (cotGrp.failed || 0) + (routeGrp.failed || 0);
+      $('#ioThru').textContent = ioTotal > 0 ? ('累计 ' + ioTotal + ' 次') : '';
+      $('#cpuThru').textContent = cpuTotal > 0 ? ('累计 ' + cpuTotal + ' 次') : '';
       $('#barCPU').style.width = cpuPct + '%';
       $('#barCPU').style.background = barColor(cpuPct);
       $('#numCPU').textContent = (m.cpu_active || 0) + '/' + (m.cpu_workers || 0);
